@@ -65,6 +65,11 @@ jobs:
               chmod a+x ./tools/setup/ubuntu.sh
               ./tools/setup/ubuntu.sh
 
+      - name: Setup GStreamer
+        uses: blinemedical/setup-gstreamer@v1
+        with:
+          version: '1.24.0'
+
       - name: Create build directory
         run:  mkdir ${{ runner.temp }}/shadow_build_dir
 

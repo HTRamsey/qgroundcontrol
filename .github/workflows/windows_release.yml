@@ -75,22 +75,27 @@ jobs:
         run:  |
               7z x jom.zip -ojom
 
-      - name: Download Gstreamer
-        uses: suisei-cn/actions-download-file@v1.6.0
+      - name: Setup GStreamer
+        uses: blinemedical/setup-gstreamer@v1
         with:
-          url:    https://s3-us-west-2.amazonaws.com/qgroundcontrol/dependencies/gstreamer-1.0-msvc-x86_64-1.18.1.msi
-          target: ${{ runner.temp }}\
+          version: '1.24.0'
 
-      - name: Download Gstreamer dev
-        uses: suisei-cn/actions-download-file@v1.6.0
-        with:
-          url:    https://s3-us-west-2.amazonaws.com/qgroundcontrol/dependencies/gstreamer-1.0-devel-msvc-x86_64-1.18.1.msi
-          target: ${{ runner.temp }}\
+      # - name: Download Gstreamer
+      #   uses: suisei-cn/actions-download-file@v1.6.0
+      #   with:
+      #     url:    https://gstreamer.freedesktop.org/data/pkg/windows/1.24.0/msvc/gstreamer-1.0-msvc-x86_64-1.24.0.msi
+      #     target: ${{ runner.temp }}\
 
-      - name: Install Gstreamer
-        run:  |
-            cmd /c start /wait msiexec /package ${{ runner.temp }}\gstreamer-1.0-msvc-x86_64-1.18.1.msi /passive ADDLOCAL=ALL
-            cmd /c start /wait msiexec /package ${{ runner.temp }}\gstreamer-1.0-devel-msvc-x86_64-1.18.1.msi /passive ADDLOCAL=ALL
+      # - name: Download Gstreamer dev
+      #   uses: suisei-cn/actions-download-file@v1.6.0
+      #   with:
+      #     url:    https://gstreamer.freedesktop.org/data/pkg/windows/1.24.0/msvc/gstreamer-1.0-devel-msvc-x86_64-1.24.0.msi
+      #     target: ${{ runner.temp }}\
+
+      # - name: Install Gstreamer
+      #   run:  |
+      #       cmd /c start /wait msiexec /package ${{ runner.temp }}\gstreamer-1.0-msvc-x86_64-1.18.1.msi /passive ADDLOCAL=ALL
+      #       cmd /c start /wait msiexec /package ${{ runner.temp }}\gstreamer-1.0-devel-msvc-x86_64-1.18.1.msi /passive ADDLOCAL=ALL
 
       - name: Set up Visual Studio shell
         uses: ilammy/msvc-dev-cmd@v1
