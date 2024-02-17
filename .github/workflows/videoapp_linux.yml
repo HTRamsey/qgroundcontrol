@@ -88,8 +88,8 @@ jobs:
       - name: Build
         working-directory: ${{ runner.temp }}/shadow_build_dir
         run:  |
-          qmake -r ${SOURCE_DIR}/videoreceiverapp.pro CONFIG+=debug CONFIG+=${BUILD_TYPE}
-          make -j2
+          cmake -S ${SOURCE_DIR}/VideoReceiverApp -B ${SOURCE_DIR}/VideoReceiverApp/build/
+          cmake --build ${SOURCE_DIR}/VideoReceiverApp/build/ --target all
 
       - name: ccache post-run
         run:  ccache -s
