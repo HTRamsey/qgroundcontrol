@@ -1,13 +1,26 @@
 <?xml version="1.0"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="org.qtproject.example"
+    package="org.mavlink.qgroundcontrol"
     android:installLocation="auto"
-    
+
     android:versionCode="-- %%INSERT_VERSION_CODE%% --"
     android:versionName="-- %%INSERT_VERSION_NAME%% --">
 
     <!-- %%INSERT_PERMISSIONS -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <!-- Needed to keep working while 'asleep' -->
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <!-- Need MulticastLock to receive broadcast UDP packets  -->
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
+
     <!-- %%INSERT_FEATURES -->
+    <uses-feature android:name="android.hardware.usb.host" android:required="false"/>
+    <uses-feature android:name="android.hardware.usb.accessory" android:required="false"/>
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false"/>
+    <uses-feature android:name="android.hardware.location.gps" android:required="false"/>
+    <uses-feature android:name="android.hardware.location.network" android:required="false"/>
+    <uses-feature android:name="android.hardware.location" android:required="false"/>
 
     <supports-screens
         android:anyDensity="true"
@@ -22,7 +35,8 @@
         android:requestLegacyExternalStorage="true"
         android:allowBackup="true"
         android:fullBackupOnly="false"
-        android:icon="@drawable/icon">
+        android:icon="@drawable/icon"
+        android:networkSecurityConfig="@xml/network_security_config">
         <activity
             android:name="org.mavlink.qgroundcontrol.QGCActivity"
             android:configChanges="orientation|uiMode|screenLayout|screenSize|smallestScreenSize|layoutDirection|locale|fontScale|keyboard|keyboardHidden|navigation|mcc|mnc|density"
@@ -31,14 +45,15 @@
             android:screenOrientation="sensorLandscape"
             android:exported="true">
             <intent-filter>
+                <!-- %%QGC_INSERT_ACTIVITY_INTENT_FILTER -->
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
-
-                <!-- %%QGC_INSERT_ACTIVITY_INTENT_FILTER -->
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
             </intent-filter>
 
             <!-- %%QGC_INSERT_ACTIVITY_META_DATA -->
-
             <meta-data
                 android:name="android.app.lib_name"
                 android:value="-- %%INSERT_APP_LIB_NAME%% --" />
@@ -50,6 +65,15 @@
             <meta-data
                 android:name="android.app.extract_android_style"
                 android:value="minimal" />
+
+            <meta-data
+                android:name="android.app.background_running"
+                android:value="true" />
+
+            <meta-data
+                android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
+                android:resource="@xml/device_filter" />
+
         </activity>
 
         <provider
@@ -62,17 +86,4 @@
                 android:resource="@xml/qtprovider_paths"/>
         </provider>
     </application>
-
-    <!-- Needed to keep working while 'asleep' -->
-    <uses-permission android:name="android.permission.WAKE_LOCK"/>
-
-    <!-- Need MulticastLock to receive broadcast UDP packets  -->
-    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
-
-    <uses-feature android:name="android.hardware.usb.host" android:required="false"/>
-    <uses-feature android:name="android.hardware.usb.accessory" android:required="false"/>
-    <uses-feature android:name="android.hardware.bluetooth" android:required="false"/>
-    <uses-feature android:name="android.hardware.location.gps" android:required="false"/>
-    <uses-feature android:name="android.hardware.location.network" android:required="false"/>
-    <uses-feature android:name="android.hardware.location" android:required="false"/>
 </manifest>

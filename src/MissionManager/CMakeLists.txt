@@ -51,7 +51,8 @@ if(BUILD_TESTING)
 	)
 endif()
 
-add_library(MissionManager
+qt_add_library(MissionManager
+	STATIC
 	BlankPlanCreator.cc
 	BlankPlanCreator.h
 	CameraCalc.cc

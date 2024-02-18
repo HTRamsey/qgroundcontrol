@@ -1,5 +1,6 @@
 
-add_library(Terrain
+qt_add_library(Terrain
+	STATIC
 	TerrainQuery.cc
 )
 

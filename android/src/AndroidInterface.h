@@ -16,4 +16,6 @@ class AndroidInterface
 public:
     static bool checkStoragePermissions();
     static QString getSDCardPath();
+    static void setKeepScreenOn( bool bKeepScreenOn );
+    static const char* getQGCActivityClassName();
 };

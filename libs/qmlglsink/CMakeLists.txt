@@ -1,7 +1,9 @@
+message(STATUS "Building qmlglsink")
 
-find_package(Qt6Gui ${QT_VERSION}  REQUIRED )
-find_package(Qt6 ${QT_VERSION}  REQUIRED )
-find_package(OpenGL REQUIRED)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui)
+if(NOT ANDROID)
+	find_package(Qt6 REQUIRED COMPONENTS OpenGL)
+endif()
 
 add_library(qmlglsink
 	gst-plugins-good/ext/qt6/gstplugin.cc
@@ -14,6 +16,7 @@ add_library(qmlglsink
 )
 
 if(LINUX)
+	option(USE_WAYLAND "Use wayland for qmlglsink" ON)
 	if (USE_WAYLAND)
 		message(STATUS "Using wayland for qmlglsink")
 		# use wayland

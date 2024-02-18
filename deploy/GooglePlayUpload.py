@@ -23,7 +23,7 @@ import httplib2
 from oauth2client import client
 from oauth2client.service_account import ServiceAccountCredentials
 
-JSON_KEY='android/Google_Play_Android_Developer-4432a3c4f5d1.json'
+JSON_KEY='android/deploy/Google_Play_Android_Developer-4432a3c4f5d1.json'
 
 # Declare command-line flags.
 argparser = argparse.ArgumentParser(add_help=False)

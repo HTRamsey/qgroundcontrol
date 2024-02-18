@@ -2,7 +2,8 @@ find_package(Threads REQUIRED)
 
 if(CONFIG_UTM_ADAPTER)
     message(STATUS "UTMSP is Initialized")
-    add_library(UTMSP
+    qt_add_library(UTMSP
+        STATIC
             UTMSPRestInterface.cpp
             UTMSPBlenderRestInterface.cpp
             UTMSPAuthorization.cpp
@@ -13,20 +14,21 @@ if(CONFIG_UTM_ADAPTER)
             UTMSPServiceController.cpp
             UTMSPVehicle.cpp
             UTMSPManager.cpp
-            )
+    )
 
     add_custom_target(UTMSPQml
         SOURCES
-        UTMSPAdapterEditor.qml
-        UTMSPMapVisuals.qml
-        UTMSPActivationStatusBar.qml
-        )
+            UTMSPAdapterEditor.qml
+            UTMSPMapVisuals.qml
+            UTMSPActivationStatusBar.qml
+    )
 
 else()
     # If CONFIG_UTM_ADAPTER is not set, use utmsp_dummy.qrc
     message(STATUS "UTMSP: Dummy is Initialized")
 
-    add_library(UTMSP
+    qt_add_library(UTMSP
+        STATIC
             dummy/utmsp_dummy.qrc
     )
 
@@ -37,10 +39,9 @@ endif()
 target_include_directories(UTMSP PUBLIC services )
 
 target_link_libraries(UTMSP
-
-PRIVATE
+    PRIVATE
         libevents_parser
-PUBLIC
+    PUBLIC
         Qt6::Core
         Qt6::Location
         Qt6::Widgets

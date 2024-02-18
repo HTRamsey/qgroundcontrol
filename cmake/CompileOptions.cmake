@@ -1,5 +1,5 @@
 
-if(${CMAKE_BUILD_TYPE} MATCHES "Debug")
+if(${CMAKE_BUILD_TYPE} MATCHES "Debug" AND NOT MOBILE)
 	include(CTest)
 	enable_testing()
 	if(BUILD_TESTING)

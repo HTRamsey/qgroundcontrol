@@ -1,6 +1,7 @@
 add_subdirectory(APM)
 
-add_library(FirmwarePlugin
+qt_add_library(FirmwarePlugin
+	STATIC
 	CameraMetaData.cc
 	FirmwarePlugin.cc
 	FirmwarePluginManager.cc

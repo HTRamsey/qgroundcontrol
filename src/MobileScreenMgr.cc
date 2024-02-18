@@ -7,12 +7,15 @@
  *
  ****************************************************************************/
 
-
 #include "MobileScreenMgr.h"
+#include <QtGlobal>
+#ifdef Q_OS_ANDROID
+    #include "AndroidInterface.h"
+#endif
 
-//static const char* kJniClassName = "org/mavlink/qgroundcontrol/QGCActivity";
-
-void MobileScreenMgr::setKeepScreenOn(bool /*keepScreenOn*/)
+void MobileScreenMgr::setKeepScreenOn( bool keepScreenOn )
 {
-    //-- Screen is locked on while QGC is running on Android
+    #ifdef Q_OS_ANDROID
+        AndroidInterface::setKeepScreenOn( keepScreenOn );
+    #endif
 }

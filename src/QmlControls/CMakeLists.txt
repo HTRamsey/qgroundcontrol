@@ -1,4 +1,5 @@
-add_library(QmlControls
+qt_add_library(QmlControls
+	STATIC
 	AppMessages.cc
 	AppMessages.h
 	EditPositionDialogController.cc

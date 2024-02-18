@@ -6,7 +6,8 @@ if(BUILD_TESTING)
 	)
 endif()
 
-add_library(Audio
+qt_add_library(Audio
+	STATIC
 	AudioOutput.cc
 	${EXTRA_SRC}
 )

@@ -1,5 +1,6 @@
 
-add_library(FollowMe
+qt_add_library(FollowMe
+	STATIC
 	FollowMe.cc
 )
 

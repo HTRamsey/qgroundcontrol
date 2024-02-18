@@ -1,5 +1,6 @@
 
-add_library(QtLocationPlugin
+qt_add_library(QtLocationPlugin
+	STATIC
 	BingMapProvider.cpp
 	ElevationMapProvider.cpp
 	EsriMapProvider.cpp
@@ -28,8 +29,8 @@ add_library(QtLocationPlugin
 target_link_libraries(QtLocationPlugin
 	PUBLIC
 		Qt6::Location
+                Qt6::LocationPrivate
 		Qt6::Sql
-
 		qgc
 )
 

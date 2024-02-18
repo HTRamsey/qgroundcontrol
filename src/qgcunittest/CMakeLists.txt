@@ -1,5 +1,6 @@
 
-add_library(qgcunittest
+qt_add_library(qgcunittest
+	STATIC
 	#FileDialogTest.cc
 	#FileDialogTest.h
 	#FileManagerTest.cc

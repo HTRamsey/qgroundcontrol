@@ -1,5 +1,6 @@
 
-add_library(ADSB
+qt_add_library(ADSB
+	STATIC
 	ADSBVehicle.cc
 	ADSBVehicle.h
 	ADSBVehicleManager.cc

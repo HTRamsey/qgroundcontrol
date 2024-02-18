@@ -38,7 +38,17 @@ QString AndroidInterface::getSDCardPath()
     if (!checkStoragePermissions()) {
         return QString();
     } else {
-        auto value = QJniObject::callStaticObjectMethod("org/mavlink/qgroundcontrol/QGCActivity", "getSDCardPath", "()Ljava/lang/String;");
+        auto value = QJniObject::callStaticObjectMethod(getQGCActivityClassName(), "getSDCardPath", "()Ljava/lang/String;");
         return value.toString();
     }
+}
+
+void AndroidInterface::setKeepScreenOn( bool bKeepScreenOn )
+{
+    Q_UNUSED( bKeepScreenOn );
+}
+
+const char * AndroidInterface::getQGCActivityClassName()
+{
+    return "org/mavlink/qgroundcontrol/QGCActivity";
 }

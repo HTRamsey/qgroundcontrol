@@ -22,6 +22,7 @@ package org.mavlink.qgroundcontrol;
 
 
 import com.hoho.android.usbserial.driver.*;
+import com.hoho.android.usbserial.util.*;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;

@@ -1,5 +1,6 @@
 
-add_library(uas
+qt_add_library(uas
+	STATIC
 	UASMessageHandler.cc
 	UASMessageHandler.h
 )

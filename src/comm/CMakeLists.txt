@@ -1,6 +1,7 @@
 
 set(EXTRA_SRC)
-if(BUILD_TESTING)
+#CMAKE_BUILD_TYPE
+#if(BUILD_TESTING)
 	list(APPEND EXTRA_SRC
 		MockLink.cc
 		MockLink.h
@@ -9,9 +10,10 @@ if(BUILD_TESTING)
 		MockLinkMissionItemHandler.cc
 		MockLinkMissionItemHandler.h
 	)
-endif()
+#endif()
 
-add_library(comm
+qt_add_library(comm
+	STATIC
 	#BluetoothLink.cc
 	#BluetoothLink.h
 	LinkConfiguration.cc
