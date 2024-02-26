@@ -80,7 +80,7 @@ message(STATUS "Qt spec: ${QT_MKSPEC}")
 
 
 # Find Qt6 libraries
-find_package(Qt6 ${QT_VERSION}
+find_package(Qt6
         COMPONENTS
                 Bluetooth
                 Charts
@@ -107,7 +107,7 @@ find_package(Qt6 ${QT_VERSION}
 )
 
 if(NOT QT_MKSPEC MATCHES "winrt")
-    find_package(Qt6 ${QT_VERSION}
+    find_package(Qt6
             COMPONENTS
             SerialPort
             REQUIRED
