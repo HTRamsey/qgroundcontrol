@@ -19,6 +19,10 @@ add_library(QmlControls
 	QGCGeoBoundingCube.h
 	QGCImageProvider.cc
 	QGCImageProvider.h
+    QGCMapPalette.cc
+	QGCMapPalette.h
+    QGCPalette.cc
+    QGCPalette.h
 	QGroundControlQmlGlobal.cc
 	QGroundControlQmlGlobal.h
 	QmlObjectListModel.cc

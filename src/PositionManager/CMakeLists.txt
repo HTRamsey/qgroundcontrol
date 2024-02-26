@@ -2,6 +2,8 @@
 add_library(PositionManager
 	PositionManager.cpp
 	SimulatedPosition.cc
+    QGCQGeoCoordinate.cc
+    QGCQGeoCoordinate.h
 )
 
 target_link_libraries(PositionManager

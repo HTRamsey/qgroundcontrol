@@ -50,6 +50,8 @@ add_library(Vehicle
 	TerrainProtocolHandler.h
 	TrajectoryPoints.cc
 	TrajectoryPoints.h
+	UASMessageHandler.cc
+	UASMessageHandler.h
 	VehicleBatteryFactGroup.cc
 	VehicleBatteryFactGroup.h
 	Vehicle.cc
@@ -86,8 +88,8 @@ add_library(Vehicle
 	VehicleVibrationFactGroup.h
 	VehicleWindFactGroup.cc
 	VehicleWindFactGroup.h
-        VehicleHygrometerFactGroup.cc
-        VehicleHygrometerFactGroup.h
+    VehicleHygrometerFactGroup.cc
+    VehicleHygrometerFactGroup.h
 	RemoteIDManager.h
 	RemoteIDManager.cc
 )

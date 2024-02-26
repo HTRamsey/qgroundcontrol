@@ -1,6 +1,8 @@
 
 add_library(Terrain
 	TerrainQuery.cc
+    TerrainTile.cc
+    TerrainTile.h
 )
 
 target_link_libraries(Terrain

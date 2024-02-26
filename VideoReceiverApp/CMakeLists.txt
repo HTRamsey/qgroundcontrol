@@ -72,12 +72,12 @@ include_directories(VideoReceiver
         ${GST_INCLUDE_DIRS}
         ${QGC_ROOT}/src
         ${QGC_ROOT}/src/Settings
+        ${QGC_ROOT}/src/Tools
 )
 
 add_subdirectory(${QGC_ROOT}/libs/qmlglsink qmlglsink.build)
+add_subdirectory(${QGC_ROOT}/src/Tools Tools.build)
 add_subdirectory(${QGC_ROOT}/src/VideoReceiver VideoReceiver.build)
-
-target_sources(${PROJECT_NAME} PRIVATE ${QGC_ROOT}/src/QGCLoggingCategory.cc)
 
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
