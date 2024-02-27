@@ -3,7 +3,7 @@ if(LINUX)
 	# TODO: investigate https://github.com/probonopd/linuxdeployqt
 
 	add_custom_command(OUTPUT ${CMAKE_BINARY_DIR}/release/package/QGroundControl.AppImage
-		COMMAND ${CMAKE_SOURCE_DIR}/deploy/create_linux_appimage.sh ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR} ${CMAKE_BINARY_DIR}/release/package;
+		COMMAND ${CMAKE_SOURCE_DIR}/deploy/linux/create_linux_appimage.sh ${CMAKE_SOURCE_DIR} ${CMAKE_BINARY_DIR} ${CMAKE_BINARY_DIR}/release/package;
 		DEPENDS QGroundControl
 		USES_TERMINAL
 	)

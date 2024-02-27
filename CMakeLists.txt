@@ -340,24 +340,26 @@ install(
         DIRECTORY ${CMAKE_SOURCE_DIR}/resources/
         DESTINATION ${CMAKE_INSTALL_DATADIR}/qgroundcontrol
 )
-install(
-        FILES ${CMAKE_SOURCE_DIR}/deploy/org.mavlink.qgroundcontrol.desktop
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
-)
-install(
-        FILES ${CMAKE_SOURCE_DIR}/resources/icons/qgroundcontrol.png
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/128x128/apps/
-        RENAME org.mavlink.qgroundcontrol.png
-)
-configure_file(
-        ${CMAKE_SOURCE_DIR}/deploy/org.mavlink.qgroundcontrol.metainfo.xml.in
-        ${CMAKE_BINARY_DIR}/metainfo/org.mavlink.qgroundcontrol.metainfo.xml
-        @ONLY
-)
-install(
-        FILES ${CMAKE_BINARY_DIR}/metainfo/org.mavlink.qgroundcontrol.metainfo.xml
-        DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo/
-)
+if(LINUX)
+    install(
+            FILES ${CMAKE_SOURCE_DIR}/deploy/linux/org.mavlink.qgroundcontrol.desktop
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/applications
+    )
+    install(
+            FILES ${CMAKE_SOURCE_DIR}/resources/icons/qgroundcontrol.png
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/128x128/apps/
+            RENAME org.mavlink.qgroundcontrol.png
+    )
+    configure_file(
+            ${CMAKE_SOURCE_DIR}/deploy/linux/org.mavlink.qgroundcontrol.metainfo.xml.in
+            ${CMAKE_BINARY_DIR}/metainfo/org.mavlink.qgroundcontrol.metainfo.xml
+            @ONLY
+    )
+    install(
+            FILES ${CMAKE_BINARY_DIR}/metainfo/org.mavlink.qgroundcontrol.metainfo.xml
+            DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo/
+    )
+endif()
 if(NOT ANDROID)
     qt_generate_deploy_qml_app_script(TARGET ${PROJECT_NAME} OUTPUT_SCRIPT deploy_script)
     install(SCRIPT ${deploy_script})
