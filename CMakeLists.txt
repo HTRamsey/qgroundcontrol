@@ -102,8 +102,6 @@ find_package(Qt6
                 Xml
         OPTIONAL_COMPONENTS
                 SerialPort
-        HINTS
-                ${QT_LIBRARY_HINTS}
 )
 
 qt_standard_project_setup(REQUIRES 6.6.0)

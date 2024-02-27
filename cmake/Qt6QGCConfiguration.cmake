@@ -3,7 +3,6 @@ if(DEFINED ENV{QT_VERSION})
 endif()
 
 if(NOT QT_VERSION)
-	# if QT version not specified then use any available version (5.12 or 5.15 only)
 	file(GLOB FOUND_QT_VERSIONS
 		LIST_DIRECTORIES true
 		$ENV{HOME}/Qt/6.6.*
@@ -12,7 +11,7 @@ if(NOT QT_VERSION)
 		return()
 	endif()
 	list(GET FOUND_QT_VERSIONS 0 QT_VERSION_PATH)
-	get_filename_component(QT_VERSION ${QT_VERSION_PATH} NAME)	
+	get_filename_component(QT_VERSION ${QT_VERSION_PATH} NAME)
 endif()
 
 if(DEFINED ENV{QT_MKSPEC})
@@ -31,6 +30,12 @@ if(NOT QT_MKSPEC)
 	elseif(WIN32)
 		set(QT_MKSPEC msvc2017_64)
 		#set(QT_MKSPEC winrt_x64_msvc2017)
+	elseif(ANDROID)
+		if(${ANDROID_ABI} STREQUAL arm64-v8a)
+			set(QT_MKSPEC android_arm64_v8a)
+		elseif(${ANDROID_ABI} STREQUAL armeabi-v7a)
+			set(QT_MKSPEC android_armv7)
+		endif()
 	endif()
 endif()
 
