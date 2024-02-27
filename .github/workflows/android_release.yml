@@ -23,7 +23,6 @@ defaults:
 
 env:
   SOURCE_DIR:   ${{ github.workspace }}
-  QT_VERSION:   6.6.*
   BUILD_TYPE:   ${{ fromJSON('["DailyBuild", "StableBuild"]')[ github.ref_type == 'tag' || contains(github.ref, 'Stable_' ) ] }}
 
 jobs:
@@ -67,7 +66,7 @@ jobs:
       - name: Install Qt6 for Android
         uses: jurplel/install-qt-action@v3
         with:
-          version:      ${{ env.QT_VERSION }}
+          version:      6.6.*
           aqtversion:   ==3.1.*
           host:         linux
           target:       android
@@ -105,7 +104,7 @@ jobs:
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run:  |
-            ls /home/runner/work/_temp/Qt/${{ env.QT_VERSION }}
+            ls /home/runner/work/_temp/Qt/6.6.*
             qmake -r ${SOURCE_DIR}/qgroundcontrol.pro -spec android-clang CONFIG+=${BUILD_TYPE} CONFIG+=installer ANDROID_ABIS="${{ matrix.eabi }}"
             make -j2
 

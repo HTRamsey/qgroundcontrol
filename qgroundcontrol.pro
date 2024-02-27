@@ -441,7 +441,6 @@ HEADERS += \
     src/JsonHelper.h \
     src/KMLDomDocument.h \
     src/KMLHelper.h \
-    src/LogCompressor.h \
     src/MissionManager/CameraCalc.h \
     src/MissionManager/CameraSection.h \
     src/MissionManager/CameraSpec.h \
@@ -497,7 +496,6 @@ HEADERS += \
     src/QGC.h \
     src/QGCApplication.h \
     src/QGCCachedFileDownload.h \
-    src/QGCComboBox.h \
     src/QGCConfig.h \
     src/QGCFileDownload.h \
     src/QGCLoggingCategory.h \
@@ -701,7 +699,6 @@ SOURCES += \
     src/JsonHelper.cc \
     src/KMLDomDocument.cc \
     src/KMLHelper.cc \
-    src/LogCompressor.cc \
     src/MissionManager/CameraCalc.cc \
     src/MissionManager/CameraSection.cc \
     src/MissionManager/CameraSpec.cc \
@@ -755,7 +752,6 @@ SOURCES += \
     src/QGC.cc \
     src/QGCApplication.cc \
     src/QGCCachedFileDownload.cc \
-    src/QGCComboBox.cc \
     src/QGCFileDownload.cc \
     src/QGCLoggingCategory.cc \
     src/QGCMapPalette.cc \

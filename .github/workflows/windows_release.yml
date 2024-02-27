@@ -21,7 +21,6 @@ defaults:
 
 env:
   SOURCE_DIR:   ${{ github.workspace }}
-  QT_VERSION:   6.6.*
   ARTIFACT:     QGroundControl-installer.exe
   BUILD_TYPE:   ${{ fromJSON('["DailyBuild", "StableBuild"]')[ github.ref_type == 'tag' || contains(github.ref, 'Stable_' ) ] }}
 
@@ -53,7 +52,7 @@ jobs:
       - name: Install Qt
         uses: jurplel/install-qt-action@v3
         with:
-          version:      ${{ env.QT_VERSION }}
+          version:      6.6.*
           aqtversion:   ==3.1.*
           host:         windows
           target:       desktop

@@ -38,8 +38,6 @@ qt_add_library(${PROJECT_NAME} STATIC
         KMLDomDocument.h
         KMLHelper.cc
         KMLHelper.h
-        LogCompressor.cc
-        LogCompressor.h
         main.cc
         QGC.cc
         QGC.h
@@ -47,8 +45,6 @@ qt_add_library(${PROJECT_NAME} STATIC
         QGCApplication.h
         QGCCachedFileDownload.cc
         QGCCachedFileDownload.h
-        QGCComboBox.cc
-        QGCComboBox.h
         QGCConfig.h
         QGCFileDownload.cc
         QGCFileDownload.h
@@ -103,6 +99,7 @@ add_subdirectory(PositionManager)
 add_subdirectory(QmlControls)
 add_subdirectory(QtLocationPlugin)
 add_subdirectory(Settings)
+option(QGC_AIRLINK_DISABLED "Enable airlink" OFF)
 if (NOT ${QGC_AIRLINK_DISABLED})
     add_subdirectory(AirLink)
 endif()
@@ -154,20 +151,23 @@ target_link_libraries(${PROJECT_NAME}
             VehicleSetup
             VideoManager
             Viewer3D
-            z # zlib
 )
 
-if (NOT ${QGC_AIRLINK_DISABLED})
+if(NOT QT_MKSPEC MATCHES "winrt")
+    target_link_libraries(${PROJECT_NAME}
+        PUBLIC
+            Qt6::SerialPort
+        )
+endif()
+
+if(NOT ${QGC_AIRLINK_DISABLED})
     target_link_libraries(${PROJECT_NAME} PUBLIC AirLink)
 else()
     target_compile_definitions(${PROJECT_NAME} PUBLIC QGC_AIRLINK_DISABLED)
 endif()
 
 target_include_directories(${PROJECT_NAME}
-        PUBLIC
+    PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_CURRENT_BINARY_DIR}/ui/ui_autogen/include # HACK: AUTOUIC paths not inheriting?
-        ${CMAKE_CURRENT_BINARY_DIR}/ui/ui_autogen/include_Debug
-        ${CMAKE_CURRENT_BINARY_DIR}/qgc_autogen/include # HACK: AUTOUIC paths not inheriting?
-        ${CMAKE_CURRENT_BINARY_DIR}/qgc_autogen/include_Debug
+        ${CMAKE_SOURCE_DIR}/libs/shapelib
 )
