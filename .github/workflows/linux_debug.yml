@@ -54,35 +54,31 @@ jobs:
           setup-python: true
           cache: true
 
-      - name: Install github environment dependencies for unit test running
-        run:  sudo apt-get install -y libxcb-xinerama0 libxkbcommon-x11-0 libxcb-cursor0
-
-      - name: Install QGC source dependencies
-        run:  sudo apt-get install -y libsdl2-dev
-
-      - name: Install Gstreamer dev packages
-        run:  sudo apt-get install -y libgstreamer-plugins-base1.0-dev libgstreamer1.0-0:amd64 libgstreamer1.0-dev
-
-      - name: Install post-link dependencies
-        run:  sudo apt-get install -y binutils patchelf ninja-build
-
-      - name: Create build directory
-        run:  mkdir ${{ runner.temp }}/shadow_build_dir
+      - name: Install dependencies
+        run:  |
+              sudo apt-get install -y libxcb-xinerama0 libxkbcommon-x11-0 libxcb-cursor0
+              sudo apt-get install -y libsdl2-dev
+              sudo apt-get install -y libgstreamer-plugins-base1.0-dev libgstreamer1.0-0:amd64 libgstreamer1.0-dev
+              sudo apt-get install -y binutils ninja-build
 
       - name: Build
-        working-directory: ${{ runner.temp }}/shadow_build_dir
         run:  |
+              mkdir ${{ runner.temp }}/shadow_build_dir
               cmake -S ${SOURCE_DIR} -B ${SOURCE_DIR}/shadow_build_dir/ -G Ninja -DCMAKE_BUILD_TYPE=Debug
               cmake --build ${SOURCE_DIR}/shadow_build_dir/ --target all
               cmake --install ${SOURCE_DIR}/shadow_build_dir
 
-      - name: Setup for unit tests
+      - name: Create AppImage
         working-directory: ${{ runner.temp }}/shadow_build_dir
+        run:  |
+              wget https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage
+              chmod a+x ./linuxdeployqt-continuous-x86_64.AppImage
+              ./linuxdeployqt-continuous-x86_64.AppImage ${SOURCE_DIR}/shadow_build_dir/staging/share/applications/org.mavlink.qgroundcontrol.desktop -unsupported-allow-new-glibc -verbose=2 -appimage
+
+      - name: Run unit tests
+        working-directory:  ${{ runner.temp }}/shadow_build_dir
         run:  |
               mkdir -p ~/.config/QtProject/
               cp ${SOURCE_DIR}/test/qtlogging.ini ~/.config/QtProject/
               export QT_FATAL_WARNINGS=1
-
-      - name: Run unit tests
-        working-directory:  ${{ runner.temp }}/shadow_build_dir
-        run:                xvfb-run -a ${SOURCE_DIR}/shadow_build_dir/staging/bin/QGroundControl --unittest
+              xvfb-run -a ${SOURCE_DIR}/shadow_build_dir/staging/bin/QGroundControl --unittest
