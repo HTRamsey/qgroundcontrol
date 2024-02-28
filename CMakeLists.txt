@@ -44,6 +44,10 @@ endif()
 include(CMakeDependentOption)
 cmake_dependent_option(QGC_BUILD_TESTING "Enable testing" ON "CMAKE_BUILD_TYPE STREQUAL Debug" OFF)
 
+if(ANDROID)
+    add_compile_definitions(__mobile__ __android__)
+endif()
+
 #######################################################
 #               Qt6 Configuration
 #######################################################
