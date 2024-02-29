@@ -58,12 +58,16 @@ jobs:
           dir:          ${{ runner.temp }}
           modules:      qtcharts qtlocation qtpositioning qtspeech qt5compat qtmultimedia qtserialport qtimageformats qtshadertools qtconnectivity qtquick3d
           setup-python: true
-          cache: true
+          cache:        true
+          tools:        tools_opensslv3_src
 
       - name: Install Dependencies
         run:  |
               chmod a+x ./tools/setup/ubuntu.sh
               ./tools/setup/ubuntu.sh
+
+      - name: Build OpenSSLv3
+        uses: ./.github/actions/openssl
 
       - name: Create build directory
         run:  mkdir ${{ runner.temp }}/shadow_build_dir

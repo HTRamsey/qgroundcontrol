@@ -196,7 +196,7 @@ MacBuild {
         -F$$SOURCE_DIR/libs/Frameworks \
         -framework SDL2
 } else:LinuxBuild {
-    PKGCONFIG = sdl2
+    PKGCONFIG += sdl2
 } else:WindowsBuild {
     INCLUDEPATH += $$SOURCE_DIR/libs/sdl2/msvc/include
     INCLUDEPATH += $$SOURCE_DIR/libs/OpenSSL/Windows/x64/include
@@ -204,12 +204,15 @@ MacBuild {
     LIBS += -lSDL2
 }
 
-# Include Android OpenSSL libs
+# Include OpenSSL libs
 AndroidBuild {
     include($$SOURCE_DIR/libs/OpenSSL/android_openssl/openssl.pri)
     #message("ANDROID_EXTRA_LIBS")
     #message($$ANDROID_TARGET_ARCH)
     #message($$ANDROID_EXTRA_LIBS)
+} else:LinuxBuild {
+    INCLUDEPATH += $$SOURCE_DIR/libs/OpenSSL/linux/include
+    LIBS += -L$$SOURCE_DIR/libs/OpenSSL/linux/lib -lssl -lcrypto
 }
 
 #

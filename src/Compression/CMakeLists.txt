@@ -1,4 +1,5 @@
-
+#find_package(ZLIB)
+#find_package(LZMA)
 set(XZ_EMBEDDED_DIR ${CMAKE_SOURCE_DIR}/libs/xz-embedded)
 
 qt_add_library(compression STATIC

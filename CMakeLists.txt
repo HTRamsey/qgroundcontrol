@@ -192,6 +192,8 @@ if(APPLE)
 elseif(WIN32)
     set_target_properties(${PROJECT_NAME} PROPERTIES WIN32_EXECUTABLE TRUE)
 elseif(ANDROID)
+    #find_package(Java)
+    #find_package(JNI)
     add_android_openssl_libraries(${PROJECT_NAME})
 
     set_target_properties(${PROJECT_NAME}
@@ -217,7 +219,13 @@ elseif(ANDROID)
     )
 
 elseif(LINUX)
-
+    find_package(OpenSSL)
+    if(OpenSSL_FOUND)
+        message(STATUS "OpenSSL version: ${OPENSSL_VERSION}")
+        target_link_libraries(${PROJECT_NAME} PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+    else()
+        message(STATUS "OpenSSL Not Found")
+    endif()
 endif()
 
 target_link_libraries(${PROJECT_NAME} PRIVATE qgc)

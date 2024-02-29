@@ -1,3 +1,4 @@
+#find_package(Vulkan)
 set(EXTRA_SOURCES)
 set(EXTRA_LIBRARIES)
 

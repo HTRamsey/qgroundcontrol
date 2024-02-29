@@ -1,0 +1,25 @@
+name: 'Build OpenSSL'
+description: 'Builds OpenSSL 3'
+runs:
+  using: "composite"
+  steps:
+    - name: Build OpenSSLv3
+      working-directory: ${{ runner.temp }}
+      run:  |
+            openssl version -a
+            sudo apt install build-essential checkinstall zlib1g-dev -y
+            wget https://github.com/openssl/openssl/releases/download/openssl-3.2.1/openssl-3.2.1.tar.gz
+            tar -xvzf openssl-3.2.1.tar.gz
+            cd openssl-3.*/
+            ./config --prefix=/usr/local/ssl --openssldir=/usr/local/ssl '-Wl,-rpath,$(LIBRPATH)'
+            make build_sw
+            sudo make install_sw
+            export PATH=/usr/local/ssl/bin:$PATH
+            export LD_LIBRARY_PATH=/usr/local/ssl/lib64:$LD_LIBRARY_PATH
+            export PKG_CONFIG_PATH=/usr/local/ssl/lib64/pkgconfig:$PKG_CONFIG_PATH
+            cd /usr/lib/ssl
+            sudo unlink openssl.cnf
+            sudo ln -s /usr/local/ssl/openssl.cnf openssl.cnf
+            sudo ldconfig /usr/local/lib
+            openssl version -a
+      shell: bash
