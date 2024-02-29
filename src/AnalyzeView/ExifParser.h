@@ -1,8 +1,7 @@
 #ifndef EXIFPARSER_H
 #define EXIFPARSER_H
 
-#include <QGeoCoordinate>
-#include <QDebug>
+#include <QtCore/QDebug>
 
 #include "GeoTagController.h"
 

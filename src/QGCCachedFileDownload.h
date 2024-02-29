@@ -9,14 +9,16 @@
 
 #pragma once
 
-#include "QGCFileDownload.h"
+#include <QtCore/QObject>
+#include <QtCore/QString>
 
-#include <QNetworkDiskCache>
+class QGCFileDownload;
+class QNetworkDiskCache;
 
 class QGCCachedFileDownload : public QObject
 {
     Q_OBJECT
-    
+
 public:
     QGCCachedFileDownload(QObject* parent, const QString& cacheDirectory);
 

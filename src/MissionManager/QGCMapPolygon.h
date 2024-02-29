@@ -10,10 +10,10 @@
 #ifndef QGCMapPolygon_H
 #define QGCMapPolygon_H
 
-#include <QObject>
-#include <QGeoCoordinate>
-#include <QVariantList>
-#include <QPolygon>
+#include <QtCore/QObject>
+#include <QtPositioning/QGeoCoordinate>
+#include <QtCore/QVariantList>
+#include <QtGui/QPolygon>
 
 #include "QmlObjectListModel.h"
 #include "KMLDomDocument.h"

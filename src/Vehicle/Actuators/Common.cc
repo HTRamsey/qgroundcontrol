@@ -8,6 +8,7 @@
  ****************************************************************************/
 
 #include "Common.h"
+#include "ParameterManager.h"
 
 #include <QDebug>
 

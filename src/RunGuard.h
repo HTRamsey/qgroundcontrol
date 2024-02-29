@@ -10,9 +10,9 @@
 #ifndef RunGuard_H
 #define RunGuard_H
 
-#include <QObject>
-#include <QSharedMemory>
-#include <QSystemSemaphore>
+#include <QtCore/QObject>
+#include <QtCore/QSharedMemory>
+#include <QtCore/QSystemSemaphore>
 
 class RunGuard
 {

@@ -13,8 +13,8 @@
 #include "QGCMAVLink.h"
 #include "QGCLoggingCategory.h"
 
-#include <QObject>
-#include <QGeoCoordinate>
+#include <QtCore/QObject>
+#include <QtPositioning/QGeoCoordinate>
 
 class TerrainFactGroup;
 

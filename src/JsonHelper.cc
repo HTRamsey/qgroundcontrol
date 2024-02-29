@@ -20,6 +20,7 @@
 #include <QRegularExpression>
 #include <QRegularExpressionMatch>
 #include <QFile>
+#include <QtCore/QFileInfo>
 #include <QTranslator>
 
 const char* JsonHelper::jsonVersionKey                      = "version";

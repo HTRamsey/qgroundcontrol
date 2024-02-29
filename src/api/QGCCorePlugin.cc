@@ -24,9 +24,11 @@
 #include "QGCCameraManager.h"
 #include "HorizontalFactValueGrid.h"
 #include "InstrumentValueData.h"
+#include "JoystickManager.h"
 
-#include <QtQml>
-#include <QQmlEngine>
+#include <QtQml/QQmlEngine>
+#include <QtQml/QQmlApplicationEngine>
+#include <QtQml/QQmlContext>
 
 /// @file
 ///     @brief Core Plugin Interface for QGroundControl - Default Implementation

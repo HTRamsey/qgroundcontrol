@@ -14,9 +14,9 @@
 #ifndef AIRFRAMECOMPONENTCONTROLLER_H
 #define AIRFRAMECOMPONENTCONTROLLER_H
 
-#include <QObject>
-#include <QQuickItem>
-#include <QList>
+#include <QtCore/QObject>
+#include <QtQuick/QQuickItem>
+#include <QtCore/QList>
 
 #include "AutoPilotPlugin.h"
 #include "FactPanelController.h"

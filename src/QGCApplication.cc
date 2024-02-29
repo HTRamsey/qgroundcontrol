@@ -16,20 +16,18 @@
  *
  */
 
-#include <QFile>
-#include <QRegularExpression>
-#include <QFontDatabase>
-#include <QQuickWindow>
-#include <QQuickImageProvider>
-#include <QQuickStyle>
+#include <QtCore/QFile>
+#include <QtCore/QRegularExpression>
+#include <QtCore/QDebug>
+#include <QtGui/QFontDatabase>
+#include <QtQuick/QQuickWindow>
+#include <QtQuick/QQuickImageProvider>
 
 #ifdef QGC_ENABLE_BLUETOOTH
-#include <QBluetoothLocalDevice>
+#include <QtBluetooth/QBluetoothLocalDevice>
 #endif
 
-#include <QDebug>
-
-#if defined(QGC_GST_STREAMING)
+#ifdef QGC_GST_STREAMING
 #include "GStreamer.h"
 #endif
 
@@ -105,6 +103,11 @@
 #include "RemoteIDManager.h"
 #include "CustomAction.h"
 #include "CustomActionManager.h"
+#include "MAVLinkProtocol.h"
+#include "AudioOutput.h"
+#include "GPSRTKFactGroup.h"
+#include "FactSystem.h"
+#include "LinkConfiguration.h"
 
 #include "CityMapGeometry.h"
 #include "Viewer3DQmlBackend.h"
@@ -124,16 +127,15 @@
 #include "GPS/GPSManager.h"
 #endif
 
-#ifdef QGC_RTLAB_ENABLED
-#include "OpalLink.h"
-#endif
-
 #ifdef Q_OS_LINUX
 #ifndef __mobile__
 #include <unistd.h>
 #include <sys/types.h>
 #endif
 #endif
+
+#include <QtCore/QRunnable>
+#include <QtCore/QLibraryInfo>
 
 #include "QGCMapEngine.h"
 
@@ -836,6 +838,8 @@ bool QGCApplication::isInternetAvailable()
         return getQGCMapEngine()->isInternetActive();
     return true;
 }
+
+FactGroup* QGCApplication::gpsRtkFactGroup()  { return _gpsRtkFactGroup; }
 
 void QGCApplication::_checkForNewVersion()
 {

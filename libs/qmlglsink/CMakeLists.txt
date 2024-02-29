@@ -30,10 +30,8 @@ if(LINUX OR ANDROID)
     message(STATUS "GStreamer egl libs: ${GST_EGL_LIBS}")
 endif()
 
-message(STATUS "gst found ${GST_FOUND}")
-
 if(GST_FOUND)
-    message(STATUS "Building qmlglsink")
+    message(STATUS "gst found, building qmlglsink")
 
 	find_package(Qt6 REQUIRED COMPONENTS Gui OpenGL)
 	find_package(OpenGL)
@@ -84,7 +82,7 @@ if(GST_FOUND)
 			${GST_LINK_LIBRARIES}
 	)
 
-	target_include_directories(qmlglsink PRIVATE ${GST_INCLUDE_DIRS})
+	target_include_directories(qmlglsink PUBLIC ${GST_INCLUDE_DIRS})
 	if (MSVC)
 		target_include_directories(qmlglsink PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/windows)
 	else()
@@ -94,4 +92,6 @@ if(GST_FOUND)
 				-Wno-implicit-fallthrough
 			)
 	endif()
+else()
+    message(STATUS "gst not found, skipping qmlglsink")
 endif()

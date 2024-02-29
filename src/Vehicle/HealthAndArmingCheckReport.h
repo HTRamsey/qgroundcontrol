@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include <QObject>
+#include <QtCore/QObject>
 
 #include <QmlObjectListModel.h>
 #include <libevents/libs/cpp/parse/health_and_arming_checks.h>

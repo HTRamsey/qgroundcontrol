@@ -2,7 +2,7 @@
 #define AIRLINKLINK_H
 
 #include <UDPLink.h>
-#include <QMutex>
+#include <QtCore/QMutex>
 
 class AirlinkConfiguration : public UDPConfiguration
 {

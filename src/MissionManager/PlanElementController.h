@@ -10,7 +10,7 @@
 #ifndef PlanElementController_H
 #define PlanElementController_H
 
-#include <QObject>
+#include <QtCore/QObject>
 
 #include "Vehicle.h"
 #include "MultiVehicleManager.h"

@@ -1,7 +1,7 @@
 #ifndef VIEWER3DMANAGER_H
 #define VIEWER3DMANAGER_H
 
-#include <QObject>
+#include <QtCore/QObject>
 
 #include "Viewer3DQmlBackend.h"
 #include "OsmParser.h"

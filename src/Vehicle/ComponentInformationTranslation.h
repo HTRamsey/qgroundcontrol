@@ -9,8 +9,8 @@
 
 #pragma once
 
-#include <QLoggingCategory>
-#include <QJsonDocument>
+#include <QtCore/QLoggingCategory>
+#include <QtCore/QJsonDocument>
 
 #include "QGCLoggingCategory.h"
 #include "QGCCachedFileDownload.h"

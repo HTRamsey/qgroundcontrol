@@ -1,4 +1,5 @@
 #include "AirlinkLink.h"
+#include "MAVLinkProtocol.h"
 #include <QGC.h>
 #include <QGCApplication.h>
 #include <AppSettings.h>

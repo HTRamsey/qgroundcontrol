@@ -10,9 +10,6 @@
 #ifndef SettingsManager_H
 #define SettingsManager_H
 
-#include "QGCLoggingCategory.h"
-#include "Joystick.h"
-#include "MultiVehicleManager.h"
 #include "QGCToolbox.h"
 #include "AppSettings.h"
 #include "UnitsSettings.h"
@@ -30,9 +27,9 @@
 #include "FirmwareUpgradeSettings.h"
 #include "ADSBVehicleManagerSettings.h"
 #include "BatteryIndicatorSettings.h"
-#include <QVariantList>
 #include "RemoteIDSettings.h"
 #include "Viewer3DSettings.h"
+#include <QtCore/QVariantList>
 
 /// Provides access to all app settings
 class SettingsManager : public QGCTool

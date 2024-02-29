@@ -9,10 +9,10 @@
 
 #pragma once
 
-#include <QObject>
-#include <QList>
-#include <QGeoCoordinate>
-#include <QVariant>
+#include <QtCore/QObject>
+#include <QtCore/QList>
+#include <QtPositioning/QGeoCoordinate>
+#include <QtCore/QVariant>
 
 /// Routines for loading polygons or polylines from KML or SHP files.
 class ShapeFileHelper : public QObject

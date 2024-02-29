@@ -1,10 +1,12 @@
 #include "Viewer3DQmlBackend.h"
+#include "OsmParser.h"
+#include "Viewer3DSettings.h"
+#include "QGCApplication.h"
+#include "SettingsManager.h"
+#include "MultiVehicleManager.h"
 #include <QQmlEngine>
 #include <QQmlComponent>
 #include <QUrl>
-
-#include "QGCApplication.h"
-#include "SettingsManager.h"
 
 #define GPS_REF_NOT_SET                 0
 #define GPS_REF_SET_BY_MAP              1

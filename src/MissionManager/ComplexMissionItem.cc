@@ -15,8 +15,9 @@
 #include "FlightPathSegment.h"
 #include "MissionController.h"
 
-#include <QCborValue>
-#include <QSettings>
+#include <QtCore/QCborValue>
+#include <QtCore/QCborMap>
+#include <QtCore/QSettings>
 
 const char* ComplexMissionItem::jsonComplexItemTypeKey = "complexItemType";
 

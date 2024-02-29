@@ -11,10 +11,13 @@
 /// @brief Application Settings
 
 #pragma once
-#include <QTranslator>
+
+#include <QtCore/QString>
+#include <QtCore/QList>
+#include <QtCore/QVariant>
+#include <QtCore/QLocale>
 
 #include "SettingsGroup.h"
-#include "QGCMAVLink.h"
 
 /// Application Settings
 class AppSettings : public SettingsGroup

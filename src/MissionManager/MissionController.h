@@ -17,7 +17,7 @@
 #include "QGCGeoBoundingCube.h"
 #include "QGroundControlQmlGlobal.h"
 
-#include <QHash>
+#include <QtCore/QHash>
 
 class FlightPathSegment;
 class VisualMissionItem;

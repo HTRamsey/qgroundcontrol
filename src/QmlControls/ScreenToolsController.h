@@ -15,8 +15,8 @@
 #define ScreenToolsController_H
 
 #include "QGCApplication.h"
-#include <QQuickItem>
-#include <QCursor>
+#include <QtQuick/QQuickItem>
+#include <QtGui/QCursor>
 
 /*!
     @brief Screen helper tools for QML widgets

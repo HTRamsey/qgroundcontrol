@@ -13,10 +13,12 @@
 #ifdef __android__
     #include "qserialportinfo.h"
 #else
-    #include <QSerialPortInfo>
+    #include <QtSerialPort/QSerialPortInfo>
 #endif
 
-#include "QGCLoggingCategory.h"
+#include <QtCore/QList>
+#include <QtCore/QString>
+#include <QtCore/QLoggingCategory>
 
 Q_DECLARE_LOGGING_CATEGORY(QGCSerialPortInfoLog)
 

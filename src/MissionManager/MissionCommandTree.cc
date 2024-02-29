@@ -8,7 +8,6 @@
  ****************************************************************************/
 
 #include "MissionCommandTree.h"
-#include "FactMetaData.h"
 #include "Vehicle.h"
 #include "FirmwarePluginManager.h"
 #include "QGCApplication.h"
@@ -16,7 +15,7 @@
 #include "MissionCommandList.h"
 #include "SettingsManager.h"
 
-#include <QQmlEngine>
+#include <QtQml/QQmlEngine>
 
 MissionCommandTree::MissionCommandTree(QGCApplication* app, QGCToolbox* toolbox, bool unitTest)
     : QGCTool               (app, toolbox)

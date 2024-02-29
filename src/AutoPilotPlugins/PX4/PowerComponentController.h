@@ -14,8 +14,8 @@
 #ifndef PowerComponentController_H
 #define PowerComponentController_H
 
-#include <QObject>
-#include <QQuickItem>
+#include <QtCore/QObject>
+#include <QtQuick/QQuickItem>
 
 #include "FactPanelController.h"
 

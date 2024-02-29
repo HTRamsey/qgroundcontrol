@@ -18,7 +18,6 @@
 #include "APMSubMotorComponentController.h"
 #include "MissionManager.h"
 #include "ParameterManager.h"
-#include "QGCFileDownload.h"
 #include "SettingsManager.h"
 #include "AppSettings.h"
 #include "APMMavlinkStreamRateSettings.h"
@@ -28,7 +27,7 @@
 #include "ArduSubFirmwarePlugin.h"
 #include "LinkManager.h"
 
-#include <QTcpSocket>
+#include <QtNetwork/QTcpSocket>
 #include <QtCore5Compat/QRegExp>
 
 QGC_LOGGING_CATEGORY(APMFirmwarePluginLog, "APMFirmwarePluginLog")

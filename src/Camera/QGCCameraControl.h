@@ -11,12 +11,17 @@
 
 #pragma once
 
-#include "QGCApplication.h"
-#include <QLoggingCategory>
+#include "QmlObjectListModel.h"
+#include "FactGroup.h"
+#include "MAVLinkProtocol.h"
+#include <QtCore/QLoggingCategory>
+#include <QtCore/QRectF>
+#include <QtCore/QTimer>
 
 class QDomNode;
 class QDomNodeList;
 class QGCCameraParamIO;
+class QNetworkAccessManager;
 
 Q_DECLARE_LOGGING_CATEGORY(CameraControlLog)
 Q_DECLARE_LOGGING_CATEGORY(CameraControlVerboseLog)

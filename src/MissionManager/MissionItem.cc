@@ -8,12 +8,11 @@
  ****************************************************************************/
 
 
-#include <QStringList>
-#include <QDebug>
+#include <QtCore/QStringList>
+#include <QtCore/QDebug>
+#include <QtCore/QJsonArray>
 
 #include "MissionItem.h"
-#include "FirmwarePluginManager.h"
-#include "QGCApplication.h"
 #include "JsonHelper.h"
 #include "VisualMissionItem.h"
 

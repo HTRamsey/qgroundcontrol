@@ -10,12 +10,11 @@
 #ifndef SettingsGroup_H
 #define SettingsGroup_H
 
-#include "QGCLoggingCategory.h"
-#include "Joystick.h"
-#include "MultiVehicleManager.h"
-#include "QGCToolbox.h"
+#include "SettingsFact.h"
 
-#include <QVariantList>
+#include <QtCore/QObject>
+#include <QtCore/QMap>
+#include <QtCore/QString>
 
 #define DEFINE_SETTING_NAME_GROUP() \
     static const char* name; \

@@ -1,3 +1,4 @@
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Quick Network OPTIONAL_COMPONENTS SerialPort)
 
 qt_add_library(VehicleSetup STATIC
 	Bootloader.cc
@@ -30,9 +31,28 @@ add_custom_target(VehicleSetupQml
 
 target_link_libraries(VehicleSetup
 	PRIVATE
+		api
+		AutoPilotPlugins
 		compression
+		FirmwarePlugin
+		Settings
+		Vehicle
 	PUBLIC
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Quick
+        Qt6::Network
+		comm
+		FactSystem
+		Joystick
 		qgc
 )
 
-target_include_directories(VehicleSetup INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT ANDROID)
+	target_link_libraries(VehicleSetup
+		PUBLIC
+			Qt6::SerialPort
+	)
+endif()
+
+target_include_directories(VehicleSetup PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

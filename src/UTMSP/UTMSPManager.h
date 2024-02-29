@@ -12,8 +12,8 @@
 #include "QGCLoggingCategory.h"
 #include "QGCToolbox.h"
 #include <memory>
-#include <QTimer>
-#include <QDebug>
+#include <QtCore/QTimer>
+#include <QtCore/QDebug>
 
 #include "UTMSPVehicle.h"
 #include "services/dispatcher.h"

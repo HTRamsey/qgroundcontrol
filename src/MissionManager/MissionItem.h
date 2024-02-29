@@ -11,19 +11,17 @@
 #ifndef MissionItem_H
 #define MissionItem_H
 
-#include <QObject>
-#include <QString>
-#include <QtQml>
-#include <QTextStream>
-#include <QJsonObject>
-#include <QGeoCoordinate>
+#include <QtCore/QObject>
+#include <QtCore/QString>
+#include <QtCore/QTextStream>
+#include <QtCore/QJsonObject>
+#include <QtPositioning/QGeoCoordinate>
 
 #include "QGCMAVLink.h"
 #include "QGC.h"
 #include "QmlObjectListModel.h"
 #include "Fact.h"
 #include "QGCLoggingCategory.h"
-#include "QmlObjectListModel.h"
 
 class SurveyComplexItem;
 class SimpleMissionItem;

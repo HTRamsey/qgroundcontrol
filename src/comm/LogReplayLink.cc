@@ -11,10 +11,11 @@
 #include "LogReplayLink.h"
 #include "LinkManager.h"
 #include "QGCApplication.h"
-
-#include <QFileInfo>
-#include <QtEndian>
-#include <QSignalSpy>
+#include "MAVLinkProtocol.h"
+#include "MultiVehicleManager.h"
+#include <QtCore/QFileInfo>
+#include <QtCore/QtEndian>
+#include <QtTest/QSignalSpy>
 
 const char*  LogReplayLinkConfiguration::_logFilenameKey = "logFilename";
 

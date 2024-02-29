@@ -10,14 +10,10 @@
 #include "MissionSettingsItem.h"
 #include "JsonHelper.h"
 #include "MissionController.h"
-#include "QGCGeo.h"
-#include "SimpleMissionItem.h"
-#include "SettingsManager.h"
-#include "AppSettings.h"
-#include "MissionCommandUIInfo.h"
 #include "PlanMasterController.h"
 
-#include <QPolygonF>
+#include <QtGui/QPolygonF>
+#include <QtCore/QJsonArray>
 
 QGC_LOGGING_CATEGORY(MissionSettingsItemLog, "MissionSettingsItemLog")
 

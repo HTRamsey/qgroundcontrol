@@ -1,3 +1,4 @@
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Positioning Qml Quick3D Xml)
 
 qt_add_library(Viewer3D STATIC
     CityMapGeometry.cc
@@ -14,16 +15,20 @@ qt_add_library(Viewer3D STATIC
     Viewer3DUtils.h
 )
 
-find_package(Qt6 REQUIRED COMPONENTS Quick3D)
-
 target_link_libraries(Viewer3D
+    PRIVATE
+        Settings
 	PUBLIC
-		qgc
+        Qt6::Core
+        Qt6::Gui
+        Qt6::Positioning
+        Qt6::Qml
         Qt6::Quick3D
+        Qt6::Xml
+        qgc
 )
 
 target_include_directories(Viewer3D
 	PUBLIC
 		${CMAKE_CURRENT_SOURCE_DIR}
-	)
-
+)

@@ -10,7 +10,9 @@
 #include "SettingsGroup.h"
 #include "QGCCorePlugin.h"
 #include "QGCApplication.h"
-
+#include "QGCToolbox.h"
+#include "FactMetaData.h"
+#include "SettingsFact.h"
 #include <QQmlEngine>
 #include <QtQml>
 

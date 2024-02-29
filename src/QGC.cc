@@ -13,7 +13,8 @@
 #include <qmath.h>
 #include <float.h>
 
-#include <QtGlobal>
+#include <QtCore/QtGlobal>
+#include <QtCore/QDateTime>
 
 namespace QGC
 {

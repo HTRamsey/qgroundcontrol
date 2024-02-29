@@ -7,23 +7,16 @@
  *
  ****************************************************************************/
 
-#include <inttypes.h>
-#include <iostream>
-
-#include <QDebug>
-#include <QTime>
-#include <QApplication>
-#include <QSettings>
-#include <QStandardPaths>
-#include <QtEndian>
-#include <QMetaType>
-#include <QDir>
-#include <QFileInfo>
+#include <QtCore/QDebug>
+#include <QtCore/QSettings>
+#include <QtCore/QStandardPaths>
+#include <QtCore/QtEndian>
+#include <QtCore/QDir>
+#include <QtCore/QFileInfo>
 
 #include "MAVLinkProtocol.h"
 #include "LinkManager.h"
 #include "QGCMAVLink.h"
-#include "QGC.h"
 #include "QGCApplication.h"
 #include "QGCLoggingCategory.h"
 #include "MultiVehicleManager.h"

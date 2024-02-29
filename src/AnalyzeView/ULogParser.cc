@@ -1,6 +1,7 @@
 #include "ULogParser.h"
-#include <math.h>
-#include <QDateTime>
+#include <QtCore/QtMath>
+#include <QtCore/QByteArray>
+#include <QtCore/QString>
 
 ULogParser::ULogParser()
 {

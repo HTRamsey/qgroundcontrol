@@ -8,8 +8,10 @@
  ****************************************************************************/
 
 
-#include <QStringList>
-#include <QDebug>
+#include <QtCore/QStringList>
+#include <QtCore/QDebug>
+#include <QtCore/QJsonArray>
+#include <QtCore/QJsonObject>
 
 #include "SimpleMissionItem.h"
 #include "FirmwarePluginManager.h"

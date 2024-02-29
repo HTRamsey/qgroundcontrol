@@ -23,6 +23,7 @@
 #ifndef QGC_AIRLINK_DISABLED
 #include <AirlinkLink.h>
 #endif
+#include <QtCore/QDebug>
 
 #define LINK_SETTING_ROOT "LinkConfigurations"
 

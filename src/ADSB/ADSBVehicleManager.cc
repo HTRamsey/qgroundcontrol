@@ -13,7 +13,8 @@
 #include "SettingsManager.h"
 #include "ADSBVehicleManagerSettings.h"
 
-#include <QDebug>
+#include <QtCore/QDebug>
+#include <QtNetwork/QTcpSocket>
 
 ADSBVehicleManager::ADSBVehicleManager(QGCApplication* app, QGCToolbox* toolbox)
     : QGCTool(app, toolbox)

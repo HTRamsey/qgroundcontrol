@@ -28,7 +28,7 @@
 #include "SyslinkComponent.h"
 #include "Vehicle.h"
 
-#include <QImage>
+#include <QtGui/QImage>
 
 /// @file
 ///     @brief This is the PX4 specific implementation of the AutoPilot class.

@@ -8,8 +8,8 @@
  ****************************************************************************/
 
 #include "APMAirframeComponent.h"
-#include "ArduCopterFirmwarePlugin.h"
 #include "ParameterManager.h"
+#include "Fact.h"
 
 const char* APMAirframeComponent::_frameClassParam = "FRAME_CLASS";
 

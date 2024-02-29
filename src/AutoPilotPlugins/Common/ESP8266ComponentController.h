@@ -16,7 +16,7 @@
 #ifndef ESP8266ComponentController_H
 #define ESP8266ComponentController_H
 
-#include <QTimer>
+#include <QtCore/QTimer>
 
 #include "FactPanelController.h"
 #include "QGCLoggingCategory.h"

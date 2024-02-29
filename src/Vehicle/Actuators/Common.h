@@ -9,15 +9,14 @@
 
 #pragma once
 
+#include "Fact.h"
+#include <QtCore/QString>
+#include <QtCore/QRegularExpressionMatch>
+#include <QtGui/QVector3D>
+#include <QtCore/QJsonValue>
+#include <QtCore/QLoggingCategory>
 
-#include <QString>
-#include <QRegularExpressionMatch>
-#include <QVector3D>
-#include <QJsonValue>
-
-#include <stdint.h>
-
-#include "ParameterManager.h"
+class ParameterManager;
 
 Q_DECLARE_LOGGING_CATEGORY(ActuatorsConfigLog)
 

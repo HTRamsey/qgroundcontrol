@@ -8,14 +8,11 @@
  ****************************************************************************/
 
 #include "GeoTagController.h"
+#include <QtCore/QtEndian>
+#include <QtCore/QDebug>
+#include <QtCore/QDir>
+#include <QtCore/QUrl>
 #include "QGCLoggingCategory.h"
-#include <math.h>
-#include <QtEndian>
-#include <QDebug>
-#include <cfloat>
-#include <QDir>
-#include <QUrl>
-
 #include "ExifParser.h"
 #include "ULogParser.h"
 #include "PX4LogParser.h"

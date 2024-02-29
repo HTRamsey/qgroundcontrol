@@ -7,12 +7,12 @@
  *
  ****************************************************************************/
 
-#include <QElapsedTimer>
-#include <cmath>
+#include <QtCore/QElapsedTimer>
+#include <QtCore/QtMath>
+#include <QtPositioning/QGeoPositionInfo>
 
 #include "MultiVehicleManager.h"
 #include "FirmwarePlugin.h"
-#include "MAVLinkProtocol.h"
 #include "FollowMe.h"
 #include "Vehicle.h"
 #include "PositionManager.h"

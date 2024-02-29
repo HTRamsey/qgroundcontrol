@@ -9,8 +9,9 @@
 
 #pragma once
 
-#include <QTimer>
-#include <QObject>
+#include <QtCore/QObject>
+
+class QTimer;
 
 /**
  * @brief The MavlinkMessagesTimer class

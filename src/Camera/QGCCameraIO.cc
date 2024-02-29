@@ -5,8 +5,12 @@
  *
  */
 
-#include "QGCCameraControl.h"
 #include "QGCCameraIO.h"
+#include "QGCApplication.h"
+#include "QGCCameraControl.h"
+#include "Vehicle.h"
+#include "Fact.h"
+#include <QtQml/QQmlEngine>
 
 QGC_LOGGING_CATEGORY(CameraIOLog, "CameraIOLog")
 QGC_LOGGING_CATEGORY(CameraIOLogVerbose, "CameraIOLogVerbose")

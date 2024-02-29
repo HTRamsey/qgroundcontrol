@@ -13,9 +13,10 @@
 #include "AutoPilotPlugin.h"
 #include "QGCApplication.h"
 #include "VideoManager.h"
-#include "QGCCameraManager.h"
-#include "QGCCameraControl.h"
-
+#include "FirmwarePlugin.h"
+#include "QGCLoggingCategory.h"
+#include "Vehicle.h"
+#include "MultiVehicleManager.h"
 #include <QSettings>
 
 // JoystickLog Category declaration moved to QGCLoggingCategory.cc to allow access in Vehicle

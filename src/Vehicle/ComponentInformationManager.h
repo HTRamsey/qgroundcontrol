@@ -15,7 +15,7 @@
 #include "ComponentInformationCache.h"
 #include "ComponentInformationTranslation.h"
 
-#include <QElapsedTimer>
+#include <QtCore/QElapsedTimer>
 
 Q_DECLARE_LOGGING_CATEGORY(ComponentInformationManagerLog)
 

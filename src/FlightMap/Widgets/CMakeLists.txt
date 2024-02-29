@@ -1,4 +1,6 @@
-add_custom_target(FligthMapWidgetsQml
+find_package(Qt6 REQUIRED COMPONENTS Qml)
+
+add_custom_target(FlightMapWidgetsQml
 	SOURCES
 		CenterMapDropButton.qml
 		CenterMapDropPanel.qml

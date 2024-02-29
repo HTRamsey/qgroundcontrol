@@ -10,6 +10,8 @@
 #include "ActuatorComponent.h"
 
 #include "QGCApplication.h"
+#include <QtQml/QQmlApplicationEngine>
+#include "GeometryImage.h"
 
 static bool imageProviderAdded{false};
 

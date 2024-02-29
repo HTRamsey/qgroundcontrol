@@ -13,6 +13,7 @@
 #include "FirmwarePlugin.h"
 #include "FirmwarePluginManager.h"
 #include "QGCApplication.h"
+#include "Vehicle.h"
 
 #include <QStandardPaths>
 #include <QJsonDocument>

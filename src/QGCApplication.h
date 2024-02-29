@@ -9,37 +9,26 @@
 
 #pragma once
 
-#include <QApplication>
-#include <QTimer>
-#include <QElapsedTimer>
-#include <QMap>
-#include <QSet>
-#include <QMetaMethod>
-#include <QMetaObject>
+#include <QtWidgets/QApplication>
+#include <QtCore/QTimer>
+#include <QtCore/QElapsedTimer>
+#include <QtCore/QMap>
+#include <QtCore/QSet>
+#include <QtCore/QMetaMethod>
+#include <QtCore/QMetaObject>
+#include <QtCore/QTranslator>
+#include <QtCore/QLocale>
 
 // These private headers are require to implement the signal compress support below
-#include <private/qthread_p.h>
-#include <private/qobject_p.h>
-
-#include "LinkConfiguration.h"
-#include "MAVLinkProtocol.h"
-#include "FlightMapSettings.h"
-#include "FirmwarePluginManager.h"
-#include "MultiVehicleManager.h"
-#include "JoystickManager.h"
-#include "AudioOutput.h"
-#include "UASMessageHandler.h"
-#include "FactSystem.h"
-#include "GPSRTKFactGroup.h"
-
-#ifdef QGC_RTLAB_ENABLED
-#include "OpalLink.h"
-#endif
+#include <QtCore/private/qthread_p.h>
+#include <QtCore/private/qobject_p.h>
 
 // Work around circular header includes
+class QQuickWindow;
 class QQmlApplicationEngine;
-class QGCSingleton;
 class QGCToolbox;
+class GPSRTKFactGroup;
+class FactGroup;
 
 /**
  * @brief The main application and management class.
@@ -88,7 +77,7 @@ public:
     /// Is Internet available?
     bool isInternetAvailable();
 
-    FactGroup* gpsRtkFactGroup(void)  { return _gpsRtkFactGroup; }
+    FactGroup* gpsRtkFactGroup(void);
 
     QTranslator& qgcJSONTranslator(void) { return _qgcTranslatorJSON; }
 

@@ -1,15 +1,15 @@
 #ifndef OSMPARSER_H
 #define OSMPARSER_H
 
-#include "qqml.h"
-#include <QObject>
-#include <QtXml>
-#include <QFile>
-#include <QMap>
-#include <QVector3D>
-#include <QVector2D>
-#include "qgeocoordinate.h"
-#include <QVariant>
+#include <QtQml/qqml.h>
+#include <QtCore/QObject>
+#include <QtXml/QDomElement>
+#include <QtCore/QFile>
+#include <QtCore/QMap>
+#include <QtGui/QVector3D>
+#include <QtGui/QVector2D>
+#include <QtPositioning/QGeoCoordinate>
+#include <QtCore/QVariant>
 
 ///     @author Omid Esrafilian <esrafilian.omid@gmail.com>
 

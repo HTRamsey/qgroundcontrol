@@ -1,3 +1,5 @@
+find_package(Qt6 REQUIRED COMPONENTS Core Qml)
+
 qt_add_library(QmlControlsTest STATIC)
 
 target_link_libraries(QmlControlsTest

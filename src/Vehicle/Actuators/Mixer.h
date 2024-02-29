@@ -9,11 +9,11 @@
 
 #pragma once
 
-#include <QObject>
-#include <QString>
-#include <QList>
-#include <QMap>
-#include <QSet>
+#include <QtCore/QObject>
+#include <QtCore/QString>
+#include <QtCore/QList>
+#include <QtCore/QMap>
+#include <QtCore/QSet>
 
 #include "Common.h"
 

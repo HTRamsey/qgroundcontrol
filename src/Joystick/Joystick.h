@@ -12,14 +12,16 @@
 
 #pragma once
 
-#include <QObject>
-#include <QThread>
+#include <QtCore/QObject>
+#include <QtCore/QThread>
+#include <QtCore/QLoggingCategory>
 #include <atomic>
-
-#include "QGCLoggingCategory.h"
-#include "Vehicle.h"
-#include "MultiVehicleManager.h"
 #include "JoystickMavCommand.h"
+#include "QmlObjectListModel.h"
+#include "MAVLinkProtocol.h"
+
+class Vehicle;
+class MultiVehicleManager;
 
 // JoystickLog Category declaration moved to QGCLoggingCategory.cc to allow access in Vehicle
 Q_DECLARE_LOGGING_CATEGORY(JoystickValuesLog)

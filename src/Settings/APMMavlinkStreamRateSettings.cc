@@ -9,6 +9,8 @@
 
 #include "APMMavlinkStreamRateSettings.h"
 #include "QGCApplication.h"
+#include "MultiVehicleManager.h"
+#include "Vehicle.h"
 
 #include <QQmlEngine>
 #include <QtQml>

@@ -1,3 +1,4 @@
+find_package(Qt6 REQUIRED COMPONENTS Core Charts Qml)
 
 qt_add_library(AnalyzeView STATIC
 	ExifParser.cc
@@ -29,15 +30,15 @@ add_custom_target(AnalyzeViewQml
 
 target_link_libraries(AnalyzeView
 	PRIVATE
-		qgc
-
-	PUBLIC
 		Qt6::Charts
-		Qt6::Location
-		Qt6::SerialPort
-		Qt6::TextToSpeech
-		Qt6::Widgets
+		FactSystem
+		QtLocationPlugin
+		Settings
+		Vehicle
+	PUBLIC
+		Qt6::Core
+		Qt6::Positioning
+		qgc
 )
 
-target_include_directories(AnalyzeView INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
-
+target_include_directories(AnalyzeView PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

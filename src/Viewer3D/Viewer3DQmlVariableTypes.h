@@ -1,8 +1,9 @@
 #ifndef VIEWER3DQMLVARIABLETYPES_H
 #define VIEWER3DQMLVARIABLETYPES_H
-#include <QObject>
-#include <qqml.h>
-#include <QGeoCoordinate>
+#include <QtCore/QObject>
+#include <QtQml/qqml.h>
+#include <QtPositioning/QGeoCoordinate>
+#include <QtGui/QVector3D>
 
 #include "Viewer3DUtils.h"
 

@@ -9,10 +9,10 @@
 
 #pragma once
 
-#include <QObject>
-#include <QQuickItem>
-#include <QList>
-#include <QAbstractListModel>
+#include <QtCore/QObject>
+#include <QtQuick/QQuickItem>
+#include <QtCore/QList>
+#include <QtCore/QAbstractListModel>
 
 #include "AutoPilotPlugin.h"
 #include "FactPanelController.h"

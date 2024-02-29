@@ -1,3 +1,4 @@
+find_package(Qt6 REQUIRED COMPONENTS Core)
 
 set(XZ_EMBEDDED_DIR ${CMAKE_SOURCE_DIR}/libs/xz-embedded)
 
@@ -25,14 +26,13 @@ target_link_libraries(compression
         z # zlib
 	PUBLIC
 		Qt6::Core
-		qgc
 )
 
 target_include_directories(compression
-	INTERFACE
-		${CMAKE_CURRENT_SOURCE_DIR}
 	PRIVATE
 		${XZ_EMBEDDED_DIR}/userspace
 		${XZ_EMBEDDED_DIR}/linux/include/linux
+	PUBLIC
+		${CMAKE_CURRENT_SOURCE_DIR}
 )
 

@@ -18,7 +18,6 @@
 #include "QGCApplication.h"
 #include "ParameterManager.h"
 #include "JsonHelper.h"
-#include "QGCQGeoCoordinate.h"
 #include "AppSettings.h"
 #include "PlanMasterController.h"
 #include "SettingsManager.h"

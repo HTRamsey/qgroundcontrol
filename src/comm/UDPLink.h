@@ -9,20 +9,19 @@
 
 #pragma once
 
-#include <QString>
-#include <QList>
-#include <QMap>
-#include <QMutex>
-#include <QUdpSocket>
-#include <QMutex>
-#include <QQueue>
-#include <QByteArray>
+#include <QtCore/QString>
+#include <QtCore/QList>
+#include <QtCore/QMap>
+#include <QtCore/QMutex>
+#include <QtNetwork/QUdpSocket>
+#include <QtCore/QMutex>
+#include <QtCore/QQueue>
+#include <QtCore/QByteArray>
 
 #if defined(QGC_ZEROCONF_ENABLED)
 #include <dns_sd.h>
 #endif
 
-#include "QGCConfig.h"
 #include "LinkConfiguration.h"
 #include "LinkInterface.h"
 

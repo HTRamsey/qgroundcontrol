@@ -11,10 +11,10 @@
 #ifndef PX4AIRFRAMELOADER_H
 #define PX4AIRFRAMELOADER_H
 
-#include <QObject>
-#include <QMap>
-#include <QXmlStreamReader>
-#include <QLoggingCategory>
+#include <QtCore/QObject>
+#include <QtCore/QMap>
+#include <QtCore/QXmlStreamReader>
+#include <QtCore/QLoggingCategory>
 
 #include "ParameterManager.h"
 #include "FactSystem.h"

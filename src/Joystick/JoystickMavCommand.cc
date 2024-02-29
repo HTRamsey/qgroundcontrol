@@ -10,9 +10,9 @@
 #include "JoystickMavCommand.h"
 #include "QGCLoggingCategory.h"
 #include "Vehicle.h"
-#include <QJsonDocument>
-#include <QJsonParseError>
-#include <QJsonArray>
+#include <QtCore/QJsonDocument>
+#include <QtCore/QJsonParseError>
+#include <QtCore/QJsonArray>
 
 QGC_LOGGING_CATEGORY(JoystickMavCommandLog, "JoystickMavCommandLog")
 

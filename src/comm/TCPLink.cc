@@ -7,16 +7,10 @@
  *
  ****************************************************************************/
 
-#include <QTimer>
-#include <QList>
 #include <QDebug>
-#include <QMutexLocker>
-#include <iostream>
 #include "TCPLink.h"
-#include "LinkManager.h"
-#include "QGC.h"
-#include <QHostInfo>
-#include <QSignalSpy>
+#include <QtNetwork/QHostInfo>
+#include <QtTest/QSignalSpy>
 
 TCPLink::TCPLink(SharedLinkConfigurationPtr& config)
     : LinkInterface(config)

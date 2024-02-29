@@ -5,9 +5,15 @@
  *
  */
 
-#include "QGCApplication.h"
 #include "QGCCameraManager.h"
+#include "QGCApplication.h"
+#include "QGCToolbox.h"
 #include "JoystickManager.h"
+#include "Vehicle.h"
+#include "MultiVehicleManager.h"
+#include "FirmwarePlugin.h"
+#include "QGCLoggingCategory.h"
+#include <QtQml/QQmlEngine>
 
 QGC_LOGGING_CATEGORY(CameraManagerLog, "CameraManagerLog")
 

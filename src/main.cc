@@ -23,8 +23,7 @@
 #include "QGC.h"
 #include "QGCApplication.h"
 #include "AppMessages.h"
-
-#include <iostream>
+#include "Vehicle.h"
 
 #ifndef __mobile__
     #include "QGCSerialPortInfo.h"

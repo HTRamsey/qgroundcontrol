@@ -1,7 +1,8 @@
-
 add_subdirectory(APM)
 add_subdirectory(Common)
 add_subdirectory(PX4)
+
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick)
 
 qt_add_library(AutoPilotPlugins STATIC
 	APM/APMAirframeComponent.cc
@@ -70,18 +71,28 @@ qt_add_library(AutoPilotPlugins STATIC
 	PX4/SensorsComponent.h
 
 	AutoPilotPlugin.cc
+	AutoPilotPlugin.h
 )
 
 target_link_libraries(AutoPilotPlugins
 	PRIVATE
+		FirmwarePlugin
+		Actuators
+	PUBLIC
+		Qt6::Core
+		Qt6::Gui
+		Qt6::Qml
+		Qt6::Quick
 		qgc
+		FactSystem
+		Vehicle
+		VehicleSetup
 )
 
 target_include_directories(AutoPilotPlugins
-	INTERFACE
-		${CMAKE_CURRENT_SOURCE_DIR}
 	PUBLIC
+		${CMAKE_CURRENT_SOURCE_DIR}
 		APM
 		Common
 		PX4
-	)
+)

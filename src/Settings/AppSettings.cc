@@ -11,11 +11,13 @@
 #include "QGCPalette.h"
 #include "QGCApplication.h"
 #include "ParameterManager.h"
+#include "QGCMAVLink.h"
 
 #ifdef __android__
 #include "AndroidInterface.h"
 #endif
 
+#include <QtCore/QTranslator>
 #include <QQmlEngine>
 #include <QtQml>
 #include <QStandardPaths>

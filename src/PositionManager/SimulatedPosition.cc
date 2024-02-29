@@ -7,9 +7,8 @@
  *
  ****************************************************************************/
 
-#include <QtCore>
-#include <QDateTime>
-#include <QDate>
+#include <QtCore/QDateTime>
+#include <QtCore/QDate>
 
 #include "SimulatedPosition.h"
 #include "QGCApplication.h"

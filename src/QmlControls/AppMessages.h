@@ -10,10 +10,10 @@
 
 #pragma once
 
-#include <QObject>
-#include <QStringListModel>
-#include <QUrl>
-#include <QFile>
+#include <QtCore/QObject>
+#include <QtCore/QStringListModel>
+#include <QtCore/QUrl>
+#include <QtCore/QFile>
 
 // Hackish way to force only this translation unit to have public ctor access
 #ifndef _LOG_CTOR_ACCESS_

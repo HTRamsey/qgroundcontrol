@@ -1,7 +1,8 @@
 #include "ExifParser.h"
-#include <math.h>
-#include <QtEndian>
-#include <QDateTime>
+#include <QtCore/QtEndian>
+#include <QtCore/QtMath>
+#include <QtCore/QDateTime>
+#include <QtCore/QByteArray>
 
 ExifParser::ExifParser()
 {

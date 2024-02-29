@@ -18,7 +18,7 @@
 #ifndef QGCGEO_H
 #define QGCGEO_H
 
-#include <QGeoCoordinate>
+#include <QtPositioning/QGeoCoordinate>
 
 /**
  * @brief Project a geodetic coordinate on to local tangential plane (LTP) as coordinate with East,

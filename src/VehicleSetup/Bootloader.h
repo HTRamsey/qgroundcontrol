@@ -14,10 +14,8 @@
 #ifdef __android__
 #include "qserialport.h"
 #else
-#include <QSerialPort>
+#include <QtSerialPort/QSerialPort>
 #endif
-
-#include <stdint.h>
 
 /// Bootloader Utility routines. Works with PX4 and 3DR Radio bootloaders.
 class Bootloader : public QObject

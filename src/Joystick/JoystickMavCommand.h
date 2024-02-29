@@ -12,8 +12,8 @@
 
 #pragma once
 
-#include <QString>
-#include <QList>
+#include <QtCore/QString>
+#include <QtCore/QList>
 
 class Vehicle;
 

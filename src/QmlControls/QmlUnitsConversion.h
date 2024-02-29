@@ -10,8 +10,8 @@
 #ifndef QMLUNITSCONVERSION_H
 #define QMLUNITSCONVERSION_H
 
-#include <QObject>
-#include <qmath.h>
+#include <QtCore/QObject>
+#include <QtCore/QtMath>
 #include "FactMetaData.h"
 
 class QmlUnitsConversion : public QObject

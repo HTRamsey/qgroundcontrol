@@ -9,11 +9,11 @@
 
 #pragma once
 
-#include <QObject>
-#include <QTimer>
-#include <QDebug>
-#include <QLoggingCategory>
-#include <QElapsedTimer>
+#include <QtCore/QObject>
+#include <QtCore/QTimer>
+#include <QtCore/QDebug>
+#include <QtCore/QLoggingCategory>
+#include <QtCore/QElapsedTimer>
 
 #include "QGCMAVLink.h"
 #include "LinkInterface.h"

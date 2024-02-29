@@ -9,12 +9,11 @@
 
 #pragma once
 
-#include <QObject>
-#include <QString>
-
 #include "Common.h"
-
-#include <QmlObjectListModel.h>
+#include "Vehicle.h"
+#include "QmlObjectListModel.h"
+#include <QtCore/QObject>
+#include <QtCore/QString>
 
 namespace ActuatorActions {
 

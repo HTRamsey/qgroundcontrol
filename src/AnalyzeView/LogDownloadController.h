@@ -11,11 +11,8 @@
 #ifndef LogDownloadController_H
 #define LogDownloadController_H
 
-#include <QObject>
-#include <QTimer>
-#include <QAbstractListModel>
-#include <QLocale>
-#include <QElapsedTimer>
+#include <QtCore/QObject>
+#include <QtCore/QTimer>
 
 #include <memory>
 

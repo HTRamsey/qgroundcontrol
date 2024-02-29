@@ -11,7 +11,7 @@
 #ifndef RCChannelMonitorController_H
 #define RCChannelMonitorController_H
 
-#include <QTimer>
+#include <QtCore/QTimer>
 
 #include "FactPanelController.h"
 #include "QGCLoggingCategory.h"

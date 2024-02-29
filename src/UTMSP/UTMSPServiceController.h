@@ -9,10 +9,10 @@
 
 #pragma once
 
-#include "qelapsedtimer.h"
-#include "qgeocoordinate.h"
 #include <QGCMAVLink.h>
-#include <QObject>
+#include <QtPositioning/QGeoCoordinate>
+#include <QtCore/QElapsedTimer>
+#include <QtCore/QObject>
 
 #include "UTMSPAuthorization.h"
 #include "UTMSPFlightPlanManager.h"

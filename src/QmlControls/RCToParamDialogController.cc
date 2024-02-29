@@ -9,6 +9,8 @@
 
 #include "RCToParamDialogController.h"
 #include "QGCApplication.h"
+#include "MultiVehicleManager.h"
+#include "Vehicle.h"
 #include "ParameterManager.h"
 
 const char*  RCToParamDialogController::_scaleFactName =    "Scale";

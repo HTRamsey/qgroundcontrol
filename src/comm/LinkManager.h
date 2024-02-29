@@ -9,15 +9,13 @@
 
 #pragma once
 
-#include <QList>
-#include <QMultiMap>
-#include <QMutex>
-
+#include <QtCore/QList>
+#include <QtCore/QObject>
+#include <QtCore/QLoggingCategory>
 #include <limits>
 
 #include "LinkConfiguration.h"
 #include "LinkInterface.h"
-#include "QGCLoggingCategory.h"
 #include "QGCToolbox.h"
 #include "MAVLinkProtocol.h"
 #if !defined(__mobile__)

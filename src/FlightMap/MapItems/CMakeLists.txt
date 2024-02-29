@@ -1,3 +1,5 @@
+find_package(Qt6 REQUIRED COMPONENTS Qml)
+
 add_custom_target(FligthMapItemsQml
 	SOURCES
 		CameraTriggerIndicator.qml

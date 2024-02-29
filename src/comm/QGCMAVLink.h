@@ -9,13 +9,12 @@
 
 #pragma once
 
-#include <QObject>
-#include <QString>
-#include <QList>
+#include <QtCore/QObject>
+#include <QtCore/QString>
+#include <QtCore/QList>
 
 #define MAVLINK_USE_MESSAGE_INFO
 #define MAVLINK_EXTERNAL_RX_STATUS  // Single m_mavlink_status instance is in QGCApplication.cc
-#include <stddef.h>                 // Hack workaround for Mav 2.0 header problem with respect to offsetof usage
 
 // Ignore warnings from mavlink headers for both GCC/Clang and MSVC
 #ifdef __GNUC__

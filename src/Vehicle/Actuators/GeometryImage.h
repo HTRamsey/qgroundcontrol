@@ -9,17 +9,14 @@
 
 #pragma once
 
-#include <QObject>
-#include <QString>
+#include <QtCore/QObject>
+#include <QtCore/QString>
 
-#include <functional>
-#include <cmath>
+#include <QtQuick/QQuickImageProvider>
+#include <QtGui/QVector2D>
+#include <QtGui/QPainter>
 
-#include <QQuickImageProvider>
-#include <QVector2D>
-#include <QPainter>
-
-#include <QGCPalette.h>
+#include "QGCPalette.h"
 
 #include "Common.h"
 

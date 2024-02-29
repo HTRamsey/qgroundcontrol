@@ -7,8 +7,8 @@
  *
  ****************************************************************************/
 
-#include <QQmlEngine>
-
+#include <QtQml/QQmlEngine>
+#include <QtCore/QJsonArray>
 #include "CustomActionManager.h"
 #include "CustomAction.h"
 #include "JsonHelper.h"

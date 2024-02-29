@@ -9,10 +9,10 @@
 
 #pragma once
 
-#include <QQuickItem>
-#include <QTimer>
-#include <QSGGeometryNode>
-#include <QSGGeometry>
+#include <QtQuick/QQuickItem>
+#include <QtCore/QTimer>
+#include <QtQuick/QSGGeometryNode>
+#include <QtQuick/QSGGeometry>
 
 #include "QGCLoggingCategory.h"
 

@@ -9,9 +9,9 @@
 
 #pragma once
 
-#include <QObject>
-#include <QVector>
-#include <QMutex>
+#include <QtCore/QObject>
+#include <QtCore/QVector>
+#include <QtCore/QMutex>
 
 #include "QGCToolbox.h"
 

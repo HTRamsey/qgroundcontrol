@@ -10,11 +10,12 @@
 
 #include "QGCSerialPortInfo.h"
 #include "JsonHelper.h"
+#include "QGCLoggingCategory.h"
 
-#include <QFile>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonArray>
+#include <QtCore/QFile>
+#include <QtCore/QJsonDocument>
+#include <QtCore/QJsonObject>
+#include <QtCore/QJsonArray>
 #include <QtCore5Compat/QRegExp>
 
 QGC_LOGGING_CATEGORY(QGCSerialPortInfoLog, "QGCSerialPortInfoLog")

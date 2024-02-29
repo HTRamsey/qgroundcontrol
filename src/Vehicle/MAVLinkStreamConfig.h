@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include <QVector>
+#include <QtCore/QVector>
 
 #include <functional>
 

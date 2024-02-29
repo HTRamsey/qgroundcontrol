@@ -14,7 +14,7 @@
 #include "APMParameterMetaData.h"
 #include "FollowMe.h"
 
-#include <QAbstractSocket>
+#include <QtNetwork/QAbstractSocket>
 
 Q_DECLARE_LOGGING_CATEGORY(APMFirmwarePluginLog)
 

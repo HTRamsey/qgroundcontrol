@@ -11,10 +11,10 @@
 #ifndef VideoManager_H
 #define VideoManager_H
 
-#include <QObject>
-#include <QTimer>
-#include <QTime>
-#include <QUrl>
+#include <QtCore/QObject>
+#include <QtCore/QTimer>
+#include <QtCore/QTime>
+#include <QtCore/QUrl>
 
 #include "QGCMAVLink.h"
 #include "QGCLoggingCategory.h"

@@ -11,7 +11,7 @@
 #ifndef APMSubMotorComponentController_H
 #define APMSubMotorComponentController_H
 
-#include <QObject>
+#include <QtCore/QObject>
 #include "FactPanelController.h"
 #include "Vehicle.h"
 

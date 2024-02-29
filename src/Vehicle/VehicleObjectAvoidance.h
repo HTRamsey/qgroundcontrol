@@ -9,9 +9,9 @@
 
 #pragma once
 
-#include <QObject>
-#include <QVector>
-#include <QPointF>
+#include <QtCore/QObject>
+#include <QtCore/QVector>
+#include <QtCore/QPointF>
 
 #include "QGCMAVLink.h"
 

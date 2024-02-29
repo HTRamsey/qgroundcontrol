@@ -10,12 +10,12 @@
 #include "FixedWingLandingComplexItem.h"
 #include "JsonHelper.h"
 #include "MissionController.h"
-#include "QGCGeo.h"
-#include "SimpleMissionItem.h"
 #include "PlanMasterController.h"
 #include "FlightPathSegment.h"
 
-#include <QPolygonF>
+#include <QtGui/QPolygonF>
+#include <QtCore/QJsonArray>
+#include <QtCore/QJsonObject>
 
 QGC_LOGGING_CATEGORY(FixedWingLandingComplexItemLog, "FixedWingLandingComplexItemLog")
 

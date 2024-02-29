@@ -10,20 +10,16 @@
 
 #pragma once
 
-#include <QString>
-#include <QThread>
-#include <QByteArray>
-#ifdef __android__
-#include "qserialport.h"
-#else
-#include <QSerialPort>
-#endif
+#include <QtCore/QString>
+#include <QtCore/QThread>
+#include <QtCore/QByteArray>
 
 #include <atomic>
 
 #include "GPSPositionMessage.h"
 #include "Drivers/src/gps_helper.h"
 
+class QSerialPort;
 
 /**
  ** class GPSProvider

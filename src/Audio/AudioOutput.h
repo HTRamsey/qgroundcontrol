@@ -9,11 +9,11 @@
 
 #pragma once
 
-#include <QObject>
-#include <QTimer>
-#include <QThread>
-#include <QStringList>
-#include <QTextToSpeech>
+#include <QtCore/QObject>
+#include <QtCore/QTimer>
+#include <QtCore/QThread>
+#include <QtCore/QStringList>
+#include <QtTextToSpeech/QTextToSpeech>
 
 #include "QGCToolbox.h"
 

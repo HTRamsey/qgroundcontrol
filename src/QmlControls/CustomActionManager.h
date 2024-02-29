@@ -7,7 +7,7 @@
  *
  ****************************************************************************/
 
-#include <QObject>
+#include <QtCore/QObject>
 #include <QmlObjectListModel.h>
 
 

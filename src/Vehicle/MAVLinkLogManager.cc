@@ -10,6 +10,7 @@
 #include "MAVLinkLogManager.h"
 #include "QGCApplication.h"
 #include "SettingsManager.h"
+#include "MultiVehicleManager.h"
 
 #include <QQmlContext>
 #include <QQmlProperty>

@@ -9,23 +9,17 @@
 
 #pragma once
 
-#include <QThread>
-#include <QDateTime>
-#include <QLoggingCategory>
-#include <QMutex>
-#include <QMutexLocker>
-#include <QMetaType>
-#include <QSharedPointer>
-#include <QDebug>
-#include <QTimer>
+#include <QtCore/QThread>
+#include <QtCore/QLoggingCategory>
+#include <QtCore/QDebug>
 
 #include <memory>
 
 #include "QGCMAVLink.h"
 #include "LinkConfiguration.h"
-#include "MavlinkMessagesTimer.h"
 
 class LinkManager;
+class MavlinkMessagesTimer;
 
 Q_DECLARE_LOGGING_CATEGORY(LinkInterfaceLog)
 

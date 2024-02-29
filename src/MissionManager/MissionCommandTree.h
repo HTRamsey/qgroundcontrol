@@ -13,8 +13,8 @@
 #include "QGCMAVLink.h"
 #include "Vehicle.h"
 
-#include <QVariantList>
-#include <QMap>
+#include <QtCore/QVariantList>
+#include <QtCore/QMap>
 
 class MissionCommandUIInfo;
 class MissionCommandList;

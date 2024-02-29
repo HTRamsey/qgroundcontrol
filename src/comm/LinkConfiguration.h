@@ -9,8 +9,8 @@
 
 #pragma once
 
-#include <QSettings>
-
+#include <QtCore/QSettings>
+#include <QtCore/QObject>
 #include <memory>
 
 class LinkInterface;
@@ -52,9 +52,9 @@ public:
 #endif
         TypeUdp,        ///< UDP Link
         TypeTcp,        ///< TCP Link
-#ifdef QGC_ENABLE_BLUETOOTH
+// #ifdef QGC_ENABLE_BLUETOOTH
         TypeBluetooth,  ///< Bluetooth Link
-#endif
+// #endif
 #ifdef QT_DEBUG
         TypeMock,       ///< Mock Link for Unitesting
 #endif

@@ -1,15 +1,4 @@
-
-set(EXTRA_SRC)
-if(QGC_BUILD_TESTING)
-	list(APPEND EXTRA_SRC
-		MockLink.cc
-		MockLink.h
-		MockLinkFTP.cc
-		MockLinkFTP.h
-		MockLinkMissionItemHandler.cc
-		MockLinkMissionItemHandler.h
-	)
-endif()
+find_package(Qt6 REQUIRED COMPONENTS Bluetooth Core Core5Compat Network Qml Test OPTIONAL_COMPONENTS SerialPort)
 
 qt_add_library(comm STATIC
 	BluetoothLink.cc
@@ -38,26 +27,45 @@ qt_add_library(comm STATIC
 	UdpIODevice.h
 	UDPLink.cc
 	UDPLink.h
-
-	${EXTRA_SRC}
 )
 
+if(QGC_BUILD_TESTING)
+	target_sources(comm
+		PRIVATE
+			MockLink.cc
+			MockLink.h
+			MockLinkFTP.cc
+			MockLinkFTP.h
+			MockLinkMissionItemHandler.cc
+			MockLinkMissionItemHandler.h
+	)
+endif()
+
 target_link_libraries(comm
-	PUBLIC
-		qgc
-		Qt6::Location
-		Qt6::SerialPort
+	PRIVATE
+		Qt6::Core5Compat
+		Qt6::Qml
 		Qt6::Test
-		Qt6::TextToSpeech
-		Qt6::Widgets
+		gps
+		PositionManager
+		Vehicle
+	PUBLIC
 		Qt6::Bluetooth
+		Qt6::Core
+		Qt6::Network
+		qgc
+		QmlControls
 )
 
 if(NOT QT6_DISABLE_DNSENGINE)
 	target_link_libraries(comm PUBLIC qmdnsengine)
 endif()
 
-target_compile_definitions(comm PUBLIC QGC_ENABLE_BLUETOOTH)
+if(ANDROID)
+	target_compile_definitions(comm PUBLIC QGC_ENABLE_BLUETOOTH)
+else()
+	target_link_libraries(comm PUBLIC Qt6::SerialPort)
+endif()
 
 target_include_directories(comm
     PUBLIC

@@ -9,23 +9,22 @@
 
 #pragma once
 
-#include <QObject>
-#include <QThread>
-#include <QMutex>
-#include <QString>
+#include <QtCore/QObject>
+#include <QtCore/QThread>
+#include <QtCore/QMutex>
+#include <QtCore/QString>
 
 #ifdef __android__
 #include "qserialport.h"
 #else
-#include <QSerialPort>
+#include <QtSerialPort/QSerialPort>
 #endif
-#include <QMetaType>
-#include <QLoggingCategory>
+#include <QtCore/QMetaType>
+#include <QtCore/QLoggingCategory>
 
 // We use QSerialPort::SerialPortError in a signal so we must declare it as a meta type
 Q_DECLARE_METATYPE(QSerialPort::SerialPortError)
 
-#include "QGCConfig.h"
 #include "LinkConfiguration.h"
 #include "LinkInterface.h"
 

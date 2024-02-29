@@ -14,12 +14,11 @@
 #ifndef VEHICLECOMPONENT_H
 #define VEHICLECOMPONENT_H
 
-#include <QObject>
-#include <QQmlContext>
-#include <QQuickItem>
+#include <QtCore/QObject>
+#include <QtQml/QQmlContext>
+#include <QtQuick/QQuickItem>
 
-#include "Vehicle.h"
-
+class Vehicle;
 class AutoPilotPlugin;
 
 /// A vehicle component is an object which abstracts the physical portion of a vehicle into a set of

@@ -48,44 +48,26 @@ cmake_dependent_option(QGC_BUILD_TESTING "Enable testing" ON "CMAKE_BUILD_TYPE S
 #               Qt6 Configuration
 #######################################################
 
-add_compile_definitions(QT_DISABLE_DEPRECATED_BEFORE=0x060600)
-add_compile_definitions(QT_DEBUG_FIND_PACKAGE=ON)
-
-include(Qt6QGCConfiguration)
-message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")
-message(STATUS "Qt version: ${QT_VERSION}")
-message(STATUS "Qt spec: ${QT_MKSPEC}")
-
-# Find Qt6 libraries
 find_package(Qt6
     REQUIRED
     COMPONENTS
-        Bluetooth
-        Charts
-        Concurrent
         Core
-        Core5Compat
-        Location
-        Multimedia
-        Network
-        Positioning
-        Quick
-        QuickControls2
-        QuickWidgets
-        OpenGL
-        Sql
-        Svg
-        Test
-        TextToSpeech
-        Widgets
-        Xml
-    OPTIONAL_COMPONENTS
-        SerialPort
+        Qml
     HINTS
         {QT_LIBRARY_HINTS}
 )
 
 qt_standard_project_setup(REQUIRES 6.6.0)
+
+add_compile_definitions(
+    QT_DISABLE_DEPRECATED_BEFORE=0x060600
+    QT_DEBUG_FIND_PACKAGE=ON
+)
+
+include(Qt6QGCConfiguration)
+message(STATUS "Build Type: ${CMAKE_BUILD_TYPE}")
+message(STATUS "Qt version: ${QT_VERSION}")
+message(STATUS "Qt spec: ${QT_MKSPEC}")
 
 qt_policy(
     SET QTP0001 NEW
@@ -114,8 +96,10 @@ option(QGC_DEBUG_QML "Build QGroundControl with QML debugging/profiling support.
 add_feature_info(DEBUG_QML DEBUG_QML "Build QGroundControl with QML debugging/profiling support.")
 if(QGC_DEBUG_QML)
     message(STATUS "To enable the QML debugger/profiler, run with: '-qmljsdebugger=port:1234'")
-    add_definitions(-DQMLJSDEBUGGER)
-    add_definitions(-DQT_QML_DEBUG)
+    add_compile_definitions(
+        QMLJSDEBUGGER
+        QT_QML_DEBUG
+    )
 endif()
 
 #######################################################
@@ -126,10 +110,10 @@ set(COMPANY "Mavlink")
 set(COPYRIGHT "Copyright (c) 2018 QGroundControl. All rights reserved.")
 set(IDENTIFIER "io.mavlink.qgroundcontrol")
 
-add_definitions(
-    -DQGC_APPLICATION_NAME="QGroundControl"
-    -DQGC_ORG_NAME="QGroundControl.org"
-    -DQGC_ORG_DOMAIN="org.qgroundcontrol"
+add_compile_definitions(
+    QGC_APPLICATION_NAME="QGroundControl"
+    QGC_ORG_NAME="QGroundControl.org"
+    QGC_ORG_DOMAIN="org.qgroundcontrol"
 )
 
 #######################################################
@@ -170,7 +154,7 @@ endif()
 
 if(WIN32)
     list(APPEND QGC_RESOURCES ${CMAKE_SOURCE_DIR}/deploy/windows/QGroundControl.rc)
-elseif(APPLE)
+elseif(MACOS)
     set(MACOSX_BUNDLE_ICON_FILE macx.icns)
     set(app_icon_macos "${CMAKE_SOURCE_DIR}/resources/icons/macx.icns")
     set_source_files_properties(${app_icon_macos} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
@@ -183,7 +167,9 @@ endif()
 
 qt_add_executable(${PROJECT_NAME} ${QGC_RESOURCES})
 
-if(APPLE)
+target_precompile_headers(qgc PRIVATE ${CMAKE_SOURCE_DIR}/src/pch.h)
+
+if(MACOS)
     set_target_properties(${PROJECT_NAME}
         PROPERTIES
             MACOSX_BUNDLE TRUE
@@ -212,10 +198,8 @@ elseif(ANDROID)
             #QT_ANDROID_KEYSTORE_KEY_PASS
             #QT_ANDROID_SIGN_APK
             #QT_ENABLE_VERBOSE_DEPLOYMENT
-            #QT_HOST_PATH
             #QT_PATH_ANDROID_ABI_arm64-v8a
     )
-
 elseif(LINUX)
 
 endif()

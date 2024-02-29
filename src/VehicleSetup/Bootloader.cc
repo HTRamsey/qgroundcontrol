@@ -10,10 +10,9 @@
 #include "Bootloader.h"
 #include "QGCLoggingCategory.h"
 
-#include <QFile>
-#include <QSerialPortInfo>
-#include <QDebug>
-#include <QElapsedTimer>
+#include <QtCore/QFile>
+#include <QtCore/QDebug>
+#include <QtCore/QElapsedTimer>
 
 #include "QGC.h"
 

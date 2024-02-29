@@ -13,7 +13,7 @@
 #include "QGCLoggingCategory.h"
 #include "FactMetaData.h"
 
-#include <QObject>
+#include <QtCore/QObject>
 
 class FactMetaData;
 class Vehicle;

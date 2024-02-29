@@ -19,17 +19,10 @@
 #include "FirmwareImage.h"
 #include "QGCSerialPortInfo.h"
 
-#include <QObject>
-#include <QThread>
-#include <QTimer>
-#include <QTime>
-#ifdef __android__
-#include "qserialport.h"
-#else
-#include <QSerialPort>
-#endif
-
-#include <stdint.h>
+#include <QtCore/QObject>
+#include <QtCore/QThread>
+#include <QtCore/QTimer>
+#include <QtCore/QTime>
 
 class PX4FirmwareUpgradeThreadController;
 

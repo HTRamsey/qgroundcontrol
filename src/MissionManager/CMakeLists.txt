@@ -1,3 +1,4 @@
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Positioning Qml Xml)
 
 qt_add_library(MissionManager STATIC
 	BlankPlanCreator.cc
@@ -20,6 +21,10 @@ qt_add_library(MissionManager STATIC
 	GeoFenceController.h
 	GeoFenceManager.cc
 	GeoFenceManager.h
+    KMLDomDocument.cc
+    KMLDomDocument.h
+    KMLHelper.cc
+    KMLHelper.h
 	KMLPlanDomDocument.cc
 	KMLPlanDomDocument.h
 	LandingComplexItem.cc
@@ -63,6 +68,10 @@ qt_add_library(MissionManager STATIC
 	RallyPointManager.cc
 	RallyPointManager.h
 	Section.h
+    ShapeFileHelper.cc
+    ShapeFileHelper.h
+    SHPFileHelper.cc
+    SHPFileHelper.h
 	SimpleMissionItem.cc
 	SimpleMissionItem.h
 	SpeedSection.cc
@@ -83,8 +92,6 @@ qt_add_library(MissionManager STATIC
 	VisualMissionItem.h
 	VTOLLandingComplexItem.cc
 	VTOLLandingComplexItem.h
-
-	Section.h # shouldn't be listed here, but isn't named properly for AUTOMOC
 )
 
 add_custom_Target(MisionManagerQml
@@ -96,9 +103,27 @@ add_custom_Target(MisionManagerQml
 )
 
 target_link_libraries(MissionManager
+	PRIVATE
+		shp
+		Qt6::Qml
+		api
+		FirmwarePlugin
+		VideoManager
 	PUBLIC
+		Qt6::Core
+		Qt6::Gui
+		Qt6::Positioning
 		Qt6::Xml
+		comm
+		FactSystem
+		Geo
 		qgc
+		QmlControls
+		Vehicle
 )
 
-target_include_directories(MissionManager INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(MissionManager
+	PUBLIC
+		${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/libs/shapelib
+)

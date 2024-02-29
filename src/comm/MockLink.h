@@ -9,11 +9,11 @@
 
 #pragma once
 
-#include <QElapsedTimer>
-#include <QGeoCoordinate>
-#include <QLoggingCategory>
-#include <QMap>
-#include <QMutex>
+#include <QtCore/QElapsedTimer>
+#include <QtPositioning/QGeoCoordinate>
+#include <QtCore/QLoggingCategory>
+#include <QtCore/QMap>
+#include <QtCore/QMutex>
 
 #include "MockLinkMissionItemHandler.h"
 #include "MockLinkFTP.h"

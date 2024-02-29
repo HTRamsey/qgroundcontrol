@@ -9,8 +9,8 @@
 
 #pragma once
 
-#include <QObject>
-#include <QList>
+#include <QtCore/QObject>
+#include <QtCore/QList>
 
 #include "AutoPilotPlugin.h"
 #include "FactPanelController.h"

@@ -9,8 +9,8 @@
 
 #pragma once
 
-#include <QObject>
-#include <QString>
+#include <QtCore/QObject>
+#include <QtCore/QString>
 
 #include <functional>
 

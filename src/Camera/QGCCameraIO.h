@@ -11,10 +11,13 @@
 
 #pragma once
 
-#include "QGCApplication.h"
-#include <QLoggingCategory>
+#include "MAVLinkProtocol.h"
+#include <QtCore/QLoggingCategory>
+#include <QtCore/QVariant>
 
 class QGCCameraControl;
+class Fact;
+class Vehicle;
 
 Q_DECLARE_LOGGING_CATEGORY(CameraIOLog)
 Q_DECLARE_LOGGING_CATEGORY(CameraIOLogVerbose)

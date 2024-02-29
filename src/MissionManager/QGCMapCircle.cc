@@ -8,9 +8,7 @@
  ****************************************************************************/
 
 #include "QGCMapCircle.h"
-#include "QGCGeo.h"
 #include "JsonHelper.h"
-#include "QGCQGeoCoordinate.h"
 
 #include <QGeoRectangle>
 #include <QDebug>

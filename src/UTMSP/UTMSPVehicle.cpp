@@ -9,7 +9,7 @@
 
 #include "Vehicle.h"
 
-#include <QQmlApplicationEngine>
+#include <QtQml/QQmlApplicationEngine>
 
 #include "UTMSPVehicle.h"
 #include "UTMSPLogger.h"

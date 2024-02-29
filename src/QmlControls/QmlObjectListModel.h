@@ -11,7 +11,7 @@
 #ifndef QmlObjectListModel_H
 #define QmlObjectListModel_H
 
-#include <QAbstractListModel>
+#include <QtCore/QAbstractListModel>
 
 class QmlObjectListModel : public QAbstractListModel
 {

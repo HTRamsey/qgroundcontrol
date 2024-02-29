@@ -11,17 +11,16 @@
 
 #pragma once
 
-#include "QGCApplication.h"
-#include <QLoggingCategory>
 #include "QmlObjectListModel.h"
 #include "QGCCameraControl.h"
-
-#include <QObject>
-#include <QTimer>
+#include <QtCore/QLoggingCategory>
+#include <QtCore/QObject>
+#include <QtCore/QTimer>
 
 Q_DECLARE_LOGGING_CATEGORY(CameraManagerLog)
 
 class Joystick;
+class Vehicle;
 
 //-----------------------------------------------------------------------------
 /// Camera Manager

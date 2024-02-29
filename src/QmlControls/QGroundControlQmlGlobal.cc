@@ -9,7 +9,7 @@
 
 #include "QGroundControlQmlGlobal.h"
 #include "LinkManager.h"
-
+#include "FirmwarePluginManager.h"
 #include <QSettings>
 #include <QLineF>
 #include <QPointF>

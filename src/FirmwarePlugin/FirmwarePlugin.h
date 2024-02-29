@@ -16,19 +16,20 @@
 
 #include "QGCMAVLink.h"
 #include "VehicleComponent.h"
-#include "AutoPilotPlugin.h"
 #include "GeoFenceManager.h"
 #include "RallyPointManager.h"
 #include "FollowMe.h"
 
-#include <QList>
-#include <QString>
-#include <QVariantList>
+#include <QtCore/QList>
+#include <QtCore/QString>
+#include <QtCore/QVariantList>
 
 class Vehicle;
 class QGCCameraControl;
 class QGCCameraManager;
 class Autotune;
+class AutoPilotPlugin;
+class FactGroup;
 
 /// This is the base class for Firmware specific plugins
 ///

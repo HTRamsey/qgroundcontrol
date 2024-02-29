@@ -1,5 +1,6 @@
+find_package(Qt6 REQUIRED COMPONENTS Qml)
 
-add_custom_target(FligthDisplayQml
+add_custom_target(FlightDisplayQml
 	SOURCES
 		DefaultChecklist.qml
 		FixedWingChecklist.qml
@@ -52,4 +53,3 @@ add_custom_target(FligthDisplayQml
 		ObstacleDistanceOverlayMap.qml
 		ObstacleDistanceOverlayVideo.qml
 )
-

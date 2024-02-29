@@ -18,6 +18,8 @@
 #include "ADSBVehicleManager.h"
 #include "QGCPalette.h"
 #include "QmlUnitsConversion.h"
+#include "MAVLinkProtocol.h"
+#include "QGCMapUrlEngine.h"
 #ifndef QGC_AIRLINK_DISABLED
 #include "AirLinkManager.h"
 #else
@@ -27,10 +29,13 @@ class AirLinkManager;
 #include "UTMSPManager.h"
 #endif
 
+#include <QtPositioning/QGeoCoordinate>
+
 class QGCToolbox;
 class LinkManager;
 
 Q_MOC_INCLUDE("LinkManager.h")
+Q_MOC_INCLUDE("MultiVehicleManager.h")
 Q_MOC_INCLUDE("QGCMapEngineManager.h")
 Q_MOC_INCLUDE("PositionManager.h")
 Q_MOC_INCLUDE("VideoManager.h")

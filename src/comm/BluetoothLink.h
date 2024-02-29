@@ -9,16 +9,13 @@
 
 #pragma once
 
-#include <QString>
-#include <QList>
-#include <QMutex>
-#include <QMutexLocker>
-#include <QQueue>
-#include <QByteArray>
-#include <QBluetoothDeviceInfo>
+#include <QtCore/QString>
+#include <QtCore/QList>
+#include <QtCore/QByteArray>
+#include <QtBluetooth/QBluetoothDeviceInfo>
 #include <QtBluetooth/QBluetoothSocket>
-#include <qbluetoothserviceinfo.h>
-#include <qbluetoothservicediscoveryagent.h>
+#include <QtBluetooth/QBluetoothServiceInfo>
+#include <QtBluetooth/QBluetoothServiceDiscoveryAgent>
 
 #include "LinkConfiguration.h"
 #include "LinkInterface.h"

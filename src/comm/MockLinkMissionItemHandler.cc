@@ -10,6 +10,7 @@
 
 #include "MockLinkMissionItemHandler.h"
 #include "MockLink.h"
+#include "QGCLoggingCategory.h"
 
 #include <QDebug>
 

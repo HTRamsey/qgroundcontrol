@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include <QTimer>
+#include <QtCore/QTimer>
 #include "Vehicle.h"
 #include "MAVLinkProtocol.h"
 

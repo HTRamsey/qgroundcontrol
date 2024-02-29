@@ -9,17 +9,16 @@
 
 #include "FirmwarePlugin.h"
 #include "QGCApplication.h"
+#include "AutoPilotPlugin.h"
 #include "Generic/GenericAutoPilotPlugin.h"
 #include "CameraMetaData.h"
-#include "SettingsManager.h"
-#include "AppSettings.h"
 #include "QGCFileDownload.h"
 #include "QGCCameraManager.h"
 #include "RadioComponentController.h"
 #include "Autotune.h"
-
-#include <QRegularExpression>
-#include <QDebug>
+#include "QGCLoggingCategory.h"
+#include <QtCore/QRegularExpression>
+#include <QtCore/QDebug>
 
 QGC_LOGGING_CATEGORY(FirmwarePluginLog, "FirmwarePluginLog")
 

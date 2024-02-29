@@ -11,7 +11,7 @@
 #ifndef MAVLinkLogManager_H
 #define MAVLinkLogManager_H
 
-#include <QObject>
+#include <QtCore/QObject>
 
 #include "QmlObjectListModel.h"
 #include "QGCLoggingCategory.h"

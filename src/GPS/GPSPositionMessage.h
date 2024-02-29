@@ -12,7 +12,7 @@
 
 #include "sensor_gps.h"
 #include "satellite_info.h"
-#include <QMetaType>
+#include <QtCore/QMetaType>
 
 /**
  ** struct GPSPositionMessage

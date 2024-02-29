@@ -8,9 +8,9 @@
  ****************************************************************************/
 
 #pragma once
-#include <QObject>
-#include <QQmlListProperty>
-#include <QQuickImageProvider>
+#include <QtCore/QObject>
+#include <QtQml/QQmlListProperty>
+#include <QtQuick/QQuickImageProvider>
 
 #include "QGCToolbox.h"
 

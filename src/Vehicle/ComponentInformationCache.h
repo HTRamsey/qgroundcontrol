@@ -11,11 +11,9 @@
 
 #include "QGCLoggingCategory.h"
 
-#include <QString>
-#include <QDir>
-#include <QMap>
-
-#include <cstdint>
+#include <QtCore/QString>
+#include <QtCore/QDir>
+#include <QtCore/QMap>
 
 Q_DECLARE_LOGGING_CATEGORY(ComponentInformationCacheLog)
 

@@ -14,8 +14,8 @@
 #include "QGCLoggingCategory.h"
 #include "FactMetaData.h"
 
-#include <QObject>
-#include <QMap>
+#include <QtCore/QObject>
+#include <QtCore/QMap>
 
 class FactMetaData;
 class Vehicle;

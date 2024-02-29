@@ -9,10 +9,10 @@
 
 #pragma once
 
-#include <QObject>
-#include <QDir>
-#include <QTimer>
-#include <QQueue>
+#include <QtCore/QObject>
+#include <QtCore/QDir>
+#include <QtCore/QTimer>
+#include <QtCore/QQueue>
 
 #include "QGCLoggingCategory.h"
 #include "QGCMAVLink.h"

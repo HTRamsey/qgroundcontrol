@@ -8,10 +8,6 @@
  ****************************************************************************/
 
 #include "MissionCommandList.h"
-#include "FactMetaData.h"
-#include "Vehicle.h"
-#include "FirmwarePluginManager.h"
-#include "QGCApplication.h"
 #include "JsonHelper.h"
 #include "MissionCommandUIInfo.h"
 

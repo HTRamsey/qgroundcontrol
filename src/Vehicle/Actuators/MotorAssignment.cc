@@ -9,7 +9,7 @@
 
 #include "MotorAssignment.h"
 #include "ActuatorOutputs.h"
-
+#include "QmlControls/QmlObjectListModel.h"
 #include "QGCApplication.h"
 
 #include <vector>

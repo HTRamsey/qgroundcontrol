@@ -12,10 +12,14 @@
 #include "QGCLoggingCategory.h"
 #include "QGCApplication.h"
 #include "SettingsManager.h"
-
+#ifdef __android__
+#include "qserialport.h"
+#else
+#include <QtSerialPort/QSerialPort>
+#endif
 #define GPS_RECEIVE_TIMEOUT 1200
 
-#include <QDebug>
+#include <QtCore/QDebug>
 
 #include "Drivers/src/ubx.h"
 #include "Drivers/src/sbf.h"

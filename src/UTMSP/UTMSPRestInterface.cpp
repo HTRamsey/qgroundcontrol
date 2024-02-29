@@ -7,8 +7,8 @@
  *
  ****************************************************************************/
 
-#include <QList>
-#include <QNetworkInterface>
+#include <QtCore/QList>
+#include <QtNetwork/QNetworkInterface>
 
 #include "UTMSPRestInterface.h"
 #include "UTMSPLogger.h"

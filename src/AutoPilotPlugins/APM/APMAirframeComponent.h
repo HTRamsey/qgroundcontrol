@@ -13,6 +13,8 @@
 
 #include "VehicleComponent.h"
 
+class Fact;
+
 class APMAirframeComponent : public VehicleComponent
 {
     Q_OBJECT

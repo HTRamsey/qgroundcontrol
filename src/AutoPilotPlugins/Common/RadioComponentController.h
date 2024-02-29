@@ -16,7 +16,7 @@
 #ifndef RadioComponentController_H
 #define RadioComponentController_H
 
-#include <QTimer>
+#include <QtCore/QTimer>
 
 #include "FactPanelController.h"
 #include "QGCLoggingCategory.h"

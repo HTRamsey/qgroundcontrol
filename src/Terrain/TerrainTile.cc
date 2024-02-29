@@ -11,6 +11,7 @@
 #include "JsonHelper.h"
 #include "QGCMapEngine.h"
 #include "QGC.h"
+#include "QGCLoggingCategory.h"
 
 #include <QJsonDocument>
 #include <QJsonObject>

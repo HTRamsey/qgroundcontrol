@@ -26,12 +26,15 @@
 #include "SettingsManager.h"
 #include "AppSettings.h"
 #include "MissionSettingsItem.h"
-#include "QGCQGeoCoordinate.h"
 #include "PlanMasterController.h"
 #include "KMLPlanDomDocument.h"
 #include "QGCCorePlugin.h"
 #include "TakeoffMissionItem.h"
 #include "PlanViewSettings.h"
+
+#include <QtCore/QJsonArray>
+#include <QtCore/QJsonDocument>
+#include <QtPositioning/QGeoCoordinate>
 
 #define UPDATE_TIMEOUT 5000 ///< How often we check for bounding box changes
 

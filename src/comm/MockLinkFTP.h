@@ -11,9 +11,9 @@
 #pragma once
 
 #include "QGCMAVLink.h"
-
-#include <QStringList>
-#include <QFile>
+#include <QtCore/QStringList>
+#include <QtCore/QFile>
+#include <QtCore/QObject>
 
 class MockLink;
 

@@ -1,6 +1,7 @@
 #include "JoystickAndroid.h"
 #include "JoystickManager.h"
 
+#include "MultiVehicleManager.h"
 #include <QQmlEngine>
 #include <QJniEnvironment>
 #include <QJniObject>

@@ -17,10 +17,8 @@
 #include "Vehicle.h"
 #include "SettingsManager.h"
 
-#include <QDebug>
-#include <QSettings>
-#include <QUrl>
-#include <QBitArray>
+#include <QtCore/QDebug>
+#include <QtCore/QBitArray>
 #include <QtCore/qmath.h>
 
 #define kTimeOutMilliseconds 500

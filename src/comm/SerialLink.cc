@@ -7,17 +7,13 @@
  *
  ****************************************************************************/
 
-#include <QTimer>
-#include <QDebug>
-#include <QSettings>
-#include <QMutexLocker>
-
+#include <QtCore/QDebug>
+#include <QtCore/QSettings>
 #ifdef __android__
 #include "qserialport.h"
 #else
-#include <QSerialPort>
+#include <QtSerialPort/QSerialPort>
 #endif
-
 #include "SerialLink.h"
 #include "QGC.h"
 #include "QGCLoggingCategory.h"

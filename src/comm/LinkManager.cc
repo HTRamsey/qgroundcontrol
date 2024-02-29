@@ -7,10 +7,8 @@
  *
  ****************************************************************************/
 
-#include <QList>
-#include <QApplication>
-#include <QDebug>
-#include <QSignalSpy>
+#include <QtCore/QList>
+#include <QtCore/QDebug>
 
 #include <memory>
 
@@ -38,8 +36,8 @@
 #endif
 
 #ifndef QGC_AIRLINK_DISABLED
-#include <AirLinkManager.h>
-#include <AirlinkLink.h>
+#include "AirLinkManager.h"
+#include "AirlinkLink.h"
 #endif
 
 #include <qmdnsengine/browser.h>
@@ -47,6 +45,9 @@
 #include <qmdnsengine/mdns.h>
 #include <qmdnsengine/server.h>
 #include <qmdnsengine/service.h>
+#include "QGCLoggingCategory.h"
+#include "MultiVehicleManager.h"
+#include <QtQml/qqml.h>
 
 QGC_LOGGING_CATEGORY(LinkManagerLog, "LinkManagerLog")
 QGC_LOGGING_CATEGORY(LinkManagerVerboseLog, "LinkManagerVerboseLog")

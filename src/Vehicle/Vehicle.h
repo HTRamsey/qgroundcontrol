@@ -9,13 +9,13 @@
 
 #pragma once
 
-#include <QElapsedTimer>
-#include <QObject>
-#include <QVariantList>
-#include <QGeoCoordinate>
-#include <QTime>
-#include <QQueue>
-#include <QSharedPointer>
+#include <QtCore/QElapsedTimer>
+#include <QtCore/QObject>
+#include <QtCore/QVariantList>
+#include <QtPositioning/QGeoCoordinate>
+#include <QtCore/QTime>
+#include <QtCore/QQueue>
+#include <QtCore/QSharedPointer>
 
 #include "FactGroup.h"
 #include "QGCMAVLink.h"

@@ -12,9 +12,8 @@
 #include "JsonHelper.h"
 #include "QGCApplication.h"
 
-#include <QDebug>
-#include <QtMath>
-#include <QJsonParseError>
+#include <QtCore/QDebug>
+#include <QtCore/QtMath>
 #include <QJsonArray>
 
 #include <limits>

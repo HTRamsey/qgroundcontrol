@@ -8,8 +8,8 @@
  ****************************************************************************/
 
 #include "MavlinkMessagesTimer.h"
-
-#include <QDebug>
+#include <QtCore/QTimer>
+#include <QtCore/QDebug>
 
 MavlinkMessagesTimer::MavlinkMessagesTimer(int vehicle_id, bool high_latency) :
     _active(true),

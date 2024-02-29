@@ -1,41 +1,67 @@
+find_package(Qt6 REQUIRED COMPONENTS Core Core5Compat Network Qml)
 
 qt_add_library(QtLocationPlugin STATIC
-	BingMapProvider.cpp
-	ElevationMapProvider.cpp
-	EsriMapProvider.cpp
-	GenericMapProvider.cpp
-	GoogleMapProvider.cpp
-	MapboxMapProvider.cpp
-	MapProvider.cpp
-	QGCMapEngine.cpp
-	QGCMapTileSet.cpp
-	QGCMapUrlEngine.cpp
-	QGCTileCacheWorker.cpp
-	QGeoCodeReplyQGC.cpp
-	QGeoCodingManagerEngineQGC.cpp
-	QGeoMapReplyQGC.cpp
-	QGeoServiceProviderPluginQGC.cpp
-	QGeoTiledMappingManagerEngineQGC.cpp
-	QGeoTileFetcherQGC.cpp
-
 	QMLControl/QGCMapEngineManager.cc
-
-	# HEADERS
-	# shouldn't be listed here, but aren't named properly for AUTOMOC
+	QMLControl/QGCMapEngineManager.h
+	BingMapProvider.cpp
+	BingMapProvider.h
+	ElevationMapProvider.cpp
+	ElevationMapProvider.h
+	EsriMapProvider.cpp
+	EsriMapProvider.h
+	GenericMapProvider.cpp
+	GenericMapProvider.h
+	GoogleMapProvider.cpp
+	GoogleMapProvider.h
+	MapboxMapProvider.cpp
+	MapboxMapProvider.h
+	MapProvider.cpp
+	MapProvider.h
+	QGCMapEngine.cpp
+	QGCMapEngine.h
 	QGCMapEngineData.h
+	QGCMapTileSet.cpp
+	QGCMapTileSet.h
+	QGCMapUrlEngine.cpp
+	QGCMapUrlEngine.h
+	QGCTileCacheWorker.cpp
+	QGCTileCacheWorker.h
+	QGCTileSet.h
+	QGeoCodeReplyQGC.cpp
+	QGeoCodeReplyQGC.h
+	QGeoCodingManagerEngineQGC.cpp
+	QGeoCodingManagerEngineQGC.h
+	QGeoMapReplyQGC.cpp
+	QGeoMapReplyQGC.h
+	QGeoServiceProviderPluginQGC.cpp
+	QGeoServiceProviderPluginQGC.h
+	QGeoTiledMappingManagerEngineQGC.cpp
+	QGeoTiledMappingManagerEngineQGC.h
+	QGeoTileFetcherQGC.cpp
+	QGeoTileFetcherQGC.h
+)
+
+add_custom_target(QtLocationPluginQml
+	SOURCES
+		QMLControl/OfflineMap.qml
+		QMLControl/OfflineMapEditor.qml
 )
 
 target_link_libraries(QtLocationPlugin
+	PRIVATE
+		Qt6::Core5Compat
+		Qt6::Network
 	PUBLIC
+		Qt6::Core
 		Qt6::Location
 		Qt6::LocationPrivate
 		Qt6::Sql
-
 		qgc
+		QmlControls
 )
 
 target_include_directories(QtLocationPlugin
-	INTERFACE
+	PUBLIC
 		${CMAKE_CURRENT_SOURCE_DIR}
 		QMLControl
 )

@@ -11,8 +11,8 @@
 #include "MultiVehicleManager.h"
 #include "QGCApplication.h"
 #include "ParameterManager.h"
-
-#include <QQmlEngine>
+#include "QGCLoggingCategory.h"
+#include <QtQml/QQmlEngine>
 
 /// @file
 ///     @author Don Gagne <don@thegagnes.com>

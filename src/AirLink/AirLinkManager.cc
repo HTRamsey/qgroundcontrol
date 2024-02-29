@@ -12,10 +12,8 @@
 #include "QGCCorePlugin.h"
 #include "LinkManager.h"
 #include "SettingsManager.h"
-#include "UDPLink.h"
-
-//#include "LinkInterface.h"
-
+#include <QtCore/QJsonDocument>
+#include <QtCore/QJsonArray>
 #include <QSettings>
 #include <QDebug>
 

@@ -11,10 +11,10 @@
 #ifndef APMFlightModesComponentController_H
 #define APMFlightModesComponentController_H
 
-#include <QObject>
-#include <QQuickItem>
-#include <QList>
-#include <QStringList>
+#include <QtCore/QObject>
+#include <QtQuick/QQuickItem>
+#include <QtCore/QList>
+#include <QtCore/QStringList>
 
 #include "AutoPilotPlugin.h"
 #include "FactPanelController.h"

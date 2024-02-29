@@ -18,10 +18,10 @@
 
 #include "QGCLoggingCategory.h"
 #include "Fact.h"
-#include <QObject>
-#include <QTimer>
-#include <QDateTime>
-#include <QFile>
+#include <QtCore/QObject>
+#include <QtCore/QTimer>
+#include <QtCore/QDateTime>
+#include <QtCore/QFile>
 
 Q_DECLARE_LOGGING_CATEGORY(SubtitleWriterLog)
 

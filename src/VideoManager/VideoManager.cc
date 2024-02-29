@@ -14,14 +14,15 @@
 #include <QUrl>
 #include <QDir>
 #include <QQuickWindow>
+#include <QtCore/QPermissions>
 
 #ifndef QGC_DISABLE_UVC
 #include <QMediaDevices>
 #include <QCameraDevice>
 #endif
 
-#include "ScreenToolsController.h"
 #include "VideoManager.h"
+#include "QGCApplication.h"
 #include "QGCToolbox.h"
 #include "QGCCorePlugin.h"
 #include "MultiVehicleManager.h"

@@ -14,11 +14,16 @@
 #include "FTPManager.h"
 #include "QGCLZMA.h"
 #include "QGCCorePlugin.h"
+#include "QGCLoggingCategory.h"
+#include "Vehicle.h"
+#include "QGCApplication.h"
 
 #include <QDir>
 #include <QStandardPaths>
 #include <QDomDocument>
 #include <QDomNodeList>
+#include <QtNetwork/QNetworkAccessManager>
+#include <QtQml/QQmlEngine>
 
 QGC_LOGGING_CATEGORY(CameraControlLog, "CameraControlLog")
 QGC_LOGGING_CATEGORY(CameraControlVerboseLog, "CameraControlVerboseLog")

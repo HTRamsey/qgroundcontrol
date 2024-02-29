@@ -9,9 +9,9 @@
 
 #pragma once
 
-#include <QObject>
-#include <QByteArray>
-#include <QImage>
+#include <QtCore/QObject>
+#include <QtCore/QByteArray>
+#include <QtGui/QImage>
 
 #include "QGCLoggingCategory.h"
 #include "QGCMAVLink.h"

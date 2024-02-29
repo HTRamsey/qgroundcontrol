@@ -9,25 +9,25 @@
 
 #pragma once
 
-#include <QObject>
-#include <QMap>
-#include <QXmlStreamReader>
-#include <QLoggingCategory>
-#include <QMutex>
-#include <QDir>
-#include <QJsonObject>
+#include <QtCore/QObject>
+#include <QtCore/QMap>
+#include <QtCore/QXmlStreamReader>
+#include <QtCore/QLoggingCategory>
+#include <QtCore/QMutex>
+#include <QtCore/QDir>
+#include <QtCore/QJsonObject>
 
 #include "FactSystem.h"
 #include "MAVLinkProtocol.h"
 #include "AutoPilotPlugin.h"
 #include "QGCMAVLink.h"
-#include "Vehicle.h"
 
 Q_DECLARE_LOGGING_CATEGORY(ParameterManagerVerbose1Log)
 Q_DECLARE_LOGGING_CATEGORY(ParameterManagerVerbose2Log)
 Q_DECLARE_LOGGING_CATEGORY(ParameterManagerDebugCacheFailureLog)
 
 class ParameterEditorController;
+class Vehicle;
 
 class ParameterManager : public QObject
 {

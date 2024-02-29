@@ -11,7 +11,7 @@
 #ifndef QGCToolbox_h
 #define QGCToolbox_h
 
-#include <QObject>
+#include <QtCore/QObject>
 
 class FactSystem;
 class FirmwarePluginManager;

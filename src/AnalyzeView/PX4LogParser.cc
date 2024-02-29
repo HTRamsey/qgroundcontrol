@@ -1,7 +1,8 @@
 #include "PX4LogParser.h"
-#include <math.h>
-#include <QtEndian>
-#include <QDateTime>
+#include <QtCore/QtEndian>
+#include <QtCore/QByteArray>
+#include <QtCore/QList>
+#include <QtCore/QtMath>
 
 PX4LogParser::PX4LogParser()
 {

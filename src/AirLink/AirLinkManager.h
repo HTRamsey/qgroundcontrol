@@ -10,14 +10,8 @@
 #pragma once
 
 #include "QGCToolbox.h"
-#include "QGCLoggingCategory.h"
-#include "Fact.h"
-#include "LinkConfiguration.h"
 
-#include <QTimer>
-#include <QTime>
-#include <QNetworkReply>
-#include <QMutex>
+#include <QtNetwork/QNetworkReply>
 
 class AppSettings;
 class QGCApplication;

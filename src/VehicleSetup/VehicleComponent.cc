@@ -14,6 +14,7 @@
 #include "VehicleComponent.h"
 #include "AutoPilotPlugin.h"
 #include "ParameterManager.h"
+#include "Vehicle.h"
 
 VehicleComponent::VehicleComponent(Vehicle* vehicle, AutoPilotPlugin* autopilot, QObject* parent) :
     QObject(parent),

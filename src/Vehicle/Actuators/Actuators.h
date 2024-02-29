@@ -9,14 +9,13 @@
 
 #pragma once
 
-#include <QObject>
-#include <QString>
-#include <QJsonDocument>
+#include <QtCore/QObject>
+#include <QtCore/QString>
+#include <QtCore/QJsonDocument>
 
 #include "ActuatorOutputs.h"
 #include "ActuatorTesting.h"
 #include "Mixer.h"
-#include "GeometryImage.h"
 #include "MotorAssignment.h"
 
 

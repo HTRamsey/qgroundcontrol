@@ -9,9 +9,9 @@
 
 #pragma once
 
-#include <QLoggingCategory>
-#include <QStringList>
-#include <QObject>
+#include <QtCore/QLoggingCategory>
+#include <QtCore/QStringList>
+#include <QtCore/QObject>
 
 // Add Global logging categories (not class specific) here using Q_DECLARE_LOGGING_CATEGORY
 Q_DECLARE_LOGGING_CATEGORY(FirmwareUpgradeLog)

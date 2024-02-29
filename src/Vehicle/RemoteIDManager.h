@@ -9,9 +9,9 @@
 
 #pragma once
 
-#include <QObject>
-#include <QDateTime>
-#include <QGeoPositionInfo>
+#include <QtCore/QObject>
+#include <QtCore/QDateTime>
+#include <QtPositioning/QGeoPositionInfo>
 
 #include "QGCLoggingCategory.h"
 #include "QGCMAVLink.h"

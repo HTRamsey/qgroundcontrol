@@ -17,7 +17,7 @@
 #include "QmlObjectListModel.h"
 #include "FlightPathSegment.h"
 
-#include <QSettings>
+#include <QtCore/QSettings>
 
 class PlanMasterController;
 class MissionController;

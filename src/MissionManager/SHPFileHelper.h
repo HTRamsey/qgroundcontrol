@@ -9,10 +9,10 @@
 
 #pragma once
 
-#include <QObject>
-#include <QList>
-#include <QGeoCoordinate>
-#include <QScopedPointer>
+#include <QtCore/QObject>
+#include <QtCore/QList>
+#include <QtPositioning/QGeoCoordinate>
+#include <QtCore/QScopedPointer>
 
 #include "ShapeFileHelper.h"
 

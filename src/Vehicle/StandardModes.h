@@ -11,8 +11,8 @@
 
 #include "QGCLoggingCategory.h"
 #include "QGCMAVLink.h"
-#include <QString>
-#include <QMap>
+#include <QtCore/QString>
+#include <QtCore/QMap>
 
 Q_DECLARE_LOGGING_CATEGORY(StandardModesLog)
 

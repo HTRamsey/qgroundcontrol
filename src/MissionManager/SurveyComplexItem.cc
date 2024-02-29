@@ -18,7 +18,8 @@
 #include "PlanMasterController.h"
 #include "QGCApplication.h"
 
-#include <QPolygonF>
+#include <QtCore/QJsonArray>
+#include <QtGui/QPolygonF>
 
 QGC_LOGGING_CATEGORY(SurveyComplexItemLog, "SurveyComplexItemLog")
 

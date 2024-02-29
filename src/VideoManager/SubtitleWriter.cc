@@ -20,9 +20,11 @@
 #include "FactValueGrid.h"
 #include "HorizontalFactValueGrid.h"
 #include "InstrumentValueData.h"
+#include "MultiVehicleManager.h"
 #include <QDateTime>
 #include <QString>
 #include <QDate>
+#include <QtCore/QFileInfo>
 
 QGC_LOGGING_CATEGORY(SubtitleWriterLog, "SubtitleWriterLog")
 

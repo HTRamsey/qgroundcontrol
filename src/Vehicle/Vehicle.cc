@@ -54,6 +54,7 @@
 #endif
 #include "Autotune.h"
 #include "RemoteIDManager.h"
+#include "AudioOutput.h"
 
 QGC_LOGGING_CATEGORY(VehicleLog, "VehicleLog")
 

@@ -13,8 +13,8 @@
 #include "QGCToolbox.h"
 #include "QGCMAVLink.h"
 
-#include <QString>
-#include <QVariant>
+#include <QtCore/QString>
+#include <QtCore/QVariant>
 
 class MissionCommandTree;
 class MissionCommandUIInfo;

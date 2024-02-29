@@ -14,13 +14,11 @@
 #ifndef FirmwareImage_H
 #define FirmwareImage_H
 
-#include <QObject>
-#include <QString>
-#include <QByteArray>
-#include <QList>
-#include <QTextStream>
-
-#include <stdint.h>
+#include <QtCore/QObject>
+#include <QtCore/QString>
+#include <QtCore/QByteArray>
+#include <QtCore/QList>
+#include <QtCore/QTextStream>
 
 /// Support for Intel Hex firmware file
 class FirmwareImage : public QObject

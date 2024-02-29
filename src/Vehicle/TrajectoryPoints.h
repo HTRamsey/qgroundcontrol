@@ -11,7 +11,7 @@
 
 #include "QmlObjectListModel.h"
 
-#include <QGeoCoordinate>
+#include <QtPositioning/QGeoCoordinate>
 
 class Vehicle;
 

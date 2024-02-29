@@ -12,10 +12,10 @@
 
 #include "GPSProvider.h"
 #include "RTCM/RTCMMavlink.h"
-#include <QGCToolbox.h>
+#include "QGCToolbox.h"
 
-#include <QString>
-#include <QObject>
+#include <QtCore/QString>
+#include <QtCore/QObject>
 
 /**
  ** class GPSManager

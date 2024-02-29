@@ -9,12 +9,14 @@
 
 #pragma once
 
-#include "MAVLinkProtocol.h"
+#include "LinkInterface.h"
+#include "LinkConfiguration.h"
 
-#include <QTimer>
-#include <QFile>
+#include <QtCore/QTimer>
+#include <QtCore/QFile>
 
 class LinkManager;
+class MAVLinkProtocol;
 
 class LogReplayLinkConfiguration : public LinkConfiguration
 {

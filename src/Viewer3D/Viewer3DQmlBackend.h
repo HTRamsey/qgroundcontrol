@@ -1,16 +1,16 @@
 #ifndef Viewer3DQmlBackend_H
 #define Viewer3DQmlBackend_H
 
-#include <QObject>
-#include <qqml.h>
-#include <QString>
-
-#include "OsmParser.h"
-#include "Viewer3DSettings.h"
+#include <QtCore/QObject>
+#include <QtQml/qqml.h>
+#include <QtCore/QString>
+#include <QtPositioning/QGeoCoordinate>
 
 ///     @author Omid Esrafilian <esrafilian.omid@gmail.com>
 
+class OsmParser;
 class Viewer3DSettings;
+class Vehicle;
 
 class Viewer3DQmlBackend : public QObject
 {

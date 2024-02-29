@@ -1,5 +1,6 @@
-
 add_subdirectory(Actuators)
+
+find_package(Qt6 REQUIRED COMPONENTS Core Core5Compat Gui Positioning)
 
 qt_add_library(Vehicle STATIC
 	Autotune.cpp
@@ -50,6 +51,8 @@ qt_add_library(Vehicle STATIC
 	TerrainProtocolHandler.h
 	TrajectoryPoints.cc
 	TrajectoryPoints.h
+	UASMessageHandler.cc
+	UASMessageHandler.h
 	VehicleBatteryFactGroup.cc
 	VehicleBatteryFactGroup.h
 	Vehicle.cc
@@ -86,22 +89,47 @@ qt_add_library(Vehicle STATIC
 	VehicleVibrationFactGroup.h
 	VehicleWindFactGroup.cc
 	VehicleWindFactGroup.h
-        VehicleHygrometerFactGroup.cc
-        VehicleHygrometerFactGroup.h
+    VehicleHygrometerFactGroup.cc
+    VehicleHygrometerFactGroup.h
 	RemoteIDManager.h
 	RemoteIDManager.cc
 )
 
 target_link_libraries(Vehicle
 	PRIVATE
+		Qt6::Core5Compat
 		Actuators
+		Audio
+		api
 		compression
+		FirmwarePlugin
+		Geo
 		libevents_generated
 		libevents_parser
 		libevents_health_and_arming_checks
+		Settings
+		VideoManager
+		VideoReceiver
 	PUBLIC
+		Qt6::Core
+		Qt6::Gui
+		Qt6::Positioning
+		AutoPilotPlugins
+		Camera
+		comm
+		FactSystem
+		MissionManager
+		QmlControls
 		qgc
+		Terrain
 )
+
+if(CONFIG_UTM_ADAPTER)
+	target_link_libraries(Vehicle
+		PUBLIC
+			UTMSP
+	)
+endif()
 
 target_include_directories(Vehicle
 	PUBLIC

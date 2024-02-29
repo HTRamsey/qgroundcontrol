@@ -14,10 +14,10 @@
 #ifndef AIRFRAMECOMPONENTAIRFRAMES_H
 #define AIRFRAMECOMPONENTAIRFRAMES_H
 
-#include <QObject>
-#include <QQuickItem>
-#include <QList>
-#include <QMap>
+#include <QtCore/QObject>
+#include <QtQuick/QQuickItem>
+#include <QtCore/QList>
+#include <QtCore/QMap>
 
 #include "AutoPilotPlugin.h"
 

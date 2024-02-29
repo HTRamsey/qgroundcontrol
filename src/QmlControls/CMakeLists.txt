@@ -1,3 +1,5 @@
+find_package(Qt6 REQUIRED COMPONENTS Core Concurrent Gui Positioning Qml Quick)
+
 qt_add_library(QmlControls STATIC
 	AppMessages.cc
 	AppMessages.h
@@ -19,6 +21,10 @@ qt_add_library(QmlControls STATIC
 	QGCGeoBoundingCube.h
 	QGCImageProvider.cc
 	QGCImageProvider.h
+    QGCMapPalette.cc
+    QGCMapPalette.h
+    QGCPalette.cc
+    QGCPalette.h
 	QGroundControlQmlGlobal.cc
 	QGroundControlQmlGlobal.h
 	QmlObjectListModel.cc
@@ -136,16 +142,36 @@ add_custom_target(QmlControlsQml
 )
 
 target_link_libraries(QmlControls
+	PRIVATE
+		FirmwarePlugin
 	PUBLIC
-		qgc
-
-		FactSystem
-	PUBLIC
+		Qt6::Core
 		Qt6::Concurrent
+		Qt6::Gui
 		Qt6::Location
+		Qt6::Positioning
+		Qt6::Qml
+		Qt6::Quick
 		Qt6::SerialPort
 		Qt6::TextToSpeech
 		Qt6::Widgets
+		ADSB
+		api
+		AutoPilotPlugins
+		comm
+		qgc
+		FactSystem
+		MissionManager
+		PositionManager
+		QtLocationPlugin
+		Settings
+		Terrain
+		Vehicle
+		VideoManager
 )
 
-target_include_directories(QmlControls INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+if(NOT ${QGC_AIRLINK_DISABLED})
+    target_link_libraries(QmlControls PUBLIC AirLink)
+endif()
+
+target_include_directories(QmlControls PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

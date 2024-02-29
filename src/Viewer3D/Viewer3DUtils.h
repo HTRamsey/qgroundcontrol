@@ -2,8 +2,8 @@
 #define VIEWER3DUTILS_H
 #include "math.h"
 
-#include <QGeoCoordinate>
-#include <QVector3D>
+#include <QtPositioning/QGeoCoordinate>
+#include <QtGui/QVector3D>
 
 #ifndef DEG_TO_RAD
 #define DEG_TO_RAD 0.017453292519f

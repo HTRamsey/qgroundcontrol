@@ -1,33 +1,34 @@
-set(EXTRA_SOURCES)
-set(EXTRA_LIBRARIES)
-
-if (GST_FOUND)
-    set(EXTRA_SOURCES
-    	gstqgc.c
-    	gstqgcvideosinkbin.c
-    	GStreamer.cc
-    	GStreamer.h
-    	GstVideoReceiver.cc
-    	GstVideoReceiver.h
-    )
-
-    set(EXTRA_LIBRARIES qmlglsink ${GST_LINK_LIBRARIES})
-endif()
+find_package(Qt6 REQUIRED COMPONENTS Core Quick)
 
 qt_add_library(VideoReceiver STATIC
-    ${EXTRA_SOURCES}
     VideoReceiver.h
 )
 
 target_link_libraries(VideoReceiver
     PUBLIC
-        Qt6::Multimedia
-        Qt6::OpenGL
-        Qt6::Quick
-        ${EXTRA_LIBRARIES}
+        Qt6::Core
 )
 
-target_include_directories(VideoReceiver INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
-if (GST_FOUND)
-	target_include_directories(VideoReceiver PUBLIC ${GST_INCLUDE_DIRS})
+target_include_directories(VideoReceiver PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+set(EXTRA_LIBRARIES)
+
+if(GST_FOUND)
+    target_sources(VideoReceiver
+        PRIVATE
+            gstqgc.c
+            gstqgcvideosinkbin.c
+            GStreamer.cc
+            GStreamer.h
+            GstVideoReceiver.cc
+            GstVideoReceiver.h
+    )
+
+    target_link_libraries(VideoReceiver
+        PUBLIC
+            Qt6::Quick
+            qgc
+            qmlglsink
+            Settings
+    )
 endif()

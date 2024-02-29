@@ -8,7 +8,7 @@
  ****************************************************************************/
 
 #include "Mixer.h"
-
+#include "ParameterManager.h"
 #include <QDebug>
 
 #include <cmath>

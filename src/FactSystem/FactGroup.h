@@ -13,9 +13,9 @@
 #include "QGCMAVLink.h"
 #include "QGCLoggingCategory.h"
 
-#include <QStringList>
-#include <QMap>
-#include <QTimer>
+#include <QtCore/QStringList>
+#include <QtCore/QMap>
+#include <QtCore/QTimer>
 
 class Vehicle;
 

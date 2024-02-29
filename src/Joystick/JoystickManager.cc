@@ -10,8 +10,9 @@
 
 #include "JoystickManager.h"
 #include "QGCApplication.h"
-
-#include <QQmlEngine>
+#include "MultiVehicleManager.h"
+#include "QGCLoggingCategory.h"
+#include <QtQml/QQmlEngine>
 
 #ifndef __mobile__
     #include "JoystickSDL.h"

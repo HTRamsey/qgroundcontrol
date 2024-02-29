@@ -11,8 +11,8 @@
 #ifndef QGCFileDialogController_H
 #define QGCFileDialogController_H
 
-#include <QObject>
-#include <QUrl>
+#include <QtCore/QObject>
+#include <QtCore/QUrl>
 
 #include "QGCLoggingCategory.h"
 

@@ -9,8 +9,8 @@
 
 #pragma once
 
-#include <QObject>
-#include <QGeoCoordinate>
+#include <QtCore/QObject>
+#include <QtPositioning/QGeoCoordinate>
 
 #include "QGCLoggingCategory.h"
 #include "PlanManager.h"

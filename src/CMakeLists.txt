@@ -1,83 +1,72 @@
-#######################################################
-#                   Main QGC library
-#######################################################
-project(qgc)
-
-#######################################################
-#               Directory Inclusion
-#######################################################
-include_directories(
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_CURRENT_BINARY_DIR}
-        ${Qt6Location_PRIVATE_INCLUDE_DIRS}
+find_package(Qt6
+    REQUIRED
+    COMPONENTS
+        Bluetooth
+        Charts
+        Concurrent
+        Core
+        Core5Compat
+        Location
+        Multimedia
+        Network
+        Positioning
+        Quick
+        QuickControls2
+        QuickWidgets
+        OpenGL
+        Sql
+        Svg
+        Test
+        TextToSpeech
+        Widgets
+        Xml
+    OPTIONAL_COMPONENTS
+        SerialPort
+    HINTS
+        {QT_LIBRARY_HINTS}
 )
 
-#######################################################
-#               Mobile Specific Sources
-#######################################################
-set(EXTRA_SRC)
+qt_add_library(qgc STATIC
+    CmdLineOptParser.cc
+    CmdLineOptParser.h
+    JsonHelper.cc
+    JsonHelper.h
+    main.cc
+    QGC.cc
+    QGC.h
+    QGCApplication.cc
+    QGCApplication.h
+    QGCCachedFileDownload.cc
+    QGCCachedFileDownload.h
+    QGCConfig.h
+    QGCFileDownload.cc
+    QGCFileDownload.h
+    QGCLoggingCategory.cc
+    QGCLoggingCategory.h
+    QGCQGeoCoordinate.cc
+    QGCQGeoCoordinate.h
+    QGCTemporaryFile.cc
+    QGCTemporaryFile.h
+    QGCToolbox.cc
+    QGCToolbox.h
+    RunGuard.cc
+    RunGuard.h
+)
 
-if (MOBILE)
-    list(APPEND EXTRA_SRC
+if(ANDROID)
+    target_sources(qgc
+        PRIVATE
             MobileScreenMgr.cc
             MobileScreenMgr.h
     )
-endif ()
+endif()
 
-#######################################################
-#             Source Files
-#######################################################
-qt_add_library(${PROJECT_NAME} STATIC
-        ${EXTRA_SRC}
+target_include_directories(qgc PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-        CmdLineOptParser.cc
-        CmdLineOptParser.h
-        JsonHelper.cc
-        JsonHelper.h
-        KMLDomDocument.cc
-        KMLDomDocument.h
-        KMLHelper.cc
-        KMLHelper.h
-        main.cc
-        QGC.cc
-        QGC.h
-        QGCApplication.cc
-        QGCApplication.h
-        QGCCachedFileDownload.cc
-        QGCCachedFileDownload.h
-        QGCConfig.h
-        QGCFileDownload.cc
-        QGCFileDownload.h
-        QGCLoggingCategory.cc
-        QGCLoggingCategory.h
-        QGCMapPalette.cc
-        QGCMapPalette.h
-        QGCPalette.cc
-        QGCPalette.h
-        QGCQGeoCoordinate.cc
-        QGCQGeoCoordinate.h
-        QGCTemporaryFile.cc
-        QGCTemporaryFile.h
-        QGCToolbox.cc
-        QGCToolbox.h
-        RunGuard.cc
-        RunGuard.h
-        ShapeFileHelper.cc
-        ShapeFileHelper.h
-        SHPFileHelper.cc
-        SHPFileHelper.h
-        TerrainTile.cc
-        TerrainTile.h
-)
-
-target_precompile_headers(${PROJECT_NAME} PRIVATE pch.h)
-
-set_source_files_properties(QGCApplication.cc PROPERTIES COMPILE_DEFINITIONS APP_VERSION_STR="${APP_VERSION_STR}")
-
-# Subdirectories
-add_subdirectory(ui)
+set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/QGCApplication.cc PROPERTIES COMPILE_DEFINITIONS APP_VERSION_STR="${APP_VERSION_STR}")
 
 add_subdirectory(ADSB)
+add_subdirectory(AirLink)
 add_subdirectory(AnalyzeView)
 add_subdirectory(api)
 add_subdirectory(Audio)
@@ -99,12 +88,8 @@ add_subdirectory(PositionManager)
 add_subdirectory(QmlControls)
 add_subdirectory(QtLocationPlugin)
 add_subdirectory(Settings)
-option(QGC_AIRLINK_DISABLED "Enable airlink" OFF)
-if (NOT ${QGC_AIRLINK_DISABLED})
-    add_subdirectory(AirLink)
-endif()
 add_subdirectory(Terrain)
-add_subdirectory(uas)
+add_subdirectory(ui)
 add_subdirectory(UTMSP)
 add_subdirectory(Vehicle)
 add_subdirectory(VehicleSetup)
@@ -112,62 +97,45 @@ add_subdirectory(VideoManager)
 add_subdirectory(VideoReceiver)
 add_subdirectory(Viewer3D)
 
-#######################################################
-#               Linking Libraries
-#######################################################
-target_link_libraries(${PROJECT_NAME}
-        PRIVATE
-            shp
-            Qt6::QuickControls2
-        PUBLIC
-            Qt6::QuickWidgets
-            Qt6::Widgets
-            Qt6::Core5Compat
-
-            ADSB
-            AnalyzeView
-            api
-            Audio
-            AutoPilotPlugins
-            Camera
-            comm
-            compression
-            FactSystem
-            FirmwarePlugin
-            FlightMap
-            FollowMe
-            Geo
-            gps
-            Joystick
-            MissionManager
-            PositionManager
-            QmlControls
-            QtLocationPlugin
-            Settings
-            Terrain
-            uas
-            UTMSP
-            Vehicle
-            VehicleSetup
-            VideoManager
-            Viewer3D
+target_link_libraries(qgc
+    PRIVATE
+        Qt6::QuickControls2
+        Qt6::QuickWidgets
+        ADSB
+        AnalyzeView
+        api
+        Audio
+        AutoPilotPlugins
+        Camera
+        comm
+        compression
+        FactSystem
+        FirmwarePlugin
+        FollowMe
+        Geo
+        gps
+        Joystick
+        MissionManager
+        PositionManager
+        QmlControls
+        QtLocationPlugin
+        Settings
+        Terrain
+        UTMSP
+        Vehicle
+        VehicleSetup
+        VideoManager
+        Viewer3D
+    PUBLIC
+        Qt6::Core
+        Qt6::CorePrivate
+        Qt6::Network
+        Qt6::Positioning
+        Qt6::Widgets
 )
-
-if(NOT QT_MKSPEC MATCHES "winrt")
-    target_link_libraries(${PROJECT_NAME}
-        PUBLIC
-            Qt6::SerialPort
-        )
-endif()
 
 if(NOT ${QGC_AIRLINK_DISABLED})
-    target_link_libraries(${PROJECT_NAME} PUBLIC AirLink)
+    target_link_libraries(qgc PRIVATE AirLink)
 else()
-    target_compile_definitions(${PROJECT_NAME} PUBLIC QGC_AIRLINK_DISABLED)
+    target_compile_definitions(qgc PUBLIC QGC_AIRLINK_DISABLED)
 endif()
-
-target_include_directories(${PROJECT_NAME}
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_SOURCE_DIR}/libs/shapelib
-)

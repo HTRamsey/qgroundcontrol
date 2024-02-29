@@ -1,3 +1,5 @@
+find_package(Qt6 REQUIRED COMPONENTS Core Quick Multimedia)
+
 qt_add_library(VideoManager STATIC
     GLVideoItemStub.cc
     GLVideoItemStub.h
@@ -8,11 +10,20 @@ qt_add_library(VideoManager STATIC
 )
 
 target_link_libraries(VideoManager
-    PUBLIC
-        qgc
+    PRIVATE
         Qt6::Multimedia
-        Qt6::OpenGL
+        api
+        Camera
+        QmlControls
+        Settings
+        Vehicle
+    PUBLIC
+        Qt6::Core
+        Qt6::Quick
+        qgc
+        comm
+        FactSystem
         VideoReceiver
 )
 
-target_include_directories(VideoManager INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(VideoManager PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

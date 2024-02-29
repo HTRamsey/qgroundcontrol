@@ -10,6 +10,7 @@
 #include "EsriMapProvider.h"
 #include "QGCApplication.h"
 #include "SettingsManager.h"
+#include <QtNetwork/QNetworkRequest>
 
 EsriMapProvider::EsriMapProvider(const quint32 averageSize, const QGeoMapType::MapStyle mapType, QObject *parent)
     : MapProvider(QString(), QString(), averageSize, mapType, parent) {}

@@ -9,9 +9,9 @@
 
 #pragma once
 
-#include <QObject>
-#include <QGeoCoordinate>
-#include <QTimer>
+#include <QtCore/QObject>
+#include <QtPositioning/QGeoCoordinate>
+#include <QtCore/QTimer>
 
 #include "TerrainQuery.h"
 #include "QGCLoggingCategory.h"

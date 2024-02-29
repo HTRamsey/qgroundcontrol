@@ -10,20 +10,17 @@
 #include "FirmwareImage.h"
 #include "QGCLoggingCategory.h"
 #include "JsonHelper.h"
-#include "QGCMAVLink.h"
 #include "QGCApplication.h"
-#include "FirmwarePlugin.h"
 #include "CompInfoParam.h"
 #include "Bootloader.h"
 
-#include <QDebug>
-#include <QFile>
-#include <QTextStream>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QSettings>
-#include <QFileInfo>
-#include <QDir>
+#include <QtCore/QDebug>
+#include <QtCore/QFile>
+#include <QtCore/QTextStream>
+#include <QtCore/QJsonDocument>
+#include <QtCore/QJsonObject>
+#include <QtCore/QFileInfo>
+#include <QtCore/QDir>
 
 const char* FirmwareImage::_jsonBoardIdKey =            "board_id";
 const char* FirmwareImage::_jsonParamXmlSizeKey =       "parameter_xml_size";

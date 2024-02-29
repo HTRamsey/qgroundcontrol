@@ -13,13 +13,11 @@
 #include "QmlObjectListModel.h"
 #include "Fact.h"
 #include "FactMetaData.h"
-#include <QObject>
-#include <QString>
-#include <QThread>
-#include <QFileInfoList>
-#include <QElapsedTimer>
-#include <QDebug>
-#include <QGeoCoordinate>
+#include <QtCore/QObject>
+#include <QtCore/QString>
+#include <QtCore/QThread>
+#include <QtCore/QFileInfoList>
+#include <QtCore/QDebug>
 
 class GeoTagWorker : public QThread
 {

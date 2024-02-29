@@ -10,6 +10,7 @@
 #include "EditPositionDialogController.h"
 #include "QGCGeo.h"
 #include "QGCApplication.h"
+#include "MultiVehicleManager.h"
 
 const char*  EditPositionDialogController::_latitudeFactName =      "Latitude";
 const char*  EditPositionDialogController::_longitudeFactName =     "Longitude";

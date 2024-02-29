@@ -10,12 +10,12 @@
 
 #pragma once
 
-#include <QObject>
-#include <QMap>
-#include <QTimer>
+#include <QtCore/QObject>
+#include <QtCore/QMap>
+#include <QtCore/QTimer>
+#include <QtCore/QLoggingCategory>
 
 #include "QGCMAVLink.h"
-#include "QGCLoggingCategory.h"
 #include "MAVLinkProtocol.h"
 
 class MockLink;

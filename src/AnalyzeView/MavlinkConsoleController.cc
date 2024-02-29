@@ -9,8 +9,9 @@
 
 #include "MavlinkConsoleController.h"
 #include "QGCApplication.h"
-
-#include <QClipboard>
+#include "MultiVehicleManager.h"
+#include <QtCore/QByteArray>
+#include <QtGui/QClipboard>
 
 MavlinkConsoleController::MavlinkConsoleController()
     : QStringListModel()

@@ -10,13 +10,12 @@
 #ifndef AUTOPILOTPLUGIN_H
 #define AUTOPILOTPLUGIN_H
 
-#include <QObject>
-#include <QList>
-#include <QString>
-#include <QQmlContext>
+#include <QtCore/QObject>
+#include <QtCore/QList>
+#include <QtCore/QString>
+#include <QtQml/QQmlContext>
 
 #include "VehicleComponent.h"
-#include "FactSystem.h"
 #include "Vehicle.h"
 
 class Vehicle;

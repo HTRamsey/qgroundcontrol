@@ -2,8 +2,8 @@
 #ifndef CITYMAPGEOMETRY_H
 #define CITYMAPGEOMETRY_H
 
-#include <QQuick3DGeometry>
-#include <QTimer>
+#include <QtQuick3D/QQuick3DGeometry>
+#include <QtCore/QTimer>
 
 #include "OsmParser.h"
 

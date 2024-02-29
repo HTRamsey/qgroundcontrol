@@ -1,4 +1,6 @@
 if (QGC_BUILD_TESTING)
+    find_package(Qt6 REQUIRED COMPONENTS Core Test)
+
     qt_add_library(qgctest
         STATIC
             UnitTestList.cc
@@ -12,8 +14,8 @@ if (QGC_BUILD_TESTING)
 
     function(add_qgc_test test_name)
         add_test(
-                NAME ${test_name}
-                COMMAND $<TARGET_FILE:QGroundControl> --unittest:${test_name}
+            NAME ${test_name}
+            COMMAND $<TARGET_FILE:QGroundControl> --unittest:${test_name}
         )
         add_dependencies(check QGroundControl)
     endfunction()
@@ -61,6 +63,8 @@ if (QGC_BUILD_TESTING)
     add_qgc_test(TransectStyleComplexItemTest)
 
     target_link_libraries(qgctest
+        PRIVATE
+            Qt6::Test
         PUBLIC
             AnalyzeViewTest
             AudioTest
@@ -73,4 +77,4 @@ if (QGC_BUILD_TESTING)
             VehicleTest
     )
 
-endif ()
+endif()

@@ -2,10 +2,9 @@
 #define JOYSTICKANDROID_H
 
 #include "Joystick.h"
-#include "Vehicle.h"
-#include "MultiVehicleManager.h"
-
 #include <QtCore/private/qandroidextras_p.h>
+
+class MultiVehicleManager;
 
 class JoystickAndroid : public Joystick, public QtAndroidPrivate::GenericMotionEventListener, public QtAndroidPrivate::KeyEventListener
 {

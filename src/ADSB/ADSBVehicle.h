@@ -9,11 +9,9 @@
 
 #pragma once
 
-#include <QObject>
-#include <QGeoCoordinate>
-#include <QElapsedTimer>
-
-#include "QGCMAVLink.h"
+#include <QtCore/QObject>
+#include <QtPositioning/QGeoCoordinate>
+#include <QtCore/QElapsedTimer>
 
 class ADSBVehicle : public QObject
 {

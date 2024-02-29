@@ -9,9 +9,9 @@
 
 #pragma once
 
-#include <QDomDocument>
-#include <QDomElement>
-#include <QGeoCoordinate>
+#include <QtXml/QDomDocument>
+#include <QtXml/QDomElement>
+#include <QtPositioning/QGeoCoordinate>
 
 class MissionItem;
 class Vehicle;

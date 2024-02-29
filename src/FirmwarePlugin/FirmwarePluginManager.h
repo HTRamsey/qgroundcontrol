@@ -9,7 +9,7 @@
 
 #pragma once
 
-#include <QObject>
+#include <QtCore/QObject>
 
 #include "FirmwarePlugin.h"
 #include "QGCMAVLink.h"
