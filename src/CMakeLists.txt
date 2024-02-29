@@ -29,15 +29,10 @@ endif ()
 #######################################################
 qt_add_library(${PROJECT_NAME} STATIC
         ${EXTRA_SRC}
-
         CmdLineOptParser.cc
         CmdLineOptParser.h
         JsonHelper.cc
         JsonHelper.h
-        KMLDomDocument.cc
-        KMLDomDocument.h
-        KMLHelper.cc
-        KMLHelper.h
         main.cc
         QGC.cc
         QGC.h
@@ -50,24 +45,12 @@ qt_add_library(${PROJECT_NAME} STATIC
         QGCFileDownload.h
         QGCLoggingCategory.cc
         QGCLoggingCategory.h
-        QGCMapPalette.cc
-        QGCMapPalette.h
-        QGCPalette.cc
-        QGCPalette.h
-        QGCQGeoCoordinate.cc
-        QGCQGeoCoordinate.h
         QGCTemporaryFile.cc
         QGCTemporaryFile.h
         QGCToolbox.cc
         QGCToolbox.h
         RunGuard.cc
         RunGuard.h
-        ShapeFileHelper.cc
-        ShapeFileHelper.h
-        SHPFileHelper.cc
-        SHPFileHelper.h
-        TerrainTile.cc
-        TerrainTile.h
 )
 
 target_precompile_headers(${PROJECT_NAME} PRIVATE pch.h)
@@ -104,7 +87,6 @@ if (NOT ${QGC_AIRLINK_DISABLED})
     add_subdirectory(AirLink)
 endif()
 add_subdirectory(Terrain)
-add_subdirectory(uas)
 add_subdirectory(UTMSP)
 add_subdirectory(Vehicle)
 add_subdirectory(VehicleSetup)
@@ -145,7 +127,6 @@ target_link_libraries(${PROJECT_NAME}
             QtLocationPlugin
             Settings
             Terrain
-            uas
             UTMSP
             Vehicle
             VehicleSetup
