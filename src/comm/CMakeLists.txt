@@ -1,3 +1,7 @@
+# QGC_ZEROCONF_ENABLED
+# QGC_ENABLE_BLUETOOTH
+# NO_SERIAL_LINK # TODO: Make this QGC_NO_SERIAL_LINK
+# QGC_DISABLE_DNSENGINE
 
 set(EXTRA_SRC)
 if(QGC_BUILD_TESTING)
@@ -53,8 +57,8 @@ target_link_libraries(comm
 		Qt6::Bluetooth
 )
 
-if(NOT QT6_DISABLE_DNSENGINE)
-	target_link_libraries(comm PUBLIC qmdnsengine)
+if(NOT QGC_DISABLE_DNSENGINE)
+	target_link_libraries(comm PRIVATE qmdnsengine)
 endif()
 
 target_compile_definitions(comm PUBLIC QGC_ENABLE_BLUETOOTH)
