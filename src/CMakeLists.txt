@@ -113,6 +113,7 @@ target_include_directories(${PROJECT_NAME}
 if(ANDROID)
     target_sources(${PROJECT_NAME}
         PRIVATE
+            ${CMAKE_SOURCE_DIR}/android/src/AndroidInit.cpp
             ${CMAKE_SOURCE_DIR}/android/src/AndroidInterface.cc
             ${CMAKE_SOURCE_DIR}/android/src/AndroidInterface.h
     )
