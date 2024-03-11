@@ -21,3 +21,7 @@ qt_add_library(Actuators STATIC
 target_link_libraries(Actuators PRIVATE
 	qgc)
 
+target_include_directories(Actuators
+        PUBLIC
+                ${CMAKE_CURRENT_SOURCE_DIR}
+)

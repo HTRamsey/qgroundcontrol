@@ -96,11 +96,11 @@ qt_add_library(Vehicle STATIC
 
 target_link_libraries(Vehicle
 	PRIVATE
-		Actuators
 		compression
 	PUBLIC
 		qgc
 		libevents
+                Actuators
 )
 
 target_include_directories(Vehicle

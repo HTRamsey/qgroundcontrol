@@ -73,8 +73,8 @@ qt_add_library(AutoPilotPlugins STATIC
 )
 
 target_link_libraries(AutoPilotPlugins
-	PRIVATE
-		qgc
+        PRIVATE
+                qgc
 )
 
 target_include_directories(AutoPilotPlugins
