@@ -204,7 +204,7 @@ DECLARE_SETTINGSFACT_NO_FUNC(AppSettings, qLocaleLanguage)
                 rgUpdatedValues.append(rgOriginalValues[i].toInt());
             }
         }
-#ifdef DAILY_BUILD
+#ifdef QGC_DAILY_BUILD
         // Only daily builds include full set
         for (int i=0; i<rgOriginalStrings.count(); i++) {
             int languageId = rgOriginalValues[i].toInt();

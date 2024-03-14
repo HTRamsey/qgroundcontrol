@@ -1,25 +1,3 @@
-if(UNIX AND NOT APPLE AND NOT ANDROID)
-	set(LINUX TRUE)
-endif()
-
-if(APPLE AND NOT IOS)
-	set(MACOS TRUE)
-endif()
-
-if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
-	include(CTest)
-	enable_testing()
-	if(QGC_BUILD_TESTING)
-        message("Building tests")
-		add_compile_definitions(UNITTEST_BUILD) # TODO: QGC_UNITTEST_BUILD
-	else()
-		# will prevent the definition of QT_DEBUG, which enables code that uses MockLink
-		add_compile_definitions(QT_NO_DEBUG)
-	endif()
-elseif(${CMAKE_BUILD_TYPE} STREQUAL "Release")
-	add_compile_definitions(QGC_INSTALL_RELEASE)
-endif()
-
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 	# clang and AppleClang
 	add_compile_options(
@@ -44,20 +22,9 @@ elseif(WIN32)
     )
 endif()
 
-add_compile_definitions(
-    QT_DISABLE_DEPRECATED_BEFORE=0x060600
-    QT_DEBUG_FIND_PACKAGE=ON
-)
-
 if(ANDROID OR IOS)
 	set(MOBILE TRUE)
 	add_compile_definitions(__mobile__)
-endif()
-
-if(ANDROID)
-	add_compile_definitions(__android__)
-elseif(IOS)
-	add_compile_definitions(__ios__)
 endif()
 
 if(NOT EXISTS ${CMAKE_SOURCE_DIR}/libs/mavlink/include/mavlink/v2.0/ardupilotmega)
