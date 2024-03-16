@@ -112,10 +112,11 @@ target_link_libraries(Vehicle
 		ADSB
         api
 		Audio
-                Camera
+        Camera
 		Compression
 		FirmwarePlugin
         Geo
+        MockLink
         Utilities
 		UTMSP
 	PUBLIC
@@ -125,7 +126,7 @@ target_link_libraries(Vehicle
         libevents
 		comm
 		FactSystem
-                MissionManager
+        MissionManager
         qgc
 )
 

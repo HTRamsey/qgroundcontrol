@@ -1,5 +1,7 @@
 find_package(Qt6 REQUIRED COMPONENTS Core Network Qml Test Widgets)
 
+add_subdirectory(MockLink)
+
 qt_add_library(comm STATIC
 	LinkConfiguration.cc
 	LinkConfiguration.h
@@ -20,18 +22,6 @@ qt_add_library(comm STATIC
 	UDPLink.cc
 	UDPLink.h
 )
-
-if(QGC_BUILD_TESTING)
-	target_sources(comm
-		PRIVATE
-			MockLink.cc
-			MockLink.h
-			MockLinkFTP.cc
-			MockLinkFTP.h
-			MockLinkMissionItemHandler.cc
-			MockLinkMissionItemHandler.h
-	)
-endif()
 
 target_link_libraries(comm
 	PRIVATE
@@ -54,6 +44,13 @@ if(NOT MOBILE)
 		PRIVATE
 			gps
 			PositionManager
+	)
+endif()
+
+if(QGC_BUILD_TESTING)
+	target_link_libraries(comm
+		PRIVATE
+			MockLink
 	)
 endif()
 
