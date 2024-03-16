@@ -20,9 +20,7 @@
 #include "TCPLink.h"
 #include "SettingsManager.h"
 #include "LogReplayLink.h"
-#ifdef QGC_ENABLE_BLUETOOTH
 #include "BluetoothLink.h"
-#endif
 
 #ifndef __mobile__
 #include "GPSManager.h"
@@ -129,11 +127,9 @@ bool LinkManager::createConnectedLink(SharedLinkConfigurationPtr& config, bool i
     case LinkConfiguration::TypeTcp:
         link = std::make_shared<TCPLink>(config);
         break;
-#ifdef QGC_ENABLE_BLUETOOTH
     case LinkConfiguration::TypeBluetooth:
         link = std::make_shared<BluetoothLink>(config);
         break;
-#endif
     case LinkConfiguration::TypeLogReplay:
         link = std::make_shared<LogReplayLink>(config);
         break;
@@ -331,11 +327,9 @@ void LinkManager::loadLinkConfigurationList()
                             case LinkConfiguration::TypeTcp:
                                 link = new TCPConfiguration(name);
                                 break;
-#ifdef QGC_ENABLE_BLUETOOTH
                             case LinkConfiguration::TypeBluetooth:
                                 link = new BluetoothConfiguration(name);
                                 break;
-#endif
                             case LinkConfiguration::TypeLogReplay:
                                 link = new LogReplayLinkConfiguration(name);
                                 break;
@@ -888,7 +882,8 @@ void LinkManager::_removeConfiguration(LinkConfiguration* config)
 
 bool LinkManager::isBluetoothAvailable(void)
 {
-    return qgcApp()->isBluetoothAvailable();
+    QBluetoothLocalDevice localDevice;
+    return localDevice.isValid()
 }
 
 bool LinkManager::containsLink(LinkInterface* link)

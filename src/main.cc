@@ -45,10 +45,6 @@
     #endif
 #endif
 
-#ifdef QGC_ENABLE_BLUETOOTH
-#include <QtBluetooth/QBluetoothSocket>
-#endif
-
 #include "QGCMapEngine.h"
 
 /* SDL does ugly things to main() */
@@ -284,10 +280,6 @@ int main(int argc, char *argv[])
     // anyway to silence the debug output.
 #ifndef NO_SERIAL_LINK
     qRegisterMetaType<QSerialPort::SerialPortError>();
-#endif
-#ifdef QGC_ENABLE_BLUETOOTH
-    qRegisterMetaType<QBluetoothSocket::SocketError>();
-    qRegisterMetaType<QBluetoothServiceInfo>();
 #endif
     qRegisterMetaType<QAbstractSocket::SocketError>();
 #ifndef __mobile__

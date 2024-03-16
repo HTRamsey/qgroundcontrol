@@ -54,9 +54,9 @@ AndroidHomeApp {
     # Add usb device support
     QGC_INSERT_ACTIVITY_INTENT_FILTER = $$QGC_INSERT_ACTIVITY_INTENT_FILTER "\r\n<action android:name=\\\"android.hardware.usb.action.USB_DEVICE_ATTACHED\\\"\\\/>\r\n<action android:name=\\\"android.hardware.usb.action.USB_DEVICE_DETACHED\\\"\\\/>\r\n<action android:name=\\\"android.hardware.usb.action.USB_ACCESSORY_ATTACHED\\\"\\\/>"
 }
-contains(DEFINES, QGC_ENABLE_BLUETOOTH) {
-    QGC_INSERT_ACTIVITY_INTENT_FILTER = $$QGC_INSERT_ACTIVITY_INTENT_FILTER "\r\n<action android:name=\\\"android.bluetooth.device.action.ACL_CONNECTED\\\"\\\/>\r\n<action android:name=\\\"android.bluetooth.device.action.ACL_DISCONNECTED\\\"\\\/>"
-}
+
+QGC_INSERT_ACTIVITY_INTENT_FILTER = $$QGC_INSERT_ACTIVITY_INTENT_FILTER "\r\n<action android:name=\\\"android.bluetooth.device.action.ACL_CONNECTED\\\"\\\/>\r\n<action android:name=\\\"android.bluetooth.device.action.ACL_DISCONNECTED\\\"\\\/>"
+
 android_source_dir_target.commands = $$android_source_dir_target.commands && \
     $$SED_I \"s/<!-- %%QGC_INSERT_ACTIVITY_INTENT_FILTER -->/$$QGC_INSERT_ACTIVITY_INTENT_FILTER/\" $$ANDROID_PACKAGE_SOURCE_DIR/AndroidManifest.xml
 

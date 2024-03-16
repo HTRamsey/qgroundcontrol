@@ -180,17 +180,6 @@ contains (CONFIG, QGC_DISABLE_PX4_PLUGIN_FACTORY) {
     CONFIG += PX4FirmwarePluginFactory
 }
 
-# Bluetooth
-contains (DEFINES, QGC_DISABLE_BLUETOOTH) {
-    message("Bluetooth support disabled (manual override from command line)")
-    DEFINES -= QGC_ENABLE_BLUETOOTH
-} else:exists(user_config.pri):infile(user_config.pri, DEFINES, QGC_DISABLE_BLUETOOTH) {
-    message("Bluetooth support disabled (manual override from user_config.pri)")
-    DEFINES -= QGC_ENABLE_BLUETOOTH
-} else:exists(user_config.pri):infile(user_config.pri, DEFINES, QGC_ENABLE_BLUETOOTH) {
-    DEFINES += QGC_ENABLE_BLUETOOTH
-}
-
 # QTNFC
 contains (DEFINES, QGC_DISABLE_QTNFC) {
     message("Skipping support for QTNFC (manual override from command line)")
@@ -271,10 +260,7 @@ QT += \
         serialport \
 }
 
-contains(DEFINES, QGC_ENABLE_BLUETOOTH) {
-QT += \
-    bluetooth \
-}
+QT += bluetooth
 
 contains(DEFINES, QGC_ENABLE_QTNFC) {
 QT += \
@@ -639,10 +625,7 @@ WindowsBuild {
     OTHER_FILES += .appveyor.yml
 }
 
-contains(DEFINES, QGC_ENABLE_BLUETOOTH) {
-    HEADERS += \
-    src/comm/BluetoothLink.h \
-}
+HEADERS += src/comm/BluetoothLink.h
 
 !contains(DEFINES, NO_SERIAL_LINK) {
 HEADERS += \
@@ -891,10 +874,7 @@ SOURCES += \
     src/comm/SerialLink.cc \
 }
 
-contains(DEFINES, QGC_ENABLE_BLUETOOTH) {
-    SOURCES += \
-    src/comm/BluetoothLink.cc \
-}
+SOURCES += src/comm/BluetoothLink.cc
 
 !MobileBuild {
 SOURCES += \

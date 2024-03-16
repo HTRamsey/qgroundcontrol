@@ -82,9 +82,6 @@ public:
     // Still working on getting rid of this and using dependency injection instead for everything
     QGCToolbox* toolbox(void) { return _toolbox; }
 
-    /// Do we have Bluetooth Support?
-    bool isBluetoothAvailable() const{ return _bluetoothAvailable; }
-
     /// Is Internet available?
     bool isInternetAvailable();
 

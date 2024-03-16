@@ -14,9 +14,7 @@
 #include "UDPLink.h"
 #include "TCPLink.h"
 #include "LogReplayLink.h"
-#ifdef QGC_ENABLE_BLUETOOTH
 #include "BluetoothLink.h"
-#endif
 #ifdef QT_DEBUG
 #include "MockLink.h"
 #endif
@@ -83,11 +81,9 @@ LinkConfiguration* LinkConfiguration::createSettings(int type, const QString& na
         case LinkConfiguration::TypeTcp:
             config = new TCPConfiguration(name);
             break;
-#ifdef QGC_ENABLE_BLUETOOTH
-    case LinkConfiguration::TypeBluetooth:
-        config = new BluetoothConfiguration(name);
-        break;
-#endif
+        case LinkConfiguration::TypeBluetooth:
+            config = new BluetoothConfiguration(name);
+            break;
         case LinkConfiguration::TypeLogReplay:
             config = new LogReplayLinkConfiguration(name);
             break;
@@ -124,11 +120,9 @@ LinkConfiguration* LinkConfiguration::duplicateSettings(LinkConfiguration* sourc
         case TypeTcp:
             dupe = new TCPConfiguration(qobject_cast<TCPConfiguration*>(source));
             break;
-#ifdef QGC_ENABLE_BLUETOOTH
         case TypeBluetooth:
             dupe = new BluetoothConfiguration(qobject_cast<BluetoothConfiguration*>(source));
             break;
-#endif
         case TypeLogReplay:
             dupe = new LogReplayLinkConfiguration(qobject_cast<LogReplayLinkConfiguration*>(source));
             break;

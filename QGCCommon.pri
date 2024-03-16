@@ -44,7 +44,6 @@ linux {
         CONFIG += AndroidBuild MobileBuild
         DEFINES += __android__
         DEFINES += __STDC_LIMIT_MACROS
-        DEFINES += QGC_ENABLE_BLUETOOTH
         QMAKE_CXXFLAGS_WARN_ON += -Werror \
             -Wno-unused-parameter \             # gst_plugins-good has these errors
             -Wno-implicit-fallthrough \         # gst_plugins-good has these errors

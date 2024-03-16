@@ -77,7 +77,7 @@ public:
 
     // Property accessors
 
-    bool isBluetoothAvailable       (void);
+    bool isBluetoothAvailable(void) const;
 
     QList<SharedLinkInterfacePtr>   links                           (void) { return _rgLinks; }
     QStringList                     linkTypeStrings                 (void) const;

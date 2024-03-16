@@ -63,8 +63,6 @@ if(QGC_ZEROCONF_ENABLED)
 	target_include_directories(comm PRIVATE ${CMAKE_SOURCE_DIR}/libs)
 endif()
 
-target_compile_definitions(comm PUBLIC QGC_ENABLE_BLUETOOTH)
-
 target_include_directories(comm
     PUBLIC
     	${CMAKE_CURRENT_SOURCE_DIR}

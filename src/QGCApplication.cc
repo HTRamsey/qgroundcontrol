@@ -23,10 +23,6 @@
 #include <QQuickImageProvider>
 #include <QQuickStyle>
 
-#ifdef QGC_ENABLE_BLUETOOTH
-#include <QBluetoothLocalDevice>
-#endif
-
 #include <QDebug>
 
 #if defined(QGC_GST_STREAMING)
@@ -307,15 +303,6 @@ QGCApplication::QGCApplication(int &argc, char* argv[], bool unitTesting)
 
     // Set up our logging filters
     QGCLoggingCategoryRegister::instance()->setFilterRulesFromSettings(loggingOptions);
-
-    // Initialize Bluetooth
-#ifdef QGC_ENABLE_BLUETOOTH
-    QBluetoothLocalDevice localDevice;
-    if (localDevice.isValid())
-    {
-        _bluetoothAvailable = true;
-    }
-#endif
 
     // Gstreamer debug settings
     int gstDebugLevel = 0;
