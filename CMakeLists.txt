@@ -6,6 +6,7 @@ cmake_minimum_required(VERSION 3.21.1 FATAL_ERROR)
 
 project(QGroundControl LANGUAGES C CXX)
 
+
 #######################################################
 #            CMake Configuration Options
 #######################################################
