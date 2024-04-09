@@ -142,8 +142,8 @@ add_compile_definitions(
 #                QGroundControl Git Information
 #######################################################
 
-include(Git)
-message(STATUS "QGroundControl version: ${APP_VERSION_STR}")
+# include(Git)
+# message(STATUS "QGroundControl version: ${APP_VERSION_STR}")
 
 #######################################################
 #                QGroundControl Resources
@@ -226,17 +226,23 @@ elseif(ANDROID)
 
     set_target_properties(${PROJECT_NAME}
         PROPERTIES
-            QT_ANDROID_ABIS ${ANDROID_ABI}
+            QT_ANDROID_ABIS "${QT_ANDROID_ABIS}"
+            # QT_PATH_ANDROID_ABI_<ABI>
+            QT_ANDROID_BUILD_ALL_ABIS ON
             QT_ANDROID_MIN_SDK_VERSION 26
             QT_ANDROID_TARGET_SDK_VERSION 33
             QT_ANDROID_PACKAGE_SOURCE_DIR ${CMAKE_SOURCE_DIR}/android
-            QT_ANDROID_VERSION_NAME ${APP_VERSION_STR}
-            # QT_ANDROID_VERSION_CODE 5.0
+            QT_ANDROID_VERSION_NAME "${CMAKE_PROJECT_VERSION}"
+            QT_ANDROID_VERSION_CODE ${CMAKE_PROJECT_VERSION}
+            # QT_ANDROID_APPLICATION_ARGUMENTS
             QT_QML_ROOT_PATH ${CMAKE_SOURCE_DIR}
     )
 
     if(CMAKE_BUILD_TYPE STREQUAL "Release" AND ANDROID_KEYSTORE_PASSWORD)
+        set(QT_ANDROID_DEPLOY_RELEASE TRUE)
         set(QT_ANDROID_SIGN_APK TRUE)
+    else()
+        set(QT_ENABLE_VERBOSE_DEPLOYMENT TRUE)
     endif()
 endif()
 
@@ -262,14 +268,16 @@ install(
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
     BUNDLE  DESTINATION .
 )
-if(NOT ANDROID)
-    qt_generate_deploy_qml_app_script(
-        TARGET ${PROJECT_NAME}
-        OUTPUT_SCRIPT deploy_script
-        MACOS_BUNDLE_POST_BUILD
-    )
-    install(SCRIPT ${deploy_script})
-endif()
+
+qt_generate_deploy_qml_app_script(
+    TARGET ${PROJECT_NAME}
+    OUTPUT_SCRIPT deploy_script
+    MACOS_BUNDLE_POST_BUILD
+    NO_UNSUPPORTED_PLATFORM_ERROR
+    DEPLOY_USER_QML_MODULES_ON_UNSUPPORTED_PLATFORM
+)
+install(SCRIPT ${deploy_script})
+
 install(
     DIRECTORY ${CMAKE_SOURCE_DIR}/resources/
     DESTINATION ${CMAKE_INSTALL_DATADIR}/qgroundcontrol
