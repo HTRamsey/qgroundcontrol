@@ -104,24 +104,8 @@ target_link_libraries(QGC
 target_include_directories(QGC PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(ANDROID)
-	target_sources(QGC
-		PRIVATE
-			${CMAKE_SOURCE_DIR}/android/src/AndroidInterface.cc
-			${CMAKE_SOURCE_DIR}/android/src/AndroidInterface.h
-		PUBLIC
-			${CMAKE_SOURCE_DIR}/android/src/AndroidInit.cpp
-	)
-
-	target_link_libraries(QGC
-		PRIVATE
-			Qt6::CorePrivate
-		PUBLIC
-			Qt6::Core
-                        Comms
-                        Joystick
-	)
-
-	target_include_directories(QGC PUBLIC ${CMAKE_SOURCE_DIR}/android/src)
+	add_subdirectory(${CMAKE_SOURCE_DIR}/android qgcandroid.build)
+    target_link_libraries(qgc PUBLIC qgcandroid)
 else()
 	target_sources(QGC
 		PRIVATE
