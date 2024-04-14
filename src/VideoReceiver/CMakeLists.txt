@@ -30,4 +30,8 @@ if(GST_FOUND)
             qmlglsink
             Settings
     )
+
+    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+        target_compile_definitions(${PROJECT_NAME} PRIVATE QGC_INSTALL_RELEASE)
+    endif()
 endif()

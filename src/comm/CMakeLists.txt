@@ -77,6 +77,14 @@ endif()
 
 target_compile_definitions(comm PUBLIC QGC_ENABLE_BLUETOOTH)
 
+if(NOT EXISTS ${CMAKE_SOURCE_DIR}/libs/mavlink/include/mavlink/v2.0/ardupilotmega)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC NO_ARDUPILOT_DIALECT) # TODO: Make this QGC_NO_ARDUPILOT_DIALECT
+endif()
+
+# if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+# 	target_compile_options(comm PRIVATE -Wno-address-of-packed-member)
+# endif()
+
 target_include_directories(comm
     PUBLIC
     	${CMAKE_CURRENT_SOURCE_DIR}
