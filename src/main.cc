@@ -26,19 +26,21 @@
 
 #include <iostream>
 
-#ifndef __mobile__
-    #ifndef NO_SERIAL_LINK
+#ifndef NO_SERIAL_LINK
+    #include "QGCSerialPortInfo.h"
+    #ifdef Q_OS_ANDROID
+        #include "qserialport.h"
+    #else
         #include <QSerialPort>
     #endif
-    #include "QGCSerialPortInfo.h"
+#endif
+
+#ifndef __mobile__
     #include "RunGuard.h"
 #endif
 
 #ifdef Q_OS_ANDROID
     #include "AndroidInterface.h"
-    #ifndef NO_SERIAL_LINK
-        #include "qserialport.h"
-    #endif
 #endif
 
 #ifdef UNITTEST_BUILD
@@ -63,10 +65,8 @@
 #undef main
 #endif
 
-#ifndef __mobile__
 #ifndef NO_SERIAL_LINK
     Q_DECLARE_METATYPE(QGCSerialPortInfo)
-#endif
 #endif
 
 #ifdef Q_OS_WIN
@@ -184,10 +184,8 @@ int main(int argc, char *argv[])
     qRegisterMetaType<QBluetoothServiceInfo>();
 #endif
     qRegisterMetaType<QAbstractSocket::SocketError>();
-#ifndef __mobile__
 #ifndef NO_SERIAL_LINK
     qRegisterMetaType<QGCSerialPortInfo>();
-#endif
 #endif
 
     qRegisterMetaType<Vehicle::MavCmdResultFailureCode_t>("Vehicle::MavCmdResultFailureCode_t");

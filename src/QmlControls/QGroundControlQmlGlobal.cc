@@ -9,7 +9,7 @@
 
 #include "QGroundControlQmlGlobal.h"
 #include "LinkManager.h"
-#ifndef __mobile__
+#ifndef NO_SERIAL_LINK
 #include "GPSManager.h"
 #endif
 #include <QSettings>
@@ -81,7 +81,7 @@ void QGroundControlQmlGlobal::setToolbox(QGCToolbox* toolbox)
     _corePlugin             = toolbox->corePlugin();
     _firmwarePluginManager  = toolbox->firmwarePluginManager();
     _settingsManager        = toolbox->settingsManager();
-#ifndef __mobile__
+#ifndef NO_SERIAL_LINK
     _gpsRtkFactGroup        = toolbox->gpsManager()->gpsRtkFactGroup();
 #endif
     _adsbVehicleManager     = toolbox->adsbVehicleManager();

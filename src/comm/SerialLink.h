@@ -9,6 +9,8 @@
 
 #pragma once
 
+#ifndef NO_SERIAL_LINK
+
 #include <QMutex>
 #include <QString>
 
@@ -147,3 +149,4 @@ private:
 
 };
 
+#endif

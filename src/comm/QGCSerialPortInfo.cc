@@ -7,6 +7,7 @@
  *
  ****************************************************************************/
 
+#ifndef NO_SERIAL_LINK
 
 #include "QGCSerialPortInfo.h"
 #include "JsonHelper.h"
@@ -375,3 +376,5 @@ bool QGCSerialPortInfo::canFlash(void) const
         return false;
     }
 }
+
+#endif

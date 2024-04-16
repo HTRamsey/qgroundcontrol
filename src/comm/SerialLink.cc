@@ -7,6 +7,8 @@
  *
  ****************************************************************************/
 
+#ifndef NO_SERIAL_LINK
+
 #include <QTimer>
 #include <QDebug>
 #include <QSettings>
@@ -461,3 +463,5 @@ void SerialConfiguration::setUsbDirect(bool usbDirect)
         emit usbDirectChanged(_usbDirect);
     }
 }
+
+#endif

@@ -18,12 +18,9 @@
 #include "LinkInterface.h"
 #include "QGCToolbox.h"
 #include "MAVLinkProtocol.h"
-#if !defined(__mobile__)
-#include "LogReplayLink.h"
 #include "UdpIODevice.h"
-#endif
+#include "LogReplayLink.h"
 #include "QmlObjectListModel.h"
-
 #ifndef NO_SERIAL_LINK
     #include "SerialLink.h"
     #include "QGCSerialPortInfo.h"
@@ -54,9 +51,6 @@ public:
     Q_PROPERTY(bool                 isBluetoothAvailable            READ isBluetoothAvailable            CONSTANT)
     Q_PROPERTY(QmlObjectListModel*  linkConfigurations              READ _qmlLinkConfigurations          CONSTANT)
     Q_PROPERTY(QStringList          linkTypeStrings                 READ linkTypeStrings                 CONSTANT)
-    Q_PROPERTY(QStringList          serialBaudRates                 READ serialBaudRates                 CONSTANT)
-    Q_PROPERTY(QStringList          serialPortStrings               READ serialPortStrings               NOTIFY commPortStringsChanged)
-    Q_PROPERTY(QStringList          serialPorts                     READ serialPorts                     NOTIFY commPortsChanged)
     Q_PROPERTY(bool                 mavlinkSupportForwardingEnabled READ mavlinkSupportForwardingEnabled NOTIFY mavlinkSupportForwardingEnabledChanged)
 
     /// Create/Edit Link Configuration
@@ -79,9 +73,6 @@ public:
 
     QList<SharedLinkInterfacePtr>   links                           (void) { return _rgLinks; }
     QStringList                     linkTypeStrings                 (void) const;
-    QStringList                     serialBaudRates                 (void);
-    QStringList                     serialPortStrings               (void);
-    QStringList                     serialPorts                     (void);
     bool                            mavlinkSupportForwardingEnabled (void) { return _mavlinkSupportForwardingEnabled; }
 
     void loadLinkConfigurationList();
@@ -139,8 +130,6 @@ public:
     static const char*  settingsGroup;
 
 signals:
-    void commPortStringsChanged();
-    void commPortsChanged();
     void mavlinkSupportForwardingEnabledChanged();
 
 private slots:
@@ -150,19 +139,13 @@ private:
     QmlObjectListModel* _qmlLinkConfigurations      (void) { return &_qmlConfigurations; }
     bool                _connectionsSuspendedMsg    (void);
     void                _updateAutoConnectLinks     (void);
-    void                _updateSerialPorts          (void);
     void                _removeConfiguration        (LinkConfiguration* config);
     void                _addUDPAutoConnectLink      (void);
 #ifdef QGC_ZEROCONF_ENABLED
     void                _addZeroConfAutoConnectLink (void);
 #endif
     void                _addMAVLinkForwardingLink   (void);
-    bool                _isSerialPortConnected      (void);
     void                _createDynamicForwardLink   (const char* linkName, QString hostName);
-    bool                _allowAutoConnectToBoard    (QGCSerialPortInfo::BoardType_t boardType);
-#ifndef NO_SERIAL_LINK
-    bool                _portAlreadyConnected       (const QString& portName);
-#endif
 
     bool                                _configUpdateSuspended;                     ///< true: stop updating configuration list
     bool                                _configurationsLoaded;                      ///< true: Link configurations have been loaded
@@ -176,26 +159,10 @@ private:
 
     QList<SharedLinkInterfacePtr>       _rgLinks;
     QList<SharedLinkConfigurationPtr>   _rgLinkConfigs;
-    QString                             _autoConnectRTKPort;
     QmlObjectListModel                  _qmlConfigurations;
 
-    QMap<QString, int>                  _autoconnectPortWaitList;               ///< key: QGCSerialPortInfo::systemLocation, value: wait count
-    QStringList                         _commPortList;
-    QStringList                         _commPortDisplayList;
-
-#ifndef NO_SERIAL_LINK
-    QList<SerialLink*>                  _activeLinkCheckList;                   ///< List of links we are waiting for a vehicle to show up on
-#endif
-
-    // NMEA GPS device for GCS position
-#ifndef __mobile__
-#ifndef NO_SERIAL_LINK
     QString                             _nmeaDeviceName;
-    QSerialPort*                        _nmeaPort;
-    uint32_t                            _nmeaBaud;
     UdpIODevice                         _nmeaSocket;
-#endif
-#endif
 
     static const char*  _defaultUDPLinkName;
     static const char*  _mavlinkForwardingLinkName;
@@ -204,5 +171,35 @@ private:
     static const int    _autoconnectConnectDelayMSecs;
     bool                _mavlinkSupportForwardingEnabled = false;
 
-};
+#ifndef NO_SERIAL_LINK
 
+public:
+    Q_PROPERTY(QStringList  serialBaudRates     READ serialBaudRates    CONSTANT)
+    Q_PROPERTY(QStringList  serialPortStrings   READ serialPortStrings  NOTIFY commPortStringsChanged)
+    Q_PROPERTY(QStringList  serialPorts         READ serialPorts        NOTIFY commPortsChanged)
+
+    QStringList serialBaudRates     (void);
+    QStringList serialPortStrings   (void);
+    QStringList serialPorts         (void);
+
+signals:
+    void commPortStringsChanged();
+    void commPortsChanged();
+
+private:
+    bool _isSerialPortConnected     (void);
+    void _updateSerialPorts         (void);
+    bool _allowAutoConnectToBoard   (QGCSerialPortInfo::BoardType_t boardType);
+    bool _portAlreadyConnected      (const QString& portName);
+
+    QMap<QString, int>  _autoconnectPortWaitList; ///< key: QGCSerialPortInfo::systemLocation, value: wait count
+    QStringList         _commPortList;
+    QStringList         _commPortDisplayList;
+    QString             _autoConnectRTKPort;
+    QList<SerialLink*>  _activeLinkCheckList; ///< List of links we are waiting for a vehicle to show up on
+
+    QSerialPort*        _nmeaPort;
+    uint32_t            _nmeaBaud;
+
+#endif // NO_SERIAL_LINK
+};

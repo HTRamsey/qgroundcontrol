@@ -10,6 +10,8 @@
 
 #pragma once
 
+#ifndef NO_SERIAL_LINK
+
 #include <QtCore/QtSystemDetection>
 #ifdef Q_OS_ANDROID
     #include "qserialportinfo.h"
@@ -93,3 +95,4 @@ private:
     static QList<BoardRegExpFallback_t>         _boardManufacturerFallbackList;
 };
 
+#endif

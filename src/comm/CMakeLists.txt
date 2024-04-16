@@ -1,6 +1,4 @@
-find_package(Qt6 REQUIRED COMPONENTS Bluetooth Core Network Test)
-
-# NO_SERIAL_LINK # TODO: Make this QGC_NO_SERIAL_LINK
+find_package(Qt6 REQUIRED COMPONENTS Bluetooth Core Network Test OPTIONAL_COMPONENTS SerialPort)
 
 qt_add_library(comm STATIC
 	BluetoothLink.cc
@@ -17,10 +15,6 @@ qt_add_library(comm STATIC
 	MAVLinkProtocol.h
 	QGCMAVLink.cc
 	QGCMAVLink.h
-	QGCSerialPortInfo.cc
-	QGCSerialPortInfo.h
-	SerialLink.cc
-	SerialLink.h
 	TCPLink.cc
 	TCPLink.h
 	UdpIODevice.cc
@@ -51,10 +45,21 @@ target_link_libraries(comm
 		Qt6::Network
 )
 
-if(ANDROID)
-    target_link_libraries(comm PUBLIC qtandroidserialport)
+if(NOT QGC_NO_SERIAL_LINK)
+	target_sources(comm
+		PRIVATE
+			QGCSerialPortInfo.cc
+			QGCSerialPortInfo.h
+			SerialLink.cc
+			SerialLink.h
+	)
+	if(ANDROID)
+	    target_link_libraries(comm PUBLIC qtandroidserialport)
+	else()
+		target_link_libraries(comm PUBLIC Qt6::SerialPort)
+	endif()
 else()
-	target_link_libraries(comm PUBLIC Qt6::SerialPort)
+	target_compile_definitions(comm PUBLIC NO_SERIAL_LINK)
 endif()
 
 option(QGC_ZEROCONF_ENABLED "Enable ZeroConf Compatibility" OFF)
