@@ -25,6 +25,7 @@ Q_DECLARE_LOGGING_CATEGORY(QGCSerialPortInfoLog)
 /// that QGC cares about.
 class QGCSerialPortInfo : public QSerialPortInfo
 {
+    Q_GADGET
 public:
     typedef enum {
         BoardTypePixhawk,

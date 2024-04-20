@@ -797,6 +797,7 @@ public:
         MavCmdResultFailureNoResponseToCommand, ///< No response from vehicle to command
         MavCmdResultFailureDuplicateCommand,    ///< Unable to send command since duplicate is already being waited on for response
     } MavCmdResultFailureCode_t;
+    Q_ENUM(MavCmdResultFailureCode_t)
 
     /// Callback for sendMavCommandWithHandler which handles MAV_RESULT_IN_PROGRESS acks
     ///     @param progressHandlerData  Opaque data passed in to sendMavCommand call
@@ -1561,5 +1562,3 @@ private:
     QMultiHash<uint8_t, uint16_t> _unsupportedMessageIds;
     uint16_t _lastSetMsgIntervalMsgId = 0;
 };
-
-Q_DECLARE_METATYPE(Vehicle::MavCmdResultFailureCode_t)

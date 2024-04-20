@@ -7,38 +7,29 @@
  *
  ****************************************************************************/
 
-#include <QtGlobal>
-#include <QApplication>
-#include <QIcon>
-#include <QSslSocket>
-#include <QMessageBox>
-#include <QProcessEnvironment>
-#include <QHostAddress>
-#include <QUdpSocket>
-#include <QtPlugin>
-#include <QStringListModel>
-#include <QQuickStyle>
-#include <QQuickWindow>
+#include <QtCore/QtEnvironmentVariables>
+#include <QtCore/QtPlugin>
+#include <QtWidgets/QApplication>
+#include <QtWidgets/QMessageBox>
+#include <QtGui/QIcon>
+#include <QtQuickControls2/QQuickStyle>
+#include <QtQuick/QQuickWindow>
+#ifdef Q_OS_MAC
+#ifndef Q_OS_IOS
+#include <QtCore/QProcess>
+#endif
+#endif
 
 #include "QGC.h"
 #include "QGCApplication.h"
 #include "AppMessages.h"
 
-#include <iostream>
-
 #ifndef __mobile__
-    #ifndef NO_SERIAL_LINK
-        #include <QSerialPort>
-    #endif
-    #include "QGCSerialPortInfo.h"
     #include "RunGuard.h"
 #endif
 
 #ifdef Q_OS_ANDROID
     #include "AndroidInterface.h"
-    #ifndef NO_SERIAL_LINK
-        #include "qserialport.h"
-    #endif
 #endif
 
 #ifdef UNITTEST_BUILD
@@ -52,10 +43,6 @@
     #endif
 #endif
 
-#ifdef QGC_ENABLE_BLUETOOTH
-#include <QtBluetooth/QBluetoothSocket>
-#endif
-
 #include "QGCMapEngine.h"
 
 /* SDL does ugly things to main() */
@@ -63,14 +50,9 @@
 #undef main
 #endif
 
-#ifndef __mobile__
-#ifndef NO_SERIAL_LINK
-    Q_DECLARE_METATYPE(QGCSerialPortInfo)
-#endif
-#endif
-
 #ifdef Q_OS_WIN
 
+#include <iostream>
 #include <windows.h>
 
 /// @brief CRT Report Hook installed using _CrtSetReportHook. We install this hook when
@@ -88,6 +70,7 @@ int WindowsCrtReportHook(int reportType, char* message, int* returnValue)
 
 // To shut down QGC on Ctrl+C on Linux
 #ifdef Q_OS_LINUX
+
 #include <csignal>
 
 void sigHandler(int s)
@@ -135,8 +118,9 @@ int main(int argc, char *argv[])
 
 #ifdef Q_OS_UNIX
     //Force writing to the console on UNIX/BSD devices
-    if (!qEnvironmentVariableIsSet("QT_LOGGING_TO_CONSOLE"))
+    if (!qEnvironmentVariableIsSet("QT_LOGGING_TO_CONSOLE")) {
         qputenv("QT_LOGGING_TO_CONSOLE", "1");
+    }
 #endif
 
     // install the message handler
@@ -148,6 +132,11 @@ int main(int argc, char *argv[])
     // tip: the domain can be cross-checked on the command line with <defaults domains>
     QProcess::execute("defaults", {"write org.qgroundcontrol.qgroundcontrol NSAppSleepDisabled -bool YES"});
 #endif
+#endif
+
+#ifdef Q_OS_LINUX
+    std::signal(SIGINT, sigHandler);
+    std::signal(SIGTERM, sigHandler);
 #endif
 
 #ifdef Q_OS_WIN
@@ -165,40 +154,13 @@ int main(int argc, char *argv[])
             break;
         }
     }
-#endif
 
-#ifdef Q_OS_LINUX
-    std::signal(SIGINT, sigHandler);
-    std::signal(SIGTERM, sigHandler);
-#endif /* Q_OS_LINUX */
+// In Windows, the compiler doesn't see the use of the class created by Q_IMPORT_PLUGIN
+#pragma warning( disable : 4930 4101 )
 
-    // The following calls to qRegisterMetaType are done to silence debug output which warns
-    // that we use these types in signals, and without calling qRegisterMetaType we can't queue
-    // these signals. In general we don't queue these signals, but we do what the warning says
-    // anyway to silence the debug output.
-#ifndef NO_SERIAL_LINK
-    qRegisterMetaType<QSerialPort::SerialPortError>();
 #endif
-#ifdef QGC_ENABLE_BLUETOOTH
-    qRegisterMetaType<QBluetoothSocket::SocketError>();
-    qRegisterMetaType<QBluetoothServiceInfo>();
-#endif
-    qRegisterMetaType<QAbstractSocket::SocketError>();
-#ifndef __mobile__
-#ifndef NO_SERIAL_LINK
-    qRegisterMetaType<QGCSerialPortInfo>();
-#endif
-#endif
-
-    qRegisterMetaType<Vehicle::MavCmdResultFailureCode_t>("Vehicle::MavCmdResultFailureCode_t");
 
     // We statically link our own QtLocation plugin
-
-#ifdef Q_OS_WIN
-    // In Windows, the compiler doesn't see the use of the class created by Q_IMPORT_PLUGIN
-#pragma warning( disable : 4930 4101 )
-#endif
-
     Q_IMPORT_PLUGIN(QGeoServiceProviderFactoryQGC)
 
     bool runUnitTests = false;          // Run unit tests
@@ -223,19 +185,19 @@ int main(int argc, char *argv[])
         runUnitTests = true;
     }
 
-    if (quietWindowsAsserts) {
 #ifdef Q_OS_WIN
+    if (quietWindowsAsserts) {
         _CrtSetReportHook(WindowsCrtReportHook);
-#endif
     }
 
-#ifdef Q_OS_WIN
     if (runUnitTests) {
         // Don't pop up Windows Error Reporting dialog when app crashes. This prevents TeamCity from
         // hanging.
         DWORD dwMode = SetErrorMode(SEM_NOGPFAULTERRORBOX);
         SetErrorMode(dwMode | SEM_NOGPFAULTERRORBOX);
     }
+#else
+    Q_UNUSED(quietWindowsAsserts);
 #endif
 #endif // QT_DEBUG
 
@@ -255,13 +217,6 @@ int main(int argc, char *argv[])
 #ifdef Q_OS_LINUX
     QApplication::setWindowIcon(QIcon(":/res/resources/icons/qgroundcontrol.ico"));
 #endif /* Q_OS_LINUX */
-
-    // There appears to be a threading issue in qRegisterMetaType which can cause it to throw a qWarning
-    // about duplicate type converters. This is caused by a race condition in the Qt code. Still working
-    // with them on tracking down the bug. For now we register the type which is giving us problems here
-    // while we only have the main thread. That should prevent it from hitting the race condition later
-    // on in the code.
-    qRegisterMetaType<QList<QPair<QByteArray,QByteArray> > >();
 
     app->_initCommon();
     //-- Initialize Cache System
