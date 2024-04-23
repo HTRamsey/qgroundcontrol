@@ -1,4 +1,4 @@
-find_package(Qt6 REQUIRED COMPONENTS Core Qml)
+find_package(Qt6 REQUIRED COMPONENTS Core Qml Concurrent Location Widgets)
 
 qt_add_library(QmlControls STATIC
 	AppMessages.cc

@@ -1,4 +1,4 @@
-find_package(Qt6 REQUIRED COMPONENTS Core)
+find_package(Qt6 REQUIRED COMPONENTS Core Xml)
 
 qt_add_library(MissionManager STATIC
 	BlankPlanCreator.cc

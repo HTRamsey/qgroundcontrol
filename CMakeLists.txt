@@ -92,10 +92,11 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Debug")
     enable_testing()
 endif()
 
+set(QT_ENABLE_VERBOSE_DEPLOYMENT ON CACHE BOOL "Verbose Deployment")
+
 if(ANDROID)
     cmake_print_variables(QT_ANDROID_APPLICATION_ARGUMENTS QT_HOST_PATH)
 
-    set(QT_ENABLE_VERBOSE_DEPLOYMENT ON CACHE BOOL "Verbose Deployment")
     # QT_USE_TARGET_ANDROID_BUILD_DIR
     list(APPEND QT_ANDROID_MULTI_ABI_FORWARD_VARS QGC_STABLE_BUILD)
     list(APPEND QT_ANDROID_MULTI_ABI_FORWARD_VARS QT_HOST_PATH)
@@ -118,29 +119,10 @@ endif()
 find_package(Qt6
     REQUIRED
     COMPONENTS
-        Bluetooth
-        Charts
-        Concurrent
         Core
-        Core5Compat
-        Location
-        Multimedia
-        Network
-        Positioning
-        Quick
-        QuickControls2
-        QuickWidgets
-        OpenGL
-        Sql
-        Svg
-        Test
-        Widgets
-        Xml
+        Qml
     OPTIONAL_COMPONENTS
         LinguistTools
-        SerialPort
-    HINTS
-        ${QT_LIBRARY_HINTS}
 )
 
 qt_standard_project_setup(REQUIRES 6.6.0)
@@ -187,12 +169,6 @@ set(QGC_RESOURCES
     ${CMAKE_SOURCE_DIR}/src/FirmwarePlugin/PX4/PX4Resources.qrc
 )
 
-if(CONFIG_UTM_ADAPTER)
-    list(APPEND QGC_RESOURCES ${CMAKE_SOURCE_DIR}/src/UTMSP/utmsp.qrc)
-else()
-    list(APPEND QGC_RESOURCES ${CMAKE_SOURCE_DIR}/src/UTMSP/dummy/utmsp_dummy.qrc)
-endif()
-
 if(QGC_BUILD_TESTING)
     list(APPEND QGC_RESOURCES ${CMAKE_SOURCE_DIR}/test/UnitTest.qrc)
 endif()
@@ -220,7 +196,7 @@ if(Qt6LinguistTools_FOUND)
     qt_add_translations(${PROJECT_NAME} TS_FILES ${TS_SOURCES}) # TODO: Update to new qt_add_translations form in Qt6.7
 endif()
 
-target_precompile_headers(${PROJECT_NAME} PRIVATE src/pch.h)
+target_precompile_headers(${PROJECT_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/src/pch.h)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES QT_RESOURCE_PREFIX "/qgc")
 
@@ -234,12 +210,12 @@ elseif(MACOS)
             MACOSX_BUNDLE_INFO_PLIST ${CMAKE_SOURCE_DIR}/deploy/mac/MacOSXBundleInfo.plist.in
             MACOSX_BUNDLE_BUNDLE_NAME ${PROJECT_NAME}
             MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
-            MACOSX_BUNDLE_COPYRIGHT "Copyright (c) 2018 QGroundControl. All rights reserved."
+            MACOSX_BUNDLE_COPYRIGHT "Copyright (c) 2020 QGroundControl. All rights reserved."
             MACOSX_BUNDLE_GUI_IDENTIFIER "io.mavlink.qgroundcontrol"
-            MACOSX_BUNDLE_ICON_FILE "${CMAKE_SOURCE_DIR}/resources/icons/macx.icns"
-            # MACOSX_BUNDLE_INFO_STRING
-            # MACOSX_BUNDLE_LONG_VERSION_STRING
-            # MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+            MACOSX_BUNDLE_ICON_FILE ${CMAKE_SOURCE_DIR}/resources/icons/macx.icns
+            MACOSX_BUNDLE_INFO_STRING "Open Source Ground Control App"
+            MACOSX_BUNDLE_LONG_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}
+            MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
     )
 elseif(IOS)
     enable_language(OBJC)
