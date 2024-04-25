@@ -17,7 +17,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-13
 
     strategy:
       matrix:
@@ -59,10 +59,10 @@ jobs:
           modules: qtcharts qtlocation qtpositioning qtspeech qt5compat qtmultimedia qtserialport qtimageformats qtshadertools qtconnectivity qtquick3d
           setup-python: true
           cache: ${{ github.ref == 'refs/heads/master' && github.event_name != 'pull_request' }}
-          tools: 'tools_cmake tools_ninja'
+          tools: 'tools_cmake'
 
       - name: Install Dependencies
-        run: brew install ninja SDL2
+        run: brew install ninja cmake SDL2
 
       - name: Install Gstreamer
         env:
