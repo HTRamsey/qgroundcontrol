@@ -188,5 +188,9 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved)
 
     QNativeInterface::QAndroidApplication::hideSplashScreen(333);
 
+    #ifndef NO_SERIAL_LINK
+        qRegisterMetaType<QSerialPort::SerialPortError>();
+    #endif
+
     return JNI_VERSION_1_6;
 }
