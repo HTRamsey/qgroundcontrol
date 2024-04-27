@@ -9,7 +9,7 @@
 
 #include <jni.h>
 
-static Q_LOGGING_CATEGORY(AndroidSerialLog, "qgc.android.serial");
+Q_LOGGING_CATEGORY(AndroidSerialLog, "qgc.android.serial");
 
 void AndroidSerial::onNewData(int port, QByteArray data)
 {
@@ -123,7 +123,7 @@ QByteArray AndroidSerial::read(int deviceId, int length, int timeout)
 
     jbyte * bytes = jniEnv->GetByteArrayElements(jarray, nullptr);
     const jsize len = jniEnv->GetArrayLength(jarray);
-    QByteArray data = QByteArray::fromRawData(bytes, len);
+    QByteArray data = QByteArray::fromRawData(reinterpret_cast<char*>(bytes), len);
     jniEnv->ReleaseByteArrayElements(jarray, bytes, JNI_ABORT);
 
     return data;
