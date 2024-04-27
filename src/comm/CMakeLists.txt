@@ -51,18 +51,15 @@ target_link_libraries(comm
 		Utilities
 )
 
-if(NOT MOBILE)
+option(QGC_NO_SERIAL_LINK "Disable Serial Links" OFF)
+if(QGC_NO_SERIAL_LINK)
+	target_compile_definitions(comm PUBLIC NO_SERIAL_LINK)
+else()
 	target_link_libraries(comm
 		PRIVATE
 			gps
 			PositionManager
 	)
-endif()
-
-option(QGC_NO_SERIAL_LINK "Disable Serial Links" OFF)
-if(QGC_NO_SERIAL_LINK)
-	target_compile_definitions(comm PUBLIC NO_SERIAL_LINK)
-else()
 	if(ANDROID)
 		add_subdirectory(${CMAKE_SOURCE_DIR}/libs/qtandroidserialport qtandroidserialport.build)
 	    target_link_libraries(comm PUBLIC qtandroidserialport)
