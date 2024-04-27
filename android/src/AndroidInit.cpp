@@ -32,16 +32,6 @@ extern "C"
 
 //-----------------------------------------------------------------------------
 
-static void cleanJavaException()
-{
-    QJniEnvironment env;
-    if (env->ExceptionCheck())
-    {
-        env->ExceptionDescribe();
-        env->ExceptionClear();
-    }
-}
-
 static void jniLogDebug(JNIEnv *envA, jobject thizA, jstring messageA)
 {
     Q_UNUSED(thizA);
@@ -49,8 +39,7 @@ static void jniLogDebug(JNIEnv *envA, jobject thizA, jstring messageA)
     const char *stringL = envA->GetStringUTFChars(messageA, nullptr);
     QString logMessage = QString::fromUtf8(stringL);
     envA->ReleaseStringUTFChars(messageA, stringL);
-    if (envA->ExceptionCheck())
-    {
+    if (envA->ExceptionCheck()) {
         envA->ExceptionClear();
     }
     qCDebug(AndroidInitLog) << logMessage;
@@ -63,8 +52,7 @@ static void jniLogWarning(JNIEnv *envA, jobject thizA, jstring messageA)
     const char *stringL = envA->GetStringUTFChars(messageA, nullptr);
     QString logMessage = QString::fromUtf8(stringL);
     envA->ReleaseStringUTFChars(messageA, stringL);
-    if (envA->ExceptionCheck())
-    {
+    if (envA->ExceptionCheck()) {
         envA->ExceptionClear();
     }
     qCWarning(AndroidInitLog) << logMessage;
@@ -92,22 +80,19 @@ static void jniInit(JNIEnv* env, jobject context)
     qCDebug(AndroidInitLog) << Q_FUNC_INFO;
 
     const jclass context_cls = env->GetObjectClass(context);
-    if (!context_cls)
-    {
+    if (!context_cls) {
         return;
     }
 
     const jmethodID get_class_loader_id = env->GetMethodID(context_cls, "getClassLoader", "()Ljava/lang/ClassLoader;");
-    if (env->ExceptionCheck())
-    {
+    if (env->ExceptionCheck()) {
         env->ExceptionDescribe();
         env->ExceptionClear();
         return;
     }
 
     const jobject class_loader = env->CallObjectMethod(context, get_class_loader_id);
-    if (env->ExceptionCheck())
-    {
+    if (env->ExceptionCheck()) {
         env->ExceptionDescribe();
         env->ExceptionClear();
         return;
@@ -133,28 +118,24 @@ static jint jniSetNativeMethods(void)
         {"nativeLogWarning", "(Ljava/lang/String;)V", reinterpret_cast<void *>(jniLogWarning)}
     };
 
-    cleanJavaException();
+    AndroidInterface::cleanJavaException();
 
     QJniEnvironment jniEnv;
     jclass objectClass = jniEnv->FindClass(AndroidInterface::getQGCActivityClassName());
-    if (!objectClass)
-    {
+    if (!objectClass) {
         qCWarning(AndroidInitLog) << "Couldn't find class:" << AndroidInterface::getQGCActivityClassName();
         return JNI_ERR;
     }
 
     const jint val = jniEnv->RegisterNatives(objectClass, javaMethods, sizeof(javaMethods) / sizeof(javaMethods[0]));
-    if (val < 0)
-    {
+    if (val < 0) {
         qCWarning(AndroidInitLog) << "Error registering methods: " << val;
         return JNI_ERR;
-    }
-    else
-    {
+    } else {
         qCDebug(AndroidInitLog) << "Main Native Functions Registered";
     }
 
-    cleanJavaException();
+    AndroidInterface::cleanJavaException();
 
     return JNI_OK;
 }
@@ -167,13 +148,11 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved)
     qCDebug(AndroidInitLog) << Q_FUNC_INFO;
 
     JNIEnv* env;
-    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK)
-    {
+    if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
         return JNI_ERR;
     }
 
-    if(jniSetNativeMethods() != JNI_OK)
-    {
+    if(jniSetNativeMethods() != JNI_OK) {
         return JNI_ERR;
     }
 

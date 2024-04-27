@@ -24,8 +24,6 @@ dependencies {
 }
 
 android {
-    namespace "org.mavlink.qgroundcontrol"
-
     /*******************************************************
      * The following variables:
      * - androidBuildToolsVersion,

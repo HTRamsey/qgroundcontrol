@@ -11,8 +11,7 @@ Q_LOGGING_CATEGORY(AndroidInterfaceLog, "qgc.android.interface");
 void AndroidInterface::cleanJavaException()
 {
     QJniEnvironment env;
-    if (env->ExceptionCheck())
-    {
+    if (env->ExceptionCheck()) {
         env->ExceptionDescribe();
         env->ExceptionClear();
     }
@@ -34,16 +33,13 @@ bool AndroidInterface::checkStoragePermissions()
     QString writePermission("android.permission.WRITE_EXTERNAL_STORAGE");
 
     QStringList permissions = { readPermission, writePermission };
-    for (const auto& permission: permissions)
-    {
+    for (const auto& permission: permissions) {
         auto futurePermissionResult = QtAndroidPrivate::checkPermission(permission);
         auto permissionResult = futurePermissionResult.result();
-        if (permissionResult == QtAndroidPrivate::PermissionResult::Denied)
-        {
+        if (permissionResult == QtAndroidPrivate::PermissionResult::Denied) {
             futurePermissionResult = QtAndroidPrivate::requestPermission(permission);
             permissionResult = futurePermissionResult.result();
-            if (permissionResult == QtAndroidPrivate::PermissionResult::Denied)
-            {
+            if (permissionResult == QtAndroidPrivate::PermissionResult::Denied) {
                 result = false;
                 break;
             }
@@ -59,8 +55,7 @@ QString AndroidInterface::getSDCardPath()
 
     QString result = QString();
 
-    if (checkStoragePermissions())
-    {
+    if (checkStoragePermissions()) {
         auto value = QJniObject::callStaticObjectMethod(getQGCActivityClassName(), "getSDCardPath", "()Ljava/lang/String;");
         result = value.toString();
     }

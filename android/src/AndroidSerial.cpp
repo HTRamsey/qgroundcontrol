@@ -35,8 +35,7 @@ QList<QSerialPortInfo> AndroidSerial::availableDevices()
     jobjectArray objArray = result.object<jobjectArray>();
     const int count = env->GetArrayLength(objArray);
 
-    for (int i = 0; i < count; i++)
-    {
+    for (int i = 0; i < count; i++) {
         jstring string = (jstring) env->GetObjectArrayElement(objArray, i);
         const char *rawString = env->GetStringUTFChars(string, 0);
         QStringList strList = QString::fromUtf8(rawString).split(QStringLiteral(":"));
