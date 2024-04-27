@@ -12,6 +12,8 @@ qt_add_library(qgcandroid STATIC
 	src/AndroidSerial.h
 )
 
+# if(NOT QGC_NO_SERIAL_LINK)
+
 target_link_libraries(qgcandroid
 	PRIVATE
 		Qt6::CorePrivate
