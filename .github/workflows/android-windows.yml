@@ -146,10 +146,6 @@ jobs:
         working-directory: ${{ runner.temp }}/shadow_build_dir
         run: cmake --build . --target all --config ${{ matrix.BuildType }}
 
-      - name: Prepare APK
-        working-directory: ${{ runner.temp }}/shadow_build_dir
-        run: cp ./android-build/*.apk ./${{ env.ARTIFACT }}
-
       - name: Save APK
         uses: actions/upload-artifact@v4
         with:
