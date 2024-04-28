@@ -110,23 +110,23 @@ target_link_libraries(Vehicle
 		Qt6::Qml
 		Actuators
 		ADSB
-        api
+                api
 		Audio
                 Camera
 		Compression
 		FirmwarePlugin
-        Geo
-        Utilities
+                Geo
+                Utilities
 		UTMSP
 	PUBLIC
 		Qt6::Core
 		Qt6::Gui
 		Qt6::Positioning
-        libevents
+                libevents
 		comm
 		FactSystem
                 MissionManager
-        qgc
+                qgc
 )
 
 target_include_directories(Vehicle PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

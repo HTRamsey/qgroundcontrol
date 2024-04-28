@@ -7,14 +7,12 @@ qt_add_library(AnalyzeView STATIC
 	GeoTagController.h
 	LogDownloadController.cc
 	LogDownloadController.h
-	MavlinkConsoleController.cc
-	MavlinkConsoleController.h
+	MAVLinkChartController.cc
+	MAVLinkChartController.h
+	MAVLinkConsoleController.cc
+	MAVLinkConsoleController.h
 	MAVLinkInspectorController.cc
 	MAVLinkInspectorController.h
-	PX4LogParser.cc
-	PX4LogParser.h
-	ULogParser.cc
-	ULogParser.h
 )
 
 add_custom_target(AnalyzeViewQml

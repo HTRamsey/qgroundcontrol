@@ -7,7 +7,7 @@
  *
  ****************************************************************************/
 
-#include "MavlinkConsoleController.h"
+#include "MAVLinkConsoleController.h"
 #include "QGCApplication.h"
 #include "QGCToolbox.h"
 #include "MultiVehicleManager.h"

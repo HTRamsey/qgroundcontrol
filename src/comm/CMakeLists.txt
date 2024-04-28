@@ -1,5 +1,7 @@
 find_package(Qt6 REQUIRED COMPONENTS Core Network Qml Test Widgets)
 
+add_subdirectory(Mavlink)
+
 qt_add_library(comm STATIC
 	LinkConfiguration.cc
 	LinkConfiguration.h
@@ -9,10 +11,6 @@ qt_add_library(comm STATIC
 	LinkManager.h
 	LogReplayLink.cc
 	LogReplayLink.h
-	MAVLinkProtocol.cc
-	MAVLinkProtocol.h
-	QGCMAVLink.cc
-	QGCMAVLink.h
 	TCPLink.cc
 	TCPLink.h
 	UdpIODevice.cc
@@ -20,6 +18,8 @@ qt_add_library(comm STATIC
 	UDPLink.cc
 	UDPLink.h
 )
+
+target_include_directories(comm PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(QGC_BUILD_TESTING)
 	target_sources(comm
@@ -44,6 +44,7 @@ target_link_libraries(comm
 	PUBLIC
 		Qt6::Core
 		Qt6::Network
+		Mavlink
 		qgc
 		QmlControls
 		Utilities
@@ -63,7 +64,7 @@ if(QGC_NO_SERIAL_LINK)
 else()
 	if(ANDROID)
 		add_subdirectory(${CMAKE_SOURCE_DIR}/libs/qtandroidserialport qtandroidserialport.build)
-	    target_link_libraries(comm PUBLIC qtandroidserialport)
+                target_link_libraries(comm PUBLIC qtandroidserialport)
 	else()
 		find_package(Qt6 REQUIRED COMPONENTS SerialPort)
 		target_link_libraries(comm PUBLIC Qt6::SerialPort)
@@ -105,15 +106,3 @@ if(QGC_ZEROCONF_ENABLED)
 	target_link_libraries(comm PRIVATE qmdnsengine)
 	target_compile_definitions(comm PUBLIC QGC_ZEROCONF_ENABLED)
 endif()
-
-# if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-# 	target_compile_options(comm PRIVATE -Wno-address-of-packed-member)
-# endif()
-
-target_include_directories(comm
-    PUBLIC
-    	${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_SOURCE_DIR}/libs/mavlink/include/mavlink/v2.0
-        ${CMAKE_SOURCE_DIR}/libs/mavlink/include/mavlink/v2.0/all
-        ${CMAKE_SOURCE_DIR}/libs/mavlink/include/mavlink/v2.0/common
-)

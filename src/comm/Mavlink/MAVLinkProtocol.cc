@@ -1,23 +1,13 @@
-/****************************************************************************
- *
- * (c) 2009-2020 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
- *
- * QGroundControl is licensed according to the terms in the file
- * COPYING.md in the root of the source code directory.
- *
- ****************************************************************************/
-
 #include "MAVLinkProtocol.h"
 #include "LinkManager.h"
+#include "LinkInterface.h"
 #include "QGCApplication.h"
 #include "QGCLoggingCategory.h"
 #include "MultiVehicleManager.h"
 #include "SettingsManager.h"
 
-#include <QtWidgets/QApplication>
 #include <QtCore/QSettings>
 #include <QtCore/QStandardPaths>
-#include <QtCore/QMetaType>
 #include <QtCore/QDir>
 #include <QtCore/QFileInfo>
 
