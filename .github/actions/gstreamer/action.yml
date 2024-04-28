@@ -4,7 +4,7 @@ inputs:
   gst_version:
     description: Version of GStreamer to Build
     required: true
-    default: 1.22.11
+    default: 1.24.2
   build_type:
     description: Build Type "release" or "debug"
     required: true
@@ -34,6 +34,7 @@ runs:
         --wrap-mode=forcefallback
         --strip
         -Dauto_features=disabled
+        -Dgst-full-target-type=static_library
         -Dgst-full-libraries=gstreamer,base,controller,net,app,audio,fft,pbutils,riff,rtp,rtsp,tag,video,gl,codecparsers,photography
         -Dgpl=enabled
         -Dlibav=enabled
@@ -66,7 +67,6 @@ runs:
         -Dgst-plugins-ugly:x264=enabled
         builddir
         # -Dqt6=enabled
-        # -Dgst-full-target-type=static_library
         # -Dgst-plugins-base:gl_platform=glx,egl
         # -Dgst-plugins-base:gl_winsys=x11,egl,wayland
         # -Dgst-plugins-good:qt-wayland=enabled

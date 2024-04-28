@@ -85,8 +85,8 @@ jobs:
           sudo apt update
           sudo apt install vulkan-sdk
 
-      # - name: Build GStreamer
-        # uses: ./.github/actions/gstreamer
+      - name: Build GStreamer
+        uses: ./.github/actions/gstreamer
 
       - name: Create build directory
         run:  mkdir ${{ runner.temp }}/shadow_build_dir
