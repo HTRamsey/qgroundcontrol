@@ -1,0 +1,74 @@
+name: Build QGC
+description: Build QGC
+inputs:
+  BuildType:
+    description: Build Type
+    default: Debug
+# outputs:
+#   artifact:
+#     description: Path To Build Output
+#     value: ${{ steps.save-artifact.outputs. }}
+runs:
+  using: "composite"
+  steps:
+    - name: Setup Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.6.x - 3.11.x'
+
+    - name: Install Build Tools
+      run: python3 -m pip install --user ninja cmake
+      shell: bash
+
+    - name: Install Cache Tool
+      run: |
+        wget --quiet https://github.com/ccache/ccache/releases/download/v4.9.1/ccache-4.9.1-linux-x86_64.tar.xz
+        tar -xvf ccache-*-linux-x86_64.tar.xz
+        cd ccache-*-linux-x86_64
+        sudo make install
+      shell: bash
+
+    - name: Set Up Cache
+      uses: hendrikmuhs/ccache-action@v1.2
+      with:
+        create-symlink: true
+        key: ${{ runner.os }}-${{ inputs.BuildType }}
+        restore-keys: ${{ runner.os }}-${{ inputs.BuildType }}
+        max-size: 1G
+        append-timestamp: false
+        save: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+
+    - name: Create build directory
+      run: mkdir ${{ runner.temp }}/shadow_build_dir
+      shell: bash
+
+    - name: Configure
+      working-directory: ${{ runner.temp }}/shadow_build_dir
+      run: cmake -S ${{ github.workspace }} -B . -G Ninja
+            -DCMAKE_BUILD_TYPE=${{ inputs.BuildType }}
+            -DQGC_BUILD_TESTING=${{ inputs.BuildType == 'Debug' && 'ON' || 'OFF' }}
+            -DQGC_STABLE_BUILD=${{ github.ref_type == 'tag' || contains(github.ref, 'Stable') && 'ON' || 'OFF' }}
+      shell: bash
+
+    - name: Build
+      working-directory: ${{ runner.temp }}/shadow_build_dir
+      run: cmake --build . --target all --config ${{ inputs.BuildType }}
+      shell: bash
+
+    - name: Install
+      working-directory: ${{ runner.temp }}/shadow_build_dir
+      run: cmake --install . --config ${{ inputs.BuildType }}
+      shell: bash
+
+    - name: Run unit tests
+      if: inputs.BuildType == 'Debug'
+      working-directory:  ${{ runner.temp }}/shadow_build_dir
+      run: xvfb-run -a ./*.AppImage --unittest
+      shell: bash
+
+    # - name: Save artifact
+    #   id: save-artifact
+    #   uses: actions/upload-artifact@v4
+    #   with:
+    #     name: ${{ inputs.artifact_name }}
+    #     path: ${{ runner.temp }}/shadow_build_dir/${{ inputs.source }}/${{ inputs.artifact_name }}

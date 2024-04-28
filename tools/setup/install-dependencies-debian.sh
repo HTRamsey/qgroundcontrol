@@ -2,10 +2,10 @@
 
 set -e
 
-apt-get update -y --quiet
+apt update -y --quiet
 
 #Build Tools
-DEBIAN_FRONTEND=noninteractive apt-get -y --quiet --no-install-recommends install \
+DEBIAN_FRONTEND=noninteractive apt -y --quiet install \
 	build-essential \
 	ccache \
 	cmake \
@@ -19,18 +19,42 @@ DEBIAN_FRONTEND=noninteractive apt-get -y --quiet --no-install-recommends instal
 	make \
 	ninja-build \
 	rsync \
-    binutils \
-    locales \
-    patchelf
+	binutils \
+	locales \
+	patchelf \
+	pkgconf \
+	libtool \
+	appstream \
+	python3 \
+	python3-pip
 
 #Qt Required
-DEBIAN_FRONTEND=noninteractive apt-get -y --quiet install \
+DEBIAN_FRONTEND=noninteractive apt -y --quiet install \
+	libgl1-mesa-dev \
+	libpulse-dev \
+	libxcb-glx0 \
+	libxcb-icccm4 \
+	libxcb-image0 \
+	libxcb-keysyms1 \
+	libxcb-randr0 \
+	libxcb-render-util0 \
+	libxcb-render0 \
+	libxcb-shape0 \
+	libxcb-shm0 \
+	libxcb-sync1 \
+	libxcb-util1 \
+	libxcb-xfixes0 \
 	libxcb-xinerama0 \
-    libxkbcommon-x11-0 \
-    libxcb-cursor0
+	libxcb1 \
+	libxkbcommon-dev \
+	libxkbcommon-x11-0 \
+	libxcb-xkb-dev \
+	libxcb-cursor0 \
+	libdrm-dev \
+	libzstd-dev
 
 #QGC
-DEBIAN_FRONTEND=noninteractive apt-get -y --quiet install \
+DEBIAN_FRONTEND=noninteractive apt -y --quiet install \
 	libsdl2-dev \
 	libspeechd2 \
 	flite \
@@ -38,8 +62,9 @@ DEBIAN_FRONTEND=noninteractive apt-get -y --quiet install \
 	speech-dispatcher-flite
 
 #GStreamer
-DEBIAN_FRONTEND=noninteractive apt-get -y --quiet install \
+DEBIAN_FRONTEND=noninteractive apt -y --quiet install \
 	libgstreamer1.0-dev \
+	libgstreamer-gl1.0-0 \
 	libgstreamer-plugins-base1.0-dev \
 	libgstreamer-plugins-good1.0-dev \
 	libgstreamer-plugins-bad1.0-dev \
@@ -56,5 +81,4 @@ DEBIAN_FRONTEND=noninteractive apt-get -y --quiet install \
 	gstreamer1.0-gtk3 \
 	gstreamer1.0-gl \
 	gstreamer1.0-vaapi \
-	gstreamer1.0-rtsp \
-    libdrm-dev
+	gstreamer1.0-rtsp
