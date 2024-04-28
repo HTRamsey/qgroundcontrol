@@ -230,6 +230,13 @@ qt_add_executable(${PROJECT_NAME}
     ${QGC_RESOURCES}
 )
 
+set_source_files_properties(resources/qtquickcontrols2.conf PROPERTIES QT_RESOURCE_ALIAS qtquickcontrols2.conf)
+
+qt_add_resources(${PROJECT_NAME} "app_res"
+    FILES
+        resources/qtquickcontrols2.conf
+)
+
 if(Qt6LinguistTools_FOUND)
     file(GLOB TS_SOURCES RELATIVE ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/translations/qgc_*.ts)
     qt_add_translations(${PROJECT_NAME} TS_FILES ${TS_SOURCES}) # TODO: Update to new qt_add_translations form in Qt6.7
@@ -315,7 +322,6 @@ target_link_libraries(${PROJECT_NAME}
         Qt6::Gui
         Qt6::Qml
         Qt6::Quick
-        Qt6::QuickControls2
         Qt6::Svg # Used to import QSvgPlugin
         qgc
 )

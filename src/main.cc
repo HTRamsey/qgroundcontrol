@@ -43,7 +43,6 @@
 #include <QtWidgets/QMessageBox>
 #include <QtCore/QProcessEnvironment>
 #include <QtCore/QtPlugin>
-#include <QtQuickControls2/QQuickStyle>
 #include <QtQuick/QQuickWindow>
 #ifdef QGC_ENABLE_BLUETOOTH
 #include <QtBluetooth/QBluetoothSocket>
@@ -236,7 +235,6 @@ int main(int argc, char *argv[])
     QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
 #endif
 
-    QQuickStyle::setStyle("Basic");
     QGCApplication* app = new QGCApplication(argc, argv, runUnitTests);
     Q_CHECK_PTR(app);
     if(app->isErrorState()) {
