@@ -26,7 +26,7 @@ jobs:
           submodules: recursive
           fetch-tags: true
 
-      - name: Install SCCache
+      - name: Install Dependencies
         run: |
           choco install --no-progress sccache ninja -y
           choco install --no-progress cmake --installargs 'ADD_CMAKE_TO_PATH=System' --apply-install-arguments-to-dependencies
@@ -85,11 +85,6 @@ jobs:
           modules: qtcharts qtlocation qtpositioning qtspeech qt5compat qtmultimedia qtserialport qtimageformats qtshadertools qtconnectivity qtquick3d
           setup-python: true
           cache: ${{ github.ref == 'refs/heads/master' && github.event_name != 'pull_request' }}
-
-      - name: Install Dependencies
-        run: |
-          choco install --no-progress ninja -y
-          choco install --no-progress cmake --installargs 'ADD_CMAKE_TO_PATH=System' --apply-install-arguments-to-dependencies
 
       - name: Install Gstreamer
         uses: blinemedical/setup-gstreamer@v1
