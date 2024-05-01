@@ -61,6 +61,9 @@ jobs:
           sudo update-alternatives --set gcc /usr/bin/gcc-13
           python3 -m pip install --user ninja meson
 
+      - run: which ccache
+      - run: ccache --version
+
       - name: Install Vulkan
         run: |
           wget -qO - http://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
