@@ -23,6 +23,7 @@ FetchContent_Declare(zlib
 	GIT_TAG v1.3.1
 	GIT_SHALLOW TRUE
 )
+FetchContent_MakeAvailable(zlib)
 
 ############### XZ
 
@@ -31,22 +32,34 @@ FetchContent_Declare(xz-embedded
     GIT_TAG v2024-04-05
     GIT_SHALLOW TRUE
 )
+FetchContent_MakeAvailable(xz-embedded)
 
-FetchContent_MakeAvailable(zlib xz-embedded)
+# qt_add_library(xz STATIC
+#     ${xz-embedded_SOURCE_DIR}/linux/include/linux/xz.h
+#     ${xz-embedded_SOURCE_DIR}/linux/lib/xz/xz_crc32.c
+#     ${xz-embedded_SOURCE_DIR}/linux/lib/xz/xz_crc64.c
+#     ${xz-embedded_SOURCE_DIR}/linux/lib/xz/xz_dec_lzma2.c
+#     ${xz-embedded_SOURCE_DIR}/linux/lib/xz/xz_dec_stream.c
+#     ${xz-embedded_SOURCE_DIR}/linux/lib/xz/xz_lzma2.h
+#     ${xz-embedded_SOURCE_DIR}/linux/lib/xz/xz_private.h
+#     ${xz-embedded_SOURCE_DIR}/linux/lib/xz/xz_stream.h
+#     ${xz-embedded_SOURCE_DIR}/userspace/xz_config.h
+# )
 
-qt_add_library(xz STATIC
-    ${xz-embedded_SOURCE_DIR}/linux/include/linux/xz.h
-    ${xz-embedded_SOURCE_DIR}/linux/lib/xz/xz_crc32.c
-    ${xz-embedded_SOURCE_DIR}/linux/lib/xz/xz_crc64.c
-    ${xz-embedded_SOURCE_DIR}/linux/lib/xz/xz_dec_lzma2.c
-    ${xz-embedded_SOURCE_DIR}/linux/lib/xz/xz_dec_stream.c
-    ${xz-embedded_SOURCE_DIR}/linux/lib/xz/xz_lzma2.h
-    ${xz-embedded_SOURCE_DIR}/linux/lib/xz/xz_private.h
-    ${xz-embedded_SOURCE_DIR}/linux/lib/xz/xz_stream.h
-    ${xz-embedded_SOURCE_DIR}/userspace/xz_config.h
+target_sources(Compression
+    PRIVATE
+        ${xz-embedded_SOURCE_DIR}/linux/include/linux/xz.h
+        ${xz-embedded_SOURCE_DIR}/linux/lib/xz/xz_crc32.c
+        ${xz-embedded_SOURCE_DIR}/linux/lib/xz/xz_crc64.c
+        ${xz-embedded_SOURCE_DIR}/linux/lib/xz/xz_dec_lzma2.c
+        ${xz-embedded_SOURCE_DIR}/linux/lib/xz/xz_dec_stream.c
+        ${xz-embedded_SOURCE_DIR}/linux/lib/xz/xz_lzma2.h
+        ${xz-embedded_SOURCE_DIR}/linux/lib/xz/xz_private.h
+        ${xz-embedded_SOURCE_DIR}/linux/lib/xz/xz_stream.h
+        ${xz-embedded_SOURCE_DIR}/userspace/xz_config.h
 )
 
-target_include_directories(xz
+target_include_directories(Compression
 	PUBLIC
         ${xz-embedded_SOURCE_DIR}/linux/include/linux
     PRIVATE
@@ -54,7 +67,7 @@ target_include_directories(xz
         ${xz-embedded_SOURCE_DIR}/userspace
 )
 
-target_compile_definitions(xz
+target_compile_definitions(Compression
     PRIVATE
         XZ_DEC_ANY_CHECK
     PUBLIC
@@ -66,7 +79,6 @@ target_compile_definitions(xz
 target_link_libraries(Compression
 	PRIVATE
         zlibstatic
-        xz
 	PUBLIC
 		Qt6::Core
 )

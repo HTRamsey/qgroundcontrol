@@ -1,13 +1,15 @@
 find_package(Qt6 REQUIRED COMPONENTS Core)
 
-include(FetchContent)
-FetchContent_Declare(libevents
-	GIT_REPOSITORY https://github.com/mavlink/libevents.git
-	GIT_TAG main
-	GIT_SHALLOW TRUE
-	SOURCE_SUBDIR libs/cpp
-)
-FetchContent_MakeAvailable(libevents)
+# include(FetchContent)
+# FetchContent_Declare(libevents
+# 	GIT_REPOSITORY https://github.com/mavlink/libevents.git
+# 	GIT_TAG main
+# 	GIT_SHALLOW TRUE
+# 	SOURCE_SUBDIR libs/cpp
+# )
+# FetchContent_MakeAvailable(libevents)
+
+add_subdirectory(${CMAKE_SOURCE_DIR}/libs/libevents/libevents/libs/cpp libevents.build)
 
 qt_add_library(libevents_wrapper STATIC
 	EventHandler.cc
@@ -20,7 +22,7 @@ qt_add_library(libevents_wrapper STATIC
 target_link_libraries(libevents_wrapper
 	PRIVATE
 		QmlControls
-                Utilities
+        Utilities
 	PUBLIC
 		Qt6::Core
 		comm
@@ -30,5 +32,5 @@ target_link_libraries(libevents_wrapper
 target_include_directories(libevents_wrapper
 	PUBLIC
 		${CMAKE_CURRENT_SOURCE_DIR}
-		${libevents_SOURCE_DIR}/libs/cpp
+		${CMAKE_SOURCE_DIR}/libs/libevents/libevents/libs/cpp
 )
