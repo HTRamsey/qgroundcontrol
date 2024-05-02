@@ -45,6 +45,9 @@ jobs:
           submodules: recursive
           fetch-tags: true
 
+      - name: hdiutil
+        run: hdiutil --version
+
       - name: Install Dependencies
         run: |
           brew update
