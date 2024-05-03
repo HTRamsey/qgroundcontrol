@@ -13,19 +13,25 @@
 
     <!-- %%INSERT_PERMISSIONS -->
 
-    <!-- Needed to keep working while 'asleep' -->
-    <uses-permission android:name="android.permission.WAKE_LOCK"/>
-    <!-- Need MulticastLock to receive broadcast UDP packets  -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+    <uses-permission android:name="android.permission.BLUETOOTH"/>
+    <uses-permission android:name="android.permission.CAMERA"/>
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
 
     <!-- %%INSERT_FEATURES -->
 
-    <uses-feature android:name="android.hardware.usb.host" android:required="false"/>
-    <uses-feature android:name="android.hardware.usb.accessory" android:required="false"/>
+    <uses-feature android:name="android.hardware.audio.output" android:required="false"/>
     <uses-feature android:name="android.hardware.bluetooth" android:required="false"/>
+    <uses-feature android:name="android.hardware.camera.any" android:required="false"/>
+    <uses-feature android:name="android.hardware.gamepad" android:required="false"/>
+    <uses-feature android:name="android.hardware.location" android:required="false"/>
     <uses-feature android:name="android.hardware.location.gps" android:required="false"/>
     <uses-feature android:name="android.hardware.location.network" android:required="false"/>
-    <uses-feature android:name="android.hardware.location" android:required="false"/>
+    <uses-feature android:name="android.hardware.usb.accessory" android:required="false"/>
+    <uses-feature android:name="android.hardware.usb.host" android:required="false"/>
+    <uses-feature android:name="android.hardware.wifi" android:required="false"/>
 
     <application
         android:name="org.qtproject.qt.android.bindings.QtApplication"
@@ -52,16 +58,22 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <intent-filter>
                 <action android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" />
                 <action android:name="android.hardware.usb.action.USB_DEVICE_DETACHED" />
                 <action android:name="android.hardware.usb.action.USB_ACCESSORY_ATTACHED" />
                 <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
                 <action android:name="android.bluetooth.device.action.ACL_DISCONNECTED" />
-                <!-- TODO: CMake configure xml file -->
+            </intent-filter>
+
+            <intent-filter>
                 <!-- %%QGC_INSERT_ACTIVITY_INTENT_FILTER -->
             </intent-filter>
 
             <!-- %%QGC_INSERT_ACTIVITY_META_DATA -->
+
             <meta-data
                 android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED"
                 android:resource="@xml/device_filter" />
