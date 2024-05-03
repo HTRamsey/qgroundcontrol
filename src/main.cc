@@ -231,7 +231,7 @@ int main(int argc, char *argv[])
 #endif
 #endif // QT_DEBUG
 
-#ifdef Q_OS_DARWIN
+#if defined(Q_OS_DARWIN) || defined(Q_OS_WINDOWS)
     // Gstreamer video playback requires OpenGL
     QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
 #endif
