@@ -23,10 +23,10 @@ public:
     HealthAndArmingCheckProblem(const QString& message, const QString& description, const QString& severity)
     : _message(message), _description(description), _severity(severity) {}
 
-    Q_PROPERTY(QString message                            READ message                CONSTANT)
-    Q_PROPERTY(QString description                        READ description            CONSTANT)
-    Q_PROPERTY(QString severity                           READ severity               CONSTANT)
-    Q_PROPERTY(bool expanded                              READ expanded               WRITE setExpanded NOTIFY expandedChanged)
+    Q_PROPERTY(QString  message      READ message        CONSTANT)
+    Q_PROPERTY(QString  description  READ description    CONSTANT)
+    Q_PROPERTY(QString  severity     READ severity       CONSTANT)
+    Q_PROPERTY(bool     expanded     READ expanded       WRITE setExpanded NOTIFY expandedChanged)
 
     const QString& message() const { return _message; }
     const QString& description() const { return _description; }

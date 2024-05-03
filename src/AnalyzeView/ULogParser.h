@@ -1,7 +1,7 @@
 #pragma once
 
 
-#include "GeoTagController.h"
+#include "GeoTagWorker.h"
 #include <QtCore/QByteArray>
 #include <QtCore/QMap>
 #include <QtCore/QString>

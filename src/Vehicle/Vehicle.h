@@ -9,38 +9,42 @@
 
 #pragma once
 
-#include "FactGroup.h"
-#include "QGCMAVLink.h"
-#include "QmlObjectListModel.h"
-#include "MAVLinkStreamConfig.h"
-#include "QGCMapCircle.h"
-#include "TerrainFactGroup.h"
-#include "SysStatusSensorInfo.h"
-#include "VehicleClockFactGroup.h"
-#include "VehicleDistanceSensorFactGroup.h"
-#include "VehicleLocalPositionFactGroup.h"
-#include "VehicleLocalPositionSetpointFactGroup.h"
-#include "VehicleWindFactGroup.h"
-#include "VehicleGPSFactGroup.h"
-#include "VehicleGPS2FactGroup.h"
-#include "VehicleSetpointFactGroup.h"
-#include "VehicleTemperatureFactGroup.h"
-#include "VehicleVibrationFactGroup.h"
-#include "VehicleEscStatusFactGroup.h"
-#include "VehicleEstimatorStatusFactGroup.h"
-#include "VehicleHygrometerFactGroup.h"
-#include "VehicleLinkManager.h"
-#include "HealthAndArmingCheckReport.h"
-#include "VehicleGeneratorFactGroup.h"
-#include "VehicleEFIFactGroup.h"
-
 #include <QtCore/QElapsedTimer>
 #include <QtCore/QObject>
 #include <QtCore/QVariantList>
 #include <QtCore/QTime>
 #include <QtCore/QTimer>
 #include <QtCore/QSharedPointer>
+#include <QtCore/QFile>
 #include <QtPositioning/QGeoCoordinate>
+
+#include "QGCMAVLink.h"
+#include "VehicleLinkManager.h"
+
+#include "QmlObjectListModel.h"
+#include "QGCMapCircle.h"
+
+#include "MAVLinkStreamConfig.h"
+#include "HealthAndArmingCheckReport.h"
+#include "SysStatusSensorInfo.h"
+
+#include "FactGroup.h"
+#include "TerrainFactGroup.h"
+#include "VehicleClockFactGroup.h"
+#include "VehicleDistanceSensorFactGroup.h"
+#include "VehicleEFIFactGroup.h"
+#include "VehicleEscStatusFactGroup.h"
+#include "VehicleEstimatorStatusFactGroup.h"
+#include "VehicleGeneratorFactGroup.h"
+#include "VehicleGPS2FactGroup.h"
+#include "VehicleGPSFactGroup.h"
+#include "VehicleHygrometerFactGroup.h"
+#include "VehicleLocalPositionFactGroup.h"
+#include "VehicleLocalPositionSetpointFactGroup.h"
+#include "VehicleSetpointFactGroup.h"
+#include "VehicleTemperatureFactGroup.h"
+#include "VehicleVibrationFactGroup.h"
+#include "VehicleWindFactGroup.h"
 
 class Actuators;
 class EventHandler;
@@ -74,6 +78,7 @@ class FTPManager;
 class ImageProtocolManager;
 class TerrainAtCoordinateQuery;
 class StandardModes;
+class QGCToolbox;
 #ifdef CONFIG_UTM_ADAPTER
 class UTMSPVehicle;
 #endif

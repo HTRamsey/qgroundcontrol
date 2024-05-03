@@ -8,8 +8,9 @@
  ****************************************************************************/
 
 #include "SysStatusSensorInfo.h"
+#include "QGCMAVLink.h"
 
-#include <QDebug>
+#include <QtCore/QDebug>
 
 SysStatusSensorInfo::SysStatusSensorInfo(QObject* parent)
     : QObject(parent)

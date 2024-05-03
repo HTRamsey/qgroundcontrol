@@ -13,8 +13,6 @@ qt_add_library(comm STATIC
 	LogReplayLink.h
 	MAVLinkProtocol.cc
 	MAVLinkProtocol.h
-	QGCMAVLink.cc
-	QGCMAVLink.h
 	TCPLink.cc
 	TCPLink.h
 	UdpIODevice.cc

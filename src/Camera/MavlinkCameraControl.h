@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "QGCMAVLink.h"
 #include "FactGroup.h"
 
 #include <QtCore/QObject>

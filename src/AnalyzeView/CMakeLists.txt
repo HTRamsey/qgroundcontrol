@@ -5,12 +5,20 @@ qt_add_library(AnalyzeView STATIC
 	ExifParser.h
 	GeoTagController.cc
 	GeoTagController.h
+	GeoTagWorker.cc
+	GeoTagWorker.h
 	LogDownloadController.cc
 	LogDownloadController.h
-	MavlinkConsoleController.cc
-	MavlinkConsoleController.h
+	MAVLinkChartController.cc
+	MAVLinkChartController.h
+	MAVLinkConsoleController.cc
+	MAVLinkConsoleController.h
 	MAVLinkInspectorController.cc
 	MAVLinkInspectorController.h
+	MAVLinkMessage.cc
+	MAVLinkMessage.h
+	MAVLinkSystem.cc
+	MAVLinkSystem.h
 	PX4LogParser.cc
 	PX4LogParser.h
 	ULogParser.cc

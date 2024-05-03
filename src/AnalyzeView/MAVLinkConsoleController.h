@@ -19,13 +19,13 @@
 class Vehicle;
 
 /// Controller for MavlinkConsole.qml.
-class MavlinkConsoleController : public QStringListModel
+class MAVLinkConsoleController : public QStringListModel
 {
     Q_OBJECT
 
 public:
-    MavlinkConsoleController();
-    virtual ~MavlinkConsoleController();
+    MAVLinkConsoleController();
+    virtual ~MAVLinkConsoleController();
 
     Q_INVOKABLE void sendCommand(QString command);
 

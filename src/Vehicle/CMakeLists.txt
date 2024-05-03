@@ -1,7 +1,6 @@
 add_subdirectory(Actuators)
 add_subdirectory(Components)
 add_subdirectory(FactGroups)
-add_subdirectory(LibEvents)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Positioning Qml)
 
@@ -10,22 +9,16 @@ qt_add_library(Vehicle STATIC
 	Autotune.h
 	FTPManager.cc
 	FTPManager.h
-	ImageProtocolManager.cc
-	ImageProtocolManager.h
 	InitialConnectStateMachine.cc
 	InitialConnectStateMachine.h
 	MAVLinkLogManager.cc
 	MAVLinkLogManager.h
-	MAVLinkStreamConfig.cc
-	MAVLinkStreamConfig.h
 	MultiVehicleManager.cc
 	MultiVehicleManager.h
 	RemoteIDManager.cc
 	RemoteIDManager.h
 	StandardModes.cc
 	StandardModes.h
-	SysStatusSensorInfo.cc
-	SysStatusSensorInfo.h
 	TerrainProtocolHandler.cc
 	TerrainProtocolHandler.h
 	TrajectoryPoints.cc
@@ -62,9 +55,10 @@ target_link_libraries(Vehicle
 		libevents_wrapper
 		comm
 		FactSystem
-	        MissionManager
-	        qgc
-	        VehicleFactGroups
+		MAVLink
+        MissionManager
+        qgc
+        VehicleFactGroups
 )
 
 target_include_directories(Vehicle PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

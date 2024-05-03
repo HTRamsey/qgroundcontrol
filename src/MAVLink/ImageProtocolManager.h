@@ -9,12 +9,12 @@
 
 #pragma once
 
-#include "QGCMAVLink.h"
-
 #include <QtCore/QObject>
 #include <QtCore/QByteArray>
 #include <QtGui/QImage>
 #include <QtCore/QLoggingCategory>
+
+#include "MAVLinkLib.h"
 
 Q_DECLARE_LOGGING_CATEGORY(ImageProtocolManagerLog)
 
@@ -23,7 +23,7 @@ Q_DECLARE_LOGGING_CATEGORY(ImageProtocolManagerLog)
 class ImageProtocolManager : public QObject
 {
     Q_OBJECT
-    
+
 public:
     ImageProtocolManager(void);
 
@@ -36,5 +36,4 @@ signals:
 private:
     mavlink_data_transmission_handshake_t   _imageHandshake;
     QByteArray                              _imageBytes;
-
 };

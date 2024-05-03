@@ -21,6 +21,7 @@
 #include "FactSystem.h"
 #include "SettingsManager.h"
 #include "AppSettings.h"
+#include "MAVLinkProtocol.h"
 #include "APMMavlinkStreamRateSettings.h"
 #include "ArduPlaneFirmwarePlugin.h"
 #include "ArduCopterFirmwarePlugin.h"

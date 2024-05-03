@@ -19,6 +19,7 @@
 #include "VehicleCameraControl.h"
 #include "VehicleComponent.h"
 #include "QGC.h"
+#include "MAVLinkProtocol.h"
 #include "QGCLoggingCategory.h"
 
 #include <QtCore/QRegularExpression>

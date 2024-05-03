@@ -84,7 +84,8 @@
 #include "FactValueSliderListModel.h"
 #include "ShapeFileHelper.h"
 #include "QGCFileDownload.h"
-#include "MavlinkConsoleController.h"
+#include "MAVLinkConsoleController.h"
+#include "MAVLinkChartController.h"
 #include "GeoTagController.h"
 #include "LogReplayLink.h"
 #include "VehicleObjectAvoidance.h"
@@ -487,7 +488,7 @@ void QGCApplication::_initCommon()
     qmlRegisterType<FirmwareUpgradeController>      (kQGCControllers,                       1, 0, "FirmwareUpgradeController");
 #endif
     qmlRegisterType<GeoTagController>               (kQGCControllers,                       1, 0, "GeoTagController");
-    qmlRegisterType<MavlinkConsoleController>       (kQGCControllers,                       1, 0, "MavlinkConsoleController");
+    qmlRegisterType<MAVLinkConsoleController>       (kQGCControllers,                       1, 0, "MAVLinkConsoleController");
 #if !defined(QGC_DISABLE_MAVLINK_INSPECTOR)
     qmlRegisterType<MAVLinkInspectorController>     (kQGCControllers,                       1, 0, "MAVLinkInspectorController");
 #endif
