@@ -21,7 +21,7 @@ endif()
 include(Git)
 
 project(QGroundControl
-    VERSION ${QGC_APP_VERSION}
+    VERSION 1.0
     DESCRIPTION ${QGC_APP_DESCRIPTION}
     HOMEPAGE_URL "https://qgroundcontrol.com/"
     LANGUAGES C CXX
@@ -77,7 +77,7 @@ if(UNIX)
         set(CMAKE_CXX_COMPILER_LAUNCHER ${CCACHE_PROGRAM})
     endif()
 elseif(WIN32)
-    # find_program(SCCACHE_PROGRAM sccache)
+    find_program(SCCACHE_PROGRAM sccache)
     if(SCCACHE_PROGRAM)
         message(STATUS "Using SCCache")
         set(CMAKE_C_COMPILER_LAUNCHER ${SCCACHE_PROGRAM})
