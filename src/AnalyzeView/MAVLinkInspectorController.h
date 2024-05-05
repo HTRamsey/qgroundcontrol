@@ -13,25 +13,28 @@
 
 #pragma once
 
-#include "QGCMAVLink.h"
-#include "MAVLinkChartController.h"
-#include "MAVLinkSystem.h"
-#include "QmlObjectListModel.h"
 #include <QtCore/QObject>
 #include <QtCore/QString>
 #include <QtCore/QTimer>
 #include <QtCore/QLoggingCategory>
 
+#include "QGCMAVLink.h"
+#include "QmlObjectListModel.h"
+
 Q_DECLARE_LOGGING_CATEGORY(MAVLinkInspectorLog)
 
 class Vehicle;
 class LinkInterface;
+class QGCMAVLinkSystem;
+class MAVLinkChartController;
 
 //-----------------------------------------------------------------------------
 /// MAVLink message inspector controller (provides the logic for UI display)
 class MAVLinkInspectorController : public QObject
 {
     Q_OBJECT
+    Q_MOC_INCLUDE("MAVLinkSystem.h")
+
 public:
     MAVLinkInspectorController();
     ~MAVLinkInspectorController();

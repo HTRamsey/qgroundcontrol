@@ -11,10 +11,10 @@
 /// @file
 ///     @author Don Gagne <don@thegagnes.com>
 
-#ifndef AIRFRAMECOMPONENTCONTROLLER_H
-#define AIRFRAMECOMPONENTCONTROLLER_H
+#pragma once
 
 #include <QtCore/QObject>
+#include <QtCore/QVariant>
 
 #include "FactPanelController.h"
 
@@ -97,5 +97,3 @@ private:
     QString         _imageResource;
     QVariantList    _airframes;
 };
-
-#endif

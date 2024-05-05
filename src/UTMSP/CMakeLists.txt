@@ -1,16 +1,28 @@
 find_package(Qt6 REQUIRED COMPONENTS Core)
 
+set(UTMSP_RESOURCES)
+qt_add_library(UTMSP STATIC)
+
 option(QGC_UTM_ADAPTER "Enable UTM Adapter" OFF)
 if(QGC_UTM_ADAPTER)
     message(STATUS "UTMSP is Initialized")
 
-    find_package(Qt6 REQUIRED COMPONENTS Qml Location Widgets)
+    if(NOT nlohmann_json_FOUND)
+        message(STATUS "UTMSP: Fetching nlohmann/json")
+        include(FetchContent)
+        FetchContent_Declare(json
+                GIT_REPOSITORY https://github.com/nlohmann/json.git
+                GIT_TAG v3.11.3
+                GIT_SHALLOW TRUE
+        )
+        FetchContent_MakeAvailable(json)
+    endif()
+
+    find_package(Qt6 REQUIRED COMPONENTS Network Positioning Qml)
     find_package(Threads REQUIRED)
 
-    set(UTMSP_RESOURCES)
     qt_add_resources(UTMSP_RESOURCES utmsp.qrc)
-
-    qt_add_library(UTMSP STATIC
+    target_sources(UTMSP
         PRIVATE
             UTMSPAircraft.cpp
             UTMSPAircraft.h
@@ -20,6 +32,7 @@ if(QGC_UTM_ADAPTER)
             UTMSPBlenderRestInterface.h
             UTMSPFlightPlanManager.cpp
             UTMSPFlightPlanManager.h
+            UTMSPLogger.h
             UTMSPManager.cpp
             UTMSPManager.h
             UTMSPNetworkRemoteIDManager.cpp
@@ -32,24 +45,27 @@ if(QGC_UTM_ADAPTER)
             UTMSPServiceController.h
             UTMSPVehicle.cpp
             UTMSPVehicle.h
-            ${UTMSP_RESOURCES}
+            # ${UTMSP_RESOURCES}
     )
 
     target_link_libraries(UTMSP
         PRIVATE
+            boost_system
             nlohmann_json
+            Threads::Threads
+            Qt6::Network
+            Comms
         PUBLIC
             Qt6::Core
-            Qt6::Location
-            Qt6::Widgets
-            Threads::Threads
-            qgc
+            Qt6::Positioning
+            QGC
     )
 
     target_include_directories(UTMSP
+        PRIVATE
+            services
         PUBLIC
             ${CMAKE_CURRENT_SOURCE_DIR}
-            services
     )
 
     target_compile_definitions(UTMSP PUBLIC CONFIG_UTM_ADAPTER)
@@ -64,8 +80,7 @@ if(QGC_UTM_ADAPTER)
 else()
     message(STATUS "UTMSP: Dummy is Initialized")
 
-    set(UTMSP_RESOURCES)
     qt_add_resources(UTMSP_RESOURCES dummy/utmsp_dummy.qrc)
+    target_sources(UTMSP PRIVATE ${UTMSP_RESOURCES})
 
-    qt_add_library(UTMSP STATIC ${UTMSP_RESOURCES})
 endif()

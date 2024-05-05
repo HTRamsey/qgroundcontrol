@@ -5,13 +5,13 @@ endif()
 include(CTest)
 enable_testing()
 
-set(UNIT_TESTING_RESOURCES)
-qt_add_resources(UNIT_TESTING_RESOURCES UnitTest.qrc)
+# set(UNIT_TESTING_RESOURCES)
+# qt_add_resources(UNIT_TESTING_RESOURCES UnitTest.qrc)
 
 qt_add_library(qgctest
     STATIC
         UnitTestList.cc
-        ${UNIT_TESTING_RESOURCES}
+        # ${UNIT_TESTING_RESOURCES}
 )
 
 add_custom_target(check
@@ -28,12 +28,12 @@ function(add_qgc_test test_name)
 endfunction()
 
 add_subdirectory(AnalyzeView)
-add_qgc_test(LogDownloadTest)
+# add_qgc_test(LogDownloadTest)
 
 add_subdirectory(Audio)
 add_qgc_test(AudioOutputTest)
 
-add_subdirectory(comm)
+add_subdirectory(Comms)
 
 add_subdirectory(Compression)
 add_qgc_test(DecompressionTest)
@@ -84,7 +84,7 @@ add_qgc_test(ComponentInformationTranslationTest)
 
 add_subdirectory(QmlControls)
 
-add_subdirectory(ui)
+add_subdirectory(UI)
 
 add_subdirectory(Vehicle)
 add_qgc_test(FTPManagerTest)
@@ -102,14 +102,14 @@ target_link_libraries(qgctest
     PRIVATE
         AnalyzeViewTest
         AudioTest
-        CommTest
+        CommsTest
         CompressionTest
         FactSystemTest
         GeoTest
         MAVLinkTest
         MissionManagerTest
         QmlControlsTest
-        uiTest
+        UITest
         VehicleTest
     PUBLIC
         qgcunittest

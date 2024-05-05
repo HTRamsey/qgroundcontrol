@@ -39,25 +39,25 @@ target_link_libraries(Vehicle
 		VehicleActuators
 		VehicleComponents
 		ADSB
-                api
+		API
 		Audio
-                AutoPilotPlugins
-        	Camera
+		AutoPilotPlugins
+		Camera
 		FirmwarePlugin
-                Joystick
-        	MockLink
-        	Utilities
+		Joystick
+		MockLink
+		Utilities
 		UTMSP
 	PUBLIC
 		Qt6::Core
 		Qt6::Gui
 		Qt6::Positioning
 		libevents_wrapper
-		comm
+		Comms
 		FactSystem
 		MAVLink
         MissionManager
-        qgc
+        QGC
         VehicleFactGroups
 )
 

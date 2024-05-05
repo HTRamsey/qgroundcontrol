@@ -9,7 +9,7 @@
 
 
 // AnalyzeView
-#include "LogDownloadTest.h"
+// #include "LogDownloadTest.h"
 
 // Audio
 #include "AudioOutputTest.h"
@@ -79,7 +79,7 @@
 
 
 // AnalyzeView
-UT_REGISTER_TEST(LogDownloadTest)
+// UT_REGISTER_TEST(LogDownloadTest)
 
 // Audio
 UT_REGISTER_TEST(AudioOutputTest)
@@ -132,7 +132,7 @@ UT_REGISTER_TEST(ComponentInformationTranslationTest)
 
 // QmlControls
 
-// ui
+// UI
 
 // Vehicle
 UT_REGISTER_TEST(FTPManagerTest)

@@ -6,8 +6,8 @@ qt_add_library(PX4FirmwarePlugin STATIC
     px4_custom_mode.h
     PX4FirmwarePlugin.cc
     PX4FirmwarePlugin.h
-    PX4FirmwarePluginFactory.cc
-    PX4FirmwarePluginFactory.h
+    # PX4FirmwarePluginFactory.cc
+    # PX4FirmwarePluginFactory.h
     PX4ParameterMetaData.cc
     PX4ParameterMetaData.h
     ${PX4_RESOURCES}
@@ -18,13 +18,13 @@ target_link_libraries(PX4FirmwarePlugin
         AutoPilotPlugins
         MissionManager
         PX4AutoPilotPlugin
-        qgc
+        QGC
         Settings
         VehicleSetup
         Utilities
     PUBLIC
         Qt6::Core
-        comm
+        Comms
         FactSystem
         FirmwarePlugin
 )

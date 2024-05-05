@@ -18,18 +18,20 @@ ReleaseBuild {
     INCLUDEPATH += \
         $$PWD/AnalyzeView \
         $$PWD/Audio \
-        $$PWD/comm \
+        $$PWD/Comms \
+        $$PWD/Compression \
         $$PWD/FactSystem \
         $$PWD/Geo \
         $$PWD/MissionManager \
         $$PWD/qgcunittest \
         $$PWD/QmlControls \
-        $$PWD/ui \
+        $$PWD/UI \
         $$PWD/Vehicle
 
     HEADERS += \
         #$$PWD/AnalyzeView/LogDownloadTest.h \
         $$PWD/Audio/AudioOutputTest.h \
+        $$PWD/Compression/DecompressionTest.h \
         $$PWD/FactSystem/FactSystemTestBase.h \
         $$PWD/FactSystem/FactSystemTestGeneric.h \
         $$PWD/FactSystem/FactSystemTestPX4.h \
@@ -78,6 +80,7 @@ ReleaseBuild {
     SOURCES += \
         #$$PWD/AnalyzeView/LogDownloadTest.cc \
         $$PWD/Audio/AudioOutputTest.cc \
+        $$PWD/Compression/DecompressionTest.cc \
         $$PWD/FactSystem/FactSystemTestBase.cc \
         $$PWD/FactSystem/FactSystemTestGeneric.cc \
         $$PWD/FactSystem/FactSystemTestPX4.cc \

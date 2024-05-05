@@ -1,7 +1,9 @@
 #pragma once
 
-#include "GeoTagWorker.h"
 #include <QtCore/QByteArray>
+#include <QtCore/QList>
+
+#include "GeoTagWorker.h"
 
 class PX4LogParser
 {

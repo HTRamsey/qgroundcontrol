@@ -11,22 +11,20 @@
 
 #include <QtCore/QElapsedTimer>
 #include <QtCore/QObject>
-#include <QtCore/QVariantList>
+#include <QtCore/QFile>
+#include <QtCore/QSharedPointer>
 #include <QtCore/QTime>
 #include <QtCore/QTimer>
-#include <QtCore/QSharedPointer>
-#include <QtCore/QFile>
+#include <QtCore/QVariantList>
 #include <QtPositioning/QGeoCoordinate>
 
-#include "QGCMAVLink.h"
-#include "VehicleLinkManager.h"
-
-#include "QmlObjectListModel.h"
-#include "QGCMapCircle.h"
-
-#include "MAVLinkStreamConfig.h"
 #include "HealthAndArmingCheckReport.h"
+#include "MAVLinkStreamConfig.h"
+#include "QGCMapCircle.h"
+#include "QGCMAVLink.h"
+#include "QmlObjectListModel.h"
 #include "SysStatusSensorInfo.h"
+#include "VehicleLinkManager.h"
 
 #include "FactGroup.h"
 #include "TerrainFactGroup.h"
@@ -47,46 +45,39 @@
 #include "VehicleWindFactGroup.h"
 
 class Actuators;
+class AutoPilotPlugin;
+class Autotune;
+class ComponentInformationManager;
 class EventHandler;
 class FirmwarePlugin;
 class FirmwarePluginManager;
-class AutoPilotPlugin;
-class ParameterManager;
-class JoystickManager;
-class UASMessage;
-class SettingsManager;
-class QGCCameraManager;
+class FTPManager;
+class GeoFenceManager;
+class ImageProtocolManager;
+class InitialConnectStateMachine;
 class Joystick;
-class VehicleObjectAvoidance;
-class TrajectoryPoints;
-class TerrainProtocolHandler;
-class ComponentInformationManager;
-class VehicleBatteryFactGroup;
-class SendMavCommandWithSignallingTest;
-class SendMavCommandWithHandlerTest;
-class RequestMessageTest;
+class JoystickManager;
 class LinkInterface;
 class LinkManager;
-class InitialConnectStateMachine;
-class Autotune;
-class RemoteIDManager;
 class MAVLinkProtocol;
 class MissionManager;
-class GeoFenceManager;
-class RallyPointManager;
-class FTPManager;
-class ImageProtocolManager;
-class TerrainAtCoordinateQuery;
-class StandardModes;
+class ParameterManager;
+class QGCCameraManager;
 class QGCToolbox;
-#ifdef CONFIG_UTM_ADAPTER
+class RallyPointManager;
+class RemoteIDManager;
+class RequestMessageTest;
+class SendMavCommandWithHandlerTest;
+class SendMavCommandWithSignallingTest;
+class SettingsManager;
+class StandardModes;
+class TerrainAtCoordinateQuery;
+class TerrainProtocolHandler;
+class TrajectoryPoints;
+class UASMessage;
 class UTMSPVehicle;
-#endif
-
-#ifndef OPAQUE_PTR_VEHICLE
-    #define OPAQUE_PTR_VEHICLE
-    Q_DECLARE_OPAQUE_POINTER(Actuators*)
-#endif
+class VehicleBatteryFactGroup;
+class VehicleObjectAvoidance;
 
 namespace events {
 namespace parser {
@@ -99,13 +90,14 @@ Q_DECLARE_LOGGING_CATEGORY(VehicleLog)
 class Vehicle : public FactGroup
 {
     Q_OBJECT
+    Q_MOC_INCLUDE("Actuators.h")
     Q_MOC_INCLUDE("AutoPilotPlugin.h")
-    Q_MOC_INCLUDE("TrajectoryPoints.h")
-    Q_MOC_INCLUDE("ParameterManager.h")
-    Q_MOC_INCLUDE("VehicleObjectAvoidance.h")
     Q_MOC_INCLUDE("Autotune.h")
-    Q_MOC_INCLUDE("RemoteIDManager.h")
+    Q_MOC_INCLUDE("ParameterManager.h")
     Q_MOC_INCLUDE("QGCCameraManager.h")
+    Q_MOC_INCLUDE("RemoteIDManager.h")
+    Q_MOC_INCLUDE("TrajectoryPoints.h")
+    Q_MOC_INCLUDE("VehicleObjectAvoidance.h")
 
     friend class InitialConnectStateMachine;
     friend class VehicleLinkManager;
@@ -759,8 +751,6 @@ public:
     Autotune*                       autotune            () const { return _autotune; }
     RemoteIDManager*                remoteIDManager     () { return _remoteIDManager; }
 
-    static const int cMaxRcChannels = 18;
-
     /// Sends the specified MAV_CMD to the vehicle. If no Ack is received command will be retried. If a sendMavCommand is already in progress
     /// the command will be queued and sent when the previous command completes.
     ///     @param compId Component to send to.
@@ -1014,9 +1004,9 @@ signals:
     void loadProgressChanged            (float value);
 
     /// New RC channel values coming from RC_CHANNELS message
-    ///     @param channelCount Number of available channels, cMaxRcChannels max
+    ///     @param channelCount Number of available channels, maxRcChannels max
     ///     @param pwmValues -1 signals channel not available
-    void rcChannelsChanged              (int channelCount, int pwmValues[cMaxRcChannels]);
+    void rcChannelsChanged              (int channelCount, int pwmValues[QGCMAVLink::maxRcChannels]);
 
     /// Remote control RSSI changed  (0% - 100%)
     void remoteControlRSSIChanged       (uint8_t rssi);

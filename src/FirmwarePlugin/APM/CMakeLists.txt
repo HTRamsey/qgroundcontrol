@@ -5,8 +5,8 @@ qt_add_resources(APM_RESOURCES APMResources.qrc)
 qt_add_library(APMFirmwarePlugin STATIC
     APMFirmwarePlugin.cc
     APMFirmwarePlugin.h
-    APMFirmwarePluginFactory.cc
-    APMFirmwarePluginFactory.h
+    # APMFirmwarePluginFactory.cc
+    # APMFirmwarePluginFactory.h
     APMParameterMetaData.cc
     APMParameterMetaData.h
     ArduCopterFirmwarePlugin.cc
@@ -25,7 +25,7 @@ target_link_libraries(APMFirmwarePlugin
         APMAutoPilotPlugin
         AutoPilotPlugins
         MissionManager
-        qgc
+        QGC
         Settings
         Utilities
         Vehicle
@@ -33,7 +33,7 @@ target_link_libraries(APMFirmwarePlugin
     PUBLIC
         Qt6::Core
         Qt6::Network
-        comm
+        Comms
         FactSystem
         FollowMe
         FirmwarePlugin

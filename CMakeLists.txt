@@ -202,7 +202,19 @@ set(QGC_RESOURCES
     ${CMAKE_SOURCE_DIR}/qgcresources.qrc
     ${CMAKE_SOURCE_DIR}/qgroundcontrol.qrc
     ${CMAKE_SOURCE_DIR}/resources/InstrumentValueIcons/InstrumentValueIcons.qrc
+    ${CMAKE_SOURCE_DIR}/src/FirmwarePlugin/APM/APMResources.qrc
+    ${CMAKE_SOURCE_DIR}/src/FirmwarePlugin/PX4/PX4Resources.qrc
 )
+
+if(CONFIG_UTM_ADAPTER)
+    list(APPEND QGC_RESOURCES ${CMAKE_SOURCE_DIR}/src/UTMSP/utmsp.qrc)
+else()
+    list(APPEND QGC_RESOURCES ${CMAKE_SOURCE_DIR}/src/UTMSP/dummy/utmsp_dummy.qrc)
+endif()
+
+if(QGC_BUILD_TESTING)
+    list(APPEND QGC_RESOURCES ${CMAKE_SOURCE_DIR}/test/UnitTest.qrc)
+endif()
 
 if(WIN32)
     list(APPEND QGC_RESOURCES ${CMAKE_SOURCE_DIR}/deploy/windows/QGroundControl.rc)
@@ -300,13 +312,19 @@ add_compile_definitions(
 add_subdirectory(src)
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
+        Qt6::Bluetooth
         Qt6::Core
         Qt6::Gui
         Qt6::Qml
         Qt6::Quick
         Qt6::QuickControls2
+        Qt6::Widgets
         Qt6::Svg # Used to import QSvgPlugin
-        qgc
+        QGC
+        QGCLocation
+        QmlControls
+        Utilities
+        Vehicle
 )
 if(QGC_BUILD_TESTING)
     add_subdirectory(test)
@@ -316,6 +334,11 @@ endif()
 #######################################################
 #		Install Configuration
 #######################################################
+
+qt_import_plugins(${PROJECT_NAME}
+    INCLUDE
+        Qt6::QSvgPlugin
+)
 
 install(
     TARGETS ${PROJECT_NAME}
