@@ -14,23 +14,21 @@ qt_add_library(libevents_wrapper STATIC
 	EventHandler.h
 	HealthAndArmingCheckReport.cc
 	HealthAndArmingCheckReport.h
-	libevents_includes.h
 	logging.cpp
 )
 
 target_link_libraries(libevents_wrapper
 	PRIVATE
 		QmlControls
-		Utilities
+                Utilities
 	PUBLIC
 		Qt6::Core
-		MAVLink
+		Comms
 		libevents
 )
 
 target_include_directories(libevents_wrapper
 	PUBLIC
-		${libevents_SOURCE_DIR}/libs/cpp
-	INTERFACE
 		${CMAKE_CURRENT_SOURCE_DIR}
+		${libevents_SOURCE_DIR}/libs/cpp
 )

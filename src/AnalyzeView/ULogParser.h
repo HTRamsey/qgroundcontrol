@@ -5,7 +5,7 @@
 #include <QtCore/QString>
 #include <QtCore/QCoreApplication>
 
-#include "GeoTagWorker.h"
+#include "GeoTagController.h"
 
 #define ULOG_FILE_HEADER_LEN 16
 

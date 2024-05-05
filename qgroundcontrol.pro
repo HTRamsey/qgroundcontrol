@@ -369,7 +369,6 @@ INCLUDEPATH += \
     src/Geo \
     src/GPS \
     src/Joystick \
-    src/Mavlink \
     src/PlanView \
     src/MissionManager \
     src/PositionManager \
@@ -382,7 +381,7 @@ INCLUDEPATH += \
     src/Vehicle/Actuators \
     src/Vehicle/Components \
     src/Vehicle/FactGroups \
-    src/Mavlink/LibEvents \
+    src/Vehicle/LibEvents \
     src/Audio \
     src/Comms \
     src/Comms/MockLink \
@@ -431,10 +430,7 @@ HEADERS += \
     src/AnalyzeView/LogDownloadController.h \
     src/AnalyzeView/PX4LogParser.h \
     src/AnalyzeView/ULogParser.h \
-    src/AnalyzeView/MAVLinkChartController.h \
-    src/AnalyzeView/MAVLinkConsoleController.h \
-    src/AnalyzeView/MAVLinkMessage.h \
-    src/AnalyzeView/MAVLinkSystem.h \
+    src/AnalyzeView/MavlinkConsoleController.h \
     src/Audio/AudioOutput.h \
     src/Vehicle/Autotune.h \
     src/Camera/MavlinkCameraControl.h \
@@ -497,13 +493,6 @@ HEADERS += \
     src/PositionManager/PositionManager.h \
     src/PositionManager/SimulatedPosition.h \
     src/Geo/QGCGeo.h \
-    src/Geo/Constants.hpp \
-    src/Geo/Math.hpp \
-    src/Geo/Utility.hpp \
-    src/Geo/UTMUPS.hpp \
-    src/Geo/MGRS.hpp \
-    src/Geo/TransverseMercator.hpp \
-    src/Geo/PolarStereographic.hpp \
     src/Utilities/QGC.h \
     src/Utilities/DeviceInfo.h \
     src/QGCApplication.h \
@@ -566,9 +555,9 @@ HEADERS += \
     src/Vehicle/Actuators/GeometryImage.h \
     src/Vehicle/Actuators/Mixer.h \
     src/Vehicle/Actuators/MotorAssignment.h \
-    src/Mavlink/LibEvents/EventHandler.h \
-    src/Mavlink/LibEvents/HealthAndArmingCheckReport.h \
-    src/Mavlink/LibEvents/libevents_includes.h \
+    src/Vehicle/LibEvents/EventHandler.h \
+    src/Vehicle/LibEvents/HealthAndArmingCheckReport.h \
+    src/Vehicle/LibEvents/libevents_includes.h \
     src/Vehicle/Components/CompInfo.h \
     src/Vehicle/Components/CompInfoActuators.h \
     src/Vehicle/Components/CompInfoEvents.h \
@@ -579,15 +568,15 @@ HEADERS += \
     src/Vehicle/Components/ComponentInformationTranslation.h \
     src/Vehicle/FTPManager.h \
     src/Vehicle/FactGroups/GPSRTKFactGroup.h \
-    src/Mavlink/ImageProtocolManager.h \
+    src/Vehicle/ImageProtocolManager.h \
     src/Vehicle/InitialConnectStateMachine.h \
     src/Vehicle/MAVLinkLogManager.h \
-    src/Mavlink/MAVLinkStreamConfig.h \
+    src/Vehicle/MAVLinkStreamConfig.h \
     src/Vehicle/MultiVehicleManager.h \
     src/Vehicle/RemoteIDManager.h \
     src/Utilities/StateMachine.h \
     src/Vehicle/StandardModes.h \
-    src/Mavlink/SysStatusSensorInfo.h \
+    src/Vehicle/SysStatusSensorInfo.h \
     src/Vehicle/FactGroups/TerrainFactGroup.h \
     src/Vehicle/TerrainProtocolHandler.h \
     src/Vehicle/TrajectoryPoints.h \
@@ -615,15 +604,12 @@ HEADERS += \
     src/Comms/LinkManager.h \
     src/Comms/LogReplayLink.h \
     src/Comms/MAVLinkProtocol.h \
-    src/MAVLink/QGCMAVLink.h \
-    src/MAVLink/MAVLinkFTP.h \
-    src/MAVLink/MAVLinkLib.h \
+    src/Comms/QGCMAVLink.h \
     src/Comms/TCPLink.h \
     src/Comms/UDPLink.h \
     src/Comms/UdpIODevice.h \
     src/Vehicle/UASMessageHandler.h \
     src/AnalyzeView/GeoTagController.h \
-    src/AnalyzeView/GeoTagWorker.h \
     src/AnalyzeView/ExifParser.h \
     src/Viewer3D/CityMapGeometry.h \
     src/Viewer3D/OsmParser.h \
@@ -710,10 +696,7 @@ SOURCES += \
     src/AnalyzeView/LogDownloadController.cc \
     src/AnalyzeView/PX4LogParser.cc \
     src/AnalyzeView/ULogParser.cc \
-    src/AnalyzeView/MAVLinkChartController.cc \
-    src/AnalyzeView/MAVLinkConsoleController.cc \
-    src/AnalyzeView/MAVLinkMessage.cc \
-    src/AnalyzeView/MAVLinkSystem.cc \
+    src/AnalyzeView/MavlinkConsoleController.cc \
     src/Audio/AudioOutput.cc \
     src/Vehicle/Autotune.cpp \
     src/Camera/MavlinkCameraControl.cc \
@@ -774,12 +757,6 @@ SOURCES += \
     src/PositionManager/PositionManager.cpp \
     src/PositionManager/SimulatedPosition.cc \
     src/Geo/QGCGeo.cc \
-    src/Geo/Math.cpp \
-    src/Geo/Utility.cpp \
-    src/Geo/UTMUPS.cpp \
-    src/Geo/MGRS.cpp \
-    src/Geo/TransverseMercator.cpp \
-    src/Geo/PolarStereographic.cpp \
     src/Utilities/QGC.cc \
     src/Utilities/DeviceInfo.cc \
     src/QGCApplication.cc \
@@ -841,9 +818,9 @@ SOURCES += \
     src/Vehicle/Actuators/GeometryImage.cc \
     src/Vehicle/Actuators/Mixer.cc \
     src/Vehicle/Actuators/MotorAssignment.cc \
-    src/Mavlink/LibEvents/EventHandler.cc \
-    src/Mavlink/LibEvents/HealthAndArmingCheckReport.cc \
-    src/Mavlink/LibEvents/logging.cpp \
+    src/Vehicle/LibEvents/EventHandler.cc \
+    src/Vehicle/LibEvents/HealthAndArmingCheckReport.cc \
+    src/Vehicle/LibEvents/logging.cpp \
     src/Vehicle/Components/CompInfo.cc \
     src/Vehicle/Components/CompInfoActuators.cc \
     src/Vehicle/Components/CompInfoEvents.cc \
@@ -854,15 +831,15 @@ SOURCES += \
     src/Vehicle/Components/ComponentInformationTranslation.cc \
     src/Vehicle/FTPManager.cc \
     src/Vehicle/FactGroups/GPSRTKFactGroup.cc \
-    src/Mavlink/ImageProtocolManager.cc \
+    src/Vehicle/ImageProtocolManager.cc \
     src/Vehicle/InitialConnectStateMachine.cc \
     src/Vehicle/MAVLinkLogManager.cc \
-    src/Mavlink/MAVLinkStreamConfig.cc \
+    src/Vehicle/MAVLinkStreamConfig.cc \
     src/Vehicle/MultiVehicleManager.cc \
     src/Vehicle/RemoteIDManager.cc \
     src/Utilities/StateMachine.cc \
     src/Vehicle/StandardModes.cc \
-    src/Mavlink/SysStatusSensorInfo.cc \
+    src/Vehicle/SysStatusSensorInfo.cc \
     src/Vehicle/FactGroups/TerrainFactGroup.cc \
     src/Vehicle/TerrainProtocolHandler.cc \
     src/Vehicle/TrajectoryPoints.cc \
@@ -890,15 +867,13 @@ SOURCES += \
     src/Comms/LinkManager.cc \
     src/Comms/LogReplayLink.cc \
     src/Comms/MAVLinkProtocol.cc \
-    src/MAVLink/QGCMAVLink.cc \
-    src/MAVLink/MAVLinkFTP.cc \
+    src/Comms/QGCMAVLink.cc \
     src/Comms/TCPLink.cc \
     src/Comms/UDPLink.cc \
     src/Comms/UdpIODevice.cc \
     src/main.cc \
     src/Vehicle/UASMessageHandler.cc \
     src/AnalyzeView/GeoTagController.cc \
-    src/AnalyzeView/GeoTagWorker.cc \
     src/AnalyzeView/ExifParser.cc \
     src/Viewer3D/CityMapGeometry.cc \
     src/Viewer3D/OsmParser.cc \

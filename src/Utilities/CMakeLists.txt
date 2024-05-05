@@ -56,7 +56,7 @@ target_link_libraries(Utilities
 		shp
 		FactSystem
 		Geo
-		MissionManager
+		QGC
 		QmlControls
 		Settings
 	PUBLIC

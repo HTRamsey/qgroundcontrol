@@ -14,7 +14,6 @@
 #include "APMAutoPilotPlugin.h"
 #include "ParameterManager.h"
 #include "FactSystem.h"
-#include "MAVLinkProtocol.h"
 #include "Vehicle.h"
 #include "QGCLoggingCategory.h"
 

@@ -17,7 +17,6 @@
 #include "QGCCorePlugin.h"
 #include "Vehicle.h"
 #include "LinkInterface.h"
-#include "MAVLinkProtocol.h"
 
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtCore/QDir>

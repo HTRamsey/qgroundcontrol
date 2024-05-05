@@ -1,6 +1,6 @@
 #pragma once
 
-#include "GeoTagWorker.h"
+#include "GeoTagController.h"
 #include <QtCore/QByteArray>
 
 class ExifParser

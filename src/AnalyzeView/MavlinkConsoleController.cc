@@ -7,25 +7,24 @@
  *
  ****************************************************************************/
 
-#include "MAVLinkConsoleController.h"
+#include "MavlinkConsoleController.h"
 #include "QGCApplication.h"
 #include "QGCToolbox.h"
 #include "MultiVehicleManager.h"
 #include "Vehicle.h"
-#include "MAVLinkProtocol.h"
 
 #include <QtWidgets/QApplication>
 #include <QtGui/QClipboard>
 
-MAVLinkConsoleController::MAVLinkConsoleController()
+MavlinkConsoleController::MavlinkConsoleController()
     : QStringListModel()
 {
     auto *manager = qgcApp()->toolbox()->multiVehicleManager();
-    connect(manager, &MultiVehicleManager::activeVehicleChanged, this, &MAVLinkConsoleController::_setActiveVehicle);
+    connect(manager, &MultiVehicleManager::activeVehicleChanged, this, &MavlinkConsoleController::_setActiveVehicle);
     _setActiveVehicle(manager->activeVehicle());
 }
 
-MAVLinkConsoleController::~MAVLinkConsoleController()
+MavlinkConsoleController::~MavlinkConsoleController()
 {
     if (_vehicle) {
         QByteArray msg;
@@ -34,7 +33,7 @@ MAVLinkConsoleController::~MAVLinkConsoleController()
 }
 
 void
-MAVLinkConsoleController::sendCommand(QString command)
+MavlinkConsoleController::sendCommand(QString command)
 {
     // there might be multiple commands, add them separately to the history
     QStringList lines = command.split('\n');
@@ -49,19 +48,19 @@ MAVLinkConsoleController::sendCommand(QString command)
 }
 
 QString
-MAVLinkConsoleController::historyUp(const QString& current)
+MavlinkConsoleController::historyUp(const QString& current)
 {
     return _history.up(current);
 }
 
 QString
-MAVLinkConsoleController::historyDown(const QString& current)
+MavlinkConsoleController::historyDown(const QString& current)
 {
     return _history.down(current);
 }
 
 QString
-MAVLinkConsoleController::handleClipboard(const QString& command_pre)
+MavlinkConsoleController::handleClipboard(const QString& command_pre)
 {
     QString clipboardData = command_pre + QApplication::clipboard()->text();
     int lastLinePos = clipboardData.lastIndexOf('\n');
@@ -74,7 +73,7 @@ MAVLinkConsoleController::handleClipboard(const QString& command_pre)
 }
 
 void
-MAVLinkConsoleController::_setActiveVehicle(Vehicle* vehicle)
+MavlinkConsoleController::_setActiveVehicle(Vehicle* vehicle)
 {
     for (auto &con : _uas_connections)
         disconnect(con);
@@ -89,12 +88,12 @@ MAVLinkConsoleController::_setActiveVehicle(Vehicle* vehicle)
         _cursorY = 0;
         _cursorX = 0;
         _cursor_home_pos = -1;
-        _uas_connections << connect(_vehicle, &Vehicle::mavlinkSerialControl, this, &MAVLinkConsoleController::_receiveData);
+        _uas_connections << connect(_vehicle, &Vehicle::mavlinkSerialControl, this, &MavlinkConsoleController::_receiveData);
     }
 }
 
 void
-MAVLinkConsoleController::_receiveData(uint8_t device, uint8_t, uint16_t, uint32_t, QByteArray data)
+MavlinkConsoleController::_receiveData(uint8_t device, uint8_t, uint16_t, uint32_t, QByteArray data)
 {
     if (device != SERIAL_CONTROL_DEV_SHELL)
         return;
@@ -132,7 +131,7 @@ MAVLinkConsoleController::_receiveData(uint8_t device, uint8_t, uint16_t, uint32
 }
 
 void
-MAVLinkConsoleController::_sendSerialData(QByteArray data, bool close)
+MavlinkConsoleController::_sendSerialData(QByteArray data, bool close)
 {
     if (!_vehicle) {
         qWarning() << "Internal error";
@@ -173,7 +172,7 @@ MAVLinkConsoleController::_sendSerialData(QByteArray data, bool close)
 }
 
 bool
-MAVLinkConsoleController::_processANSItext(QByteArray &line)
+MavlinkConsoleController::_processANSItext(QByteArray &line)
 {
     // Iterate over the incoming buffer to parse off known ANSI control codes
     for (int i = 0; i < line.size(); i++) {
@@ -237,7 +236,7 @@ MAVLinkConsoleController::_processANSItext(QByteArray &line)
 }
 
 QString
-MAVLinkConsoleController::transformLineForRichText(const QString& line) const
+MavlinkConsoleController::transformLineForRichText(const QString& line) const
 {
     QString ret = line.toHtmlEscaped().replace(" ","&nbsp;").replace("\t", "&nbsp;&nbsp;&nbsp;&nbsp;");
 
@@ -251,7 +250,7 @@ MAVLinkConsoleController::transformLineForRichText(const QString& line) const
 }
 
 QString
-MAVLinkConsoleController::getText() const
+MavlinkConsoleController::getText() const
 {
     QString ret;
     if (rowCount() > 0) {
@@ -265,7 +264,7 @@ MAVLinkConsoleController::getText() const
 }
 
 void
-MAVLinkConsoleController::writeLine(int line, const QByteArray &text)
+MavlinkConsoleController::writeLine(int line, const QByteArray &text)
 {
     auto rc = rowCount();
     if (line >= rc) {
@@ -287,7 +286,7 @@ MAVLinkConsoleController::writeLine(int line, const QByteArray &text)
     _cursorX += text.size();
 }
 
-void MAVLinkConsoleController::CommandHistory::append(const QString& command)
+void MavlinkConsoleController::CommandHistory::append(const QString& command)
 {
     if (command.length() > 0) {
 
@@ -303,7 +302,7 @@ void MAVLinkConsoleController::CommandHistory::append(const QString& command)
     _index = _history.length();
 }
 
-QString MAVLinkConsoleController::CommandHistory::up(const QString& current)
+QString MavlinkConsoleController::CommandHistory::up(const QString& current)
 {
     if (_index <= 0)
         return current;
@@ -315,7 +314,7 @@ QString MAVLinkConsoleController::CommandHistory::up(const QString& current)
     return "";
 }
 
-QString MAVLinkConsoleController::CommandHistory::down(const QString& current)
+QString MavlinkConsoleController::CommandHistory::down(const QString& current)
 {
     if (_index >= _history.length())
         return current;

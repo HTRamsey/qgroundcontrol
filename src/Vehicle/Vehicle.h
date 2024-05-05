@@ -11,7 +11,6 @@
 
 #include <QtCore/QElapsedTimer>
 #include <QtCore/QObject>
-#include <QtCore/QFile>
 #include <QtCore/QSharedPointer>
 #include <QtCore/QTime>
 #include <QtCore/QTimer>
@@ -63,7 +62,6 @@ class MAVLinkProtocol;
 class MissionManager;
 class ParameterManager;
 class QGCCameraManager;
-class QGCToolbox;
 class RallyPointManager;
 class RemoteIDManager;
 class RequestMessageTest;
@@ -75,9 +73,15 @@ class TerrainAtCoordinateQuery;
 class TerrainProtocolHandler;
 class TrajectoryPoints;
 class UASMessage;
-class UTMSPVehicle;
 class VehicleBatteryFactGroup;
 class VehicleObjectAvoidance;
+#ifdef CONFIG_UTM_ADAPTER
+class UTMSPVehicle;
+#endif
+#ifndef OPAQUE_PTR_VEHICLE
+    #define OPAQUE_PTR_VEHICLE
+    Q_DECLARE_OPAQUE_POINTER(Actuators*)
+#endif
 
 namespace events {
 namespace parser {
@@ -90,14 +94,13 @@ Q_DECLARE_LOGGING_CATEGORY(VehicleLog)
 class Vehicle : public FactGroup
 {
     Q_OBJECT
-    Q_MOC_INCLUDE("Actuators.h")
     Q_MOC_INCLUDE("AutoPilotPlugin.h")
-    Q_MOC_INCLUDE("Autotune.h")
-    Q_MOC_INCLUDE("ParameterManager.h")
-    Q_MOC_INCLUDE("QGCCameraManager.h")
-    Q_MOC_INCLUDE("RemoteIDManager.h")
     Q_MOC_INCLUDE("TrajectoryPoints.h")
+    Q_MOC_INCLUDE("ParameterManager.h")
     Q_MOC_INCLUDE("VehicleObjectAvoidance.h")
+    Q_MOC_INCLUDE("Autotune.h")
+    Q_MOC_INCLUDE("RemoteIDManager.h")
+    Q_MOC_INCLUDE("QGCCameraManager.h")
 
     friend class InitialConnectStateMachine;
     friend class VehicleLinkManager;

@@ -13,6 +13,8 @@ qt_add_library(Comms STATIC
 	LogReplayLink.h
 	MAVLinkProtocol.cc
 	MAVLinkProtocol.h
+	QGCMAVLink.cc
+	QGCMAVLink.h
 	TCPLink.cc
 	TCPLink.h
 	UdpIODevice.cc
@@ -99,3 +101,23 @@ if(QGC_ZEROCONF_ENABLED)
 	target_link_libraries(Comms PRIVATE qmdnsengine)
 	target_compile_definitions(Comms PUBLIC QGC_ZEROCONF_ENABLED)
 endif()
+
+############# MAVLink
+
+include(FetchContent)
+FetchContent_Declare(MAVLink
+	GIT_REPOSITORY https://github.com/mavlink/c_library_v2.git
+	GIT_TAG 878a0660666bbb7b982bad4f0d10fad88b1b82d1
+)
+FetchContent_MakeAvailable(MAVLink)
+
+target_include_directories(Comms
+    PUBLIC
+        ${mavlink_SOURCE_DIR}
+        ${mavlink_SOURCE_DIR}/all
+        ${mavlink_SOURCE_DIR}/common
+)
+
+# if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+# 	target_compile_options(comm PRIVATE -Wno-address-of-packed-member)
+# endif()

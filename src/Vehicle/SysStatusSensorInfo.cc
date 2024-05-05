@@ -8,7 +8,6 @@
  ****************************************************************************/
 
 #include "SysStatusSensorInfo.h"
-#include "QGCMAVLink.h"
 
 #include <QtCore/QDebug>
 

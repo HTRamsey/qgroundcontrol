@@ -8,7 +8,8 @@
  ****************************************************************************/
 
 #include "HealthAndArmingCheckReport.h"
-#include <QmlObjectListModel.h>
+#include "QGCMAVLink.h"
+#include "QmlObjectListModel.h"
 
 
 HealthAndArmingCheckReport::HealthAndArmingCheckReport(QObject *parent)

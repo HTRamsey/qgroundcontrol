@@ -3,7 +3,7 @@
 #include <QtCore/QByteArray>
 #include <QtCore/QList>
 
-#include "GeoTagWorker.h"
+#include "GeoTagController.h"
 
 class PX4LogParser
 {
