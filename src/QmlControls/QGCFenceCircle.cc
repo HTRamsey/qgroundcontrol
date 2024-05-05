@@ -45,11 +45,6 @@ const QGCFenceCircle& QGCFenceCircle::operator=(const QGCFenceCircle& other)
     return *this;
 }
 
-void QGCFenceCircle::_setDirty(void)
-{
-    setDirty(true);
-}
-
 void QGCFenceCircle::saveToJson(QJsonObject& json)
 {
     json[JsonHelper::jsonVersionKey] = _jsonCurrentVersion;

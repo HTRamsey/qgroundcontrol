@@ -32,7 +32,7 @@
 QGC_LOGGING_CATEGORY(PlanMasterControllerLog, "PlanMasterControllerLog")
 
 PlanMasterController::PlanMasterController(QObject* parent)
-    : QObject               (parent)
+    : QmlObjectListItem     (parent)
     , _multiVehicleMgr      (MultiVehicleManager::instance())
     , _controllerVehicle    (new Vehicle(Vehicle::MAV_AUTOPILOT_TRACK, Vehicle::MAV_TYPE_TRACK, this))
     , _managerVehicle       (_controllerVehicle)
@@ -45,7 +45,7 @@ PlanMasterController::PlanMasterController(QObject* parent)
 
 #ifdef QT_DEBUG
 PlanMasterController::PlanMasterController(MAV_AUTOPILOT firmwareType, MAV_TYPE vehicleType, QObject* parent)
-    : QObject               (parent)
+    : QmlObjectListItem     (parent)
     , _multiVehicleMgr      (MultiVehicleManager::instance())
     , _controllerVehicle    (new Vehicle(firmwareType, vehicleType))
     , _managerVehicle       (_controllerVehicle)

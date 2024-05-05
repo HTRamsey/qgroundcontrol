@@ -31,7 +31,6 @@ CameraSection::CameraSection(PlanMasterController* masterController, QObject* pa
     , _cameraPhotoIntervalDistanceFact  (0, _cameraPhotoIntervalDistanceName,   FactMetaData::valueTypeDouble)
     , _cameraPhotoIntervalTimeFact      (0, _cameraPhotoIntervalTimeName,       FactMetaData::valueTypeUint32)
     , _cameraModeFact                   (0, _cameraModeName,                    FactMetaData::valueTypeUint32)
-    , _dirty                            (false)
 {
     if (_metaDataMap.isEmpty()) {
         _metaDataMap = FactMetaData::createMapFromJsonFile(QStringLiteral(":/json/CameraSection.FactMetaData.json"), Q_NULLPTR /* metaDataParent */);
@@ -101,14 +100,6 @@ int CameraSection::itemCount(void) const
     }
 
     return itemCount;
-}
-
-void CameraSection::setDirty(bool dirty)
-{
-    if (_dirty != dirty) {
-        _dirty = dirty;
-        emit dirtyChanged(_dirty);
-    }
 }
 
 void CameraSection::appendSectionItems(QList<MissionItem*>& items, QObject* missionItemParent, int& nextSequenceNumber)
@@ -508,11 +499,6 @@ bool CameraSection::scanForSection(QmlObjectListModel* visualItems, int scanInde
     emit settingsSpecifiedChanged(_settingsSpecified);
 
     return _settingsSpecified;
-}
-
-void CameraSection::_setDirty(void)
-{
-    setDirty(true);
 }
 
 void CameraSection::_setDirtyAndUpdateItemCount(void)

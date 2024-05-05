@@ -18,8 +18,7 @@
 #include <QtCore/QLineF>
 
 QGCMapPolygon::QGCMapPolygon(QObject* parent)
-    : QObject               (parent)
-    , _dirty                (false)
+    : QmlObjectListItem     (parent)
     , _centerDrag           (false)
     , _ignoreCenterUpdates  (false)
     , _interactive          (false)
@@ -29,8 +28,7 @@ QGCMapPolygon::QGCMapPolygon(QObject* parent)
 }
 
 QGCMapPolygon::QGCMapPolygon(const QGCMapPolygon& other, QObject* parent)
-    : QObject               (parent)
-    , _dirty                (false)
+    : QmlObjectListItem     (parent)
     , _centerDrag           (false)
     , _ignoreCenterUpdates  (false)
     , _interactive          (false)
@@ -43,7 +41,7 @@ QGCMapPolygon::QGCMapPolygon(const QGCMapPolygon& other, QObject* parent)
 
 void QGCMapPolygon::_init(void)
 {
-    connect(&_polygonModel, &QmlObjectListModel::dirtyChanged, this, &QGCMapPolygon::_polygonModelDirtyChanged);
+    connect(&_polygonModel, &QmlObjectListModel::dirtyChanged, this, &QGCMapPolygon::_setIfDirty);
     connect(&_polygonModel, &QmlObjectListModel::countChanged, this, &QGCMapPolygon::_polygonModelCountChanged);
 
     connect(this, &QGCMapPolygon::pathChanged,  this, &QGCMapPolygon::_updateCenter);
@@ -285,13 +283,6 @@ void QGCMapPolygon::appendVertices(const QVariantList& varCoords)
         rgCoords.append(varCoord.value<QGeoCoordinate>());
     }
     appendVertices(rgCoords);
-}
-
-void QGCMapPolygon::_polygonModelDirtyChanged(bool dirty)
-{
-    if (dirty) {
-        setDirty(true);
-    }
 }
 
 void QGCMapPolygon::removeVertex(int vertexIndex)

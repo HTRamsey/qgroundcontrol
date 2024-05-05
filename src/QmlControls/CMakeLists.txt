@@ -44,6 +44,8 @@ target_sources(QGC
         QGCPalette.h
         QGroundControlQmlGlobal.cc
         QGroundControlQmlGlobal.h
+        QmlObjectListItem.cc
+        QmlObjectListItem.h
         QmlObjectListModel.cc
         QmlObjectListModel.h
         QmlUnitsConversion.h

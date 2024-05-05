@@ -12,8 +12,7 @@
 #include "ParameterManager.h"
 
 QGCMapCircle::QGCMapCircle(QObject* parent)
-    : QObject           (parent)
-    , _dirty            (false)
+    : QmlObjectListItem (parent)
     , _interactive      (false)
     , _showRotation     (false)
     , _clockwiseRotation(true)
@@ -22,8 +21,7 @@ QGCMapCircle::QGCMapCircle(QObject* parent)
 }
 
 QGCMapCircle::QGCMapCircle(const QGeoCoordinate& center, double radius, bool showRotation, bool clockwiseRotation, QObject* parent)
-    : QObject           (parent)
-    , _dirty            (false)
+    : QmlObjectListItem (parent)
     , _center           (center)
     , _radius           (ParameterManager::defaultComponentId, _radiusFactName, FactMetaData::valueTypeDouble)
     , _interactive      (false)
@@ -35,8 +33,7 @@ QGCMapCircle::QGCMapCircle(const QGeoCoordinate& center, double radius, bool sho
 }
 
 QGCMapCircle::QGCMapCircle(const QGCMapCircle& other, QObject* parent)
-    : QObject           (parent)
-    , _dirty            (false)
+    : QmlObjectListItem (parent)
     , _center           (other._center)
     , _radius           (ParameterManager::defaultComponentId, _radiusFactName, FactMetaData::valueTypeDouble)
     , _interactive      (false)
@@ -63,14 +60,6 @@ void QGCMapCircle::_init(void)
 
     connect(this,       &QGCMapCircle::centerChanged,   this, &QGCMapCircle::_setDirty);
     connect(&_radius,   &Fact::rawValueChanged,         this, &QGCMapCircle::_setDirty);
-}
-
-void QGCMapCircle::setDirty(bool dirty)
-{
-    if (_dirty != dirty) {
-        _dirty = dirty;
-        emit dirtyChanged(dirty);
-    }
 }
 
 void QGCMapCircle::saveToJson(QJsonObject& json)
@@ -127,11 +116,6 @@ void QGCMapCircle::setCenter(QGeoCoordinate newCenter)
         setDirty(true);
         emit centerChanged(newCenter);
     }
-}
-
-void QGCMapCircle::_setDirty(void)
-{
-    setDirty(true);
 }
 
 void QGCMapCircle::setInteractive(bool interactive)
