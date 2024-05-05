@@ -51,7 +51,6 @@ public:
     LinkManager(QGCApplication* app, QGCToolbox* toolbox);
     ~LinkManager();
 
-    Q_PROPERTY(bool                 isBluetoothAvailable            READ isBluetoothAvailable            CONSTANT)
     Q_PROPERTY(QmlObjectListModel*  linkConfigurations              READ _qmlLinkConfigurations          CONSTANT)
     Q_PROPERTY(QStringList          linkTypeStrings                 READ linkTypeStrings                 CONSTANT)
     Q_PROPERTY(bool                 mavlinkSupportForwardingEnabled READ mavlinkSupportForwardingEnabled NOTIFY mavlinkSupportForwardingEnabledChanged)
@@ -71,8 +70,6 @@ public:
     Q_INVOKABLE LogReplayLink* startLogReplay(const QString& logFile);
 
     // Property accessors
-
-    bool isBluetoothAvailable       (void);
 
     QList<SharedLinkInterfacePtr>   links                           (void) { return _rgLinks; }
     QStringList                     linkTypeStrings                 (void) const;

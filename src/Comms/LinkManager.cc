@@ -774,11 +774,6 @@ void LinkManager::_removeConfiguration(LinkConfiguration* config)
     qWarning() << "LinkManager::_removeConfiguration called with unknown config";
 }
 
-bool LinkManager::isBluetoothAvailable(void)
-{
-    return qgcApp()->isBluetoothAvailable();
-}
-
 bool LinkManager::containsLink(LinkInterface* link)
 {
     for (int i=0; i<_rgLinks.count(); i++) {

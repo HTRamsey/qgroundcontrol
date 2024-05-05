@@ -505,6 +505,7 @@ HEADERS += \
     src/Geo/TransverseMercator.hpp \
     src/Geo/PolarStereographic.hpp \
     src/Utilities/QGC.h \
+    src/Utilities/DeviceInfo.h \
     src/QGCApplication.h \
     src/Utilities/QGCCachedFileDownload.h \
     src/QGCConfig.h \
@@ -780,6 +781,7 @@ SOURCES += \
     src/Geo/TransverseMercator.cpp \
     src/Geo/PolarStereographic.cpp \
     src/Utilities/QGC.cc \
+    src/Utilities/DeviceInfo.cc \
     src/QGCApplication.cc \
     src/Utilities/QGCCachedFileDownload.cc \
     src/Utilities/QGCFileDownload.cc \

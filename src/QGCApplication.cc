@@ -26,10 +26,6 @@
 #include <QtQml/QQmlContext>
 #include <QtQml/QQmlApplicationEngine>
 
-#ifdef QGC_ENABLE_BLUETOOTH
-#include <QtBluetooth/QBluetoothLocalDevice>
-#endif
-
 #if defined(QGC_GST_STREAMING)
 #include "GStreamer.h"
 #endif
@@ -106,6 +102,7 @@
 #include "CustomActionManager.h"
 #include "AudioOutput.h"
 #include "LinkConfiguration.h"
+#include "JsonHelper.h"
 // #ifdef QGC_VIEWER3D
 #include "CityMapGeometry.h"
 #include "Viewer3DQmlBackend.h"
@@ -300,15 +297,6 @@ QGCApplication::QGCApplication(int &argc, char* argv[], bool unitTesting)
     // Set up our logging filters
     QGCLoggingCategoryRegister::instance()->setFilterRulesFromSettings(loggingOptions);
 
-    // Initialize Bluetooth
-#ifdef QGC_ENABLE_BLUETOOTH
-    QBluetoothLocalDevice localDevice;
-    if (localDevice.isValid())
-    {
-        _bluetoothAvailable = true;
-    }
-#endif
-
     // Gstreamer debug settings
     int gstDebugLevel = 0;
     if (settings.contains(AppSettings::gstDebugLevelName)) {
@@ -364,7 +352,7 @@ void QGCApplication::setLanguage()
         }
     }
     qCDebug(LocalizationLog) << "Loading localizations for" << _locale.name();
-    _app->removeTranslator(&_qgcTranslatorJSON);
+    _app->removeTranslator(JsonHelper::translator());
     _app->removeTranslator(&_qgcTranslatorSourceCode);
     _app->removeTranslator(&_qgcTranslatorQtLibs);
     if (_locale.name() != "en_US") {
@@ -379,8 +367,8 @@ void QGCApplication::setLanguage()
         } else {
             qCWarning(LocalizationLog) << "Error loading source localization for" << _locale.name();
         }
-        if(_qgcTranslatorJSON.load(_locale, QLatin1String("qgc_json_"), "", ":/i18n")) {
-            _app->installTranslator(&_qgcTranslatorJSON);
+        if(JsonHelper::translator()->load(_locale, QLatin1String("qgc_json_"), "", ":/i18n")) {
+            _app->installTranslator(JsonHelper::translator());
         } else {
             qCWarning(LocalizationLog) << "Error loading json localization for" << _locale.name();
         }
@@ -816,13 +804,6 @@ void QGCApplication::qmlAttemptWindowClose()
     if(_rootQmlObject()) {
         QMetaObject::invokeMethod(_rootQmlObject(), "attemptWindowClose");
     }
-}
-
-bool QGCApplication::isInternetAvailable()
-{
-    if(_toolbox->settingsManager()->appSettings()->checkInternet()->rawValue().toBool())
-        return getQGCMapEngine()->isInternetActive();
-    return true;
 }
 
 void QGCApplication::_checkForNewVersion()
