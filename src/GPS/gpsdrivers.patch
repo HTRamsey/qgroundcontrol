@@ -1,0 +1,20 @@
+diff --git a/src/gps_helper.h b/src/gps_helper.h
+index ae8b7a3..c18c766 100644
+--- a/src/gps_helper.h
++++ b/src/gps_helper.h
+@@ -41,7 +41,7 @@
+ 
+ #include <cstdint>
+ #include <cstring>
+-#include "../../definitions.h"
++#include "definitions.h"
+ 
+ #ifndef GPS_READ_BUFFER_SIZE
+ #define GPS_READ_BUFFER_SIZE 150 ///< buffer size for the read() call. Messages can be longer than that.
+@@ -334,4 +334,4 @@ inline bool operator&(GPSHelper::GNSSSystemsMask a, GPSHelper::GNSSSystemsMask b
+ inline bool operator&(GPSHelper::InterfaceProtocolsMask a, GPSHelper::InterfaceProtocolsMask b)
+ {
+ 	return static_cast<int32_t>(a) & static_cast<int32_t>(b);
+-}
++}
+\ No newline at end of file
