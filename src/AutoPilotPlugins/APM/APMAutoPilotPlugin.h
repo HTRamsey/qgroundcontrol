@@ -58,7 +58,7 @@ protected:
     ESP8266Component*           _esp8266Component;
     APMHeliComponent*           _heliComponent;
     APMRemoteSupportComponent*  _apmRemoteSupportComponent;
-#if 0
+#ifdef DAILY_BUILD
     // Follow me not ready for Stable
     APMFollowComponent*         _followComponent;
 #endif

@@ -7,7 +7,6 @@
  *
  ****************************************************************************/
 
-
 #pragma once
 
 #include <QtCore/QTimer>
@@ -22,6 +21,7 @@ class Vehicle;
 class FollowMe : public QGCTool
 {
     Q_OBJECT
+    Q_MOC_INCLUDE("Vehicle.h")
 
 public:
     FollowMe(QGCApplication* app, QGCToolbox* toolbox);
@@ -46,7 +46,7 @@ public:
         HEADING = 4
     };
 
-    void setToolbox(QGCToolbox* toolbox) override;
+    void setToolbox(QGCToolbox* toolbox) final;
 
 private slots:
     void _sendGCSMotionReport       (void);

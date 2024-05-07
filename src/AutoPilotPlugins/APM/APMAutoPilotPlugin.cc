@@ -27,6 +27,11 @@
 #include "APMRemoteSupportComponent.h"
 #include "QGCApplication.h"
 #include "ParameterManager.h"
+#ifdef DAILY_BUILD
+#include "APMFollowComponent.h"
+#include "ArduCopterFirmwarePlugin.h"
+#include "ArduRoverFirmwarePlugin.h"
+#endif
 
 // #if !defined(NO_SERIAL_LINK) && !defined(Q_OS_ANDROID)
 // #include <QSerialPortInfo>
@@ -50,7 +55,7 @@ APMAutoPilotPlugin::APMAutoPilotPlugin(Vehicle* vehicle, QObject* parent)
     , _esp8266Component         (nullptr)
     , _heliComponent            (nullptr)
     , _apmRemoteSupportComponent(nullptr)
-#if 0
+#ifdef DAILY_BUILD
     // Follow me not ready for Stable
     , _followComponent          (nullptr)
 #endif
@@ -104,7 +109,7 @@ const QVariantList& APMAutoPilotPlugin::vehicleComponents(void)
             _safetyComponent->setupTriggerSignals();
             _components.append(QVariant::fromValue((VehicleComponent*)_safetyComponent));
 
-#if 0
+#ifdef DAILY_BUILD
     // Follow me not ready for Stable
 
             if ((qobject_cast<ArduCopterFirmwarePlugin*>(_vehicle->firmwarePlugin()) || qobject_cast<ArduRoverFirmwarePlugin*>(_vehicle->firmwarePlugin())) &&
