@@ -105,7 +105,7 @@ target_include_directories(QGC PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(ANDROID)
 	add_subdirectory(${CMAKE_SOURCE_DIR}/android qgcandroid.build)
-    target_link_libraries(qgc PUBLIC qgcandroid)
+    target_link_libraries(QGC PUBLIC qgcandroid)
 else()
 	target_sources(QGC
 		PRIVATE
