@@ -14,7 +14,6 @@
 #include <QtCore/QObject>
 
 class FirmwarePluginManager;
-class GPSManager;
 class JoystickManager;
 class FollowMe;
 class LinkManager;
@@ -57,9 +56,6 @@ public:
     QGCCorePlugin*              corePlugin              () { return _corePlugin; }
     SettingsManager*            settingsManager         () { return _settingsManager; }
     ADSBVehicleManager*         adsbVehicleManager      () { return _adsbVehicleManager; }
-#ifndef NO_SERIAL_LINK
-    GPSManager*                 gpsManager              () { return _gpsManager; }
-#endif
 #ifndef QGC_AIRLINK_DISABLED
     AirLinkManager*              airlinkManager          () { return _airlinkManager; }
 #endif
@@ -72,9 +68,6 @@ private:
     void _scanAndLoadPlugins(QGCApplication *app);
 
     FirmwarePluginManager*      _firmwarePluginManager  = nullptr;
-#ifndef NO_SERIAL_LINK
-    GPSManager*                 _gpsManager             = nullptr;
-#endif
     JoystickManager*            _joystickManager        = nullptr;
     LinkManager*                _linkManager            = nullptr;
     MAVLinkProtocol*            _mavlinkProtocol        = nullptr;
