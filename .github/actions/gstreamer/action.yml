@@ -4,7 +4,7 @@ inputs:
   gst_version:
     description: Version of GStreamer to Build
     required: true
-    default: 1.22.11
+    default: 1.24.7
   build_type:
     description: Build Type "release" or "debug"
     required: true
@@ -25,6 +25,10 @@ runs:
       run: git clone --depth 1 --branch ${{ inputs.gst_version }} https://github.com/GStreamer/gstreamer.git
       shell: bash
 
+    - name: Install Dependencies
+      run: python3 -m pip install --user ninja meson
+      shell: bash
+
     - name: Configure GStreamer
       working-directory: ${{ inputs.working_directory }}/gstreamer
       run: meson setup
@@ -34,7 +38,7 @@ runs:
         --wrap-mode=forcefallback
         --strip
         -Dauto_features=disabled
-        -Dgst-full-libraries=gstreamer,base,controller,net,app,audio,fft,pbutils,riff,rtp,rtsp,tag,video,gl,codecparsers,photography
+        -Dgst-full-libraries=gstreamer,base,video,gl
         -Dgpl=enabled
         -Dlibav=enabled
         -Dorc=enabled
@@ -87,5 +91,5 @@ runs:
 
     - name: Setup Environment
       working-directory: ${{ runner.temp }}/gstreamer
-      run: echo "PKG_CONFIG_PATH=${{ runner.temp }}/gst/lib/x86_64-linux-gnu/pkgconfig:${{ env.PKG_CONFIG_PATH }}" >> "$GITHUB_ENV"
+      run: echo "PKG_CONFIG_PATH=${{ runner.temp }}/gst/lib/x86_64-linux-gnu/pkgconfig:${{ runner.temp }}/gst/lib/x86_64-linux-gnu/gstreamer-1.0/pkgconfig:${{ env.PKG_CONFIG_PATH }}" >> "$GITHUB_ENV"
       shell: bash
