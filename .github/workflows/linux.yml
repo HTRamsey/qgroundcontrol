@@ -54,7 +54,7 @@ jobs:
         run: |
           chmod a+x ./tools/setup/install-dependencies-debian.sh
           sudo ./tools/setup/install-dependencies-debian.sh
-          python3 -m pip install --user ninja cmake
+          python3 -m pip install --user ninja cmake meson
 
       - uses: lukka/get-cmake@latest
 
@@ -103,8 +103,8 @@ jobs:
           modules: qtcharts qtlocation qtpositioning qtspeech qt5compat qtmultimedia qtserialport qtimageformats qtshadertools qtconnectivity qtquick3d qtsensors
           cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
 
-      # - name: Build GStreamer
-      #   uses: ./.github/actions/gstreamer
+      - name: Build GStreamer
+        uses: ./.github/actions/gstreamer
 
       - run: mkdir ${{ runner.temp }}/shadow_build_dir
 
