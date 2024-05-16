@@ -4,7 +4,7 @@ inputs:
   gst_version:
     description: Version of GStreamer to Build
     required: true
-    default: 1.22.11
+    default: 1.24.3
   build_type:
     description: Build Type "release" or "debug"
     required: true
