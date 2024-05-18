@@ -1,3 +1,14 @@
+if(LINUX)
+	set(GST_FULL_STATIC ON)
+endif()
+
+if(GST_FULL_STATIC)
+	find_package(PkgConfig)
+	pkg_check_modules(GST IMPORTED_TARGET gstreamer-full-1.0)
+	target_link_libraries(qmlglsink PUBLIC PkgConfig::GST)
+	return()
+endif()
+
 if(ANDROID)
 	set(GST_STATIC_BUILD ON)
 else()
