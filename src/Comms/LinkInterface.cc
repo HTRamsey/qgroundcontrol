@@ -20,7 +20,7 @@ QGC_LOGGING_CATEGORY(LinkInterfaceLog, "LinkInterfaceLog")
 static_assert(LinkManager::invalidMavlinkChannel() == std::numeric_limits<uint8_t>::max(), "update LinkInterface::_mavlinkChannel");
 
 LinkInterface::LinkInterface(SharedLinkConfigurationPtr& config, bool isPX4Flow)
-    : QThread   (0)
+    : QObject   (0)
     , _config   (config)
     , _isPX4Flow(isPX4Flow)
 {

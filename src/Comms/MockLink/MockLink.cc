@@ -106,8 +106,6 @@ MockLink::MockLink(SharedLinkConfigurationPtr& config)
 
     _mockLinkFTP = new MockLinkFTP(_vehicleSystemId, _vehicleComponentId, this);
 
-    moveToThread(this);
-
     _loadParams();
 
     _adsbVehicleCoordinate = QGeoCoordinate(_vehicleLatitude, _vehicleLongitude).atDistanceAndAzimuth(1000, _adsbAngle);
@@ -133,7 +131,30 @@ bool MockLink::_connect(void)
         mavlinkStatus->flags &= ~MAVLINK_STATUS_FLAG_OUT_MAVLINK1;
         mavlink_status_t* auxStatus = mavlink_get_channel_status(mavlinkAuxChannel());
         auxStatus->flags &= ~MAVLINK_STATUS_FLAG_OUT_MAVLINK1;
-        start();
+        QTimer*  timer1HzTasks = new QTimer(this);
+        QTimer*  timer10HzTasks = new QTimer(this);
+        QTimer*  timer500HzTasks = new QTimer(this);
+        QTimer*  timerStatusText = new QTimer(this);
+
+        QObject::connect(timer1HzTasks,   &QTimer::timeout, this, &MockLink::_run1HzTasks);
+        QObject::connect(timer10HzTasks,  &QTimer::timeout, this, &MockLink::_run10HzTasks);
+        QObject::connect(timer500HzTasks, &QTimer::timeout, this, &MockLink::_run500HzTasks);
+        QObject::connect(timerStatusText, &QTimer::timeout, this, &MockLink::_sendStatusTextMessages);
+
+        timer1HzTasks->start(1000);
+        timer10HzTasks->start(100);
+        timer500HzTasks->start(2);
+
+        // Wait a little bit for the ui to finish loading up before sending out status text messages
+        if (_sendStatusText) {
+            timerStatusText->setSingleShot(true);
+            timerStatusText->start(10000);
+        }
+
+        // Send first set right away
+        _run1HzTasks();
+        _run10HzTasks();
+        _run500HzTasks();
         emit connected();
     }
 
@@ -187,49 +208,44 @@ bool MockLink::mavlinkAuxChannelIsSet(void) const
 
 void MockLink::disconnect(void)
 {
+    //QObject::disconnect(&timer1HzTasks,  &QTimer::timeout, this, &MockLink::_run1HzTasks);
+    // QObject::disconnect(&timer10HzTasks, &QTimer::timeout, this, &MockLink::_run10HzTasks);
+    //QObject::disconnect(&timer500HzTasks, &QTimer::timeout, this, &MockLink::_run500HzTasks);
+
+    _missionItemHandler.shutdown();
     if (_connected) {
         _connected = false;
-        quit();
-        wait();
         emit disconnected();
     }
 }
 
-void MockLink::run(void)
-{
-    QTimer  timer1HzTasks;
-    QTimer  timer10HzTasks;
-    QTimer  timer500HzTasks;
-    QTimer  timerStatusText;
+// void MockLink::run(void)
+// {
+//     QTimer  timer1HzTasks;
+//     QTimer  timer10HzTasks;
+//     QTimer  timer500HzTasks;
+//     QTimer  timerStatusText;
 
-    QObject::connect(&timer1HzTasks,   &QTimer::timeout, this, &MockLink::_run1HzTasks);
-    QObject::connect(&timer10HzTasks,  &QTimer::timeout, this, &MockLink::_run10HzTasks);
-    QObject::connect(&timer500HzTasks, &QTimer::timeout, this, &MockLink::_run500HzTasks);
-    QObject::connect(&timerStatusText, &QTimer::timeout, this, &MockLink::_sendStatusTextMessages);
+//     QObject::connect(&timer1HzTasks,   &QTimer::timeout, this, &MockLink::_run1HzTasks);
+//     QObject::connect(&timer10HzTasks,  &QTimer::timeout, this, &MockLink::_run10HzTasks);
+//     QObject::connect(&timer500HzTasks, &QTimer::timeout, this, &MockLink::_run500HzTasks);
+//     QObject::connect(&timerStatusText, &QTimer::timeout, this, &MockLink::_sendStatusTextMessages);
 
-    timer1HzTasks.start(1000);
-    timer10HzTasks.start(100);
-    timer500HzTasks.start(2);
+//     timer1HzTasks.start(1000);
+//     timer10HzTasks.start(100);
+//     timer500HzTasks.start(2);
 
-    // Wait a little bit for the ui to finish loading up before sending out status text messages
-    if (_sendStatusText) {
-        timerStatusText.setSingleShot(true);
-        timerStatusText.start(10000);
-    }
+//     // Wait a little bit for the ui to finish loading up before sending out status text messages
+//     if (_sendStatusText) {
+//         timerStatusText.setSingleShot(true);
+//         timerStatusText.start(10000);
+//     }
 
-    // Send first set right away
-    _run1HzTasks();
-    _run10HzTasks();
-    _run500HzTasks();
-
-    exec();
-
-    QObject::disconnect(&timer1HzTasks,  &QTimer::timeout, this, &MockLink::_run1HzTasks);
-    QObject::disconnect(&timer10HzTasks, &QTimer::timeout, this, &MockLink::_run10HzTasks);
-    QObject::disconnect(&timer500HzTasks, &QTimer::timeout, this, &MockLink::_run500HzTasks);
-
-    _missionItemHandler.shutdown();
-}
+//     // Send first set right away
+//     _run1HzTasks();
+//     _run10HzTasks();
+//     _run500HzTasks();
+// }
 
 void MockLink::_run1HzTasks(void)
 {

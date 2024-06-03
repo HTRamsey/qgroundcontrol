@@ -112,9 +112,6 @@ private:
     void    _resetPlaybackToBeginning   (void);
     void    _signalCurrentLogTimeSecs   (void);
 
-    // QThread overrides
-    void run(void) override;
-
     LogReplayLinkConfiguration* _logReplayConfig;
 
     bool    _connected;

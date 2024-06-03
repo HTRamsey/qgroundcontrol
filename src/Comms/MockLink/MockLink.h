@@ -208,8 +208,6 @@ private:
     uint8_t mavlinkAuxChannel           (void) const;
     bool mavlinkAuxChannelIsSet         (void) const;
 
-    // QThread override
-    void run(void) final;
 
     // MockLink methods
     void _sendHeartBeat                 (void);

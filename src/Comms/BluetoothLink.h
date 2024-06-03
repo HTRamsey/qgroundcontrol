@@ -118,9 +118,6 @@ public:
     BluetoothLink(SharedLinkConfigurationPtr& config);
     virtual ~BluetoothLink();
 
-    // Overrides from QThread
-    void run(void) override;
-
     // LinkConfiguration overrides
     bool isConnected(void) const override;
     void disconnect (void) override;

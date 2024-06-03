@@ -101,9 +101,6 @@ public:
     bool isConnected(void) const override;
     void disconnect (void) override;
 
-    // QThread overrides
-    void run(void) override;
-
 public slots:
     void readBytes(void);
 
@@ -122,7 +119,6 @@ private:
     void _deregisterZeroconf(void);
     void _writeDataGram     (const QByteArray data, const UDPCLient* target);
 
-    bool                _running;
     QUdpSocket*         _socket;
     UDPConfiguration*   _udpConfig;
     bool                _connectState;

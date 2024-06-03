@@ -63,7 +63,6 @@ static bool contains_target(const QList<UDPCLient*> list, const QHostAddress& ad
 
 UDPLink::UDPLink(SharedLinkConfigurationPtr& config)
     : LinkInterface     (config)
-    , _running          (false)
     , _socket           (nullptr)
     , _udpConfig        (qobject_cast<UDPConfiguration*>(config.get()))
     , _connectState     (false)
@@ -79,32 +78,18 @@ UDPLink::UDPLink(SharedLinkConfigurationPtr& config)
         QHostAddress &address = allAddresses[i];
         _localAddresses.append(QHostAddress(address));
     }
-    moveToThread(this);
 }
 
 UDPLink::~UDPLink()
 {
-    disconnect();
-    // Tell the thread to exit
-    _running = false;
-    // Clear client list
-    qDeleteAll(_sessionTargets);
-    _sessionTargets.clear();
-    quit();
-    // Wait for it to exit
-    wait();
-    this->deleteLater();
-}
-
-void UDPLink::run()
-{
-    if (_hardwareConnect()) {
-        exec();
-    }
     if (_socket) {
         _deregisterZeroconf();
         _socket->close();
     }
+    disconnect();
+    // Clear client list
+    qDeleteAll(_sessionTargets);
+    _sessionTargets.clear();
 }
 
 bool UDPLink::_isIpLocal(const QHostAddress& add)
@@ -212,9 +197,6 @@ void UDPLink::readBytes()
 
 void UDPLink::disconnect(void)
 {
-    _running = false;
-    quit();
-    wait();
     if (_socket) {
         // This prevents stale signal from calling the link after it has been deleted
         QObject::disconnect(_socket, &QUdpSocket::readyRead, this, &UDPLink::readBytes);
@@ -228,13 +210,7 @@ void UDPLink::disconnect(void)
 
 bool UDPLink::_connect(void)
 {
-    if (this->isRunning() || _running) {
-        _running = false;
-        quit();
-        wait();
-    }
-    _running = true;
-    start(NormalPriority);
+    _hardwareConnect();
     return true;
 }
 

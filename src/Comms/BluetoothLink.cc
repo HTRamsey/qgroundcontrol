@@ -40,11 +40,6 @@ BluetoothLink::~BluetoothLink()
 #endif
 }
 
-void BluetoothLink::run()
-{
-
-}
-
 void BluetoothLink::_writeBytes(const QByteArray bytes)
 {
     if (_targetSocket) {

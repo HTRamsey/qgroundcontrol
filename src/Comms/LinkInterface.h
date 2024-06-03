@@ -11,7 +11,6 @@
 
 #include "LinkConfiguration.h"
 
-#include <QtCore/QThread>
 #include <QtCore/QLoggingCategory>
 
 class LinkManager;
@@ -22,7 +21,7 @@ Q_DECLARE_LOGGING_CATEGORY(LinkInterfaceLog)
 * @brief The link interface defines the interface for all links used to communicate
 * with the ground station application.
 **/
-class LinkInterface : public QThread
+class LinkInterface : public QObject
 {
     Q_OBJECT
 

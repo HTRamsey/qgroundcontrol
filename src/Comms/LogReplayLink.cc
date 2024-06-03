@@ -85,15 +85,11 @@ LogReplayLink::LogReplayLink(SharedLinkConfigurationPtr& config)
     }
 
     _errorTitle = tr("Log Replay Error");
-    
-    _readTickTimer.moveToThread(this);
-    
+        
     QObject::connect(&_readTickTimer, &QTimer::timeout,                 this, &LogReplayLink::_readNextLogEntry);
     QObject::connect(this, &LogReplayLink::_playOnThread,               this, &LogReplayLink::_play);
     QObject::connect(this, &LogReplayLink::_pauseOnThread,              this, &LogReplayLink::_pause);
     QObject::connect(this, &LogReplayLink::_setPlaybackSpeedOnThread,   this, &LogReplayLink::_setPlaybackSpeed);
-    
-    moveToThread(this);
 }
 
 LogReplayLink::~LogReplayLink(void)
@@ -109,29 +105,8 @@ bool LogReplayLink::_connect(void)
         return false;
     }
 
-    if (isRunning()) {
-        quit();
-        wait();
-    }
-    start(HighPriority);
-    return true;
-}
-
-void LogReplayLink::disconnect(void)
-{
-    if (_connected) {
-        quit();
-        wait();
-        _connected = false;
-        emit disconnected();
-    }
-}
-
-void LogReplayLink::run(void)
-{
-    // Load the log file
     if (!_loadLogFile()) {
-        return;
+        return false;
     }
     
     _connected = true;
@@ -140,10 +115,17 @@ void LogReplayLink::run(void)
     // Start playback
     _play();
 
-    // Run normal event loop until exit
-    exec();
-    
+    return true;
+}
+
+void LogReplayLink::disconnect(void)
+{
     _readTickTimer.stop();
+
+    if (_connected) {
+        _connected = false;
+        emit disconnected();
+    }
 }
 
 void LogReplayLink::_replayError(const QString& errorMsg)
