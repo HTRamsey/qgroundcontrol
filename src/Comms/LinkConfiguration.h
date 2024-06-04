@@ -21,7 +21,7 @@ class LinkConfiguration : public QObject
     Q_MOC_INCLUDE("LinkInterface.h")
 
 public:
-    LinkConfiguration(const QString& name);
+    LinkConfiguration(const QString &name, QObject* parent = nullptr);
     LinkConfiguration(LinkConfiguration* copy);
     virtual ~LinkConfiguration() {}
 

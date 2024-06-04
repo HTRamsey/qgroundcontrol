@@ -24,7 +24,6 @@ qt_add_library(Comms STATIC
 target_link_libraries(Comms
 	PRIVATE
 		Qt6::Qml
-		Qt6::Test
 		AirLink
 		MockLink
 		Settings
