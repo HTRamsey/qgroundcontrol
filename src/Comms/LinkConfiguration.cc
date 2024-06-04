@@ -26,8 +26,9 @@
 
 #define LINK_SETTING_ROOT "LinkConfigurations"
 
-LinkConfiguration::LinkConfiguration(const QString& name)
-    : _name         (name)
+LinkConfiguration::LinkConfiguration(const QString& name, QObject* parent)
+    : QObject(parent)
+    , _name         (name)
     , _dynamic      (false)
     , _autoConnect  (false)
     , _highLatency  (false)
@@ -37,11 +38,7 @@ LinkConfiguration::LinkConfiguration(const QString& name)
 
 LinkConfiguration::LinkConfiguration(LinkConfiguration* copy)
 {
-    _link       = copy->_link;
-    _name       = copy->name();
-    _dynamic    = copy->isDynamic();
-    _autoConnect= copy->isAutoConnect();
-    _highLatency= copy->isHighLatency();
+    copyFrom(copy);
     Q_ASSERT(!_name.isEmpty());
 }
 

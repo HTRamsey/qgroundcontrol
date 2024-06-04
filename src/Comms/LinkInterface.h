@@ -69,7 +69,7 @@ signals:
 
 protected:
     // Links are only created by LinkManager so constructor is not public
-    LinkInterface(SharedLinkConfigurationPtr& config, bool isPX4Flow = false);
+    LinkInterface(SharedLinkConfigurationPtr& config, bool isPX4Flow = false, QObject* parent = nullptr);
 
     void _connectionRemoved(void);
 
