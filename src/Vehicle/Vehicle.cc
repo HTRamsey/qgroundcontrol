@@ -647,6 +647,45 @@ void Vehicle::_mavlinkMessageReceived(LinkInterface* link, mavlink_message_t mes
         _handleMessageInterval(message);
         break;
     }
+    case MAVLINK_MSG_ID_DEBUG:
+    {
+        mavlink_debug_t data;
+        mavlink_msg_debug_decode(&message, &data);
+        (void) _debugMap.insert(data.ind, data.value);
+        break;
+    }
+    case MAVLINK_MSG_ID_DEBUG_VECT:
+    {
+        mavlink_debug_vect_t data;
+        mavlink_msg_debug_vect_decode(&message, &data);
+        const QVector3D vector(data.x, data.y, data.z);
+        const QString name = QString::fromLatin1(data.name, 10);
+        (void) _debugVectMap.insert(name, vector);
+        break;
+    }
+    case MAVLINK_MSG_ID_NAMED_VALUE_FLOAT:
+    {
+        mavlink_named_value_float_t data;
+        mavlink_msg_named_value_float_decode(&message, &data);
+        const float value = data.value;
+        const QString name = QString::fromLatin1(data.name, 10);
+        (void) _namedValueFloatHash.insert(name, value);
+        break;
+    }
+    case MAVLINK_MSG_ID_NAMED_VALUE_INT:
+    {
+        mavlink_named_value_int_t data;
+        mavlink_msg_named_value_int_decode(&message, &data);
+        const int32_t value = data.value;
+        const QString name = QString::fromLatin1(data.name, 10);
+        (void) _namedValueIntHash.insert(name, value);
+        break;
+    }
+    default:
+    {
+        qCDebug(VehicleLog) << Q_FUNC_INFO << "Unsupported Message:" << message.msgid;
+        break;
+    }
     }
 
     // This must be emitted after the vehicle processes the message. This way the vehicle state is up to date when anyone else

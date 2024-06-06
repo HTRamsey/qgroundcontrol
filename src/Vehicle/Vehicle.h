@@ -1288,6 +1288,11 @@ private:
     QGeoCoordinate              _altitudeAboveTerrLastCoord;
     float                       _altitudeAboveTerrLastRelAlt = qQNaN();
 
+    QMap<uint8_t, float> _debugMap;
+    QHash<QString, QVector3D> _debugVectMap;
+    QHash<QString, float> _namedValueFloatHash;
+    QHash<QString, float> _namedValueIntHash;
+
 public:
     int32_t getMessageRate(uint8_t compId, uint16_t msgId);
     void setMessageRate(uint8_t compId, uint16_t msgId, int32_t rate);
