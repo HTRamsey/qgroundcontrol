@@ -10,4 +10,7 @@
     </Licenses>
     <Default>true</Default>
     <UpdateText>Update!</UpdateText>
+    <Translations>
+        <Translation>de.qm</Translation>
+    </Translations>
 </Package>

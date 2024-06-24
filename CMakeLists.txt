@@ -180,6 +180,9 @@ qt_policy(
     SET QTP0002 NEW
 )
 
+get_target_property(_qmake_executable Qt::qmake IMPORTED_LOCATION)
+get_filename_component(_qt_bin_dir "${_qmake_executable}" DIRECTORY)
+
 #######################################################
 #                QGroundControl Options
 #######################################################

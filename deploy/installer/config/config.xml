@@ -2,6 +2,7 @@
 <Installer>
     <Name>QGroundControl</Name>
     <Version>5.0</Version>
+    <ReleaseDate>2024-01-01</ReleaseDate>
     <Title>QGroundControl Installer</Title>
     <Publisher>Dronecode</Publisher>
     <ProductUrl>http://qgroundcontrol.com/</ProductUrl>
@@ -14,4 +15,18 @@
     <AdminTargetDir>@RootDir@/QGC</AdminTargetDir>
     <MaintenanceToolName>QGC Updater Tool</MaintenanceToolName>
     <ControlScript>controller.qs</ControlScript>
+    <RepositoryCategories>
+        <RemoteRepositories>
+            <Displayname>Category 1</Displayname>
+            <Preselected>true</Preselected>
+            <Tooltip>Tooltip for category 1</Tooltip>
+            <Repository>
+                <Url>http://www.example.com/packages</Url>
+                <Enabled>0</Enabled>
+                <Username>user</Username>
+                <Password>password</Password>
+                <DisplayName>Example repository</DisplayName>
+            </Repository>
+        </RemoteRepositories>
+    </RepositoryCategories>
 </Installer>
