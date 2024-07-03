@@ -3,13 +3,14 @@ if(ANDROID)
 else()
 	set(GST_STATIC_BUILD OFF)
 endif()
+cmake_print_variables(GST_STATIC_BUILD)
 
 if(DEFINED ENV{GST_VERSION})
 	set(GST_TARGET_VERSION $ENV{GST_VERSION})
 elseif(LINUX)
 	set(GST_TARGET_VERSION 1.16)
 else()
-	set(GST_TARGET_VERSION 1.22.11)
+	set(GST_TARGET_VERSION 1.22.12)
 endif()
 # TODO: Download using ${GST_gstreamer-1.0_VERSION}
 
@@ -102,10 +103,12 @@ if(PkgConfig_FOUND)
 			set(ENV{PKG_CONFIG_PATH} "${GSTREAMER_ROOT}/lib/pkgconfig:${GSTREAMER_ROOT}/lib/gstreamer-1.0/pkgconfig:$ENV{PKG_CONFIG_PATH}")
 			list(APPEND PKG_CONFIG_ARGN
 				--define-prefix
-				--define-variable=prefix=${GSTREAMER_ROOT}
+                --define-variable=prefix=${GSTREAMER_ROOT}
+				--define-variable=exec_prefix=${GSTREAMER_ROOT}
 				--define-variable=libdir=${GSTREAMER_ROOT}/lib
 				--define-variable=includedir=${GSTREAMER_ROOT}/include
 			)
+            cmake_print_variables(PKG_CONFIG_ARGN)
 			pkg_check_modules(GST
 				IMPORTED_TARGET
 				NO_CMAKE_ENVIRONMENT_PATH
@@ -125,17 +128,18 @@ if(PkgConfig_FOUND)
 
 		if(TARGET PkgConfig::GST)
 			target_link_libraries(qmlglsink PUBLIC PkgConfig::GST)
-			target_include_directories(qmlglsink PUBLIC ${GSTREAMER_ROOT}/include/gstreamer-1.0)
+			# target_include_directories(qmlglsink PUBLIC ${GSTREAMER_ROOT}/include/gstreamer-1.0)
 			message(STATUS "GStreamer version: ${GST_gstreamer-1.0_VERSION}")
 		    message(STATUS "GStreamer prefix: ${GST_gstreamer-1.0_PREFIX}")
 		    message(STATUS "GStreamer include dir: ${GST_gstreamer-1.0_INCLUDEDIR}")
 		    message(STATUS "GStreamer libdir: ${GST_gstreamer-1.0_LIBDIR}")
+            # cmake_print_properties(TARGETS PkgConfig::GST PROPERTIES INTERFACE_LINK_DIRECTORIES)
 			if(GST_STATIC_BUILD)
-		        target_link_libraries(qmlglsink PUBLIC ${GST_STATIC_LINK_LIBRARIES})
-	    		target_link_directories(qmlglsink PUBLIC ${GST_STATIC_LIBRARY_DIRS})
-		        target_link_options(qmlglsink PUBLIC ${GST_STATIC_LDFLAGS} ${GST_STATIC_LDFLAGS_OTHER})
-		        target_compile_options(qmlglsink PUBLIC ${GST_STATIC_CFLAGS} ${GST_STATIC_CFLAGS_OTHER})
-	    		target_include_directories(qmlglsink PUBLIC ${GST_STATIC_INCLUDE_DIRS})
+		        # target_link_libraries(qmlglsink PUBLIC ${GST_STATIC_LINK_LIBRARIES})
+	    		# target_link_directories(qmlglsink PUBLIC ${GST_STATIC_LIBRARY_DIRS})
+		        # target_link_options(qmlglsink PUBLIC ${GST_STATIC_LDFLAGS} ${GST_STATIC_LDFLAGS_OTHER})
+		        # target_compile_options(qmlglsink PUBLIC ${GST_STATIC_CFLAGS} ${GST_STATIC_CFLAGS_OTHER})
+	    		# target_include_directories(qmlglsink PUBLIC ${GST_STATIC_INCLUDE_DIRS})
 	    		if(ANDROID)
 					target_link_options(PkgConfig::GST INTERFACE "-Wl,-Bsymbolic")
 				endif()

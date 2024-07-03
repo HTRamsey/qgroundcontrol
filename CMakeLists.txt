@@ -31,7 +31,6 @@ endif()
 include(FeatureSummary)
 include(FetchContent)
 include(ExternalProject)
-include(GNUInstallDirs)
 include(CMakeDependentOption)
 include(CMakePrintHelpers)
 
@@ -78,7 +77,7 @@ endif()
 #######################################################
 
 project(QGroundControl
-    VERSION ${QGC_APP_VERSION}
+    VERSION 1.0
     DESCRIPTION ${QGC_APP_DESCRIPTION}
     HOMEPAGE_URL "https://qgroundcontrol.com/"
     LANGUAGES C CXX
@@ -96,6 +95,8 @@ if(IOS OR ANDROID)
     set(MOBILE TRUE)
     add_compile_definitions(__mobile__)
 endif()
+
+include(GNUInstallDirs)
 
 #######################################################
 #               Qt6 Configuration

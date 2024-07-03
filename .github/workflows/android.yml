@@ -163,20 +163,21 @@ jobs:
               -DQT_ANDROID_SIGN_APK=${{ github.ref == 'refs/heads/master' && github.event_name != 'pull_request' && 'ON' || 'OFF' }}
               -DQT_DEBUG_FIND_PACKAGE=ON
               -DQGC_STABLE_BUILD=${{ github.ref_type == 'tag' || contains(github.ref, 'Stable') && 'ON' || 'OFF' }}
+               --log-level=VERBOSE
 
       - name: Build
         working-directory: ${{ runner.temp }}/shadow_build_dir
         run: cmake --build . --target all --config ${{ matrix.BuildType }}
 
-      - name: Prepare APK
-        working-directory: ${{ runner.temp }}/shadow_build_dir
-        run: cp ./android-build/*.apk ./${{ env.ARTIFACT }}
+      # - name: Prepare APK
+      #   working-directory: ${{ runner.temp }}/shadow_build_dir
+      #   run: cp ./android-build/*.apk ./${{ env.ARTIFACT }}
 
-      - name: Upload Build File
-        uses: ./.github/actions/upload
-        if: matrix.BuildType == 'Release'
-        with:
-          artifact_name: ${{ env.ARTIFACT }}
-          aws_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          source: ''
+      # - name: Upload Build File
+      #   uses: ./.github/actions/upload
+      #   if: matrix.BuildType == 'Release'
+      #   with:
+      #     artifact_name: ${{ env.ARTIFACT }}
+      #     aws_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      #     aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      #     source: ''
