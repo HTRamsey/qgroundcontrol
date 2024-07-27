@@ -45,6 +45,12 @@ void AppMessages::installHandler()
 {
     old_handler = qInstallMessageHandler(msgHandler);
 
+    /*qSetMessagePattern("%{category} %{type}: %{message} (%{file}:%{line})\n");
+    #ifndef Q_OS_ANDROID
+        (void) qInstallMessageHandler(myMessageHandler);
+    #endif
+    qFormatLogMessage*/
+
     // Force creation of debug model on installing thread
     Q_UNUSED(*debug_model);
 }

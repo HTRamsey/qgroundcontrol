@@ -136,6 +136,10 @@ int main(int argc, char *argv[])
 #endif
 
 #ifdef Q_OS_WIN
+    if (!qEnvironmentVariableIsSet("QT_WIN_DEBUG_CONSOLE")) {
+        qputenv("QT_WIN_DEBUG_CONSOLE", "attach"); // new
+    }
+
     // Set our own OpenGL buglist
     // qputenv("QT_OPENGL_BUGLIST", ":/opengl/resources/opengl/buglist.json");
 
@@ -225,3 +229,40 @@ int main(int argc, char *argv[])
 
     return exitCode;
 }
+
+// qputenv("QT_DISABLE_HW_TEXTURES_CONVERSION", "1");
+// qputenv("QT_FFMPEG_DECODING_HW_DEVICE_TYPES", ",");
+// qputenv("QT_FFMPEG_DEBUG", "1");
+// qputenv("QSG_INFO", "1");
+// qputenv("QSG_RENDERER_DEBUG", "render");
+// qputenv("QSG_ATLAS_OVERLAY", "1");
+// qputenv("QSG_RENDER_TIMING", "1");
+// qputenv("QSG_VISUALIZE", "");
+
+// QOpenGLDebugLogger *logger = new QOpenGLDebugLogger(this);
+// logger->initialize();
+// connect(logger, &QOpenGLDebugLogger::messageLogged, receiver, &LogHandler::handleLoggedMessage);
+// logger->startLogging();
+
+// #if defined(Q_OS_ANDROID)
+//     qputenv("QT_MEDIA_BACKEND", "android");
+//     QQuickWindow::setGraphicsApi(QSGRendererInterface::VulkanRhi);
+//     qCDebug(AppLog) << config.deviceExtensions();
+// #elif defined(Q_OS_LINUX)
+//     qputenv("QT_MEDIA_BACKEND", "gstreamer");
+//     QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGLRhi);
+// #elif defined(Q_OS_WINDOWS)
+//     qputenv("QT_MEDIA_BACKEND", "ffmpeg");
+//     // qputenv("QT_MEDIA_BACKEND", "windows");
+//     // QQuickWindow::setGraphicsApi(QSGRendererInterface::Direct3D12);
+// #endif
+
+// #if QT_DEBUG
+//     QQuickGraphicsDevice device = rootWindow()->graphicsDevice();
+//     QQuickGraphicsConfiguration config = rootWindow()->graphicsConfiguration();
+//     config.setDebugLayer(true);
+//     config.setDebugMarkers(true);
+//     config.setTimestamps(false);
+//     config.setPreferSoftwareDevice(true);
+//     rootWindow()->setGraphicsConfiguration(config);
+// #endif
