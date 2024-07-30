@@ -1115,7 +1115,6 @@ void FirmwarePlugin::sendGCSMotionReport(Vehicle* vehicle, FollowMe::GCSMotionRe
 {
     WeakLinkInterfacePtr weakLink = vehicle->vehicleLinkManager()->primaryLink();
     if (!weakLink.expired()) {
-        MAVLinkProtocol*        mavlinkProtocol = qgcApp()->toolbox()->mavlinkProtocol();
         mavlink_follow_target_t follow_target   = {};
         SharedLinkInterfacePtr  sharedLink      = weakLink.lock();
 
@@ -1130,8 +1129,8 @@ void FirmwarePlugin::sendGCSMotionReport(Vehicle* vehicle, FollowMe::GCSMotionRe
         follow_target.vel[1] =              static_cast<float>(motionReport.vyMetersPerSec);
 
         mavlink_message_t message;
-        mavlink_msg_follow_target_encode_chan(static_cast<uint8_t>(mavlinkProtocol->getSystemId()),
-                                              static_cast<uint8_t>(mavlinkProtocol->getComponentId()),
+        mavlink_msg_follow_target_encode_chan(static_cast<uint8_t>(MAVLinkProtocol::instance()->getSystemId()),
+                                              static_cast<uint8_t>(MAVLinkProtocol::instance()->getComponentId()),
                                               sharedLink->mavlinkChannel(),
                                               &message,
                                               &follow_target);

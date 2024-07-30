@@ -27,6 +27,7 @@
 #include <QtQml/QQmlContext>
 #include <QtQml/QQmlApplicationEngine>
 
+#include "Comms/MAVLinkProtocol.h"
 #include "QGCConfig.h"
 #include "QGCApplication.h"
 #include "CmdLineOptParser.h"
@@ -133,6 +134,11 @@ static QObject* qgroundcontrolQmlGlobalSingletonFactory(QQmlEngine*, QJSEngine*)
 static QObject* shapeFileHelperSingletonFactory(QQmlEngine*, QJSEngine*)
 {
     return new ShapeFileHelper;
+}
+
+static QObject *mavlinkSingletonFactory(QQmlEngine*, QJSEngine*)
+{
+    return new QGCMAVLink();
 }
 
 QGCApplication::QGCApplication(int &argc, char* argv[], bool unitTesting)
@@ -386,6 +392,8 @@ void QGCApplication::init()
 
     qmlRegisterSingletonType<ShapeFileHelper>("QGroundControl.ShapeFileHelper", 1, 0, "ShapeFileHelper", shapeFileHelperSingletonFactory);
 
+    qmlRegisterSingletonType<QGCMAVLink>("MAVLink", 1, 0, "MAVLink", mavlinkSingletonFactory);
+
 
     // Although this should really be in _initForNormalAppBoot putting it here allowws us to create unit tests which pop up more easily
     if(QFontDatabase::addApplicationFont(":/fonts/opensans") < 0) {
@@ -458,7 +466,7 @@ void QGCApplication::_initForNormalAppBoot()
     #endif
 
     // Now that main window is up check for lost log files
-    connect(this, &QGCApplication::checkForLostLogFiles, _toolbox->mavlinkProtocol(), &MAVLinkProtocol::checkForLostLogFiles);
+    connect(this, &QGCApplication::checkForLostLogFiles, MAVLinkProtocol::instance(), &MAVLinkProtocol::checkForLostLogFiles);
     emit checkForLostLogFiles();
 
     // Load known link configurations

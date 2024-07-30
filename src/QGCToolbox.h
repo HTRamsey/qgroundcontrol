@@ -18,7 +18,6 @@ class GPSManager;
 class JoystickManager;
 class FollowMe;
 class LinkManager;
-class MAVLinkProtocol;
 class MissionCommandTree;
 class MultiVehicleManager;
 class QGCMapEngineManager;
@@ -46,7 +45,6 @@ public:
     FirmwarePluginManager*      firmwarePluginManager   () { return _firmwarePluginManager; }
     JoystickManager*            joystickManager         () { return _joystickManager; }
     LinkManager*                linkManager             () { return _linkManager; }
-    MAVLinkProtocol*            mavlinkProtocol         () { return _mavlinkProtocol; }
     MissionCommandTree*         missionCommandTree      () { return _missionCommandTree; }
     MultiVehicleManager*        multiVehicleManager     () { return _multiVehicleManager; }
     QGCMapEngineManager*        mapEngineManager        () { return _mapEngineManager; }
@@ -77,7 +75,6 @@ private:
 #endif
     JoystickManager*            _joystickManager        = nullptr;
     LinkManager*                _linkManager            = nullptr;
-    MAVLinkProtocol*            _mavlinkProtocol        = nullptr;
     MissionCommandTree*         _missionCommandTree     = nullptr;
     MultiVehicleManager*        _multiVehicleManager    = nullptr;
     QGCMapEngineManager*        _mapEngineManager       = nullptr;

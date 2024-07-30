@@ -108,8 +108,8 @@ void PlanManager::_writeMissionCount(void)
         SharedLinkInterfacePtr  sharedLink = weakLink.lock();
 
         mavlink_msg_mission_count_pack_chan(
-            qgcApp()->toolbox()->mavlinkProtocol()->getSystemId(),
-            qgcApp()->toolbox()->mavlinkProtocol()->getComponentId(),
+            MAVLinkProtocol::instance()->getSystemId(),
+            MAVLinkProtocol::instance()->getComponentId(),
             sharedLink->mavlinkChannel(),
             &message,
             _vehicle->id(),
@@ -156,8 +156,8 @@ void PlanManager::_requestList(void)
         mavlink_message_t       message;
         SharedLinkInterfacePtr  sharedLink = weakLink.lock();
 
-        mavlink_msg_mission_request_list_pack_chan(qgcApp()->toolbox()->mavlinkProtocol()->getSystemId(),
-                                                   qgcApp()->toolbox()->mavlinkProtocol()->getComponentId(),
+        mavlink_msg_mission_request_list_pack_chan(MAVLinkProtocol::instance()->getSystemId(),
+                                                   MAVLinkProtocol::instance()->getComponentId(),
                                                    sharedLink->mavlinkChannel(),
                                                    &message,
                                                    _vehicle->id(),
@@ -300,8 +300,8 @@ void PlanManager::_readTransactionComplete(void)
         mavlink_message_t       message;
 
         mavlink_msg_mission_ack_pack_chan(
-            qgcApp()->toolbox()->mavlinkProtocol()->getSystemId(),
-            qgcApp()->toolbox()->mavlinkProtocol()->getComponentId(),
+            MAVLinkProtocol::instance()->getSystemId(),
+            MAVLinkProtocol::instance()->getComponentId(),
             sharedLink->mavlinkChannel(),
             &message,
             _vehicle->id(),
@@ -364,8 +364,8 @@ void PlanManager::_requestNextMissionItem(void)
         SharedLinkInterfacePtr  sharedLink = weakLink.lock();
         mavlink_message_t       message;
 
-        mavlink_msg_mission_request_int_pack_chan(qgcApp()->toolbox()->mavlinkProtocol()->getSystemId(),
-                                                  qgcApp()->toolbox()->mavlinkProtocol()->getComponentId(),
+        mavlink_msg_mission_request_int_pack_chan(MAVLinkProtocol::instance()->getSystemId(),
+                                                  MAVLinkProtocol::instance()->getComponentId(),
                                                   sharedLink->mavlinkChannel(),
                                                   &message,
                                                   _vehicle->id(),
@@ -534,8 +534,8 @@ void PlanManager::_handleMissionRequest(const mavlink_message_t& message)
         mavlink_message_t       messageOut;
         SharedLinkInterfacePtr  sharedLink = weakLink.lock();
 
-        mavlink_msg_mission_item_int_pack_chan(qgcApp()->toolbox()->mavlinkProtocol()->getSystemId(),
-                                               qgcApp()->toolbox()->mavlinkProtocol()->getComponentId(),
+        mavlink_msg_mission_item_int_pack_chan(MAVLinkProtocol::instance()->getSystemId(),
+                                               MAVLinkProtocol::instance()->getComponentId(),
                                                sharedLink->mavlinkChannel(),
                                                &messageOut,
                                                _vehicle->id(),
@@ -885,8 +885,8 @@ void PlanManager::_removeAllWorker(void)
         mavlink_message_t       message;
         SharedLinkInterfacePtr  sharedLink = weakLink.lock();
 
-        mavlink_msg_mission_clear_all_pack_chan(qgcApp()->toolbox()->mavlinkProtocol()->getSystemId(),
-                                                qgcApp()->toolbox()->mavlinkProtocol()->getComponentId(),
+        mavlink_msg_mission_clear_all_pack_chan(MAVLinkProtocol::instance()->getSystemId(),
+                                                MAVLinkProtocol::instance()->getComponentId(),
                                                 sharedLink->mavlinkChannel(),
                                                 &message,
                                                 _vehicle->id(),

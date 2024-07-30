@@ -29,7 +29,6 @@ Q_DECLARE_LOGGING_CATEGORY(LinkManagerLog)
 Q_DECLARE_LOGGING_CATEGORY(LinkManagerVerboseLog)
 
 class QGCApplication;
-class MAVLinkProtocol;
 class UDPConfiguration;
 class AutoConnectSettings;
 class LogReplayLink;
@@ -157,7 +156,6 @@ private:
     uint32_t                            _mavlinkChannelsUsedBitMask;
 
     AutoConnectSettings*                _autoConnectSettings;
-    MAVLinkProtocol*                    _mavlinkProtocol;
 
     QList<SharedLinkInterfacePtr>       _rgLinks;
     QList<SharedLinkConfigurationPtr>   _rgLinkConfigs;

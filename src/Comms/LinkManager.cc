@@ -62,7 +62,6 @@ LinkManager::LinkManager(QGCApplication* app, QGCToolbox* toolbox)
     , _connectionsSuspended(false)
     , _mavlinkChannelsUsedBitMask(1)    // We never use channel 0 to avoid sequence numbering problems
     , _autoConnectSettings(nullptr)
-    , _mavlinkProtocol(nullptr)
     #ifndef NO_SERIAL_LINK
     , _nmeaPort(nullptr)
     #endif
@@ -90,7 +89,6 @@ void LinkManager::setToolbox(QGCToolbox *toolbox)
     QGCTool::setToolbox(toolbox);
 
     _autoConnectSettings = toolbox->settingsManager()->autoConnectSettings();
-    _mavlinkProtocol = _toolbox->mavlinkProtocol();
 
     connect(&_portListTimer, &QTimer::timeout, this, &LinkManager::_updateAutoConnectLinks);
     _portListTimer.start(_autoconnectUpdateTimerMSecs); // timeout must be long enough to get past bootloader on second pass
@@ -156,12 +154,12 @@ bool LinkManager::createConnectedLink(SharedLinkConfigurationPtr& config, bool i
         config->setLink(link);
 
         connect(link.get(), &LinkInterface::communicationError,  _app,                &QGCApplication::criticalMessageBoxOnMainThread);
-        connect(link.get(), &LinkInterface::bytesReceived,       _mavlinkProtocol,    &MAVLinkProtocol::receiveBytes);
-        connect(link.get(), &LinkInterface::bytesSent,           _mavlinkProtocol,    &MAVLinkProtocol::logSentBytes);
+        connect(link.get(), &LinkInterface::bytesReceived,       MAVLinkProtocol::instance(),    &MAVLinkProtocol::receiveBytes);
+        connect(link.get(), &LinkInterface::bytesSent,           MAVLinkProtocol::instance(),    &MAVLinkProtocol::logSentBytes);
         connect(link.get(), &LinkInterface::disconnected,        this,                &LinkManager::_linkDisconnected);
 
-        _mavlinkProtocol->resetMetadataForLink(link.get());
-        _mavlinkProtocol->setVersion(_mavlinkProtocol->getCurrentVersion());
+        MAVLinkProtocol::instance()->resetMetadataForLink(link.get());
+        MAVLinkProtocol::instance()->setVersion(MAVLinkProtocol::instance()->getCurrentVersion());
 
         if (!link->_connect()) {
             link->_freeMavlinkChannel();
@@ -218,8 +216,8 @@ void LinkManager::_linkDisconnected(void)
     }
 
     disconnect(link, &LinkInterface::communicationError,  _app,                &QGCApplication::criticalMessageBoxOnMainThread);
-    disconnect(link, &LinkInterface::bytesReceived,       _mavlinkProtocol,    &MAVLinkProtocol::receiveBytes);
-    disconnect(link, &LinkInterface::bytesSent,           _mavlinkProtocol,    &MAVLinkProtocol::logSentBytes);
+    disconnect(link, &LinkInterface::bytesReceived,       MAVLinkProtocol::instance(),    &MAVLinkProtocol::receiveBytes);
+    disconnect(link, &LinkInterface::bytesSent,           MAVLinkProtocol::instance(),    &MAVLinkProtocol::logSentBytes);
     disconnect(link, &LinkInterface::disconnected,        this,                &LinkManager::_linkDisconnected);
 
     link->_freeMavlinkChannel();

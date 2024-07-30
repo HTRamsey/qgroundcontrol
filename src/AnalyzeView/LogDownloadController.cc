@@ -395,8 +395,8 @@ LogDownloadController::_requestLogData(uint16_t id, uint32_t offset, uint32_t co
             qCDebug(LogDownloadControllerLog) << "Request log data (id:" << id << "offset:" << offset << "size:" << count << "retryCount" << retryCount << ")";
             mavlink_message_t msg;
             mavlink_msg_log_request_data_pack_chan(
-                        qgcApp()->toolbox()->mavlinkProtocol()->getSystemId(),
-                        qgcApp()->toolbox()->mavlinkProtocol()->getComponentId(),
+                        MAVLinkProtocol::instance()->getSystemId(),
+                        MAVLinkProtocol::instance()->getComponentId(),
                         sharedLink->mavlinkChannel(),
                         &msg,
                         _vehicle->id(), _vehicle->defaultComponentId(),
@@ -428,8 +428,8 @@ LogDownloadController::_requestLogList(uint32_t start, uint32_t end)
 
             mavlink_message_t msg;
             mavlink_msg_log_request_list_pack_chan(
-                        qgcApp()->toolbox()->mavlinkProtocol()->getSystemId(),
-                        qgcApp()->toolbox()->mavlinkProtocol()->getComponentId(),
+                        MAVLinkProtocol::instance()->getSystemId(),
+                        MAVLinkProtocol::instance()->getComponentId(),
                         sharedLink->mavlinkChannel(),
                         &msg,
                         _vehicle->id(),
@@ -601,8 +601,8 @@ LogDownloadController::eraseAll(void)
 
             mavlink_message_t msg;
             mavlink_msg_log_erase_pack_chan(
-                        qgcApp()->toolbox()->mavlinkProtocol()->getSystemId(),
-                        qgcApp()->toolbox()->mavlinkProtocol()->getComponentId(),
+                        MAVLinkProtocol::instance()->getSystemId(),
+                        MAVLinkProtocol::instance()->getComponentId(),
                         sharedLink->mavlinkChannel(),
                         &msg,
                         qgcApp()->toolbox()->multiVehicleManager()->activeVehicle()->id(), qgcApp()->toolbox()->multiVehicleManager()->activeVehicle()->defaultComponentId());

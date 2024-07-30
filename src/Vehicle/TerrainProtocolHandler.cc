@@ -145,8 +145,8 @@ void TerrainProtocolHandler::_sendTerrainData(const QGeoCoordinate& swCorner, ui
                 SharedLinkInterfacePtr  sharedLink = weakLink.lock();
 
                 mavlink_msg_terrain_data_pack_chan(
-                            qgcApp()->toolbox()->mavlinkProtocol()->getSystemId(),
-                            qgcApp()->toolbox()->mavlinkProtocol()->getComponentId(),
+                            MAVLinkProtocol::instance()->getSystemId(),
+                            MAVLinkProtocol::instance()->getComponentId(),
                             sharedLink->mavlinkChannel(),
                             &msg,
                             _currentTerrainRequest.lat,
