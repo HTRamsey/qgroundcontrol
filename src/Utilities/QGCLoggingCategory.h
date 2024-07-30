@@ -33,6 +33,8 @@ Q_DECLARE_LOGGING_CATEGORY(JoystickLog)
     static QGCLoggingCategory qgcCategory ## name (__VA_ARGS__); \
     Q_LOGGING_CATEGORY(name, __VA_ARGS__)
 
+// TODO: QtMsgType enableForLevel = QtDebugMsg
+
 class QGCLoggingCategoryRegister : public QObject
 {
     Q_OBJECT
