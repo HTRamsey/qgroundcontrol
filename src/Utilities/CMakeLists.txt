@@ -4,6 +4,7 @@ find_package(Qt6 REQUIRED COMPONENTS Bluetooth Core Gui Network Positioning Sens
 
 qt_add_library(Utilities STATIC
     DeviceInfo.cc
+    DeviceInfo.cc
     DeviceInfo.h
     JsonHelper.cc
     JsonHelper.h
@@ -15,6 +16,8 @@ qt_add_library(Utilities STATIC
     QGC.h
     QGCCachedFileDownload.cc
     QGCCachedFileDownload.h
+    QGCCommandLineParser.cc
+    QGCCommandLineParser.h
     QGCFileDownload.cc
     QGCFileDownload.h
     QGCLoggingCategory.cc
