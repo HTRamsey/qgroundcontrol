@@ -9,8 +9,6 @@ find_package(Qt6
 )
 
 qt_add_library(QGC STATIC
-    CmdLineOptParser.cc
-    CmdLineOptParser.h
     QGCApplication.cc
     QGCApplication.h
     QGCConfig.h
@@ -94,7 +92,6 @@ target_link_libraries(QGC
         Settings
         Terrain
         # UI
-        Utilities
         UTMSP
         Vehicle
         VehicleSetup
@@ -105,6 +102,7 @@ target_link_libraries(QGC
         Qt6::Core
         Qt6::CorePrivate
         Qt6::Widgets
+        Utilities
 )
 
 if(QGC_CUSTOM_BUILD)

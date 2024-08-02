@@ -30,7 +30,6 @@
 #include "Audio/AudioOutput.h"
 #include "QGCConfig.h"
 #include "QGCApplication.h"
-#include "CmdLineOptParser.h"
 #include "UDPLink.h"
 #include "LinkManager.h"
 #include "MAVLinkProtocol.h"
@@ -138,36 +137,22 @@ static QObject* shapeFileHelperSingletonFactory(QQmlEngine*, QJSEngine*)
     return new ShapeFileHelper;
 }
 
-QGCApplication::QGCApplication(int &argc, char* argv[], bool unitTesting)
+QGCApplication::QGCApplication(int &argc, char* argv[])
     : QApplication(argc, argv)
-    , _runningUnitTests(unitTesting)
 {
     _msecsElapsedTime.start();
 
+    QGCCommandLineParser::parseCommandLine(_cmdLineOptions);
+
     // Setup for network proxy support
     QNetworkProxyFactory::setUseSystemConfiguration(true);
-
-    // Parse command line options
-    bool fClearSettingsOptions = false; // Clear stored settings
-    bool fClearCache = false;           // Clear parameter/airframe caches
-    bool logging = false;               // Turn on logging
-    QString loggingOptions;
-
-    CmdLineOpt_t rgCmdLineOptions[] = {
-        { "--clear-settings",   &fClearSettingsOptions, nullptr },
-        { "--clear-cache",      &fClearCache,           nullptr },
-        { "--logging",          &logging,               &loggingOptions },
-        { "--fake-mobile",      &_fakeMobile,           nullptr },
-        { "--log-output",       &_logOutput,            nullptr },
-        // Add additional command line option flags here
-    };
-
-    ParseCmdLineOptions(argc, argv, rgCmdLineOptions, sizeof(rgCmdLineOptions)/sizeof(rgCmdLineOptions[0]), false);
 
     // Set up timer for delayed missing fact display
     _missingParamsDelayedDisplayTimer.setSingleShot(true);
     _missingParamsDelayedDisplayTimer.setInterval(_missingParamsDelayedDisplayTimerTimeout);
     connect(&_missingParamsDelayedDisplayTimer, &QTimer::timeout, this, &QGCApplication::_missingParamsDisplay);
+
+    _runningUnitTests = _cmdLineOptions.runningUnitTests;
 
     // Set application information
     QString applicationName;
@@ -202,14 +187,7 @@ QGCApplication::QGCApplication(int &argc, char* argv[], bool unitTesting)
     }
 
     // The setting will delete all settings on this boot
-    fClearSettingsOptions |= settings.contains(_deleteAllSettingsKey);
-
-    if (_runningUnitTests) {
-        // Unit tests run with clean settings
-        fClearSettingsOptions = true;
-    }
-
-    if (fClearSettingsOptions) {
+    if (_cmdLineOptions.clearSettingsOptions || settings.contains(_deleteAllSettingsKey)) {
         // User requested settings to be cleared on command line
         settings.clear();
 
@@ -229,7 +207,7 @@ QGCApplication::QGCApplication(int &argc, char* argv[], bool unitTesting)
     }
     settings.setValue(_settingsVersionKey, QGC_SETTINGS_VERSION);
 
-    if (fClearCache) {
+    if (_cmdLineOptions.clearCache) {
         QDir dir(ParameterManager::parameterCacheDir());
         dir.removeRecursively();
         QFile airframe(cachedAirframeMetaDataFile());
@@ -239,7 +217,7 @@ QGCApplication::QGCApplication(int &argc, char* argv[], bool unitTesting)
     }
 
     // Set up our logging filters
-    QGCLoggingCategoryRegister::instance()->setFilterRulesFromSettings(loggingOptions);
+    QGCLoggingCategoryRegister::instance()->setFilterRulesFromSettings(_cmdLineOptions.loggingOptions);
 
     // We need to set language as early as possible prior to loading on JSON files.
     setLanguage();

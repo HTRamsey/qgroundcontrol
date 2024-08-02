@@ -23,6 +23,8 @@
 #include <QtCore/private/qthread_p.h>
 #include <QtCore/private/qobject_p.h>
 
+#include <QGCCommandLineParser.h>
+
 // Work around circular header includes
 class QQmlApplicationEngine;
 class QGCToolbox;
@@ -60,7 +62,7 @@ class QGCApplication : public QApplication
 {
     Q_OBJECT
 public:
-    QGCApplication(int &argc, char* argv[], bool unitTesting);
+    QGCApplication(int &argc, char* argv[]);
     ~QGCApplication();
 
     /// @brief Sets the persistent flag to delete all settings the next time QGroundControl is started.
@@ -152,6 +154,8 @@ public:
     // Although public, these methods are internal and should only be called by UnitTest code
     QQmlApplicationEngine* qmlAppEngine() { return _qmlAppEngine; }
 
+    const QGCCommandLineParser::CommandLineParseResult* cmdLineOptions() { return &_cmdLineOptions; }
+
 private slots:
     void _missingParamsDisplay                      (void);
     void _qgcCurrentStableVersionDownloadComplete   (QString remoteFile, QString localFile, QString errorMsg);
@@ -191,6 +195,8 @@ private:
     QElapsedTimer       _msecsElapsedTime;
 
     QList<QPair<QString /* title */, QString /* message */>> _delayedAppMessages;
+
+    QGCCommandLineParser::CommandLineParseResult _cmdLineOptions;
 
     class CompressedSignalList {
         Q_DISABLE_COPY(CompressedSignalList)

@@ -27,7 +27,7 @@
 
 #ifdef QT_DEBUG
 
-#include "CmdLineOptParser.h"
+#include <QGCCommandLineParser.h>
 
 #ifdef UNITTEST_BUILD
 #include "UnitTestList.h"
@@ -159,34 +159,16 @@ int main(int argc, char *argv[])
     // We statically link our own QtLocation plugin
     Q_IMPORT_PLUGIN(QGeoServiceProviderFactoryQGC)
 
-    bool runUnitTests = false;          // Run unit tests
+    QGCApplication app(argc, argv);
+    const QGCCommandLineParser::CommandLineParseResult* cmdLineOptions = app.cmdLineOptions();
 
 #ifdef QT_DEBUG
-    // We parse a small set of command line options here prior to QGCApplication in order to handle the ones
-    // which need to be handled before a QApplication object is started.
-
-    bool stressUnitTests = false;       // Stress test unit tests
-    bool quietWindowsAsserts = false;   // Don't let asserts pop dialog boxes
-
-    QString unitTestOptions;
-    CmdLineOpt_t rgCmdLineOptions[] = {
-        { "--unittest",             &runUnitTests,          &unitTestOptions },
-        { "--unittest-stress",      &stressUnitTests,       &unitTestOptions },
-        { "--no-windows-assert-ui", &quietWindowsAsserts,   nullptr },
-        // Add additional command line option flags here
-    };
-
-    ParseCmdLineOptions(argc, argv, rgCmdLineOptions, sizeof(rgCmdLineOptions)/sizeof(rgCmdLineOptions[0]), false);
-    if (stressUnitTests) {
-        runUnitTests = true;
-    }
-
 #ifdef Q_OS_WIN
-    if (quietWindowsAsserts) {
+    if (cmdLineOptions->quietWindowsAsserts) {
         _CrtSetReportHook(WindowsCrtReportHook);
     }
 
-    if (runUnitTests) {
+    if (cmdLineOptions->runUnitTests) {
         // Don't pop up Windows Error Reporting dialog when app crashes. This prevents TeamCity from
         // hanging.
         const DWORD dwMode = SetErrorMode(SEM_NOGPFAULTERRORBOX);
@@ -195,20 +177,18 @@ int main(int argc, char *argv[])
 #endif // Q_OS_WIN
 #endif // QT_DEBUG
 
-    QGCApplication app(argc, argv, runUnitTests);
-
-    #ifdef Q_OS_LINUX
-        std::signal(SIGINT, sigHandler);
-        std::signal(SIGTERM, sigHandler);
-    #endif
+#ifdef Q_OS_LINUX
+    std::signal(SIGINT, sigHandler);
+    std::signal(SIGTERM, sigHandler);
+#endif
 
     app.init();
 
     int exitCode = 0;
 
 #ifdef UNITTEST_BUILD
-    if (runUnitTests) {
-        exitCode = runTests(stressUnitTests, unitTestOptions);
+    if (cmdLineOptions->runningUnitTests) {
+        exitCode = runTests(cmdLineOptions->stressUnitTests, cmdLineOptions->unitTests.join(' '));
     } else
 #endif
     {
