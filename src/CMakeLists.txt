@@ -49,7 +49,6 @@ add_subdirectory(UTMSP)
 add_subdirectory(Vehicle)
 add_subdirectory(VehicleSetup)
 add_subdirectory(VideoManager)
-add_subdirectory(VideoReceiver)
 add_subdirectory(Viewer3D)
 
 #######################################################
@@ -83,6 +82,7 @@ target_link_libraries(QGC
         MissionManager
         # PlanView
         PositionManager
+        QGCLocation
         QmlControls
         Settings
         Terrain
@@ -98,11 +98,10 @@ target_link_libraries(QGC
         Qt6::Core
         Qt6::CorePrivate
         Qt6::Widgets
-        QGCLocation
 )
 
 if(QGC_CUSTOM_BUILD)
-    target_link_libraries(QGC PRIVATE custom)
+    target_link_libraries(QGC PRIVATE CustomPlugin)
 endif()
 
 target_include_directories(QGC PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
@@ -126,17 +125,6 @@ if(ANDROID)
     )
 
     target_include_directories(QGC PUBLIC ${CMAKE_SOURCE_DIR}/android/src)
-
-    if(!QGC_NO_SERIAL_LINK)
-        find_package(Qt6 REQUIRED COMPONENTS SerialPort)
-
-        target_link_libraries(QGC
-            PRIVATE
-                Qt6::SerialPortPrivate
-            PUBLIC
-                Qt6::SerialPort
-        )
-    endif()
 else()
     target_sources(QGC
         PRIVATE

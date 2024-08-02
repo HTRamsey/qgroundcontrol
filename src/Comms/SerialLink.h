@@ -89,8 +89,6 @@ signals:
     void usbDirectChanged       (bool usbDirect);
 
 private:
-    static void _initBaudRates();
-
     int _baud;
     int _dataBits;
     int _flowControl;
@@ -117,7 +115,7 @@ public:
     QSerialPort* _hackAccessToPort(void) { return _port; }
 
 private slots:
-    void _writeBytes(const QByteArray data) override;
+    void _writeBytes(const QByteArray &data) override;
 
 public slots:
     void linkError(QSerialPort::SerialPortError error);

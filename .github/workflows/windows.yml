@@ -37,6 +37,7 @@ jobs:
       QT_VERSION: 6.6.3
       GST_VERSION: 1.22.11
       ARTIFACT: QGroundControl-Installer.exe
+      SCCACHE_GHA_ENABLED: "true"
 
     steps:
       - name: Checkout repo
@@ -66,12 +67,11 @@ jobs:
         # run: choco install --no-progress gstreamer gstreamer-devel --version=1.22.8
 
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.4
+        uses: mozilla-actions/sccache-action@v0.0.5
 
       # - name: Set Up Cache
       #   uses: hendrikmuhs/ccache-action@v1.2
       #   with:
-      #     create-symlink: true
       #     key: ${{ runner.os }}-${{ matrix.BuildType }}
       #     restore-keys: ${{ runner.os }}-${{ matrix.BuildType }}
       #     max-size: 1G

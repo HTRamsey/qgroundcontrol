@@ -35,6 +35,10 @@
 // Geo
 #include "GeoTest.h"
 
+// MAVLink
+#include "StatusTextHandlerTest.h"
+#include "SigningTest.h"
+
 // MissionManager
 #include "CameraCalcTest.h"
 #include "CameraSectionTest.h"
@@ -119,6 +123,10 @@ int runTests(bool stress, QStringView unitTestOptions)
 
 	// Geo
     // UT_REGISTER_TEST(GeoTest)
+
+    // MAVLink
+    UT_REGISTER_TEST(StatusTextHandlerTest)
+    UT_REGISTER_TEST(SigningTest)
 
 	// MissionManager
 	UT_REGISTER_TEST(CameraCalcTest)
