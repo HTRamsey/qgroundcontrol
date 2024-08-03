@@ -18,6 +18,7 @@ jobs:
     env:
       ARTIFACT: QGroundControl.app
       QT_VERSION: 6.6.3
+      GST_VERSION: 1.22.12
 
     steps:
       - name: Checkout repo
@@ -27,18 +28,21 @@ jobs:
           fetch-tags: true
           fetch-depth: 0
 
-      - name: Install Qt6 for MacOS
-        uses: jurplel/install-qt-action@v4
-        with:
-          version: ${{ env.QT_VERSION }}
-          aqtversion: ==3.1.*
-          host: mac
-          target: desktop
-          dir: ${{ runner.temp }}
-          modules: qtcharts qtlocation qtpositioning qtspeech qt5compat qtmultimedia qtserialport qtimageformats qtshadertools qtconnectivity qtquick3d qtsensors
-          cache: ${{ github.ref == 'refs/heads/master' && github.event_name != 'pull_request' }}
+      - name: Install Dependencies
+        run: |
+          brew update
+          brew install cmake ninja ccache
 
-      - name: Install Qt6 for iOS
+      - name: Set Up Cache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ runner.os }}-${{ matrix.BuildType }}
+          restore-keys: ${{ runner.os }}-${{ matrix.BuildType }}
+          max-size: 1G
+          append-timestamp: false
+          save: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+
+      - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ env.QT_VERSION }}
@@ -48,12 +52,7 @@ jobs:
           dir: ${{ runner.temp }}
           extra: --autodesktop
           modules: qtcharts qtlocation qtpositioning qtspeech qt5compat qtmultimedia qtimageformats qtshadertools qtconnectivity qtquick3d qtsensors
-          cache: ${{ github.ref == 'refs/heads/master' && github.event_name != 'pull_request' }}
-
-      - name: Install Dependencies
-        run: |
-          brew update
-          brew install cmake ninja
+          cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
 
       - name: Create build directory
         run:  mkdir ${{ runner.temp }}/shadow_build_dir

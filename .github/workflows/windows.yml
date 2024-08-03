@@ -28,6 +28,7 @@ jobs:
     strategy:
       matrix:
         BuildType: [Debug, Release]
+        Arch: [x64] # Arm64
 
     defaults:
       run:
@@ -36,7 +37,11 @@ jobs:
     env:
       ARTIFACT: QGroundControl-installer.exe
       QT_VERSION: 6.6.3
+<<<<<<< HEAD
       GST_VERSION: 1.22.11
+=======
+      GST_VERSION: 1.22.12
+>>>>>>> 50c572e8a (CMake & CI Improvements)
       SCCACHE_GHA_ENABLED: "true"
 
     steps:
@@ -64,20 +69,26 @@ jobs:
         uses: blinemedical/setup-gstreamer@v1
         with:
           version: ${{ env.GST_VERSION }}
-        # run: choco install --no-progress gstreamer gstreamer-devel --version=1.22.8
+
+      # - name: Install Gstreamer
+      #   run: choco install --no-progress gstreamer gstreamer-devel --version=${{ env.GST_VERSION }}
+
+      # - name: Set Up sccache
+      #   uses: mozilla-actions/sccache-action@v0.0.5
 
       - name: Set Up Cache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
-          key: ${{ runner.os }}-${{ matrix.BuildType }}
-          restore-keys: ${{ runner.os }}-${{ matrix.BuildType }}
+          key: ${{ runner.os }}-${{ matrix.Arch }}-${{ matrix.BuildType }}
+          restore-keys: ${{ runner.os }}-${{ matrix.Arch }}-${{ matrix.BuildType }}
           max-size: 1G
           append-timestamp: false
           variant: sccache
           save: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
 
-      - name: Install Qt
+      - name: Install Qt (x64)
         uses: jurplel/install-qt-action@v4
+        if: matrix.Arch == 'x64'
         with:
           version: ${{ env.QT_VERSION }}
           aqtversion: ==3.1.*
@@ -86,8 +97,21 @@ jobs:
           arch: win64_msvc2019_64
           dir: ${{ runner.temp }}
           modules: qtcharts qtlocation qtpositioning qtspeech qt5compat qtmultimedia qtserialport qtimageformats qtshadertools qtconnectivity qtquick3d qtsensors
-          setup-python: true
-          cache: ${{ github.ref == 'refs/heads/master' && github.event_name != 'pull_request' }}
+          cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+
+      - name: Install Qt (Arm64)
+        uses: jurplel/install-qt-action@v4
+        if: matrix.Arch == 'Arm64'
+        with:
+          version: ${{ env.QT_VERSION }}
+          aqtversion: ==3.1.*
+          host: windows
+          target: desktop
+          arch: win64_msvc2019_64
+          dir: ${{ runner.temp }}
+          extra: --autodesktop
+          modules: qtcharts qtlocation qtpositioning qtspeech qt5compat qtmultimedia qtserialport qtimageformats qtshadertools qtconnectivity qtquick3d qtsensors
+          cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
 
       - name: Set up Visual Studio shell
         uses: ilammy/msvc-dev-cmd@v1
