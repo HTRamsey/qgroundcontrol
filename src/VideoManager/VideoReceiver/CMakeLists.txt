@@ -1,3 +1,9 @@
+# option(QGC_ENABLE_VIDEOSTREAMING "Enable video streaming" ON)
+# if(NOT QGC_ENABLE_VIDEOSTREAMING)
+#     return()
+# endif()
+# message(STATUS "Enabling video streaming support")
+
 find_package(Qt6 REQUIRED COMPONENTS Core)
 
 qt_add_library(VideoReceiver STATIC VideoReceiver.h)

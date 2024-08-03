@@ -48,11 +48,9 @@ jobs:
       # Temporary solution
       - name: Remove unused dependencies
         run: |
-          rm -rf libs/Frameworks
-          rm -rf libs/libevents
-          rm -rf libs/mavlink
-          rm -rf libs/OpenSSL
-          rm -rf libs/sdl2
+          rm -rf libs
+          rm -rf src/FirmwarePlugin/APM/ArduPilot-Parameter-Repository/*/Parameters.*
+          rm -rf src/FirmwarePlugin/APM/ArduPilot-Parameter-Repository/*/apm.pdef.json
 
       - name: Install Dependencies
         run: |

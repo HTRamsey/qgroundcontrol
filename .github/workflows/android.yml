@@ -52,18 +52,20 @@ jobs:
       # Temporary solution
       - name: Remove unused dependencies
         run: |
-          rm -rf libs/Frameworks
-          rm -rf libs/libevents
-          rm -rf libs/mavlink
-          rm -rf libs/sdl2
-          rm -rf libs/OpenSSL
+          rm -rf libs
+          rm -rf src/FirmwarePlugin/APM/ArduPilot-Parameter-Repository/*/Parameter*
+          rm -rf src/FirmwarePlugin/APM/ArduPilot-Parameter-Repository/*/apm.pdef.json
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
 
-      - name: Install dependencies
-        run: |
-          wget --quiet https://github.com/ccache/ccache/releases/download/v4.9.1/ccache-4.9.1-linux-x86_64.tar.xz
-          tar -xvf ccache-*-linux-x86_64.tar.xz
-          cd ccache-*-linux-x86_64
-          sudo make install
+      # - name: Install dependencies
+      #   run: |
+      #     wget --quiet https://github.com/ccache/ccache/releases/download/v4.9.1/ccache-4.9.1-linux-x86_64.tar.xz
+      #     tar -xvf ccache-*-linux-x86_64.tar.xz
+      #     cd ccache-*-linux-x86_64
+      #     sudo make install
 
       - uses: seanmiddleditch/gha-setup-ninja@master
 
@@ -73,11 +75,11 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Setup Android Environment
-        uses: android-actions/setup-android@v3
-        with:
-          cmdline-tools-version: 11076708
-          packages: 'platform-tools platforms;android-34 build-tools;34.0.0' # ndk;25.1.8937393'
+      # - name: Setup Android Environment
+      #   uses: android-actions/setup-android@v3
+      #   with:
+      #     cmdline-tools-version: 11076708
+      #     packages: 'platform-tools platforms;android-34 build-tools;34.0.0' # ndk;25.1.8937393'
 
       # - name: Update Android SDK / NDK / Tools
       #   run: sdkmanager --update
