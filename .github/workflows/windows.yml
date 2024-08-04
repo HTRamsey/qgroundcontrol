@@ -66,6 +66,9 @@ jobs:
           version: ${{ env.GST_VERSION }}
         # run: choco install --no-progress gstreamer gstreamer-devel --version=1.22.8
 
+      - name: Set Up sccache
+        uses: mozilla-actions/sccache-action@v0.0.5
+
       - name: Set Up Cache
         uses: hendrikmuhs/ccache-action@v1.2
         with:
