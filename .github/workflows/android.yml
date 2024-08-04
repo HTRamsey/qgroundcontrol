@@ -42,21 +42,22 @@ jobs:
       GST_VERSION: 1.22.12
 
     steps:
+      - name: Maximize build space
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 30720
+          remove-dotnet: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+          remove-docker-images: 'true'
+        continue-on-error: true
+
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-tags: true
           fetch-depth: 0
-
-      # Temporary solution
-      - name: Remove unused dependencies
-        run: |
-          rm -rf libs/Frameworks
-          rm -rf libs/libevents
-          rm -rf libs/mavlink
-          rm -rf libs/sdl2
-          rm -rf libs/OpenSSL
 
       - name: Install dependencies
         run: |
@@ -79,8 +80,8 @@ jobs:
           cmdline-tools-version: 11076708
           packages: 'platform-tools platforms;android-34 build-tools;34.0.0' # ndk;25.1.8937393'
 
-      # - name: Update Android SDK / NDK / Tools
-      #   run: sdkmanager --update
+      - name: Update Android SDK / NDK / Tools
+        run: sdkmanager --update
 
       - name: Install Android NDK
         uses: nttld/setup-ndk@v1
