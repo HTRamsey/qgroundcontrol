@@ -45,13 +45,9 @@ set(BUILD_APPS OFF CACHE INTERNAL "")
 include(FetchContent)
 FetchContent_Declare(shapelib
     GIT_REPOSITORY https://github.com/OSGeo/shapelib.git
-    GIT_TAG 6fe5012d0d893964943befc2034a055d5aa588a8
+    GIT_TAG 2cc2975f87f89e1dab4749b1dfacfc869a258647
 )
-FetchContent_GetProperties(shapelib)
-if(NOT shapelib_POPULATED)
-    FetchContent_Populate(shapelib)
-    add_subdirectory(${shapelib_SOURCE_DIR} ${shapelib_BINARY_DIR} EXCLUDE_FROM_ALL)
-endif()
+FetchContent_MakeAvailable(shapelib)
 
 target_link_libraries(Utilities
     PRIVATE
@@ -72,10 +68,7 @@ target_link_libraries(Utilities
 )
 
 if(QGC_ENABLE_BLUETOOTH)
-    target_link_libraries(Utilities
-        PRIVATE
-            Qt6::Bluetooth
-    )
+    target_link_libraries(Utilities PRIVATE Qt6::Bluetooth)
 endif()
 
 

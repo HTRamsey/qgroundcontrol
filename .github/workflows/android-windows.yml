@@ -18,6 +18,7 @@ jobs:
     env:
       ARTIFACT: QGroundControl.apk
       QT_VERSION: 6.6.3
+      GST_VERSION: 1.22.12
       QT_ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/deploy/android/android_release.keystore
       QT_ANDROID_KEYSTORE_ALIAS: QGCAndroidKeyStore
       QT_ANDROID_KEYSTORE_STORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -32,13 +33,35 @@ jobs:
           fetch-tags: true
           fetch-depth: 0
 
+      # Temporary solution
+      - name: Remove unused dependencies
+        run: rm -rf libs
+
       - name: Setup Java Environment
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
-      - name: Install Qt6 for Windows
+      - name: Install Dependencies
+        run: |
+          choco install --no-progress cmake --installargs 'ADD_CMAKE_TO_PATH=System' --apply-install-arguments-to-dependencies
+          choco install --no-progress ninja sscache -y
+
+      # - name: Set Up sccache
+      #   uses: mozilla-actions/sccache-action@v0.0.5
+
+      - name: Set Up Cache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ runner.os }}-Android-${{ matrix.BuildType }}
+          restore-keys: ${{ runner.os }}-Android-${{ matrix.BuildType }}
+          max-size: 1G
+          append-timestamp: false
+          variant: sccache
+          save: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+
+      - name: Install Qt for Windows
         uses: jurplel/install-qt-action@v4
         with:
           version: ${{ env.QT_VERSION }}
@@ -47,9 +70,9 @@ jobs:
           target: desktop
           dir: ${{ runner.temp }}
           modules: qtcharts qtlocation qtpositioning qtspeech qt5compat qtmultimedia qtserialport qtimageformats qtshadertools qtconnectivity qtquick3d qtsensors
-          cache: ${{ github.ref == 'refs/heads/master' && github.event_name != 'pull_request' }}
+          cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
 
-      - name: Install Qt6 for Android (armv7)
+      - name: Install Qt for Android (armv7)
         uses: jurplel/install-qt-action@v4
         if: contains( env.QT_ANDROID_ABIS, 'armeabi-v7a')
         with:
@@ -59,10 +82,11 @@ jobs:
           target: android
           arch: android_armv7
           dir: ${{ runner.temp }}
+          extra: --autodesktop
           modules: qtcharts qtlocation qtpositioning qtspeech qt5compat qtmultimedia qtserialport qtimageformats qtshadertools qtconnectivity qtquick3d qtsensors
-          cache: ${{ github.ref == 'refs/heads/master' && github.event_name != 'pull_request' }}
+          cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
 
-      - name: Install Qt6 for Android (arm64_v8a)
+      - name: Install Qt for Android (arm64_v8a)
         uses: jurplel/install-qt-action@v4
         if: contains( env.QT_ANDROID_ABIS, 'arm64-v8a')
         with:
@@ -72,10 +96,11 @@ jobs:
           target: android
           arch: android_arm64_v8a
           dir: ${{ runner.temp }}
+          extra: --autodesktop
           modules: qtcharts qtlocation qtpositioning qtspeech qt5compat qtmultimedia qtserialport qtimageformats qtshadertools qtconnectivity qtquick3d qtsensors
-          cache: ${{ github.ref == 'refs/heads/master' && github.event_name != 'pull_request' }}
+          cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
 
-      - name: Install Qt6 for Android (x86)
+      - name: Install Qt for Android (x86)
         uses: jurplel/install-qt-action@v4
         if: contains( env.QT_ANDROID_ABIS, 'x86')
         with:
@@ -85,10 +110,11 @@ jobs:
           target: android
           arch: android_x86
           dir: ${{ runner.temp }}
+          extra: --autodesktop
           modules: qtcharts qtlocation qtpositioning qtspeech qt5compat qtmultimedia qtserialport qtimageformats qtshadertools qtconnectivity qtquick3d qtsensors
-          cache: ${{ github.ref == 'refs/heads/master' && github.event_name != 'pull_request' }}
+          cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
 
-      - name: Install Qt6 for Android (x86_64)
+      - name: Install Qt for Android (x86_64)
         uses: jurplel/install-qt-action@v4
         if: contains( env.QT_ANDROID_ABIS, 'x86_64')
         with:
@@ -98,13 +124,9 @@ jobs:
           target: android
           arch: android_x86_64
           dir: ${{ runner.temp }}
+          extra: --autodesktop
           modules: qtcharts qtlocation qtpositioning qtspeech qt5compat qtmultimedia qtserialport qtimageformats qtshadertools qtconnectivity qtquick3d qtsensors
-          cache: ${{ github.ref == 'refs/heads/master' && github.event_name != 'pull_request' }}
-
-      - name: Install Dependencies
-        run: |
-          choco install --no-progress ninja -y
-          choco install --no-progress cmake --installargs 'ADD_CMAKE_TO_PATH=System' --apply-install-arguments-to-dependencies
+          cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
 
       - name: Set up Visual Studio shell
         uses: ilammy/msvc-dev-cmd@v1

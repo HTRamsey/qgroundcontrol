@@ -283,10 +283,7 @@ set_target_properties(${PROJECT_NAME}
 
 if(WIN32)
     set(app_icon_resource_windows "${CMAKE_SOURCE_DIR}/deploy/windows/QGroundControl.rc")
-    target_sources(${PROJECT_NAME}
-        PRIVATE
-            ${app_icon_resource_windows}
-    )
+    target_sources(${PROJECT_NAME} PRIVATE ${app_icon_resource_windows})
     set_target_properties(${PROJECT_NAME}
         PROPERTIES
             WIN32_EXECUTABLE TRUE
@@ -437,7 +434,6 @@ if(LINUX)
     )
     install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/CreateAppImage.cmake")
 elseif(WIN32)
-    # install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/CreateQGCInstaller.cmake")
     install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/CreateWinInstaller.cmake")
 elseif(MACOS)
     install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/CreateMacDMG.cmake")
