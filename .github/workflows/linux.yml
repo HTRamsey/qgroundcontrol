@@ -105,6 +105,11 @@ jobs:
       - name: Installation Cleanup
         run: sudo apt clean
 
+      - name: Install Gstreamer
+        uses: blinemedical/setup-gstreamer@v1
+        with:
+          version: ${{ env.GST_VERSION }}
+
     # - name: Build GStreamer
     #   uses: ./.github/actions/gstreamer
 
