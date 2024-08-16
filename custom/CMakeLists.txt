@@ -26,6 +26,7 @@ list(APPEND CUSTOM_RESOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/qgcimages.qrc
     ${CMAKE_CURRENT_SOURCE_DIR}/qgcresources.qrc
     ${CMAKE_CURRENT_SOURCE_DIR}/qgroundcontrol.qrc
+    ${CMAKE_CURRENT_SOURCE_DIR}/custom.qrc
 )
 set(QGC_RESOURCES ${CUSTOM_RESOURCES} PARENT_SCOPE)
 
@@ -34,6 +35,14 @@ qt_add_library(CustomPlugin STATIC
     src/CustomPlugin.h
     src/AutoPilotPlugin/CustomAutoPilotPlugin.cc
     src/AutoPilotPlugin/CustomAutoPilotPlugin.h
+    src/FactGroups/DroneFactGroup.cc
+    src/FactGroups/DroneFactGroup.h
+    src/FactGroups/GPUFactGroup.cc
+    src/FactGroups/GPUFactGroup.h
+    src/FactGroups/NextVisionFactGroup.cc
+    src/FactGroups/NextVisionFactGroup.h
+    src/FactGroups/ViewproFactGroup.cc
+    src/FactGroups/ViewproFactGroup.h
     src/FirmwarePlugin/CustomFirmwarePlugin.cc
     src/FirmwarePlugin/CustomFirmwarePlugin.h
     src/FirmwarePlugin/CustomFirmwarePluginFactory.cc
@@ -49,15 +58,16 @@ target_link_libraries(CustomPlugin
     PUBLIC
         Qt6::Core
         API
-        FirmwarePlugin
-        MAVLink
         APMAutoPilotPlugin
         APMFirmwarePlugin
+        FirmwarePlugin
+        MAVLink
 )
 
 target_include_directories(CustomPlugin
     PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/AutoPilotPlugin
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/FirmwarePlugin
+        src
+        src/AutoPilotPlugin
+        src/FactGroups
+        src/FirmwarePlugin
 )

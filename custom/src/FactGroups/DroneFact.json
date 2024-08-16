@@ -1,0 +1,67 @@
+{
+    "version":      1,
+    "fileType":  "FactMetaData",
+    "QGC.MetaData.Facts":
+[
+{
+    "name":             "spotlightEnabled",
+    "shortDesc":        "Spotlight Enabled",
+    "type":             "bool",
+    "default":          false
+},
+{
+    "name":             "spotlightStatus",
+    "shortDesc":        "Spotlight Status",
+    "type":             "uint8",
+    "units":            "x"
+},
+{
+    "name":             "beaconEnabled",
+    "shortDesc":        "Beacon Enabled",
+    "type":             "bool",
+    "default":          false
+},
+{
+    "name":             "beaconStatus",
+    "shortDesc":        "Beacon Status",
+    "type":             "bool",
+    "default":          false
+},
+{
+    "name":             "remoteIdEnabled",
+    "shortDesc":        "Remote ID Enabled",
+    "type":             "bool",
+    "default":          false
+},
+{
+    "name":             "remoteIdStatus",
+    "shortDesc":        "Remote ID Status",
+    "type":             "bool",
+    "default":          false
+},
+{
+    "name":             "navigationLightEnabled",
+    "shortDesc":        "Navigation Light Enabled",
+    "type":             "bool",
+    "default":          false
+},
+{
+    "name":             "navigationLightStatus",
+    "shortDesc":        "Navigation Light Status",
+    "type":             "bool",
+    "default":          false
+},
+{
+    "name":             "antiCollisionLightEnabled",
+    "shortDesc":        "Anti-Collision Light Enabled",
+    "type":             "bool",
+    "default":          false
+},
+{
+    "name":             "antiCollisionLightStatus",
+    "shortDesc":        "Anti-Collision Light Status",
+    "type":             "bool",
+    "default":          false
+}
+]
+}

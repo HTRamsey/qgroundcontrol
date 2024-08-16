@@ -1,0 +1,13 @@
+<RCC>
+    <qresource prefix="/qml">
+        <file alias="QGroundControl/Controls/DroneIndicator.qml">qml/DroneIndicator.qml</file>
+        <file alias="QGroundControl/Controls/GPUIndicator.qml">qml/GPUIndicator.qml</file>
+        <file alias="QGroundControl/FlightMap/Geofence.qml">qml/Geofence.qml</file>
+    </qresource>
+    <qresource prefix="/json">
+        <file alias="Vehicle/DroneFact.json">src/FactGroups/DroneFact.json</file>
+        <file alias="Vehicle/GPUFact.json">src/FactGroups/GPUFact.json</file>
+        <file alias="Vehicle/NextVisionFact.json">src/FactGroups/NextVisionFact.json</file>
+        <file alias="Vehicle/ViewproFact.json">src/FactGroups/ViewproFact.json</file>
+    </qresource>
+</RCC>

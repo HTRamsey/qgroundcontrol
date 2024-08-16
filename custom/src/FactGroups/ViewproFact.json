@@ -1,0 +1,14 @@
+{
+    "version":      1,
+    "fileType":  "FactMetaData",
+    "QGC.MetaData.Facts":
+[
+{
+    "name":             "temperature1",
+    "shortDesc":        "Temperature (1)",
+    "type":             "double",
+    "decimalPlaces":    2,
+    "units":            "C"
+}
+]
+}
