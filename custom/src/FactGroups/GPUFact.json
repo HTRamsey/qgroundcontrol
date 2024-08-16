@@ -1,0 +1,114 @@
+{
+    "version": 1,
+    "fileType": "FactMetaData",
+    "QGC.MetaData.Facts":
+[
+{
+    "name":             "psuTemperature",
+    "shortDesc":        "PSU Temperature",
+    "type":             "int8",
+    "units":            "°C"
+},
+{
+    "name":             "spoolTemperature",
+    "shortDesc":        "Spool Temperature",
+    "type":             "int8",
+    "units":            "°C"
+},
+{
+    "name":             "psuFanDuty",
+    "shortDesc":        "PSU Fan Duty",
+    "type":             "uint8",
+    "units":            "%"
+},
+{
+    "name":             "spoolFanDuty",
+    "shortDesc":        "Spool Fan Duty",
+    "type":             "uint8",
+    "units":            "%"
+},
+{
+    "name":             "motorDuty",
+    "shortDesc":        "Motor Duty",
+    "type":             "uint8",
+    "units":            "%"
+},
+{
+    "name":             "tetherTension",
+    "shortDesc":        "Tether Tension",
+    "type":             "uint32",
+    "enumStrings":      "Low,Medium,High",
+    "enumValues":       "0,1,2"
+},
+{
+    "name":             "tetherLength",
+    "shortDesc":        "Tether Length",
+    "type":             "uint8",
+    "decimalPlaces":    0,
+    "units":            "m"
+},
+{
+    "name":             "latitude",
+    "shortDesc":        "Latitude",
+    "type":             "double",
+    "decimalPlaces":    7,
+    "units":            "C"
+},
+{
+    "name":             "longitude",
+    "shortDesc":        "Longitude",
+    "type":             "double",
+    "decimalPlaces":    7,
+    "units":            "C"
+},
+{
+    "name":             "altitude",
+    "shortDesc":        "Altitude",
+    "type":             "float",
+    "decimalPlaces":    2,
+    "units":            "C"
+},
+{
+    "name":             "pressure",
+    "shortDesc":        "Pressure",
+    "type":             "uint32",
+    "units":            "kPa"
+},
+{
+    "name":             "pressureTemperature",
+    "shortDesc":        "Pressure Temperature",
+    "type":             "int8",
+    "units":            "°C"
+},
+{
+    "name":             "outputVoltage",
+    "shortDesc":        "Output Voltage",
+    "type":             "uint16",
+    "units":            "v"
+},
+{
+    "name":             "psuTempWarning",
+    "shortDesc":        "PSU Temperature Warning",
+    "type":             "bool",
+    "default":          false
+},
+{
+    "name":             "psuTempCritical",
+    "shortDesc":        "PSU Temperature Critical",
+    "type":             "bool",
+    "default":          false
+},
+{
+    "name":             "spoolTempWarning",
+    "shortDesc":        "Spool Temperature Warning",
+    "type":             "bool",
+    "default":          false
+},
+{
+    "name":             "spoolTempCritical",
+    "shortDesc":        "Spool Temperature Critical",
+    "type":             "bool",
+    "default":          false
+}
+]
+}

@@ -30,8 +30,8 @@ QGCFlyViewOptions *CustomOptions::flyViewOptions()
 
 CustomPlugin::CustomPlugin(QGCApplication *app, QGCToolbox *toolbox)
     : QGCCorePlugin(app, toolbox)
+    , _options(new CustomOptions(this, this))
 {
-    _options = new CustomOptions(this, this);
     _showAdvancedUI = false;
 }
 
@@ -40,9 +40,13 @@ CustomPlugin::~CustomPlugin()
 
 }
 
-void CustomPlugin::setToolbox(QGCToolbox* toolbox)
+void CustomPlugin::setToolbox(QGCToolbox *toolbox)
 {
     QGCCorePlugin::setToolbox(toolbox);
+    _droneFactGroup = new DroneFactGroup(this);
+    _gpuFactGroup = new GPUFactGroup(this);
+    _nextVisionFactGroup = new NextVisionFactGroup(this);
+    _viewproFactGroup = new ViewproFactGroup(this);
 }
 
 QGCOptions *CustomPlugin::options()
@@ -61,11 +65,33 @@ bool CustomPlugin::overrideSettingsGroupVisibility(QString name)
 
 bool CustomPlugin::adjustSettingMetaData(const QString &settingsGroup, FactMetaData &metaData)
 {
-    bool parentResult = QGCCorePlugin::adjustSettingMetaData(settingsGroup, metaData);
+    const bool parentResult = QGCCorePlugin::adjustSettingMetaData(settingsGroup, metaData);
 
     if (settingsGroup == AppSettings::settingsGroup) {
 
     }
 
     return parentResult;
+}
+
+bool CustomPlugin::mavlinkMessage(Vehicle *vehicle, LinkInterface *link, mavlink_message_t message)
+{
+    _droneFactGroup->handleMessage(vehicle, message);
+    _gpuFactGroup->handleMessage(vehicle, message);
+    _nextVisionFactGroup->handleMessage(vehicle, message);
+    _viewproFactGroup->handleMessage(vehicle, message);
+
+    return true;
+}
+
+const QVariantList &CustomPlugin::toolBarIndicators()
+{
+    if (_toolBarIndicatorList.isEmpty()) {
+        _toolBarIndicatorList = QVariantList({
+            // QVariant::fromValue(QUrl::fromUserInput("qrc:/toolbar/DroneIndicator.qml")),
+            // QVariant::fromValue(QUrl::fromUserInput("qrc:/toolbar/GPUIndicator.qml")),
+        });
+    }
+
+    return _toolBarIndicatorList;
 }
