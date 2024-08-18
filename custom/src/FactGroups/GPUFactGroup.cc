@@ -5,7 +5,7 @@
 QGC_LOGGING_CATEGORY(GpuFactGroupLog, "qgc.custom.factgroups.gpufactgroup")
 
 GPUFactGroup::GPUFactGroup(QObject *parent)
-    : FactGroup(1000, ":/json/Vehicle/GPUFact.json", parent)
+    : FactGroup(1000, ":/json/GPUFact.json", parent)
 {
     _addFact(&_psuTemperatureFact, _psuTemperatureFactName);
     _addFact(&_spoolTemperatureFact, _spoolTemperatureFactName);

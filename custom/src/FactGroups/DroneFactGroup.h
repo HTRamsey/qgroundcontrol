@@ -51,7 +51,7 @@ public:
     void handleMessage(Vehicle *vehicle, mavlink_message_t &message) final;
 
 private:
-    void _handleStatusText(const mavlink_message_t &message);
+    void _handleStatusText(Vehicle *vehicle, const mavlink_message_t &message);
     void _handleServoOutputRaw(const mavlink_message_t &message);
 
     const QString _spotlightEnabledFactName = QStringLiteral("spotlightEnabled");
