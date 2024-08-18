@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
 
 import QGroundControl
@@ -9,210 +8,265 @@ import QGroundControl.ScreenTools
 import QGroundControl.Palette
 import QGroundControl.FactSystem
 import QGroundControl.FactControls
+import MAVLink
 
-RowLayout {
-    id:         control
-    spacing:    0
+//-------------------------------------------------------------------------
+//-- Battery Indicator
+Item {
+    id:             control
+    anchors.top:    parent.top
+    anchors.bottom: parent.bottom
+    width:          batteryIndicatorRow.width
 
-    property bool   showIndicator:          true
-    property var    expandedPageComponent
-    property bool   waitForParameters:      false
+    property bool       showIndicator:      true
+    property bool       waitForParameters:  false   // UI won't show until parameters are ready
+    property Component  expandedPageComponent
 
-    property real fontPointSize:    ScreenTools.largeFontPointSize
-    property var  activeVehicle:    QGroundControl.multiVehicleManager.activeVehicle
-    property bool allowEditMode:    true
-    property bool editMode:         false
+    property var    _activeVehicle:     QGroundControl.multiVehicleManager.activeVehicle
+    property Fact   _indicatorDisplay:  QGroundControl.settingsManager.batteryIndicatorSettings.display
+    property bool   _showPercentage:    _indicatorDisplay.rawValue === 0
+    property bool   _showVoltage:       _indicatorDisplay.rawValue === 1
+    property bool   _showBoth:          _indicatorDisplay.rawValue === 2
 
-    RowLayout {
-        Layout.fillWidth: true
+    Row {
+        id:             batteryIndicatorRow
+        anchors.top:    parent.top
+        anchors.bottom: parent.bottom
 
-        QGCColoredImage {
-            id:         flightModeIcon
-            width:      ScreenTools.defaultFontPixelWidth * 3
-            height:     ScreenTools.defaultFontPixelHeight
-            fillMode:   Image.PreserveAspectFit
-            mipmap:     true
-            color:      qgcPal.text
-            source:     "/qmlimages/FlightModesComponentIcon.png"
-        }
+        Repeater {
+            model: _activeVehicle ? _activeVehicle.batteries : 0
 
-        QGCLabel {
-            text:               activeVehicle ? activeVehicle.flightMode : qsTr("N/A", "No data to display")
-            font.pointSize:     fontPointSize
-            Layout.alignment:   Qt.AlignCenter
+            Loader {
+                anchors.top:        parent.top
+                anchors.bottom:     parent.bottom
+                sourceComponent:    batteryVisual
 
-            MouseArea {
-                anchors.fill:   parent
-                onClicked:      mainWindow.showIndicatorDrawer(drawerComponent, control)
+                property var battery: object
             }
+        }
+    }
+    MouseArea {
+        anchors.fill:   parent
+        onClicked: {
+            mainWindow.showIndicatorDrawer(batteryPopup, control)
         }
     }
 
     Component {
-        id: drawerComponent
+        id: batteryPopup
 
         ToolIndicatorPage {
-            showExpand:         true
+            showExpand:         expandedComponent ? true : false
             waitForParameters:  control.waitForParameters
+            contentComponent:   batteryContentComponent
+            expandedComponent:  batteryExpandedComponent
+        }
+    }
 
-            contentComponent:    flightModeContentComponent
-            expandedComponent:   flightModeExpandedComponent
+    Component {
+        id: batteryVisual
 
-            onExpandedChanged: {
-                if (!expanded) {
-                    editMode = false
+        Row {
+            anchors.top:    parent.top
+            anchors.bottom: parent.bottom
+
+            function getBatteryColor() {
+                switch (battery.chargeState.rawValue) {
+                case MAVLink.MAV_BATTERY_CHARGE_STATE_OK:
+                    return qgcPal.text
+                case MAVLink.MAV_BATTERY_CHARGE_STATE_LOW:
+                    return qgcPal.colorOrange
+                case MAVLink.MAV_BATTERY_CHARGE_STATE_CRITICAL:
+                case MAVLink.MAV_BATTERY_CHARGE_STATE_EMERGENCY:
+                case MAVLink.MAV_BATTERY_CHARGE_STATE_FAILED:
+                case MAVLink.MAV_BATTERY_CHARGE_STATE_UNHEALTHY:
+                    return qgcPal.colorRed
+                default:
+                    return qgcPal.text
+                }
+            }
+
+            function getBatteryPercentageText() {
+                if (!isNaN(battery.percentRemaining.rawValue)) {
+                    if (battery.percentRemaining.rawValue > 98.9) {
+                        return qsTr("100%")
+                    } else {
+                        return battery.percentRemaining.valueString + battery.percentRemaining.units
+                    }
+                } else if (!isNaN(battery.voltage.rawValue)) {
+                    return battery.voltage.valueString + battery.voltage.units
+                } else if (battery.chargeState.rawValue !== MAVLink.MAV_BATTERY_CHARGE_STATE_UNDEFINED) {
+                    return battery.chargeState.enumStringValue
+                }
+                return qsTr("n/a")
+            }
+
+           function getBatteryVoltageText() {
+                if (!isNaN(battery.voltage.rawValue)) {
+                    return battery.voltage.valueString + battery.voltage.units
+                } else if (battery.chargeState.rawValue !== MAVLink.MAV_BATTERY_CHARGE_STATE_UNDEFINED) {
+                    return battery.chargeState.enumStringValue
+                }
+                return qsTr("n/a")
+            }
+
+            QGCColoredImage {
+                anchors.top:        parent.top
+                anchors.bottom:     parent.bottom
+                width:              height
+                sourceSize.width:   width
+                source:             "/qmlimages/Battery.svg"
+                fillMode:           Image.PreserveAspectFit
+                color:              getBatteryColor()
+            }
+
+           ColumnLayout {
+                id:                     batteryInfoColumn
+                anchors.top:            parent.top
+                anchors.bottom:         parent.bottom
+                spacing:                0
+
+                QGCLabel {
+                    Layout.alignment:       Qt.AlignHCenter
+                    verticalAlignment:      Text.AlignVCenter
+                    color:                  getBatteryColor()
+                    text:                   getBatteryPercentageText()
+                    font.pointSize:         _showBoth ? ScreenTools.defaultFontPointSize : ScreenTools.mediumFontPointSize
+                    visible:                _showBoth || _showPercentage
+                }
+
+                QGCLabel {
+                    Layout.alignment:       Qt.AlignHCenter
+                    font.pointSize:         _showBoth ? ScreenTools.defaultFontPointSize : ScreenTools.mediumFontPointSize
+                    color:                  getBatteryColor()
+                    text:                   getBatteryVoltageText()
+                    visible:                _showBoth || _showVoltage
                 }
             }
         }
     }
 
     Component {
-        id: flightModeContentComponent
+        id: batteryContentComponent
 
         ColumnLayout {
-            id:         modeColumn
-            spacing:    ScreenTools.defaultFontPixelWidth / 2
+            spacing: ScreenTools.defaultFontPixelHeight / 2
 
-            property var    activeVehicle:            QGroundControl.multiVehicleManager.activeVehicle
-            property var    flightModeSettings:       QGroundControl.settingsManager.flightModeSettings
-            property var    hiddenFlightModesFact:    null
-            property var    hiddenFlightModesList:    [] 
+            property var _activeVehicle: QGroundControl.multiVehicleManager.activeVehicle
 
-            Component.onCompleted: {
-                // Hidden flight modes are classified by firmware and vehicle class
-                var hiddenFlightModesPropPrefix
-                if (activeVehicle.px4Firmware) {
-                    hiddenFlightModesPropPrefix = "px4HiddenFlightModes"
-                } else if (activeVehicle.apmFirmware) {
-                    hiddenFlightModesPropPrefix = "apmHiddenFlightModes"
-                } else {
-                    control.allowEditMode = false
-                }
-                if (control.allowEditMode) {
-                    var hiddenFlightModesProp = hiddenFlightModesPropPrefix + activeVehicle.vehicleClassInternalName()
-                    if (flightModeSettings.hasOwnProperty(hiddenFlightModesProp)) {
-                        hiddenFlightModesFact = flightModeSettings[hiddenFlightModesProp]
-                        // Split string into list of flight modes
-                        if (hiddenFlightModesFact && hiddenFlightModesFact.value !== "") {
-                            hiddenFlightModesList = hiddenFlightModesFact.value.split(",")
-                        }
-                    } else {
-                        control.allowEditMode = false
-                    }
-                }
-                hiddenModesLabel.calcVisible()
-            }
+            Component {
+                id: batteryValuesAvailableComponent
 
-            Connections {
-                target: control
-                onEditModeChanged: {
-                    if (editMode) {
-                        for (var i=0; i<modeRepeater.count; i++) {
-                            var button      = modeRepeater.itemAt(i).children[0]
-                            var checkBox    = modeRepeater.itemAt(i).children[1]
-
-                            checkBox.checked = !hiddenFlightModesList.find(item => { return item === button.text } )
-                        }
-                    }
+                QtObject {
+                    property bool functionAvailable:         battery.function.rawValue !== MAVLink.MAV_BATTERY_FUNCTION_UNKNOWN
+                    property bool showFunction:              functionAvailable && battery.function.rawValue != MAVLink.MAV_BATTERY_FUNCTION_ALL
+                    property bool temperatureAvailable:      !isNaN(battery.temperature.rawValue)
+                    property bool currentAvailable:          !isNaN(battery.current.rawValue)
+                    property bool mahConsumedAvailable:      !isNaN(battery.mahConsumed.rawValue)
+                    property bool timeRemainingAvailable:    !isNaN(battery.timeRemaining.rawValue)
+                    property bool percentRemainingAvailable: !isNaN(battery.percentRemaining.rawValue)
+                    property bool chargeStateAvailable:      battery.chargeState.rawValue !== MAVLink.MAV_BATTERY_CHARGE_STATE_UNDEFINED
                 }
             }
 
             Repeater {
-                id:     modeRepeater
-                model:  activeVehicle ? activeVehicle.flightModes : []
+                model: _activeVehicle ? _activeVehicle.batteries : 0
 
-                RowLayout {
-                    spacing: ScreenTools.defaultFontPixelWidth
-                    visible: editMode || !hiddenFlightModesList.find(item => { return item === modelData } )
+                SettingsGroupLayout {
+                    heading:        qsTr("Battery %1").arg(_activeVehicle.batteries.length === 1 ? qsTr("Status") : object.id.rawValue)
+                    contentSpacing: 0
+                    showDividers:   false
 
-                    QGCButton {
-                        id:                 modeButton
-                        text:               modelData
-                        Layout.fillWidth:   true
+                    property var batteryValuesAvailable: batteryValuesAvailableLoader.item
 
-                        onClicked: {
-                            if (editMode) {
-                                parent.children[1].toggle()
-                                parent.children[1].clicked()
-                            } else {
-                                activeVehicle.flightMode = modelData
-                                mainWindow.closeIndicatorDrawer()
-                            }
-                        }
+                    Loader {
+                        id:                 batteryValuesAvailableLoader
+                        sourceComponent:    batteryValuesAvailableComponent
+
+                        property var battery: object
                     }
 
-                    QGCCheckBoxSlider {
-                        visible: editMode
-
-                        onClicked: {
-                            hiddenFlightModesList = []
-                            for (var i=0; i<modeRepeater.count; i++) {
-                                var checkBox = modeRepeater.itemAt(i).children[1]
-                                if (!checkBox.checked) {
-                                    hiddenFlightModesList.push(modeRepeater.model[i])
-                                }
-                            }
-                            hiddenFlightModesFact.value = hiddenFlightModesList.join(",")
-                            hiddenModesLabel.calcVisible()
-                        }
+                    LabelledLabel {
+                        label:  qsTr("Charge State")
+                        labelText:  object.chargeState.enumStringValue
+                        visible:    batteryValuesAvailable.chargeStateAvailable
                     }
-                }
-            }
 
-            QGCLabel {
-                id:                     hiddenModesLabel
-                text:                   qsTr("Some Modes Hidden")
-                Layout.fillWidth:       true
-                font.pointSize:         ScreenTools.smallFontPointSize
-                horizontalAlignment:    Text.AlignHCenter
-                visible:                false
+                    LabelledLabel {
+                        label:      qsTr("Remaining")
+                        labelText:  object.timeRemainingStr.value
+                        visible:    batteryValuesAvailable.timeRemainingAvailable
+                    }
 
-                function calcVisible() {
-                    hiddenModesLabel.visible = hiddenFlightModesList.length > 0
+                    LabelledLabel {
+                        label:      qsTr("Remaining")
+                        labelText:  object.percentRemaining.valueString + " " + object.percentRemaining.units
+                        visible:    batteryValuesAvailable.percentRemainingAvailable
+                    }
+
+                    LabelledLabel {
+                        label:      qsTr("Voltage")
+                        labelText:  object.voltage.valueString + " " + object.voltage.units
+                    }
+
+                    LabelledLabel {
+                        label:      qsTr("Consumed")
+                        labelText:  object.mahConsumed.valueString + " " + object.mahConsumed.units
+                        visible:    batteryValuesAvailable.mahConsumedAvailable
+                    }
+
+                    LabelledLabel {
+                        label:      qsTr("Temperature")
+                        labelText:  object.temperature.valueString + " " + object.temperature.units
+                        visible:    batteryValuesAvailable.temperatureAvailable
+                    }
+
+                    LabelledLabel {
+                        label:      qsTr("Function")
+                        labelText:  object.function.enumStringValue
+                        visible:    batteryValuesAvailable.showFunction
+                    }
                 }
             }
         }
     }
 
     Component {
-        id: flightModeExpandedComponent
+        id: batteryExpandedComponent
 
         ColumnLayout {
-            Layout.preferredWidth:  ScreenTools.defaultFontPixelWidth * 60
-            spacing:                margins / 2
+            spacing: ScreenTools.defaultFontPixelHeight / 2
 
-            property var  qgcPal:   QGroundControl.globalPalette
-            property real margins:  ScreenTools.defaultFontPixelHeight
+            FactPanelController { id: controller }
 
             Loader {
                 sourceComponent: expandedPageComponent
             }
 
             SettingsGroupLayout {
-                Layout.fillWidth:  true
+                Layout.fillWidth: true
 
                 RowLayout {
-                    Layout.fillWidth:   true
-                    enabled:            control.allowEditMode
+                    Layout.fillWidth: true
 
-                    QGCLabel {
-                        Layout.fillWidth:   true
-                        text:               qsTr("Edit Displayed Flight Modes")
-                    }
-
-                    QGCCheckBoxSlider {
-                        onClicked: control.editMode = checked
+                    QGCLabel { Layout.fillWidth: true; text: qsTr("Battery Display") }
+                    FactComboBox {
+                        id:             editModeCheckBox
+                        fact:           QGroundControl.settingsManager.batteryIndicatorSettings.display
+                        sizeToContents: true
                     }
                 }
 
-                LabelledButton {
-                    Layout.fillWidth:   true
-                    label:              qsTr("RC Transmitter Flight Modes")
-                    buttonText:         qsTr("Configure")
+                RowLayout {
+                    Layout.fillWidth: true
 
-                    onClicked: {
-                        mainWindow.showVehicleSetupTool(qsTr("Radio"))
-                        mainWindow.closeIndicatorDrawer()
+                    QGCLabel { Layout.fillWidth: true; text: qsTr("Vehicle Power") }
+                    QGCButton {
+                        text: qsTr("Configure")
+                        onClicked: {
+                            mainWindow.showVehicleSetupTool(qsTr("Power"))
+                            mainWindow.closeIndicatorDrawer()
+                        }
                     }
                 }
             }
