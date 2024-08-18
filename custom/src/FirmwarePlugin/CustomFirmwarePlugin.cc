@@ -7,8 +7,7 @@ CustomFirmwarePlugin::CustomFirmwarePlugin()
 
 }
 
-//-----------------------------------------------------------------------------
-AutoPilotPlugin* CustomFirmwarePlugin::autopilotPlugin(Vehicle* vehicle)
+AutoPilotPlugin* CustomFirmwarePlugin::autopilotPlugin(Vehicle *vehicle)
 {
     return new CustomAutoPilotPlugin(vehicle, vehicle);
 }

@@ -1,2 +1,3 @@
 <file alias="QGroundControl/FlightDisplay/FlyViewToolStripActionList.qml">src/FlightDisplay/FlyViewToolStripActionList.qml</file>
 <file alias="QGroundControl/Controls/MainStatusIndicator.qml">src/UI/toolbar/MainStatusIndicator.qml</file>
+<file alias="SettingsPagesModel.qml">src/UI/SettingsPagesModel.qml</file>

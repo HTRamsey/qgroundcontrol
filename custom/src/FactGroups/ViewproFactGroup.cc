@@ -7,12 +7,12 @@ QGC_LOGGING_CATEGORY(ViewproFactGroupLog, "qgc.custom.factgroups.viewprofactgrou
 ViewproFactGroup::ViewproFactGroup(QObject *parent)
     : FactGroup(1000, ":/json/ViewproFact.json", parent)
 {
-
+    // qCDebug(GpuFactGroupLog) << Q_FUNC_INFO << this;
 }
 
 ViewproFactGroup::~ViewproFactGroup()
 {
-
+    // qCDebug(GpuFactGroupLog) << Q_FUNC_INFO << this;
 }
 
 void ViewproFactGroup::handleMessage(Vehicle *vehicle, mavlink_message_t &message)

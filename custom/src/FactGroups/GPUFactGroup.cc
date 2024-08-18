@@ -20,13 +20,17 @@ GPUFactGroup::GPUFactGroup(QObject *parent)
     _addFact(&_pressureFact, _pressureFactName);
     _addFact(&_pressureTemperatureFact, _pressureTemperatureFactName);
     _addFact(&_outputVoltageFact, _outputVoltageFactName);
+    _addFact(&_psuTempWarningFact, _psuTempWarningFactName);
+    _addFact(&_psuTempCriticalFact, _psuTempCriticalFactName);
+    _addFact(&_spoolTempWarningFact, _spoolTempWarningFactName);
+    _addFact(&_spoolTempCriticalFact, _spoolTempCriticalFactName);
 
-    qCDebug(GpuFactGroupLog) << Q_FUNC_INFO << this;
+    // qCDebug(GpuFactGroupLog) << Q_FUNC_INFO << this;
 }
 
 GPUFactGroup::~GPUFactGroup()
 {
-    qCDebug(GpuFactGroupLog) << Q_FUNC_INFO << this;
+    // qCDebug(GpuFactGroupLog) << Q_FUNC_INFO << this;
 }
 
 void GPUFactGroup::handleMessage(Vehicle *vehicle, mavlink_message_t &message)

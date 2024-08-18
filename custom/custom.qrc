@@ -4,6 +4,11 @@
         <file alias="QGroundControl/Controls/GPUIndicator.qml">qml/GPUIndicator.qml</file>
         <file alias="QGroundControl/FlightDisplay/FlyViewToolStripActionList.qml">qml/FlyViewToolStripActionList.qml</file>
         <file alias="QGroundControl/Controls/MainStatusIndicator.qml">qml/MainStatusIndicator.qml</file>
+        <file alias="SettingsPagesModel.qml">qml/SettingsPagesModel.qml</file>
+    </qresource>
+    <qresource prefix="/toolbar">
+        <file alias="DroneIndicator.qml">qml/DroneIndicator.qml</file>
+        <file alias="GPUIndicator.qml">qml/GPUIndicator.qml</file>
     </qresource>
     <qresource prefix="/json">
         <file alias="DroneFact.json">src/FactGroups/DroneFact.json</file>

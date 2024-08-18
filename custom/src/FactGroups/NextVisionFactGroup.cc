@@ -7,12 +7,12 @@ QGC_LOGGING_CATEGORY(NextVisionFactGroupLog, "qgc.custom.factgroups.nextvisionfa
 NextVisionFactGroup::NextVisionFactGroup(QObject *parent)
     : FactGroup(1000, ":/json/NextVisionFact.json", parent)
 {
-
+    // qCDebug(GpuFactGroupLog) << Q_FUNC_INFO << this;
 }
 
 NextVisionFactGroup::~NextVisionFactGroup()
 {
-
+    // qCDebug(GpuFactGroupLog) << Q_FUNC_INFO << this;
 }
 
 void NextVisionFactGroup::handleMessage(Vehicle *vehicle, mavlink_message_t &message)
