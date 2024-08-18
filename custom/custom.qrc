@@ -3,6 +3,7 @@
         <file alias="QGroundControl/Controls/DroneIndicator.qml">qml/DroneIndicator.qml</file>
         <file alias="QGroundControl/Controls/GPUIndicator.qml">qml/GPUIndicator.qml</file>
         <file alias="QGroundControl/FlightDisplay/FlyViewToolStripActionList.qml">qml/FlyViewToolStripActionList.qml</file>
+        <file alias="QGroundControl/Controls/MainStatusIndicator.qml">qml/MainStatusIndicator.qml</file>
     </qresource>
     <qresource prefix="/json">
         <file alias="DroneFact.json">src/FactGroups/DroneFact.json</file>
@@ -11,6 +12,6 @@
         <file alias="ViewproFact.json">src/FactGroups/ViewproFact.json</file>
     </qresource>
     <qresource prefix="/custom/img">
-    <file alias="ZATBrandImage.png">res/images/ZATBrandImage.png</file>
+        <file alias="ZATBrandImage.png">res/images/ZATBrandImage.png</file>
     </qresource>
 </RCC>
