@@ -5,7 +5,7 @@
 QGC_LOGGING_CATEGORY(ViewproFactGroupLog, "qgc.custom.factgroups.viewprofactgroup")
 
 ViewproFactGroup::ViewproFactGroup(QObject *parent)
-    : FactGroup(1000, ":/json/Vehicle/ViewproFact.json", parent)
+    : FactGroup(1000, ":/json/ViewproFact.json", parent)
 {
 
 }

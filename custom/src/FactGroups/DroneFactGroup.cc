@@ -5,7 +5,7 @@
 QGC_LOGGING_CATEGORY(DroneFactGroupLog, "qgc.custom.factgroups.dronefactgroup")
 
 DroneFactGroup::DroneFactGroup(QObject *parent)
-    : FactGroup(1000, ":/json/Vehicle/DroneFact.json", parent)
+    : FactGroup(1000, ":/json/DroneFact.json", parent)
 {
     _addFact(&_spotlightEnabledFact, _spotlightEnabledFactName);
     _addFact(&_spotlightStatusFact, _spotlightStatusFactName);
@@ -37,7 +37,7 @@ void DroneFactGroup::handleMessage(Vehicle *vehicle, mavlink_message_t &message)
 
     switch (message.msgid) {
     case MAVLINK_MSG_ID_STATUSTEXT:
-        _handleStatusText(message);
+        _handleStatusText(vehicle, message);
         break;
     default:
         return;
@@ -46,12 +46,12 @@ void DroneFactGroup::handleMessage(Vehicle *vehicle, mavlink_message_t &message)
     _setTelemetryAvailable(true);
 }
 
-void DroneFactGroup::_handleStatusText(const mavlink_message_t &message)
+void DroneFactGroup::_handleStatusText(Vehicle *vehicle, const mavlink_message_t &message)
 {
     mavlink_statustext_t data;
     mavlink_msg_statustext_decode(&message, &data);
 
-    QString text = QString::fromStdString(data.text);
+    const QString text = QString::fromStdString(data.text);
     if (text.contains("Payload", Qt::CaseInsensitive)) {
         const QStringList parts = text.split(": ");
         QString payload = parts[1];
@@ -62,20 +62,18 @@ void DroneFactGroup::_handleStatusText(const mavlink_message_t &message)
             const QString gimbalType = params.at(1);
             const QString gimbalModel = params.at(2);
             if (gimbalType.contains("NextVision", Qt::CaseInsensitive)) {
-                if(!m_nextvisionEnabled) {
-                    m_nextvisionEnabled = true;
-                    emit nextvisionEnabledChanged();
+                if(!_nextvisionEnabledFact.rawValue().toBool()) {
+                    _nextvisionEnabledFact.setRawValue(true);
                 }
             } else if (gimbalType.contains("Viewpro", Qt::CaseInsensitive)) {
-                if (!m_viewproEnabled) {
-                    m_viewproEnabled = true;
-                    emit viewproEnabledChanged();
+                if (!_viewproEnabledFact.rawValue().toBool()) {
+                    _viewproEnabledFact.setRawValue(true);
                 }
             }
-            if (!m_gimbalEnabled) {
-                m_gimbalEnabled = true;
-                m_gimbalType = gimbalType;
-                m_gimbalModel = gimbalModel;
+            if (!_gimbalEnabledFact.rawValue().toBool()) {
+                _gimbalEnabledFact.setRawValue(true);
+                _gimbalTypeFact.setRawValue(gimbalType);
+                _gimbalModelFact.setRawValue(gimbalModel);
             }*/
         } else if (payload.contains("Servo", Qt::CaseInsensitive)) {
             const QStringList params = payload.remove(QChar(' ')).split(",");
@@ -102,7 +100,7 @@ void DroneFactGroup::_handleStatusText(const mavlink_message_t &message)
                         _antiCollisionLightEnabledFact.setRawValue(true);
                         _antiCollisionLightValue = 0;
                         _antiCollisionLightState = AntiCollisionLightState::OFF;
-                        // emit sendTask(new SetServoTask(m_antiCollisionLightPort, 1100));
+                        vehicle->sendMavCommand(vehicle->defaultComponentId(), MAV_CMD_DO_SET_SERVO, true, _antiCollisionLightPort, _antiCollisionLightOff);
                     }
                 } else if (servoName.contains("RemoteId", Qt::CaseInsensitive)) {
                     if (!_remoteIdEnabledFact.rawValue().toBool()) {

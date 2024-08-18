@@ -31,6 +31,8 @@ list(APPEND CUSTOM_RESOURCES
 set(QGC_RESOURCES ${CUSTOM_RESOURCES} PARENT_SCOPE)
 
 qt_add_library(CustomPlugin STATIC
+    src/CustomOptions.cc
+    src/CustomOptions.h
     src/CustomPlugin.cc
     src/CustomPlugin.h
     src/AutoPilotPlugin/CustomAutoPilotPlugin.cc

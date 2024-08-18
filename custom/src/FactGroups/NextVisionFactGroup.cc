@@ -5,7 +5,7 @@
 QGC_LOGGING_CATEGORY(NextVisionFactGroupLog, "qgc.custom.factgroups.nextvisionfactgroup")
 
 NextVisionFactGroup::NextVisionFactGroup(QObject *parent)
-    : FactGroup(1000, ":/json/Vehicle/NextVisionFact.json", parent)
+    : FactGroup(1000, ":/json/NextVisionFact.json", parent)
 {
 
 }
