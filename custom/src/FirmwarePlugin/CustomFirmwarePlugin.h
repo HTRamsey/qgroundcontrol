@@ -13,4 +13,9 @@ public:
     CustomFirmwarePlugin();
 
     AutoPilotPlugin *autopilotPlugin(Vehicle *vehicle) final;
+
+    bool supportsSmartRTL() const final { return false; }
+    // double minimumTakeoffAltitudeMeters(Vehicle *vehicle) final;
+    // const QVariantList &toolIndicators(const Vehicle *vehicle) final;
+    // const QVariantList &modeIndicators(const Vehicle *vehicle) final;
 };

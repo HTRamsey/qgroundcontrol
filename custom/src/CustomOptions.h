@@ -12,6 +12,7 @@ public:
     explicit CustomFlyViewOptions(CustomOptions *options, QObject *parent = nullptr);
 
     bool showMultiVehicleList() const final { return false; }
+    bool guidedBarShowEmergencyStop() const final { return false; }
 };
 
 class CustomOptions : public QGCOptions

@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
 
 import QGroundControl
@@ -7,212 +6,76 @@ import QGroundControl.Controls
 import QGroundControl.MultiVehicleManager
 import QGroundControl.ScreenTools
 import QGroundControl.Palette
-import QGroundControl.FactSystem
-import QGroundControl.FactControls
 
-RowLayout {
-    id:         control
-    spacing:    0
+Item {
+    id:             control
+    anchors.top:    parent.top
+    anchors.bottom: parent.bottom
+    width:          telemIcon.width * 1.1
 
-    property bool   showIndicator:          true
-    property var    expandedPageComponent
-    property bool   waitForParameters:      false
+    property bool showIndicator: _hasTelemetry
 
-    property real fontPointSize:    ScreenTools.largeFontPointSize
-    property var  activeVehicle:    QGroundControl.multiVehicleManager.activeVehicle
-    property bool allowEditMode:    true
-    property bool editMode:         false
+    property var  _activeVehicle: QGroundControl.multiVehicleManager.activeVehicle
+    property bool _hasTelemetry: _activeVehicle
 
-    RowLayout {
-        Layout.fillWidth: true
+    QGCColoredImage {
+        id:                 telemIcon
+        anchors.top:        parent.top
+        anchors.bottom:     parent.bottom
+        width:              height
+        sourceSize.height:  height
+        source:             "/res/helicoptericon.svg"
+        fillMode:           Image.PreserveAspectFit
+        color:              qgcPal.buttonText
+    }
 
-        QGCColoredImage {
-            id:         flightModeIcon
-            width:      ScreenTools.defaultFontPixelWidth * 3
-            height:     ScreenTools.defaultFontPixelHeight
-            fillMode:   Image.PreserveAspectFit
-            mipmap:     true
-            color:      qgcPal.text
-            source:     "/qmlimages/FlightModesComponentIcon.png"
-        }
-
-        QGCLabel {
-            text:               activeVehicle ? activeVehicle.flightMode : qsTr("N/A", "No data to display")
-            font.pointSize:     fontPointSize
-            Layout.alignment:   Qt.AlignCenter
-
-            MouseArea {
-                anchors.fill:   parent
-                onClicked:      mainWindow.showIndicatorDrawer(drawerComponent, control)
-            }
-        }
+    MouseArea {
+        anchors.fill:   parent
+        onClicked:      mainWindow.showIndicatorDrawer(telemDroneInfoPage, control)
     }
 
     Component {
-        id: drawerComponent
+        id: telemDroneInfoPage
 
         ToolIndicatorPage {
-            showExpand:         true
-            waitForParameters:  control.waitForParameters
+            showExpand: false
 
-            contentComponent:    flightModeContentComponent
-            expandedComponent:   flightModeExpandedComponent
+            contentComponent: Component {
+                ColumnLayout {
+                    spacing: ScreenTools.defaultFontPixelHeight / 2
 
-            onExpandedChanged: {
-                if (!expanded) {
-                    editMode = false
-                }
-            }
-        }
-    }
+                    SettingsGroupLayout {
+                        heading: "Drone Status"
 
-    Component {
-        id: flightModeContentComponent
-
-        ColumnLayout {
-            id:         modeColumn
-            spacing:    ScreenTools.defaultFontPixelWidth / 2
-
-            property var    activeVehicle:            QGroundControl.multiVehicleManager.activeVehicle
-            property var    flightModeSettings:       QGroundControl.settingsManager.flightModeSettings
-            property var    hiddenFlightModesFact:    null
-            property var    hiddenFlightModesList:    [] 
-
-            Component.onCompleted: {
-                // Hidden flight modes are classified by firmware and vehicle class
-                var hiddenFlightModesPropPrefix
-                if (activeVehicle.px4Firmware) {
-                    hiddenFlightModesPropPrefix = "px4HiddenFlightModes"
-                } else if (activeVehicle.apmFirmware) {
-                    hiddenFlightModesPropPrefix = "apmHiddenFlightModes"
-                } else {
-                    control.allowEditMode = false
-                }
-                if (control.allowEditMode) {
-                    var hiddenFlightModesProp = hiddenFlightModesPropPrefix + activeVehicle.vehicleClassInternalName()
-                    if (flightModeSettings.hasOwnProperty(hiddenFlightModesProp)) {
-                        hiddenFlightModesFact = flightModeSettings[hiddenFlightModesProp]
-                        // Split string into list of flight modes
-                        if (hiddenFlightModesFact && hiddenFlightModesFact.value !== "") {
-                            hiddenFlightModesList = hiddenFlightModesFact.value.split(",")
+                        LabelledLabel {
+                            label:      QGroundControl.corePlugin.drone.spotlightStatus.shortDescription
+                            labelText:  QGroundControl.corePlugin.drone.spotlightStatus.valueString
+                            visible:    QGroundControl.corePlugin.drone.spotlightEnabled.rawValue
                         }
-                    } else {
-                        control.allowEditMode = false
-                    }
-                }
-                hiddenModesLabel.calcVisible()
-            }
 
-            Connections {
-                target: control
-                onEditModeChanged: {
-                    if (editMode) {
-                        for (var i=0; i<modeRepeater.count; i++) {
-                            var button      = modeRepeater.itemAt(i).children[0]
-                            var checkBox    = modeRepeater.itemAt(i).children[1]
-
-                            checkBox.checked = !hiddenFlightModesList.find(item => { return item === button.text } )
+                        LabelledLabel {
+                            label:      QGroundControl.corePlugin.drone.beaconStatus.shortDescription
+                            labelText:  QGroundControl.corePlugin.drone.beaconStatus.valueString
+                            visible:    QGroundControl.corePlugin.drone.beaconEnabled.rawValue
                         }
-                    }
-                }
-            }
 
-            Repeater {
-                id:     modeRepeater
-                model:  activeVehicle ? activeVehicle.flightModes : []
-
-                RowLayout {
-                    spacing: ScreenTools.defaultFontPixelWidth
-                    visible: editMode || !hiddenFlightModesList.find(item => { return item === modelData } )
-
-                    QGCButton {
-                        id:                 modeButton
-                        text:               modelData
-                        Layout.fillWidth:   true
-
-                        onClicked: {
-                            if (editMode) {
-                                parent.children[1].toggle()
-                                parent.children[1].clicked()
-                            } else {
-                                activeVehicle.flightMode = modelData
-                                mainWindow.closeIndicatorDrawer()
-                            }
+                        LabelledLabel {
+                            label:      QGroundControl.corePlugin.drone.remoteIdStatus.shortDescription
+                            labelText:  QGroundControl.corePlugin.drone.remoteIdStatus.valueString
+                            visible:    QGroundControl.corePlugin.drone.remoteIdEnabled.rawValue
                         }
-                    }
 
-                    QGCCheckBoxSlider {
-                        visible: editMode
-
-                        onClicked: {
-                            hiddenFlightModesList = []
-                            for (var i=0; i<modeRepeater.count; i++) {
-                                var checkBox = modeRepeater.itemAt(i).children[1]
-                                if (!checkBox.checked) {
-                                    hiddenFlightModesList.push(modeRepeater.model[i])
-                                }
-                            }
-                            hiddenFlightModesFact.value = hiddenFlightModesList.join(",")
-                            hiddenModesLabel.calcVisible()
+                        LabelledLabel {
+                            label:      QGroundControl.corePlugin.drone.navigationLightStatus.shortDescription
+                            labelText:  QGroundControl.corePlugin.drone.navigationLightStatus.valueString
+                            visible:    QGroundControl.corePlugin.drone.navigationLightEnabled.rawValue
                         }
-                    }
-                }
-            }
 
-            QGCLabel {
-                id:                     hiddenModesLabel
-                text:                   qsTr("Some Modes Hidden")
-                Layout.fillWidth:       true
-                font.pointSize:         ScreenTools.smallFontPointSize
-                horizontalAlignment:    Text.AlignHCenter
-                visible:                false
-
-                function calcVisible() {
-                    hiddenModesLabel.visible = hiddenFlightModesList.length > 0
-                }
-            }
-        }
-    }
-
-    Component {
-        id: flightModeExpandedComponent
-
-        ColumnLayout {
-            Layout.preferredWidth:  ScreenTools.defaultFontPixelWidth * 60
-            spacing:                margins / 2
-
-            property var  qgcPal:   QGroundControl.globalPalette
-            property real margins:  ScreenTools.defaultFontPixelHeight
-
-            Loader {
-                sourceComponent: expandedPageComponent
-            }
-
-            SettingsGroupLayout {
-                Layout.fillWidth:  true
-
-                RowLayout {
-                    Layout.fillWidth:   true
-                    enabled:            control.allowEditMode
-
-                    QGCLabel {
-                        Layout.fillWidth:   true
-                        text:               qsTr("Edit Displayed Flight Modes")
-                    }
-
-                    QGCCheckBoxSlider {
-                        onClicked: control.editMode = checked
-                    }
-                }
-
-                LabelledButton {
-                    Layout.fillWidth:   true
-                    label:              qsTr("RC Transmitter Flight Modes")
-                    buttonText:         qsTr("Configure")
-
-                    onClicked: {
-                        mainWindow.showVehicleSetupTool(qsTr("Radio"))
-                        mainWindow.closeIndicatorDrawer()
+                        LabelledLabel {
+                            label:      QGroundControl.corePlugin.drone.antiCollisionLightStatus.shortDescription
+                            labelText:  QGroundControl.corePlugin.drone.antiCollisionLightStatus.valueString
+                            visible:    QGroundControl.corePlugin.drone.antiCollisionLightEnabled.rawValue
+                        }
                     }
                 }
             }

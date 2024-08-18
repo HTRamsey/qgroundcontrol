@@ -18,17 +18,12 @@ DroneFactGroup::DroneFactGroup(QObject *parent)
     _addFact(&_antiCollisionLightEnabledFact, _antiCollisionLightEnabledFactName);
     _addFact(&_antiCollisionLightStatusFact, _antiCollisionLightStatusFactName);
 
-    // _addFactGroup(&_droneFactGroup, _droneFactGroupName);
-    // _addFactGroup(&_gpuFactGroup, _gpuFactGroupName);
-    // _addFactGroup(&_nextVisionFactGroup, _nextVisionFactGroupName);
-    // _addFactGroup(&_viewproFactGroup, _viewproFactGroupName);
-
-    qCDebug(DroneFactGroupLog) << Q_FUNC_INFO << this;
+    // qCDebug(DroneFactGroupLog) << Q_FUNC_INFO << this;
 }
 
 DroneFactGroup::~DroneFactGroup()
 {
-    qCDebug(DroneFactGroupLog) << Q_FUNC_INFO << this;
+    // qCDebug(DroneFactGroupLog) << Q_FUNC_INFO << this;
 }
 
 void DroneFactGroup::handleMessage(Vehicle *vehicle, mavlink_message_t &message)
