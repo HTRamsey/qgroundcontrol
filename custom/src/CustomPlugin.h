@@ -8,6 +8,7 @@
 #include "GPUFactGroup.h"
 #include "NextVisionFactGroup.h"
 #include "ViewproFactGroup.h"
+#include "Drone.h"
 
 class CustomOptions;
 class QGCOptions;
@@ -22,6 +23,7 @@ class CustomPlugin : public QGCCorePlugin
     Q_PROPERTY(FactGroup* gpu READ gpuFactGroup CONSTANT)
     Q_PROPERTY(FactGroup* nextVision READ nextVisionFactGroup CONSTANT)
     Q_PROPERTY(FactGroup* viewpro READ viewproFactGroup CONSTANT)
+    Q_PROPERTY(Drone* droneControl READ droneControl CONSTANT)
 
 public:
     CustomPlugin(QGCApplication *app, QGCToolbox *toolbox);
@@ -45,6 +47,8 @@ public:
     FactGroup *nextVisionFactGroup() { return _nextVisionFactGroup; }
     FactGroup *viewproFactGroup() { return _viewproFactGroup; }
 
+    Drone *droneControl() { return _droneControl; }
+
 private:
     CustomOptions *_options = nullptr;
 
@@ -52,6 +56,8 @@ private:
     GPUFactGroup *_gpuFactGroup = nullptr;
     NextVisionFactGroup *_nextVisionFactGroup = nullptr;
     ViewproFactGroup *_viewproFactGroup = nullptr;
+
+    Drone *_droneControl = nullptr;
 
     const QString _droneFactGroupName = QStringLiteral("drone");
     const QString _gpuFactGroupName = QStringLiteral("gpu");

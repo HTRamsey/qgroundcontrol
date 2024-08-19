@@ -1,0 +1,41 @@
+<RCC>
+    <qresource prefix="/nvimg">
+        <file alias="NextVisionBrandImage.png">res/Images/NvBrandImage.png</file>
+        <file alias="cca3_icon.png">res/Images/cca3_icon.png</file>
+    </qresource>
+    <qresource prefix="/qml">
+        <file alias="QGroundControl/FlightDisplay/FlyViewVideo.qml">res/FlightDisplay/NvFlyViewVideo.qml</file>
+        <file alias="SetupView.qml">res/VehicleSetup/NvSetupView.qml</file>
+        <file alias="QGroundControl/FlightDisplay/FlyViewCustomLayer.qml">res/FlightDisplay/NvFlyViewLayer.qml</file>
+        <file alias="GeneralSettings.qml">res/ui/preferences/NvGeneralSettings.qml</file>
+        <file alias="QGroundControl/FlightDisplay/FlyViewMap.qml">res/FlightDisplay/NvFlyViewMap.qml</file>
+        <file alias="QGroundControl/FlightDisplay/FlyViewWidgetLayer.qml">res/FlightDisplay/NvFlyViewWidgetLayer.qml</file>
+        <file alias="QGCInstrumentWidgetAlternate.qml">res/FlightMap/Widgets/NvQGCInstrumentWidgetAlternate.qml</file>
+    </qresource>
+    <qresource prefix="/nvqml">
+        <file alias="CamModePanel.qml">res/NvExt/CamModePanel.qml</file>
+        <file alias="CamQuickPanel.qml">res/NvExt/CamQuickPanel.qml</file>
+        <file alias="CamQuick1Panel.qml">res/NvExt/CamQuick1Panel.qml</file>
+        <file alias="CamQuick2Panel.qml">res/NvExt/CamQuick2Panel.qml</file>
+        <file alias="CamIRPanel.qml">res/NvExt/CamIRPanel.qml</file>
+        <file alias="CamRecPanel.qml">res/NvExt/CamRecPanel.qml</file>
+        <file alias="CamPosPanel.qml">res/NvExt/CamPosPanel.qml</file>
+        <file alias="CamFModePanel.qml">res/NvExt/CamFModePanel.qml</file>
+        <file alias="CamJoystickConfig.qml">res/NvExt/CamJoystickConfig.qml</file>
+        <file alias="CamJoystickConfigButtons.qml">res/NvExt/CamJoystickConfigButtons.qml</file>
+        <file alias="CamJoystickConfigGeneral.qml">res/NvExt/CamJoystickConfigGeneral.qml</file>
+        <file alias="CamObjDetPanel.qml">res/NvExt/CamObjDetPanel.qml</file>
+        <file alias="CamMiscPanel.qml">res/NvExt/CamMiscPanel.qml</file>
+        <file alias="QGroundControl/NextVision/NvPhotoVideoControl.qml">res/FlightMap/Widgets/NvPhotoVideoControl.qml</file>
+        <file alias="QGroundControl/NextVision/NvVirtualCamJoystick.qml">res/FlightDisplay/NvVirtualCamJoystick.qml</file>
+        <file alias="QGroundControl/NextVision/qmldir">res/NvExt/qmldir</file>
+        <file alias="QGroundControl/NextVision/NvJoystickThumbPad.qml">res/QmlControls/NvJoystickThumbPad.qml</file>
+    </qresource>
+    <qresource prefix="/json">
+        <file alias="NextVision.SettingsGroup.json">src/Settings/NextVision.SettingsGroup.json</file>
+        <file alias="MavCmdInfoCommon.json">src/MissionManager/NvMavCmdInfoCommon.json</file>
+    </qresource>
+    <qresource prefix="/res">
+        <file alias="QGCLogoFull">res/Images/cca3_icon.png</file>
+    </qresource>
+</RCC>

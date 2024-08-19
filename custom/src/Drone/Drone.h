@@ -1,71 +1,40 @@
 #pragma once
 
-#include "DroneData.h"
-#include "MavlinkTasks.h"
-#include <QtPositioning/QGeoCoordinate>
-#include <QtQmlIntegration/QtQmlIntegration>
+#include <QtCore/QLoggingCategory>
+
+#include "DroneFactGroup.h"
+
+class Vehicle;
+
+Q_DECLARE_LOGGING_CATEGORY(DroneLog)
 
 class Drone : public QObject
 {
     Q_OBJECT
-    QML_ELEMENT
-    QML_SINGLETON
+    // QML_ELEMENT
+    // QML_SINGLETON
 
 public:
-    explicit Drone(QObject* parent = nullptr);
+    explicit Drone(DroneFactGroup *droneFactGroup, QObject *parent = nullptr);
     ~Drone();
 
-    bool readyForRtl();
-    Q_INVOKABLE void rtl();
-    bool readyForLand();
-    Q_INVOKABLE void land();
-    bool readyForBrake();
-    Q_INVOKABLE void brake();
-    bool readyForTakeoff();
-    Q_INVOKABLE void takeoff(float altitude);
-    bool readyForChangeAltitude();
-    Q_INVOKABLE void changeAltitude(float altitude);
-    bool readyForReposition();
-    Q_INVOKABLE void reposition(const QGeoCoordinate& gotoCoord);
-    bool readyForChangeHeading();
-    Q_INVOKABLE void changeHeading(const QGeoCoordinate& headingCoord);
     bool readyForAdjustLights();
-    Q_INVOKABLE void adjustLights(uint8_t intensity);
+    Q_INVOKABLE void adjustLights(Vehicle *vehicle, uint8_t intensity);
     bool readyForToggleBeacon();
-    Q_INVOKABLE void toggleBeacon();
-    bool readyForToggleRemoteID();
-    Q_INVOKABLE void toggleRemoteID();
-    bool readyForToggleNavigationLights();
-    Q_INVOKABLE void toggleNavigationLights();
+    Q_INVOKABLE void toggleBeacon(Vehicle *vehicle);
+    bool readyForToggleRemoteId();
+    Q_INVOKABLE void toggleRemoteId(Vehicle *vehicle);
+    bool readyForToggleNavigationLight();
+    Q_INVOKABLE void toggleNavigationLight(Vehicle *vehicle);
     bool readyForSetAntiCollisionLightState();
-    Q_INVOKABLE void setAntiCollisionLightState(DroneData::AntiCollisionLightState);
-    bool readyForReboot();
-    Q_INVOKABLE void reboot();
-    bool readyForFollow();
-    Q_INVOKABLE void follow();
-    bool readyForSetFollowOffsets();
-    Q_INVOKABLE void setFollowOffsets(const QGeoCoordinate& targetCoord);
-    bool readyForSetFollowLandOffsets();
-    Q_INVOKABLE void setFollowLandOffsets(const QGeoCoordinate& target);
-    bool readyForSetFollowAltitude();
-    Q_INVOKABLE void setFollowAltitude(float altitude);
-    bool readyForSetFollowTarget();
-    Q_INVOKABLE void setFollowTarget(uint8_t target);
-    bool readyForFollowLand();
-    Q_INVOKABLE void followLand();
-    void setParam(const QString &param_id, uint8_t param_type, QVariant value);
-    void getParam(const QString &param_id, uint8_t param_type, int16_t param_index = -1);
-
-signals:
-    void sendTask(MavlinkTask*);
+    Q_INVOKABLE void setAntiCollisionLightState(Vehicle *vehicle, DroneFactGroup::AntiCollisionLightState state);
 
 private:
-    QList<int8_t> m_lightTargets{};
-    uint32_t m_count = 0;
+    void _setServo(Vehicle *vehicle, uint8_t ch, uint16_t pwm);
 
-    bool _readyForArm();
-    void _arm(bool arm);
-    bool _readyForGuided();
-    void _guided();
-    bool _isValidAltitude(float altitude);
+    DroneFactGroup *_droneFactGroup = nullptr;
+    QList<int8_t> _lightTargets;
+
+    static constexpr uint16_t _servoOn = 1900;
+    static constexpr uint16_t _servoOff = 1100;
 };

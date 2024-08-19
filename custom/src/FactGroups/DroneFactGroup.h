@@ -11,16 +11,16 @@ class DroneFactGroup : public FactGroup
 {
     Q_OBJECT
 
-    Q_PROPERTY(Fact* spotlightEnabled READ spotlightEnabled CONSTANT)
-    Q_PROPERTY(Fact* spotlightStatus READ spotlightStatus CONSTANT)
-    Q_PROPERTY(Fact* beaconEnabled READ beaconEnabled CONSTANT)
-    Q_PROPERTY(Fact* beaconStatus READ beaconStatus CONSTANT)
-    Q_PROPERTY(Fact* remoteIdEnabled READ remoteIdEnabled CONSTANT)
-    Q_PROPERTY(Fact* remoteIdStatus READ remoteIdStatus CONSTANT)
-    Q_PROPERTY(Fact* navigationLightEnabled READ navigationLightEnabled CONSTANT)
-    Q_PROPERTY(Fact* navigationLightStatus READ navigationLightStatus CONSTANT)
-    Q_PROPERTY(Fact* antiCollisionLightEnabled READ antiCollisionLightEnabled CONSTANT)
-    Q_PROPERTY(Fact* antiCollisionLightStatus READ antiCollisionLightStatus CONSTANT)
+    Q_PROPERTY(Fact *spotlightEnabled READ spotlightEnabled CONSTANT)
+    Q_PROPERTY(Fact *spotlightStatus READ spotlightStatus CONSTANT)
+    Q_PROPERTY(Fact *beaconEnabled READ beaconEnabled CONSTANT)
+    Q_PROPERTY(Fact *beaconStatus READ beaconStatus CONSTANT)
+    Q_PROPERTY(Fact *remoteIdEnabled READ remoteIdEnabled CONSTANT)
+    Q_PROPERTY(Fact *remoteIdStatus READ remoteIdStatus CONSTANT)
+    Q_PROPERTY(Fact *navigationLightEnabled READ navigationLightEnabled CONSTANT)
+    Q_PROPERTY(Fact *navigationLightStatus READ navigationLightStatus CONSTANT)
+    Q_PROPERTY(Fact *antiCollisionLightEnabled READ antiCollisionLightEnabled CONSTANT)
+    Q_PROPERTY(Fact *antiCollisionLightStatus READ antiCollisionLightStatus CONSTANT)
 
 public:
     DroneFactGroup(QObject *parent = nullptr);
@@ -48,11 +48,19 @@ public:
     Fact *antiCollisionLightEnabled() { return &_antiCollisionLightEnabledFact; }
     Fact *antiCollisionLightStatus() { return &_antiCollisionLightStatusFact; }
 
+    QMap<uint8_t, uint16_t> spotlightValues() const { return _spotlightValues; }
+    uint8_t beaconPort() const { return _beaconPort; }
+    uint8_t remoteIdPort() const { return _remoteIdPort; }
+    uint8_t navigationLightPort() const { return _navigationLightPort; }
+    uint8_t antiCollisionLightPort() const { return _antiCollisionLightPort; }
+
     void handleMessage(Vehicle *vehicle, mavlink_message_t &message) final;
 
 private:
     void _handleStatusText(Vehicle *vehicle, const mavlink_message_t &message);
     void _handleServoOutputRaw(const mavlink_message_t &message);
+
+    uint8_t _calcSpotlightStatus() const;
 
     const QString _spotlightEnabledFactName = QStringLiteral("spotlightEnabled");
     const QString _spotlightStatusFactName = QStringLiteral("spotlightStatus");
@@ -82,15 +90,15 @@ private:
     Fact _highPowerFact = Fact(MAV_COMP_ID_AUTOPILOT1, _highPowerFactName, FactMetaData::valueTypeBool);
     Fact _highPowerWarningFact = Fact(MAV_COMP_ID_AUTOPILOT1, _highPowerWarningFactName, FactMetaData::valueTypeBool);
 
-    QMap<uint8_t, uint16_t> _spotlights;
+    QMap<uint8_t, uint16_t> _spotlightValues;
 
     uint16_t _beaconValue = 0;
     uint8_t _beaconPort = 9;
     static constexpr uint16_t _beaconOn = 1900;
     static constexpr uint16_t _beaconOff = 1100;
 
-    uint16_t _navigationLightsValue = 0;
-    uint8_t _navigationLightsPort = 9;
+    uint16_t _navigationLightValue = 0;
+    uint8_t _navigationLightPort = 9;
     static constexpr uint16_t _navigationLightOn = 1900;
     static constexpr uint16_t _navigationLightOff = 1100;
 

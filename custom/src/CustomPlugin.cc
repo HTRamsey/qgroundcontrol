@@ -29,6 +29,8 @@ void CustomPlugin::setToolbox(QGCToolbox *toolbox)
     _gpuFactGroup = new GPUFactGroup(this);
     _nextVisionFactGroup = new NextVisionFactGroup(this);
     _viewproFactGroup = new ViewproFactGroup(this);
+
+    _droneControl = new Drone(_droneFactGroup, this);
 }
 
 QVariantList &CustomPlugin::analyzePages()

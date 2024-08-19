@@ -1,0 +1,94 @@
+{
+    "version":      1,
+    "fileType":  "FactMetaData",
+    "QGC.MetaData.Facts":
+[
+{
+    "name":             "virtualCamJoystick",
+    "shortDesc": "Show virtual cam joystick",
+    "longDesc":  "If this option is enabled the virtual cam joystick will be shown on the Fly view.",
+    "type":             "bool",
+    "default":     false
+},
+{
+    "name":             "virtualCamJoystickShowZoom",
+    "shortDesc": "Show virtual cam joystick zoom in/out",
+    "longDesc":  "If enabled the zoom in/out virtual joystick will be shown on the Fly view.",
+    "type":             "bool",
+    "default":     true
+},
+{
+    "name":             "showFullScreenButton",
+    "shortDesc": "Show full screen button",
+    "longDesc":  "If enabled the full screen button will be shown on the Fly view.",
+    "type":             "bool",
+    "default":     false
+},
+{
+    "name":             "telemetryValuesBarLocation",
+    "shortDesc":        "Telemetry Values Bar Location",
+    "type":             "uint32",
+    "enumStrings":      "Bottom, Top",
+    "enumValues":       "0,1",
+    "default":          0
+},
+{
+    "name":             "localPositionRoll",
+    "shortDesc": "Local position roll",
+    "longDesc":  "This value specifies the default local position roll value.",
+    "type":             "int32",
+    "default":     25
+},
+{
+    "name":             "localPositionPitch",
+    "shortDesc": "Local position pitch",
+    "longDesc":  "This value specifies the default local position pitch value.",
+    "type":             "int32",
+    "default":     25
+},
+{
+    "name":             "globalPositionElevation",
+    "shortDesc": "Global position elevation",
+    "longDesc":  "This value specifies the default global position elevation value.",
+    "type":             "int32",
+    "default":     25
+},
+{
+    "name":             "globalPositionAzimuth",
+    "shortDesc": "Global position azimuth",
+    "longDesc":  "This value specifies the default global position azimuth value.",
+    "type":             "int32",
+    "default":     25
+},
+{
+    "name":             "camJoystickDZ",
+    "shortDesc":        "Camera Joystick Dead Zone",
+    "longDesc":         "This value specifies the default camera joystick dead zone value.",
+    "type":             "int32",
+    "default":          3
+},
+{
+    "name":             "camJoystickGain",
+    "shortDesc":        "Camera Joystick Gain",
+    "longDesc":         "This value specifies the default camera joystick gain value.",
+    "type":             "int32",
+    "default":          100
+},
+{
+    "name":             "quickViewMode",
+    "shortDesc":        "Quick view panel modes",
+    "type":             "uint32",
+    "enumStrings":      "Default, Quick 1",
+    "enumValues":       "0,1",
+    "default":          0
+},
+{
+    "name":             "camControlFontSize",
+    "shortDesc":        "Quick view panel modes",
+    "type":             "uint32",
+    "enumStrings":      "Small, Medium, Large",
+    "enumValues":       "0,1,2",
+    "default":          1
+}
+]
+}
