@@ -18,4 +18,4 @@ if(NOT EXISTS "${LD_QTPLUGIN_PATH}")
     execute_process(COMMAND chmod a+x "${LD_QTPLUGIN_PATH}")
 endif()
 
-execute_process(COMMAND ${LD_PATH} --appdir ${APPDIR_PATH} --output appimage) # --plugin qt
+execute_process(COMMAND ${LD_PATH} --appdir ${APPDIR_PATH} --output appimage --plugin qt)

@@ -283,10 +283,7 @@ set_target_properties(${PROJECT_NAME}
 
 if(WIN32)
     set(app_icon_resource_windows "${CMAKE_SOURCE_DIR}/deploy/windows/QGroundControl.rc")
-    target_sources(${PROJECT_NAME}
-        PRIVATE
-            ${app_icon_resource_windows}
-    )
+    target_sources(${PROJECT_NAME} PRIVATE ${app_icon_resource_windows})
     set_target_properties(${PROJECT_NAME}
         PROPERTIES
             WIN32_EXECUTABLE TRUE
@@ -296,10 +293,7 @@ if(WIN32)
 elseif(MACOS)
     set(MACOSX_BUNDLE_ICON_FILE "macx.icns")
     set(app_icon_macos "${QGC_MACOS_ICON_PATH}/macx.icns")
-    set_source_files_properties(${app_icon_macos}
-        PROPERTIES
-            MACOSX_PACKAGE_LOCATION "Resources"
-    )
+    set_source_files_properties(${app_icon_macos} PROPERTIES MACOSX_PACKAGE_LOCATION "Resources")
     target_sources(${PROJECT_NAME} PRIVATE ${app_icon_macos})
     set_target_properties(${PROJECT_NAME}
         PROPERTIES
@@ -316,10 +310,7 @@ elseif(MACOS)
     )
 elseif(IOS)
     enable_language(OBJC)
-    set_target_properties(${PROJECT_NAME}
-        PROPERTIES
-            QT_IOS_LAUNCH_SCREEN ${CMAKE_SOURCE_DIR}/deploy/ios/QGCLaunchScreen.xib
-    )
+    set_target_properties(${PROJECT_NAME} PROPERTIES QT_IOS_LAUNCH_SCREEN ${CMAKE_SOURCE_DIR}/deploy/ios/QGCLaunchScreen.xib)
 elseif(ANDROID)
     FetchContent_Declare(android_openssl
         DOWNLOAD_EXTRACT_TIMESTAMP true
@@ -433,7 +424,6 @@ if(LINUX)
     )
     install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/CreateAppImage.cmake")
 elseif(WIN32)
-    # install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/CreateQGCInstaller.cmake")
     install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/CreateWinInstaller.cmake")
 elseif(MACOS)
     install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/CreateMacDMG.cmake")

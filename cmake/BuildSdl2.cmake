@@ -33,7 +33,7 @@ function(build_sdl2)
 
     FetchContent_Declare(SDL
         GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-        GIT_TAG release-2.30.2
+        GIT_TAG release-2.30.6
         GIT_SHALLOW TRUE
         GIT_PROGRESS TRUE
     )
