@@ -1,0 +1,19 @@
+Module QGroundControl.NextVision
+
+CamFModePanel 				1.0     CamFModePanel.qml
+CamIRPanel    				1.0     CamIRPanel.qml
+CamJoystickConfig        	1.0     CamJoystickConfig.qml
+CamJoystickConfigButtons    1.0     CamJoystickConfigButtons.qml
+CamJoystickConfigGeneral    1.0     CamJoystickConfigGeneral.qml
+CamMiscPanel    			1.0     CamMiscPanel.qml
+CamModePanel     			1.0     CamModePanel.qml
+CamObjDetPanel     			1.0     CamObjDetPanel.qml
+CamPosPanel					1.0		CamPosPanel.qml
+CamQuick1Panel				1.0		CamQuick1Panel.qml
+CamQuick2Panel				1.0		CamQuick2Panel.qml
+CamQuickPanel 				1.0		CamQuickPanel.qml
+CamRecPanel 				1.0		CamRecPanel.qml
+NvPhotoVideoControl			1.0		NvPhotoVideoControl.qml
+NvFlyViewLayer				1.0		NvFlyViewLayer.qml
+NvVirtualCamJoystick		1.0		NvVirtualCamJoystick.qml
+NvJoystickThumbPad			1.0		NvJoystickThumbPad.qml

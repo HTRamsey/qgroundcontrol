@@ -38,9 +38,9 @@ void GPUFactGroup::handleMessage(Vehicle *vehicle, mavlink_message_t &message)
     Q_UNUSED(vehicle);
 
     switch (message.msgid) {
-    // case MAVLINK_MSG_ID_ZAT_GPU_DATA:
-    //     _handleZatGpuData(msg);
-    //     break;
+    case MAVLINK_MSG_ID_ZAT_GPU_DATA:
+        _handleZatGpuData(message);
+        break;
     default:
         return;
     }
@@ -48,19 +48,19 @@ void GPUFactGroup::handleMessage(Vehicle *vehicle, mavlink_message_t &message)
     _setTelemetryAvailable(true);
 }
 
-void GPUFactGroup::_handleZatGpuData(const mavlink_message_t &msg)
+void GPUFactGroup::_handleZatGpuData(const mavlink_message_t &message)
 {
-    /*mavlink_zat_gpu_data_t data;
-    mavlink_msg_zat_gpu_data_decode(&msg, &data);
+    mavlink_zat_gpu_data_t data;
+    mavlink_msg_zat_gpu_data_decode(&message, &data);
 
     // TODO: Get PSU Type From ZAT Message
     _psuTemperatureFact.setRawValue(data.psuTemperature);
-    _psuTempWarningFact.setRawValue(_psuTemperatureFact.rawValue() >= _psuTempWarningTemp);
-    _psuTempCriticalFact.setRawValue(_psuTemperatureFact.rawValue() >= _psuTempCriticalTemp);
+    _psuTempWarningFact.setRawValue(_psuTemperatureFact.rawValue().toInt() >= _psuTempWarningTemp);
+    _psuTempCriticalFact.setRawValue(_psuTemperatureFact.rawValue().toInt() >= _psuTempCriticalTemp);
 
     _spoolTemperatureFact.setRawValue(data.spoolTemperature);
-    _spoolTempWarningFact.setRawValue(_spoolTemperatureFact.rawValue() >= _spoolTempWarningTemp);
-    _spoolTempCriticalFact.setRawValue(_spoolTemperatureFact.rawValue() >= _spoolTempCriticalTemp);
+    _spoolTempWarningFact.setRawValue(_spoolTemperatureFact.rawValue().toInt() >= _spoolTempWarningTemp);
+    _spoolTempCriticalFact.setRawValue(_spoolTemperatureFact.rawValue().toInt() >= _spoolTempCriticalTemp);
 
     _psuFanDutyFact.setRawValue(data.psuFanDuty);
     _spoolFanDutyFact.setRawValue(data.spoolFanDuty);
@@ -78,5 +78,5 @@ void GPUFactGroup::_handleZatGpuData(const mavlink_message_t &msg)
     _pressureFact.setRawValue(data.pressure);
     _pressureTemperatureFact.setRawValue(data.pressureTemperature);
 
-    _outputVoltageFact.setRawValue(data.outputVoltage);*/
+    _outputVoltageFact.setRawValue(data.outputVoltage);
 }

@@ -18,5 +18,8 @@ public:
     void handleMessage(Vehicle *vehicle, mavlink_message_t &message) final;
 
 private:
-    void _handleMsg(mavlink_message_t &message);
+    void _handleStatusText(Vehicle *vehicle, const mavlink_message_t &message);
+
+    const QString _ipAddress = QStringLiteral("192.168.1.4");
+    const QString _streamUrl = QStringLiteral("rtsp://%1:554/stream0");
 };

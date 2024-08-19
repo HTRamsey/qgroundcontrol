@@ -14,6 +14,11 @@ ToolStripActionList {
         GuidedActionLand { },
         GuidedActionRTL { },
         GuidedActionPause { },
-        GuidedActionActionList { }
+        GuidedActionActionList { },
+        GuidedActionSpotlight { },
+        GuidedActionBeacon { },
+        GuidedActionRemoteId { },
+        GuidedActionNavigationLight { },
+        GuidedActionAntiCollisionLight { }
     ]
 }
