@@ -53,23 +53,14 @@ void DroneFactGroup::_handleStatusText(Vehicle *vehicle, const mavlink_message_t
         static const QRegularExpression regexp("[()]");
         payload = payload.remove(regexp);
         if (payload.contains("Gimbal", Qt::CaseInsensitive)) {
-            /*const QStringList params = payload.remove(QChar(' ')).split(",");
+            /* const QStringList params = payload.remove(QChar(' ')).split(",");
             const QString gimbalType = params.at(1);
             const QString gimbalModel = params.at(2);
-            if (gimbalType.contains("NextVision", Qt::CaseInsensitive)) {
-                if(!_nextvisionEnabledFact.rawValue().toBool()) {
-                    _nextvisionEnabledFact.setRawValue(true);
-                }
-            } else if (gimbalType.contains("Viewpro", Qt::CaseInsensitive)) {
-                if (!_viewproEnabledFact.rawValue().toBool()) {
-                    _viewproEnabledFact.setRawValue(true);
-                }
-            }
             if (!_gimbalEnabledFact.rawValue().toBool()) {
                 _gimbalEnabledFact.setRawValue(true);
                 _gimbalTypeFact.setRawValue(gimbalType);
                 _gimbalModelFact.setRawValue(gimbalModel);
-            }*/
+            } */
         } else if (payload.contains("Servo", Qt::CaseInsensitive)) {
             const QStringList params = payload.remove(QChar(' ')).split(",");
             const QString servoName = params.at(1);
@@ -85,9 +76,9 @@ void DroneFactGroup::_handleStatusText(Vehicle *vehicle, const mavlink_message_t
                     }
                 } else if (servoName.contains("NavigationLight", Qt::CaseInsensitive)) {
                     if (!_navigationLightEnabledFact.rawValue().toBool()) {
-                        _navigationLightsPort = ch;
+                        _navigationLightPort = ch;
                         _navigationLightEnabledFact.setRawValue(true);
-                        _navigationLightsValue = 0;
+                        _navigationLightValue = 0;
                     }
                 } else if (servoName.contains("AntiCollisionLight", Qt::CaseInsensitive)) {
                     if (!_antiCollisionLightEnabledFact.rawValue().toBool()) {
@@ -104,8 +95,8 @@ void DroneFactGroup::_handleStatusText(Vehicle *vehicle, const mavlink_message_t
                         _remoteIdValue = 0;
                     }
                 } else if (servoName.contains("Light", Qt::CaseInsensitive)) {
-                    if (!_spotlights.contains(ch)) {
-                        (void) _spotlights.insert(ch, 0);
+                    if (!_spotlightValues.contains(ch)) {
+                        (void) _spotlightValues.insert(ch, 0);
                     }
                     if (!_spotlightEnabledFact.rawValue().toBool()) {
                         _spotlightEnabledFact.setRawValue(true);
@@ -133,8 +124,8 @@ void DroneFactGroup::_handleServoOutputRaw(const mavlink_message_t &msg)
     // TODO: get params SERVO9_MIN SERVO9_MAX for each received servo
 
     if (_spotlightEnabledFact.rawValue().toBool()) {
-        const QList<uint8_t> ports = _spotlights.keys();
-        const QList<uint16_t> values = _spotlights.values();
+        const QList<uint8_t> ports = _spotlightValues.keys();
+        const QList<uint16_t> values = _spotlightValues.values();
         for (qsizetype i = 0; i < ports.size(); ++i) {
             uint16_t servo_raw = 0;
             switch (ports.at(i)) {
@@ -150,9 +141,11 @@ void DroneFactGroup::_handleServoOutputRaw(const mavlink_message_t &msg)
             }
 
             if (servo_raw > 0 && servo_raw != values.at(i)) {
-                _spotlights[ports.at(i)] = servo_raw;
+                _spotlightValues[ports.at(i)] = servo_raw;
             }
         }
+
+        _spotlightStatusFact.setRawValue(_calcSpotlightStatus());
     }
 
     if (_beaconEnabledFact.rawValue().toBool()) {
@@ -176,7 +169,7 @@ void DroneFactGroup::_handleServoOutputRaw(const mavlink_message_t &msg)
 
     if (_navigationLightEnabledFact.rawValue().toBool()) {
         uint16_t servo_raw = 0;
-        switch (_navigationLightsPort) {
+        switch (_navigationLightPort) {
             case 9: servo_raw = data.servo9_raw; break;
             case 10: servo_raw = data.servo10_raw; break;
             case 11: servo_raw = data.servo11_raw; break;
@@ -188,8 +181,8 @@ void DroneFactGroup::_handleServoOutputRaw(const mavlink_message_t &msg)
             default: break;
         }
 
-        if ((servo_raw > 0) && (servo_raw != _navigationLightsValue)) {
-            _navigationLightsValue = servo_raw;
+        if ((servo_raw > 0) && (servo_raw != _navigationLightValue)) {
+            _navigationLightValue = servo_raw;
         }
     }
 
@@ -232,19 +225,17 @@ void DroneFactGroup::_handleServoOutputRaw(const mavlink_message_t &msg)
     }
 }
 
-/*uint8_t DroneFactGroup::lightsStatus() const
+uint8_t DroneFactGroup::_calcSpotlightStatus() const
 {
     uint16_t lights_status = 0;
-    if(!m_lights.isEmpty())
-    {
-        const QList<uint16_t> lightsValues = m_lights.values();
+    if (!_spotlightValues.isEmpty()) {
+        const QList<uint16_t> lightsValues = _spotlightValues.values();
         uint16_t total = 0;
-        for(const uint16_t value: lightsValues)
-        {
+        for (const uint16_t value: lightsValues) {
             total += value;
         }
         const uint16_t avg = total / lightsValues.size();
         lights_status = (qBound(1000U, avg, 1900U) - 1000) / 9;
     }
     return lights_status;
-}*/
+}

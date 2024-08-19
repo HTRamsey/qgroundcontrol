@@ -37,6 +37,8 @@ qt_add_library(CustomPlugin STATIC
     src/CustomPlugin.h
     src/AutoPilotPlugin/CustomAutoPilotPlugin.cc
     src/AutoPilotPlugin/CustomAutoPilotPlugin.h
+    src/Drone/Drone.cc
+    src/Drone/Drone.h
     src/FactGroups/DroneFactGroup.cc
     src/FactGroups/DroneFactGroup.h
     src/FactGroups/GPUFactGroup.cc
@@ -70,6 +72,7 @@ target_include_directories(CustomPlugin
     PUBLIC
         src
         src/AutoPilotPlugin
+        src/Drone
         src/FactGroups
         src/FirmwarePlugin
 )
