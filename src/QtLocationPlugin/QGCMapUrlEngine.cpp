@@ -267,3 +267,48 @@ QString UrlFactory::getTileHash(QStringView type, int x, int y, int z)
     const int hash = hashFromProviderType(type);
     return QString::asprintf("%010d%08d%08d%03d", hash, x, y, z);
 }
+
+// TODO
+/*bool UrlFactory::initializeCustomMapSources(QGeoServiceProvider::Error *error,
+                                              QString *errorString,
+                                              const QGeoCameraCapabilities &cameraCaps)
+{
+    QFile mapsFile(":/MapProviders/maps.json");
+    if (!mapsFile.open(QIODevice::ReadOnly)) {
+        *error = QGeoServiceProvider::NotSupportedError;
+        *errorString = Q_FUNC_INFO + QStringLiteral("Unable to open: ") + mapsFile.fileName();
+        return false;
+    }
+    const QByteArray mapsData = mapsFile.readAll();
+    mapsFile.close();
+    QJsonParseError parseError;
+    const QJsonDocument mapsDocument = QJsonDocument::fromJson(mapsData, &parseError);
+    if (!mapsDocument.isObject()) {
+        *error = QGeoServiceProvider::NotSupportedError;
+        *errorString = QString("%1JSON error: %2, offset: %3, details: %4")
+                            .arg(Q_FUNC_INFO)
+                            .arg((int)parseError.error)
+                            .arg(parseError.offset)
+                            .arg(parseError.errorString());
+        return false;
+    }
+    const QVariantMap maps = mapsDocument.object().toVariantMap();
+    const QVariantList mapSources = maps["mapSources"].toList();
+    for (const QVariant &mapSourceElement : mapSources) {
+        const QVariantMap mapSource = mapSourceElement.toMap();
+        const int mapId = m_providers.count() + 1;
+        MapProvider* provider = new MapProvider(
+            GeoMapSource::mapStyle(mapSource[kPropStyle].toString()),
+            mapSource[kPropName].toString(),
+            mapSource[kPropDescription].toString(),
+            mapSource[kPropMobile].toBool(),
+            mapSource[kPropMapId].toBool(),
+            mapId,
+            GeoMapSource::toFormat(mapSource[kPropUrl].toString()),
+            mapSource[kPropCopyright].toString(),
+            cameraCaps
+        );
+        m_providers << provider;
+    }
+    return true;
+}*/
