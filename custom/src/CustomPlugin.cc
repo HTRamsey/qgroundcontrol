@@ -112,7 +112,7 @@ bool CustomPlugin::adjustSettingMetaData(const QString &settingsGroup, FactMetaD
             return true;
         } else if (metaData.name() == AutoConnectSettings::autoConnectPixhawkName) {
             metaData.setRawDefaultValue(false);
-            return false;
+            return true;
         } else if (metaData.name() == AutoConnectSettings::autoConnectSiKRadioName) {
             metaData.setRawDefaultValue(false);
             return false;
@@ -148,7 +148,14 @@ bool CustomPlugin::adjustSettingMetaData(const QString &settingsGroup, FactMetaD
         }
     } else if (settingsGroup == FlightModeSettings::settingsGroup) {
         if (metaData.name() == FlightModeSettings::apmHiddenFlightModesMultiRotorName) {
-            metaData.setRawDefaultValue(QStringLiteral("Acro,Circle,Drift,Sport,Flip,Throw,Guided No GPS,Flow Hold,ZigZag,Turtle,Autotune,SystemID,AutoRotate,Stabilize,Altitude Hold,Auto,Position Hold,Avoid ADSB,Smart RTL,Follow,AutoRTL,Loiter"));
+            metaData.setRawDefaultValue(
+                QStringLiteral(
+                    "Acro,Circle,Drift,Sport,Flip,Throw,Guided No GPS,"
+                    "Flow Hold,ZigZag,Turtle,Autotune,SystemID,AutoRotate,"
+                    "Stabilize,Altitude Hold,Auto,Position Hold,Avoid ADSB,"
+                    "Smart RTL,Follow,AutoRTL,Loiter"
+                )
+            );
             return true;
         }
     } else if (settingsGroup == FlyViewSettings::settingsGroup) {
