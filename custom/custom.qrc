@@ -12,6 +12,7 @@
         <file alias="QGroundControl/FlightDisplay/GuidedActionSpotlight.qml">qml/GuidedActionSpotlight.qml</file>
         <file alias="QGroundControl/FlightDisplay/GuidedActionsController.qml">qml/GuidedActionsController.qml</file>
         <file alias="HelpSettings.qml">qml/HelpSettings.qml</file>
+        <file alias="FlyViewSettings.qml">qml/FlyViewSettings.qml</file>
     </qresource>
     <qresource prefix="/toolbar">
         <file alias="DroneIndicator.qml">qml/DroneIndicator.qml</file>
