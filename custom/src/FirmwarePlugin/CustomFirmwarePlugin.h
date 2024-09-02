@@ -18,4 +18,5 @@ public:
     // double minimumTakeoffAltitudeMeters(Vehicle *vehicle) final;
     // const QVariantList &toolIndicators(const Vehicle *vehicle) final;
     // const QVariantList &modeIndicators(const Vehicle *vehicle) final;
+    // void adjustOutgoingMavlinkMessageThreadSafe(Vehicle* vehicle, LinkInterface* outgoingLink, mavlink_message_t* message) final;
 };

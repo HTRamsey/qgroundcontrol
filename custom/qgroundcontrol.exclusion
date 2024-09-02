@@ -3,3 +3,4 @@
 <file alias="SettingsPagesModel.qml">src/UI/SettingsPagesModel.qml</file>
 <file alias="QGroundControl/FlightDisplay/GuidedActionsController.qml">src/FlightDisplay/GuidedActionsController.qml</file>
 <file alias="HelpSettings.qml">src/UI/preferences/HelpSettings.qml</file>
+<file alias="FlyViewSettings.qml">src/UI/preferences/FlyViewSettings.qml</file>
