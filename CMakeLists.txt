@@ -231,6 +231,14 @@ if(QGC_DISABLE_APM_MAVLINK)
     add_compile_definitions(NO_ARDUPILOT_DIALECT)
 endif()
 
+set(MACOS_UNIVERSAL_BUILD FALSE)
+if(MACOS)
+    if(CMAKE_OSX_ARCHITECTURES AND NOT "${CMAKE_HOST_SYSTEM_PROCESSOR}" IN_LIST CMAKE_OSX_ARCHITECTURES)
+        set(MACOS_UNIVERSAL_BUILD TRUE)
+    endif()
+endif()
+cmake_dependent_option(QGC_BUILD_DEPENDENCIES "Force Building of Dependencies." OFF "CMAKE_CROSSCOMPILING OR MACOS_UNIVERSAL_BUILD" ON)
+
 #######################################################
 #                Custom Build Configuration
 #######################################################
