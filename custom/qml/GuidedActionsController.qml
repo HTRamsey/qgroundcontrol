@@ -58,6 +58,8 @@ Item {
     readonly property string setHomeTitle:                  qsTr("Set Home")
     readonly property string actionListTitle:               qsTr("Action")
     readonly property string setEstimatorOriginTitle:       qsTr("Set Estimator origin")
+    readonly property string setFlightMode:                 qsTr("Set Flight Mode")
+    readonly property string changeHeadingTitle:            qsTr("Change Heading")
     readonly property string antiCollisionLightTitle:       qsTr("Anti-Collision Light")
     readonly property string beaconTitle:                   qsTr("Beacon")
     readonly property string navigationLightTitle:          qsTr("Navigation Light")
@@ -89,6 +91,8 @@ Item {
     readonly property string roiMessage:                        qsTr("Make the specified location a Region Of Interest.")
     readonly property string setHomeMessage:                    qsTr("Set vehicle home as the specified location. This will affect Return to Home position")
     readonly property string setEstimatorOriginMessage:         qsTr("Make the specified location the estimator origin.")
+    readonly property string setFlightModeMessage:              qsTr("Set the vehicle flight mode to %1").arg(_actionData)
+    readonly property string changeHeadingMessage:              qsTr("Set the vehicle heading towards the specified location.")
     readonly property string antiCollisionLightMessage:         qsTr("Anti-Collision Light")
     readonly property string beaconMessage:                     qsTr("Beacon")
     readonly property string navigationLightMessage:            qsTr("Navigation Light")
@@ -123,11 +127,13 @@ Item {
     readonly property int actionGripper:                    26
     readonly property int actionSetHome:                    27
     readonly property int actionSetEstimatorOrigin:         28
-    readonly property int actionAntiCollisionLight:         29
-    readonly property int actionBeacon:                     30
-    readonly property int actionNavigationLight:            31
-    readonly property int actionRemoteId:                   32
-    readonly property int actionSpotlight:                  33
+    readonly property int actionSetFlightMode:              29
+    readonly property int actionChangeHeading:              30
+    readonly property int actionAntiCollisionLight:         31
+    readonly property int actionBeacon:                     32
+    readonly property int actionNavigationLight:            33
+    readonly property int actionRemoteId:                   34
+    readonly property int actionSpotlight:                  35
 
     property var    _activeVehicle:             QGroundControl.multiVehicleManager.activeVehicle
     property var    _flyViewSettings:           QGroundControl.settingsManager.flyViewSettings
@@ -160,6 +166,7 @@ Item {
     property bool showActionList:           _guidedActionsEnabled && (showStartMission || showResumeMission || showChangeAlt || showLandAbort || actionList.hasCustomActions)
     property bool showGripper:              _initialConnectComplete ? _activeVehicle.hasGripper : false
     property bool showSetEstimatorOrigin:   false // _activeVehicle && !(_activeVehicle.sensorsPresentBits & Vehicle.SysStatusSensorGPS)
+    property bool showChangeHeading:        _guidedActionsEnabled && _vehicleFlying
     property bool showAntiCollisionLight:   _guidedActionsEnabled && _corePlugin.drone.antiCollisionLightEnabled.rawValue
     property bool showBeacon:               _guidedActionsEnabled && _corePlugin.drone.beaconEnabled.rawValue
     property bool showNavigationLight:      _guidedActionsEnabled && _corePlugin.drone.navigationLightEnabled.rawValue
@@ -564,6 +571,14 @@ Item {
             confirmDialog.title = setEstimatorOriginTitle
             confirmDialog.message = setEstimatorOriginMessage
             break
+        case actionSetFlightMode:
+            confirmDialog.title = setFlightMode
+            confirmDialog.message = setFlightModeMessage
+            break
+        case actionChangeHeading:
+            confirmDialog.title = changeHeadingTitle
+            confirmDialog.message = changeHeadingMessage
+            break
         case actionAntiCollisionLight:
             confirmDialog.title = antiCollisionLightTitle
             confirmDialog.message = antiCollisionLightMessage
@@ -689,6 +704,12 @@ Item {
             break
         case actionSetEstimatorOrigin:
             _activeVehicle.setEstimatorOrigin(actionData)
+            break
+        case actionSetFlightMode:
+            _activeVehicle.flightMode = actionData
+            break
+        case actionChangeHeading:
+            _activeVehicle.guidedModeChangeHeading(actionData)
             break
         case actionAntiCollisionLight:
             _corePlugin.drone.setAntiCollisionLight(activeVehicle, actionData)
