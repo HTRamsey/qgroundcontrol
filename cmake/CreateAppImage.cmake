@@ -1,4 +1,4 @@
-message(STATUS "Creating AppImage")
+# message(STATUS "Creating AppImage")
 # TODO: https://github.com/AppImageCommunity/AppImageUpdate
 
 set(APPDIR_PATH "${CMAKE_BINARY_DIR}/AppDir")
@@ -29,7 +29,8 @@ endif()
 #     execute_process(COMMAND chmod a+x "${LD_GSTPLUGIN_PATH}")
 # endif()
 
-execute_process(COMMAND ${LD_PATH} --appdir ${APPDIR_PATH} --output appimage)
+set(ENV{QMAKE} "${QMAKE_EXECUTABLE}")
+execute_process(COMMAND ${LD_PATH} --appdir ${APPDIR_PATH} --output appimage --plugin qt)
 # --exclude-library "libX*"
 # --exclude-library "libglib*"
 # --exclude-library "libgobject*"
@@ -43,3 +44,16 @@ execute_process(COMMAND ${LD_PATH} --appdir ${APPDIR_PATH} --output appimage)
 # --exclude-library "libgst*"
 # --exclude-library "libgthread*"
 # --plugin qt --plugin gtk --plugin gstreamer
+
+# wget -c https://github.com/$(wget -q https://github.com/probonopd/go-appimage/releases/expanded_assets/continuous -O - | grep "appimagetool-.*-x86_64.AppImage" | head -n 1 | cut -d '"' -f 2)
+# chmod +x appimagetool-*.AppImage
+# ./appimagetool-*.AppImage deploy appdir/usr/share/applications/*.desktop
+# VERSION=1.0 ./appimagetool-*.AppImage ./Some.AppDir
+
+# set(LDQ_PATH "${CMAKE_BINARY_DIR}/linuxdeployqt.AppImage")
+# if(NOT EXISTS "${LDQ_PATH}")
+#     file(DOWNLOAD https://github.com/probonopd/linuxdeployqt/releases/download/continuous/linuxdeployqt-continuous-x86_64.AppImage "${LDQ_PATH}")
+#     execute_process(COMMAND chmod +x "${LDQ_PATH}")
+# endif()
+
+# execute_process(COMMAND ${LDQ_PATH} ${APPDIR_PATH}/usr/share/applications/org.mavlink.qgroundcontrol.desktop -appimage -extra-plugins=iconengines,platformthemes/libqgtk3.so -unsupported-allow-new-glibc)
