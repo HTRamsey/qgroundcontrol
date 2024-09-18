@@ -207,7 +207,7 @@ bool CustomPlugin::adjustSettingMetaData(const QString &settingsGroup, FactMetaD
             // metaData.setRawDefaultValue(QStringLiteral("rtsp://"));
             return true;
         } else if (metaData.name() == VideoSettings::gridLinesName) {
-            metaData.setRawDefaultValue(1);
+            metaData.setRawDefaultValue(0);
             return true;
         } else if (metaData.name() == VideoSettings::rtspTimeoutName) {
             metaData.setRawDefaultValue(8);
