@@ -11,8 +11,11 @@
         <file alias="QGroundControl/FlightDisplay/GuidedActionRemoteId.qml">qml/GuidedActionRemoteId.qml</file>
         <file alias="QGroundControl/FlightDisplay/GuidedActionSpotlight.qml">qml/GuidedActionSpotlight.qml</file>
         <file alias="QGroundControl/FlightDisplay/GuidedActionsController.qml">qml/GuidedActionsController.qml</file>
+        <file alias="QGroundControl/FlightDisplay/VehicleWarnings.qml">qml/VehicleWarnings.qml</file>
         <file alias="HelpSettings.qml">qml/HelpSettings.qml</file>
-        <file alias="FlyViewSettings.qml">qml/FlyViewSettings.qml</file>
+        <file alias="QGroundControl/FlightDisplay/GuidedValueSlider.qml">qml/GuidedValueSlider.qml</file>
+        <file alias="QGroundControl/FlightDisplay/GuidedActionPause.qml">qml/GuidedActionPause.qml</file>
+        <file alias="QGroundControl/FlightDisplay/GuidedActionAltitude.qml">qml/GuidedActionAltitude.qml</file>
     </qresource>
     <qresource prefix="/toolbar">
         <file alias="DroneIndicator.qml">qml/DroneIndicator.qml</file>
@@ -26,5 +29,8 @@
     </qresource>
     <qresource prefix="/custom/img">
         <file alias="ZATBrandImage.png">res/images/ZATBrandImage.png</file>
+    </qresource>
+    <qresource prefix="/checklists">
+        <file alias="MultiRotorChecklist.qml">qml/MultiRotorChecklist.qml</file>
     </qresource>
 </RCC>

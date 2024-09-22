@@ -1,12 +1,3 @@
-/****************************************************************************
- *
- * (c) 2009-2020 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
- *
- * QGroundControl is licensed according to the terms in the file
- * COPYING.md in the root of the source code directory.
- *
- ****************************************************************************/
-
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Dialogs
@@ -46,7 +37,7 @@ Item {
     readonly property string resumeMissionUploadFailTitle:  qsTr("Resume FAILED")
     readonly property string pauseTitle:                    qsTr("Pause")
     readonly property string mvPauseTitle:                  qsTr("Pause (MV)")
-    readonly property string changeAltTitle:                qsTr("Change Altitude")
+    readonly property string changeAltTitle:                qsTr("Set Altitude")
     readonly property string changeCruiseSpeedTitle:        qsTr("Change Max Ground Speed")
     readonly property string changeAirspeedTitle:           qsTr("Change Airspeed")
     readonly property string orbitTitle:                    qsTr("Orbit")
@@ -507,9 +498,10 @@ Item {
             confirmDialog.hideTrigger = Qt.binding(function() { return !showGotoLocation })
             break;
         case actionSetWaypoint:
-            confirmDialog.title = setWaypointTitle
+            /*confirmDialog.title = setWaypointTitle
             confirmDialog.message = setWaypointMessage
-            break;
+            break;*/
+            return;
         case actionOrbit:
             confirmDialog.title = orbitTitle
             confirmDialog.message = orbitMessage
@@ -522,11 +514,8 @@ Item {
             confirmDialog.hideTrigger = Qt.binding(function() { return !showLandAbort })
             break;
         case actionPause:
-            confirmDialog.title = pauseTitle
-            confirmDialog.message = pauseMessage
-            confirmDialog.hideTrigger = Qt.binding(function() { return !showPause })
-            guidedValueSlider.visible = true
-            break;
+            _activeVehicle.pauseVehicle()
+            return;
         case actionMVPause:
             confirmDialog.title = mvPauseTitle
             confirmDialog.message = mvPauseMessage

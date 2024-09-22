@@ -45,86 +45,112 @@ Item {
                     spacing: ScreenTools.defaultFontPixelHeight / 2
 
                     SettingsGroupLayout {
-                        heading: "GPU Status"
+                        id: gpuGroup
+                        heading: qsTr("GPU Status")
+                        property var gpu: QGroundControl.corePlugin.gpu
 
-                        LabelledLabel {
-                            label:      QGroundControl.corePlugin.gpu.psuTemperature.shortDescription
-                            labelText:  QGroundControl.corePlugin.gpu.psuTemperature.valueString
+                        SettingsGroupLayout {
+                            heading: qsTr("Tether")
+
+                            LabelledLabel {
+                                label:      gpuGroup.gpu.tetherTension.shortDescription
+                                labelText:  gpuGroup.gpu.tetherTension.valueString + " " + gpuGroup.gpu.tetherTension.units
+                            }
+
+                            LabelledLabel {
+                                label:      gpuGroup.gpu.motorDuty.shortDescription
+                                labelText:  gpuGroup.gpu.motorDuty.valueString + " " + gpuGroup.gpu.motorDuty.units
+                            }
                         }
 
-                        LabelledLabel {
-                            label:      QGroundControl.corePlugin.gpu.spoolTemperature.shortDescription
-                            labelText:  QGroundControl.corePlugin.gpu.spoolTemperature.valueString
+                        SettingsGroupLayout {
+                            heading: qsTr("Power")
+
+                            LabelledLabel {
+                                label:      gpuGroup.gpu.outputVoltage.shortDescription
+                                labelText:  gpuGroup.gpu.outputVoltage.valueString + " " + gpuGroup.gpu.outputVoltage.units
+                            }
                         }
 
-                        LabelledLabel {
-                            label:      QGroundControl.corePlugin.gpu.psuFanDuty.shortDescription
-                            labelText:  QGroundControl.corePlugin.gpu.psuFanDuty.valueString
+                        SettingsGroupLayout {
+                            heading: qsTr("Temperature")
+
+                            LabelledLabel {
+                                label:      gpuGroup.gpu.psuTemperature.shortDescription
+                                labelText:  gpuGroup.gpu.psuTemperature.valueString + " " + gpuGroup.gpu.psuTemperature.units
+                            }
+
+                            LabelledLabel {
+                                label:      gpuGroup.gpu.spoolTemperature.shortDescription
+                                labelText:  gpuGroup.gpu.spoolTemperature.valueString + " " + gpuGroup.gpu.spoolTemperature.units
+                            }
+
+                            LabelledLabel {
+                                label:      gpuGroup.gpu.psuFanDuty.shortDescription
+                                labelText:  gpuGroup.gpu.psuFanDuty.valueString + " " + gpuGroup.gpu.psuFanDuty.units
+                            }
+
+                            LabelledLabel {
+                                label:      gpuGroup.gpu.spoolFanDuty.shortDescription
+                                labelText:  gpuGroup.gpu.spoolFanDuty.valueString + " " + gpuGroup.gpu.spoolFanDuty.units
+                            }
                         }
 
-                        LabelledLabel {
-                            label:      QGroundControl.corePlugin.gpu.spoolFanDuty.shortDescription
-                            labelText:  QGroundControl.corePlugin.gpu.spoolFanDuty.valueString
+                        SettingsGroupLayout {
+                            heading: qsTr("Location")
+
+                            LabelledLabel {
+                                label:      gpuGroup.gpu.latitude.shortDescription
+                                labelText:  gpuGroup.gpu.latitude.valueString + " " + gpuGroup.gpu.latitude.units
+                            }
+
+                            LabelledLabel {
+                                label:      gpuGroup.gpu.longitude.shortDescription
+                                labelText:  gpuGroup.gpu.longitude.valueString + " " + gpuGroup.gpu.longitude.units
+                            }
+
+                            LabelledLabel {
+                                label:      gpuGroup.gpu.altitude.shortDescription
+                                labelText:  gpuGroup.gpu.altitude.valueString + " " + gpuGroup.gpu.altitude.units
+                            }
                         }
 
-                        LabelledLabel {
-                            label:      QGroundControl.corePlugin.gpu.motorDuty.shortDescription
-                            labelText:  QGroundControl.corePlugin.gpu.motorDuty.valueString
+                        SettingsGroupLayout {
+                            heading: qsTr("Pressure")
+
+                            LabelledLabel {
+                                label:      gpuGroup.gpu.pressure.shortDescription
+                                labelText:  gpuGroup.gpu.pressure.valueString + " " + gpuGroup.gpu.pressure.units
+                            }
+
+                            LabelledLabel {
+                                label:      gpuGroup.gpu.pressureTemperature.shortDescription
+                                labelText:  gpuGroup.gpu.pressureTemperature.valueString + " " + gpuGroup.gpu.pressureTemperature.units
+                            }
                         }
 
-                        LabelledLabel {
-                            label:      QGroundControl.corePlugin.gpu.tetherTension.shortDescription
-                            labelText:  QGroundControl.corePlugin.gpu.tetherTension.valueString
-                        }
+                        SettingsGroupLayout {
+                            heading: qsTr("Warnings")
 
-                        LabelledLabel {
-                            label:      QGroundControl.corePlugin.gpu.latitude.shortDescription
-                            labelText:  QGroundControl.corePlugin.gpu.latitude.valueString
-                        }
+                            LabelledLabel {
+                                label:      gpuGroup.gpu.psuTempWarning.shortDescription
+                                labelText:  gpuGroup.gpu.psuTempWarning.valueString + " " + gpuGroup.gpu.psuTempWarning.units
+                            }
 
-                        LabelledLabel {
-                            label:      QGroundControl.corePlugin.gpu.longitude.shortDescription
-                            labelText:  QGroundControl.corePlugin.gpu.longitude.valueString
-                        }
+                            LabelledLabel {
+                                label:      gpuGroup.gpu.psuTempCritical.shortDescription
+                                labelText:  gpuGroup.gpu.psuTempCritical.valueString + " " + gpuGroup.gpu.psuTempCritical.units
+                            }
 
-                        LabelledLabel {
-                            label:      QGroundControl.corePlugin.gpu.altitude.shortDescription
-                            labelText:  QGroundControl.corePlugin.gpu.altitude.valueString
-                        }
+                            LabelledLabel {
+                                label:      gpuGroup.gpu.spoolTempWarning.shortDescription
+                                labelText:  gpuGroup.gpu.spoolTempWarning.valueString + " " + gpuGroup.gpu.spoolTempWarning.units
+                            }
 
-                        LabelledLabel {
-                            label:      QGroundControl.corePlugin.gpu.pressure.shortDescription
-                            labelText:  QGroundControl.corePlugin.gpu.pressure.valueString
-                        }
-
-                        LabelledLabel {
-                            label:      QGroundControl.corePlugin.gpu.pressureTemperature.shortDescription
-                            labelText:  QGroundControl.corePlugin.gpu.pressureTemperature.valueString
-                        }
-
-                        LabelledLabel {
-                            label:      QGroundControl.corePlugin.gpu.outputVoltage.shortDescription
-                            labelText:  QGroundControl.corePlugin.gpu.outputVoltage.valueString
-                        }
-
-                        LabelledLabel {
-                            label:      QGroundControl.corePlugin.gpu.psuTempWarning.shortDescription
-                            labelText:  QGroundControl.corePlugin.gpu.psuTempWarning.valueString
-                        }
-
-                        LabelledLabel {
-                            label:      QGroundControl.corePlugin.gpu.psuTempCritical.shortDescription
-                            labelText:  QGroundControl.corePlugin.gpu.psuTempCritical.valueString
-                        }
-
-                        LabelledLabel {
-                            label:      QGroundControl.corePlugin.gpu.spoolTempWarning.shortDescription
-                            labelText:  QGroundControl.corePlugin.gpu.spoolTempWarning.valueString
-                        }
-
-                        LabelledLabel {
-                            label:      QGroundControl.corePlugin.gpu.spoolTempCritical.shortDescription
-                            labelText:  QGroundControl.corePlugin.gpu.spoolTempCritical.valueString
+                            LabelledLabel {
+                                label:      gpuGroup.gpu.spoolTempCritical.shortDescription
+                                labelText:  gpuGroup.gpu.spoolTempCritical.valueString + " " + gpuGroup.gpu.spoolTempCritical.units
+                            }
                         }
                     }
                 }
