@@ -20,7 +20,7 @@ class CustomOptions : public QGCOptions
 public:
     explicit CustomOptions(QObject *parent = nullptr);
 
-    // QUrl preFlightChecklistUrl() const final { return QUrl::fromUserInput("qrc:/qml/PreFlightCheckList.qml"); }
+    // QUrl preFlightChecklistUrl() const final { return QUrl::fromUserInput("qrc:/qml/ZATPreFlightCheckList.qml"); }
     bool showFirmwareUpgrade() const final { return false; }
     bool multiVehicleEnabled() const final { return false; }
     bool checkFirmwareVersion() const final { return false; }

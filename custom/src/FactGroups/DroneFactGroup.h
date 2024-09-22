@@ -84,12 +84,6 @@ private:
     Fact _antiCollisionLightEnabledFact = Fact(MAV_COMP_ID_AUTOPILOT1, _antiCollisionLightEnabledFactName, FactMetaData::valueTypeBool);
     Fact _antiCollisionLightStatusFact = Fact(MAV_COMP_ID_AUTOPILOT1, _antiCollisionLightStatusFactName, FactMetaData::valueTypeBool);
 
-    const QString _highPowerFactName = QStringLiteral("highPower");
-    const QString _highPowerWarningFactName = QStringLiteral("highPowerWarning");
-
-    Fact _highPowerFact = Fact(MAV_COMP_ID_AUTOPILOT1, _highPowerFactName, FactMetaData::valueTypeBool);
-    Fact _highPowerWarningFact = Fact(MAV_COMP_ID_AUTOPILOT1, _highPowerWarningFactName, FactMetaData::valueTypeBool);
-
     QMap<uint8_t, uint16_t> _spotlightValues;
 
     uint16_t _beaconValue = 0;

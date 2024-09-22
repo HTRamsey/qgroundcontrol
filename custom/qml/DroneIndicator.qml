@@ -15,7 +15,7 @@ Item {
 
     property bool showIndicator: _hasTelemetry
 
-    property var  _activeVehicle: QGroundControl.multiVehicleManager.activeVehicle
+    property var _activeVehicle: QGroundControl.multiVehicleManager.activeVehicle
     property bool _hasTelemetry: _activeVehicle
 
     QGCColoredImage {
@@ -30,8 +30,8 @@ Item {
     }
 
     MouseArea {
-        anchors.fill:   parent
-        onClicked:      mainWindow.showIndicatorDrawer(telemDroneInfoPage, control)
+        anchors.fill: parent
+        onClicked: mainWindow.showIndicatorDrawer(telemDroneInfoPage, control)
     }
 
     Component {
@@ -45,36 +45,113 @@ Item {
                     spacing: ScreenTools.defaultFontPixelHeight / 2
 
                     SettingsGroupLayout {
-                        heading: "Drone Status"
+                        heading: qsTr("Drone Status")
 
                         LabelledLabel {
-                            label:      QGroundControl.corePlugin.drone.spotlightStatus.shortDescription
-                            labelText:  QGroundControl.corePlugin.drone.spotlightStatus.valueString
-                            visible:    QGroundControl.corePlugin.drone.spotlightEnabled.rawValue
+                            label: qsTr("Model")
+                            labelText: _activeVehicle.vehicleTypeString
                         }
 
                         LabelledLabel {
-                            label:      QGroundControl.corePlugin.drone.beaconStatus.shortDescription
-                            labelText:  QGroundControl.corePlugin.drone.beaconStatus.valueString
-                            visible:    QGroundControl.corePlugin.drone.beaconEnabled.rawValue
+                            label: qsTr("Ready To Fly")
+                            labelText: _activeVehicle.readyToFly
                         }
 
                         LabelledLabel {
-                            label:      QGroundControl.corePlugin.drone.remoteIdStatus.shortDescription
-                            labelText:  QGroundControl.corePlugin.drone.remoteIdStatus.valueString
-                            visible:    QGroundControl.corePlugin.drone.remoteIdEnabled.rawValue
+                            label: qsTr("Armed")
+                            labelText: _activeVehicle.armed ? "True" : "False"
                         }
 
                         LabelledLabel {
-                            label:      QGroundControl.corePlugin.drone.navigationLightStatus.shortDescription
-                            labelText:  QGroundControl.corePlugin.drone.navigationLightStatus.valueString
-                            visible:    QGroundControl.corePlugin.drone.navigationLightEnabled.rawValue
+                            label: qsTr("Flight Mode")
+                            labelText: _activeVehicle.flightMode
                         }
 
                         LabelledLabel {
-                            label:      QGroundControl.corePlugin.drone.antiCollisionLightStatus.shortDescription
-                            labelText:  QGroundControl.corePlugin.drone.antiCollisionLightStatus.valueString
-                            visible:    QGroundControl.corePlugin.drone.antiCollisionLightEnabled.rawValue
+                            label: qsTr("Latitude")
+                            labelText: _activeVehicle.latitude.toFixed(7) + "°"
+                        }
+
+                        LabelledLabel {
+                            label: qsTr("Longitude")
+                            labelText: _activeVehicle.longitude.toFixed(7) + "°"
+                        }
+
+                        LabelledLabel {
+                            label: _activeVehicle.heading.shortDescription
+                            labelText: _activeVehicle.heading.valueString + " " + _activeVehicle.heading.units
+                        }
+
+                        LabelledLabel {
+                            label: _activeVehicle.throttlePct.shortDescription
+                            labelText: _activeVehicle.throttlePct.valueString + " " + _activeVehicle.throttlePct.units
+                        }
+
+                        LabelledLabel {
+                            label: _activeVehicle.groundSpeed.shortDescription
+                            labelText: _activeVehicle.groundSpeed.valueString + " " + _activeVehicle.groundSpeed.units
+                        }
+
+                        LabelledLabel {
+                            label: _activeVehicle.climbRate.shortDescription
+                            labelText: _activeVehicle.climbRate.valueString + " " + _activeVehicle.climbRate.units
+                        }
+
+                        LabelledLabel {
+                            label: _activeVehicle.distanceToGCS.shortDescription
+                            labelText: _activeVehicle.distanceToGCS.valueString + " " + _activeVehicle.distanceToGCS.units
+                        }
+
+                        LabelledLabel {
+                            label: _activeVehicle.flightDistance.shortDescription
+                            labelText: _activeVehicle.flightDistance.valueString + " " + _activeVehicle.flightDistance.units
+                        }
+
+                        LabelledLabel {
+                            label: _activeVehicle.timeToHome.shortDescription
+                            labelText: _activeVehicle.timeToHome.valueString + "ms"
+                        }
+
+                        LabelledLabel {
+                            label: _activeVehicle.hobbs.shortDescription
+                            labelText: _activeVehicle.hobbs.valueString + " " + _activeVehicle.hobbs.units
+                        }
+                    }
+
+                    SettingsGroupLayout {
+                        id: payloadsGroup
+                        heading: qsTr("Payloads")
+
+                        property var drone: QGroundControl.corePlugin.drone
+
+                        LabelledLabel {
+                            label:      payloadsGroup.drone.spotlightStatus.shortDescription
+                            labelText:  payloadsGroup.drone.spotlightStatus.valueString + " " + payloadsGroup.drone.spotlightStatus.units
+                            visible:    payloadsGroup.drone.spotlightEnabled.rawValue
+                        }
+
+                        LabelledLabel {
+                            label:      payloadsGroup.drone.beaconStatus.shortDescription
+                            labelText:  payloadsGroup.drone.beaconStatus.valueString + " " + payloadsGroup.drone.spotlightStatus.units
+                            visible:    payloadsGroup.drone.beaconEnabled.rawValue
+                        }
+
+                        LabelledLabel {
+                            label:      payloadsGroup.drone.remoteIdStatus.shortDescription
+                            labelText:  payloadsGroup.drone.remoteIdStatus.valueString + " " + payloadsGroup.drone.spotlightStatus.units
+                            visible:    payloadsGroup.drone.remoteIdEnabled.rawValue
+                        }
+
+                        LabelledLabel {
+                            label:      payloadsGroup.drone.navigationLightStatus.shortDescription
+                            labelText:  payloadsGroup.drone.navigationLightStatus.valueString + " " + payloadsGroup.drone.spotlightStatus.units
+                            visible:    payloadsGroup.drone.navigationLightEnabled.rawValue
+                        }
+
+                        LabelledLabel {
+                            label:      payloadsGroup.drone.antiCollisionLightStatus.shortDescription
+                            labelText:  payloadsGroup.drone.antiCollisionLightStatus.valueString + " " + payloadsGroup.drone.spotlightStatus.units
+                            visible:    payloadsGroup.drone.antiCollisionLightEnabled.rawValue
                         }
                     }
                 }

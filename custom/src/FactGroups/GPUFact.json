@@ -52,21 +52,21 @@
     "shortDesc":        "Latitude",
     "type":             "double",
     "decimalPlaces":    7,
-    "units":            "C"
+    "units":            "°"
 },
 {
     "name":             "longitude",
     "shortDesc":        "Longitude",
     "type":             "double",
     "decimalPlaces":    7,
-    "units":            "C"
+    "units":            "°"
 },
 {
     "name":             "altitude",
     "shortDesc":        "Altitude",
     "type":             "float",
     "decimalPlaces":    2,
-    "units":            "C"
+    "units":            "°"
 },
 {
     "name":             "pressure",
