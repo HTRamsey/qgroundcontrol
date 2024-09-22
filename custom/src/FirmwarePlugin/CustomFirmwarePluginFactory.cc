@@ -1,11 +1,22 @@
 #include "CustomFirmwarePluginFactory.h"
 #include "CustomFirmwarePlugin.h"
+#include "QGCLoggingCategory.h"
+
+QGC_LOGGING_CATEGORY(CustomFirmwarePluginFactoryLog, "qgc.custom.firmwareplugin.customfirmwarepluginfactory")
 
 CustomFirmwarePluginFactory CustomFirmwarePluginFactoryImp;
 
-CustomFirmwarePluginFactory::CustomFirmwarePluginFactory()
+CustomFirmwarePluginFactory::CustomFirmwarePluginFactory(QObject *parent)
+    : FirmwarePluginFactory()
 {
+    Q_UNUSED(parent);
 
+    // qCDebug(CustomFirmwarePluginFactoryLog) << Q_FUNC_INFO << this;
+}
+
+CustomFirmwarePluginFactory::~CustomFirmwarePluginFactory()
+{
+    // qCDebug(CustomFirmwarePluginFactoryLog) << Q_FUNC_INFO << this;
 }
 
 QList<QGCMAVLink::FirmwareClass_t> CustomFirmwarePluginFactory::supportedFirmwareClasses() const

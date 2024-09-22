@@ -32,12 +32,6 @@ const QVariantList& CustomAutoPilotPlugin::vehicleComponents()
 {
     if (_components.isEmpty() && !_incorrectParameterVersion) {
         if (_vehicle->parameterManager()->parametersReady()) {
-            if ( _vehicle->supportsRadio() ) {
-                _radioComponent = new APMRadioComponent(_vehicle, this);
-                _radioComponent->setupTriggerSignals();
-                _components.append(QVariant::fromValue((VehicleComponent*)_radioComponent));
-            }
-
             _sensorsComponent = new APMSensorsComponent(_vehicle, this);
             _sensorsComponent->setupTriggerSignals();
             _components.append(QVariant::fromValue((VehicleComponent*)_sensorsComponent));

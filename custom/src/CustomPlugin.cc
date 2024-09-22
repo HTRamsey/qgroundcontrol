@@ -116,9 +116,6 @@ bool CustomPlugin::adjustSettingMetaData(const QString &settingsGroup, FactMetaD
         } else if (metaData.name() == AutoConnectSettings::autoConnectSiKRadioName) {
             metaData.setRawDefaultValue(false);
             return false;
-        } else if (metaData.name() == AutoConnectSettings::autoConnectPX4FlowName) {
-            metaData.setRawDefaultValue(false);
-            return false;
         } else if (metaData.name() == AutoConnectSettings::autoConnectRTKGPSName) {
             metaData.setRawDefaultValue(false);
             return false;
