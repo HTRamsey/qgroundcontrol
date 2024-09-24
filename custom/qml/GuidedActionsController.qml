@@ -37,7 +37,7 @@ Item {
     readonly property string resumeMissionUploadFailTitle:  qsTr("Resume FAILED")
     readonly property string pauseTitle:                    qsTr("Pause")
     readonly property string mvPauseTitle:                  qsTr("Pause (MV)")
-    readonly property string changeAltTitle:                qsTr("Set Altitude")
+    readonly property string changeAltTitle:                qsTr("Altitude")
     readonly property string changeCruiseSpeedTitle:        qsTr("Change Max Ground Speed")
     readonly property string changeAirspeedTitle:           qsTr("Change Airspeed")
     readonly property string orbitTitle:                    qsTr("Orbit")

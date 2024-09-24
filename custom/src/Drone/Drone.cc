@@ -24,18 +24,17 @@ void Drone::_setServo(Vehicle *vehicle, uint8_t ch, uint16_t pwm)
     vehicle->sendMavCommand(vehicle->defaultComponentId(), MAV_CMD_DO_SET_SERVO, true, ch, pwm);
 }
 
-bool Drone::readyForAdjustLights()
+bool Drone::readyForAdjustLights(Vehicle *vehicle)
 {
     if (!_droneFactGroup->spotlightEnabled()->rawValue().toBool()) return false;
-    // if (!_droneFactGroup->inAir()) return false;
-    // _activeVehicle.flying
-    // if (relative_alt < minGuidedAlt() - .5) return false
+    if (!vehicle->flying()) return false;
+    // if (vehicle->vehicleFactGroup()->altitudeRelative()->rawValue() < (vehicle->minimumTakeoffAltitudeMeters() - .5)) return false;
     return true;
 }
 
 void Drone::adjustLights(Vehicle *vehicle, uint8_t intensity)
 {
-    if (!readyForAdjustLights()) return;
+    if (!readyForAdjustLights(vehicle)) return;
 
     uint8_t current = qBound(0U, _droneFactGroup->spotlightStatus()->rawValue().toUInt(), 100U);
     int8_t diff;
@@ -217,5 +216,5 @@ void Drone::setAntiCollisionLightState(Vehicle *vehicle, DroneFactGroup::AntiCol
         break;
     }
 
-    // _droneFactGroup->setAntiCollisionLightState(state);
+    _droneFactGroup->antiCollisionLightState()->setRawValue(state);
 }

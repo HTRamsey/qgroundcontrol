@@ -6,6 +6,12 @@
 #include "HorizontalFactValueGrid.h"
 #include "InstrumentValueData.h"
 #include "SettingsManager.h"
+#include "MAVLinkProtocol.h"
+#include "Vehicle.h"
+#include "LinkInterface.h"
+#include "MultiVehicleManager.h"
+#include "JoystickManager.h"
+#include "ParameterManager.h"
 #include "QGCLoggingCategory.h"
 
 QGC_LOGGING_CATEGORY(CustomLog, "qgc.custom.customplugin")
@@ -14,23 +20,83 @@ CustomPlugin::CustomPlugin(QGCApplication *app, QGCToolbox *toolbox)
     : QGCCorePlugin(app, toolbox)
     , _options(new CustomOptions(this))
 {
+    // qCDebug(CustomLog) << Q_FUNC_INFO << this;
+
     _showAdvancedUI = false;
 }
 
 CustomPlugin::~CustomPlugin()
 {
-
+    // qCDebug(CustomLog) << Q_FUNC_INFO << this;
 }
 
 void CustomPlugin::setToolbox(QGCToolbox *toolbox)
 {
     QGCCorePlugin::setToolbox(toolbox);
+
     _droneFactGroup = new DroneFactGroup(this);
     _gpuFactGroup = new GPUFactGroup(this);
     _nextVisionFactGroup = new NextVisionFactGroup(this);
     _viewproFactGroup = new ViewproFactGroup(this);
+    _gcsFactGroup = new GCSFactGroup(this);
 
     _droneControl = new Drone(_droneFactGroup, this);
+
+    MAVLinkProtocol *const mavlink = qgcApp()->toolbox()->mavlinkProtocol();
+    mavlink->setSystemId(_mavsys.sysid);
+    (void) connect(mavlink, &MAVLinkProtocol::messageReceived, this, [this](LinkInterface *link, mavlink_message_t message) {
+        Q_UNUSED(link);
+        if (_gpuFactGroup) {
+            _gpuFactGroup->handleMessage(nullptr, message);
+        }
+    }, Qt::AutoConnection);
+
+    MultiVehicleManager *const multiVehicleManager = qgcApp()->toolbox()->multiVehicleManager();
+    (void) connect(multiVehicleManager, &MultiVehicleManager::vehicleAdded, this, [this](Vehicle *vehicle) {
+        // TODO: Add these to drones fact groups
+        (void) connect(_toolbox->multiVehicleManager(), &MultiVehicleManager::vehicleAdded, this, [this](Vehicle *vehicle) {
+            vehicle->_addFactGroup(dynamic_cast<FactGroup*>(_droneFactGroup), QStringLiteral("Drone"));
+            vehicle->_addFactGroup(_gpuFactGroup, QStringLiteral("GPU"));
+            vehicle->_addFactGroup(_nextVisionFactGroup, QStringLiteral("NextVision"));
+            vehicle->_addFactGroup(_viewproFactGroup, QStringLiteral("Viewpro"));
+            vehicle->_addFactGroup(_gcsFactGroup, QStringLiteral("GCS"));
+        });
+        // _requestHomePosition(vehicle);
+    }, Qt::AutoConnection);
+
+    JoystickManager *const joystickManager = qgcApp()->toolbox()->joystickManager();
+    (void) connect(joystickManager, &JoystickManager::activeJoystickChanged, this, [this](Joystick *joystick) {
+        if (!joystick) {
+            return;
+        }
+        // joystick->totalButtonCount();
+        // joystick->buttonActions()
+    }, Qt::AutoConnection);
+
+    /*ParameterManager *const parameterManager = qgcApp()->toolbox()->multiVehicleManager()->activeVehicle()->parameterManager();
+    (void) connect(parameterManager, &ParameterManager::parametersReadyChanged, this, [parameterManager](bool parametersReady) {
+        if (!parametersReady) {
+            return;
+        }
+        if (parameterManager->parameterExists(ParameterManager::defaultComponentId, "FENCE_ALT_MAX")) {
+
+        }
+        if (parameterManager->parameterExists(ParameterManager::defaultComponentId, "FENCE_RADIUS")) {
+
+        }
+        if (parameterManager->parameterExists(ParameterManager::defaultComponentId, "AHRS_GPS_MINSATS")) {
+
+        }
+        if (parameterManager->parameterExists(ParameterManager::defaultComponentId, "BATT_LOW_VOLT")) {
+
+        }
+        if (parameterManager->parameterExists(ParameterManager::defaultComponentId, "BARO_ALT_OFFSET")) {
+
+        }
+        if (parameterManager->parameterExists(ParameterManager::defaultComponentId, "ATC_RATE_Y_MAX")) {
+
+        }
+    }, Qt::AutoConnection);*/
 }
 
 QVariantList &CustomPlugin::analyzePages()
@@ -105,6 +171,9 @@ bool CustomPlugin::adjustSettingMetaData(const QString &settingsGroup, FactMetaD
         } else if (metaData.name() == AppSettings::useChecklistName) {
             metaData.setRawDefaultValue(true);
             return true;
+        } else if (metaData.name() == AppSettings::indoorPaletteName) {
+            metaData.setRawDefaultValue(1);
+            return true;
         }
     } else if (settingsGroup == AutoConnectSettings::settingsGroup) {
         if (metaData.name() == AutoConnectSettings::autoConnectUDPName) {
@@ -166,19 +235,19 @@ bool CustomPlugin::adjustSettingMetaData(const QString &settingsGroup, FactMetaD
             metaData.setRawDefaultValue(false);
             return false;
         } else if (metaData.name() == FlyViewSettings::maxGoToLocationDistanceName) {
-            // TODO: Adjust based on Geofence
-            metaData.setRawDefaultValue(20);
+            // TODO: Adjust based on Geofence - FENCE_RADIUS
+            metaData.setRawDefaultValue(40);
             return false;
         }
     } else if (settingsGroup == MapsSettings::settingsGroup) {
         if (metaData.name() == MapsSettings::maxCacheDiskSizeName) {
-            metaData.setRawDefaultValue(2048);
+            metaData.setRawDefaultValue(4096);
             return true;
         } else if (metaData.name() == MapsSettings::maxCacheMemorySizeName) {
-#ifdef __mobile__
-            metaData.setRawDefaultValue(32);
-#else
+#ifdef Q_OS_ANDROID
             metaData.setRawDefaultValue(256);
+#else
+            metaData.setRawDefaultValue(512);
 #endif
             return true;
         }
@@ -222,6 +291,9 @@ bool CustomPlugin::adjustSettingMetaData(const QString &settingsGroup, FactMetaD
             metaData.setRawDefaultValue(false);
             return false;
         }
+    } else if (settingsGroup == CustomMavlinkActionsSettings::settingsGroup) {
+        metaData.setRawDefaultValue(false);
+        return false;
     }
 
     return parentResult;
@@ -256,9 +328,8 @@ void CustomPlugin::factValueGridCreateDefaultSettings(const QString &defaultSett
     value->setShowUnits(true);
 
     value = column->value<InstrumentValueData*>(rowIndex++);
-    value->setFact("Vehicle", "DistanceToHome");
-    value->setIcon("bookmark copy 3.svg");
-    value->setText(value->fact()->shortDescription());
+    value->setFact("Vehicle", "ThrottlePct");
+    value->setText("Thr");
     value->setShowUnits(true);
 
     rowIndex = 0;
@@ -282,38 +353,47 @@ void CustomPlugin::factValueGridCreateDefaultSettings(const QString &defaultSett
     column = factValueGrid.columns()->value<QmlObjectListModel*>(columnIndex++);
 
     value = column->value<InstrumentValueData*>(rowIndex++);
-    value->setFact("Vehicle", "AirSpeed");
-    value->setText("AirSpd");
-    value->setShowUnits(true);
-
-    value = column->value<InstrumentValueData*>(rowIndex++);
-    value->setFact("Vehicle", "ThrottlePct");
-    value->setText("Thr");
-    value->setShowUnits(true);
-
-    rowIndex = 0;
-    factValueGrid.appendColumn();
-    column = factValueGrid.columns()->value<QmlObjectListModel*>(columnIndex++);
-
-    value = column->value<InstrumentValueData*>(rowIndex++);
     value->setFact("Vehicle", "FlightTime");
     value->setIcon("timer.svg");
     value->setText(value->fact()->shortDescription());
     value->setShowUnits(false);
 
-    value = column->value<InstrumentValueData*>(rowIndex++);
-    value->setFact("Vehicle", "FlightDistance");
-    value->setIcon("travel-walk.svg");
+    /*value = column->value<InstrumentValueData*>(rowIndex++);
+    value->setFact("Gpu", "tetherTension");
+    value->setText("Tension");*/
+
+    rowIndex = 0;
+    factValueGrid.appendColumn();
+    column = factValueGrid.columns()->value<QmlObjectListModel*>(columnIndex++);
+
+    /*value = column->value<InstrumentValueData*>(rowIndex++);
+    value->setFact("Battery0", "instantPower");
     value->setText(value->fact()->shortDescription());
     value->setShowUnits(true);
+
+    value = column->value<InstrumentValueData*>(rowIndex++);
+    value->setFact("Battery0", "voltage");
+    value->setText(value->fact()->shortDescription());
+    value->setShowUnits(true);*/
 }
 
 bool CustomPlugin::mavlinkMessage(Vehicle *vehicle, LinkInterface *link, mavlink_message_t message)
 {
-    _droneFactGroup->handleMessage(vehicle, message);
-    _gpuFactGroup->handleMessage(vehicle, message);
-    _nextVisionFactGroup->handleMessage(vehicle, message);
-    _viewproFactGroup->handleMessage(vehicle, message);
+    if (_droneFactGroup) {
+        _droneFactGroup->handleMessage(vehicle, message);
+    }
+    // if (_gpuFactGroup) {
+    //     _gpuFactGroup->handleMessage(vehicle, message);
+    // }
+    if (_nextVisionFactGroup) {
+        _nextVisionFactGroup->handleMessage(vehicle, message);
+    }
+    if (_viewproFactGroup) {
+        _viewproFactGroup->handleMessage(vehicle, message);
+    }
+    if (_gcsFactGroup) {
+        _gcsFactGroup->handleMessage(vehicle, message);
+    }
 
     return true;
 }
@@ -333,3 +413,50 @@ const QVariantList &CustomPlugin::toolBarIndicators()
 
     return toolBarIndicatorList;
 }
+
+/*void CustomPlugin::_activeJoystickChanged(Joystick *activeJoystick)
+{
+    if (activeJoystick) {
+        (void) connect(activeCamJoystick, &Joystick::manualControlCam, this, &CameraManagement::manualCamControl);
+        this->_activeJoystick = activeJoystick;
+
+        for ( int i = 0; i < 32;i++ ) {
+            _buttonFuncState[i] = JoyBtnReleased;
+            _buttonFuncValue[i] = 0;
+        }
+    } else {
+        if (_activeJoystick) {
+            (void) disconnect(this->_activeCamJoystick, &Joystick::manualControlCam, this, &CameraManagement::manualCamControl);
+        }
+        _activeCamJoystick = activeCamJoystick;
+    }
+}*/
+
+/*void CustomPlugin::_requestHomePositionCommandResultHandler(void *resultHandlerData, int compId, const mavlink_command_ack_t &ack, MavCmdResultFailureCode_t failureCode)
+{
+    static int attempts = 0;
+    if ((ack.result != MAV_RESULT_ACCEPTED) || (failureCode != MavCmdResultCommandResultOnly)) {
+        Vehicle *const vehicle = static_cast<Vehicle*>(resultHandlerData);
+        if ((attempts++ < 3) && vehicle) {
+            _requestHomePosition(vehicle)
+        }
+    }
+}
+
+void CustomPlugin::_requestHomePosition(Vehicle *vehicle)
+{
+    const MavCmdAckHandlerInfo_t handlerInfo = {
+        &CustomPlugin::_requestHomePositionCommandResultHandler,
+        vehicle,
+        nullptr,
+        nullptr
+    };
+
+    vehicle->sendMavCommandWithHandler(
+        &handlerInfo,
+        compId,
+        MAV_CMD_REQUEST_MESSAGE,
+        msgId,
+        MAVLINK_MSG_ID_HOME_POSITION
+    );
+}*/

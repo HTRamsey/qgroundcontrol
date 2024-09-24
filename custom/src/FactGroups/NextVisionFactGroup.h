@@ -22,4 +22,8 @@ private:
 
     const QString _ipAddress = QStringLiteral("192.168.1.4");
     const QString _streamUrl = QStringLiteral("rtsp://%1:554/video");
+
+    static constexpr uint16_t _port = 14580;
+    // static constexpr mavlink_system_t _mavsys = {1, MAV_COMP_ID_AUTOPILOT1};
+    static constexpr const char *_ip = "192.168.1.4";
 };

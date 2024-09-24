@@ -19,6 +19,7 @@ Rectangle {
 
         Column {
             id: droneWarningsCol
+            anchors.horizontalCenter: parent.horizontalCenter
             spacing: ScreenTools.defaultFontPixelHeight
             visible: droneWarningsHeader.visible
 
@@ -61,28 +62,41 @@ Rectangle {
                 text:                       _activeVehicle ? _activeVehicle.prearmError : ""
             }
 
-            /*QGCLabel {
+            // TODO: Improve this
+            QGCLabel {
                 id: lowVoltageWarning
                 anchors.horizontalCenter:   parent.horizontalCenter
-                visible:                    QGroundControl.corePlugin.drone.lowVoltageWarning
+                visible:                    (_activeVehicle && _activeVehicle.batteries.get(0)) ? (_activeVehicle.batteries.get(0).voltage.rawValue < QGroundControl.corePlugin.drone.minTakeoffVoltage) : false
                 color:                      "black"
                 font.pointSize:             ScreenTools.largeFontPointSize
                 text:                       qsTr("Low Voltage")
             }
 
+            // TODO: Improve this
             QGCLabel {
                 id: powerLimitWarning
-                anchors.horizontalCenter:   parent.horizontalCenter
-                visible:                    QGroundControl.corePlugin.drone.powerLimitWarning
+                anchors.horizontalCenter: parent.horizontalCenter
+                visible: {
+                    if (_activeVehicle) {
+                        if (_activeVehicle.vehicleTypeString === "octorotor") {
+                            return (_activeVehicle.batteries.get(0).instantPower.rawValue > QGroundControl.corePlugin.drone.liteMaxPower);
+                        } else if (_activeVehicle.vehicleTypeString === "quadrotor") {
+                            return (_activeVehicle.batteries.get(0).instantPower.rawValue > QGroundControl.corePlugin.drone.heavyMaxPower);
+                        }
+                    }
+
+                    return false
+                }
                 color:                      "black"
                 font.pointSize:             ScreenTools.largeFontPointSize
                 text:                       qsTr("Power Limit")
-            }*/
+            }
         }
 
         Column {
             id: gpuWarningsCol
             spacing: ScreenTools.defaultFontPixelHeight
+            anchors.horizontalCenter: parent.horizontalCenter
             visible: gpuWarningsHeader.visible
 
             QGCLabel {
@@ -98,20 +112,20 @@ Rectangle {
             QGCLabel {
                 id: gpuConnectionWarning
                 anchors.horizontalCenter:   parent.horizontalCenter
-                visible:                    !QGroundControl.corePlugin.gpu.connected
+                visible:                    !QGroundControl.corePlugin.gpu.connected.rawValue
                 color:                      "black"
                 font.pointSize:             ScreenTools.largeFontPointSize
                 text:                       qsTr("No Connection to GPU")
             }
 
-            QGCLabel {
+            /*QGCLabel {
                 id: highPowerWarning
                 anchors.horizontalCenter:   parent.horizontalCenter
-                visible:                    !QGroundControl.corePlugin.gpu.highPowerWarning
+                visible:                    _activeVehicle.batteries.get(0).voltage.rawValue < !QGroundControl.corePlugin.gpu.highPowerWarning.rawValue
                 color:                      "black"
                 font.pointSize:             ScreenTools.largeFontPointSize
                 text:                       qsTr("High Power is Off")
-            }
+            }*/
 
             QGCLabel {
                 id: psuTempWarning

@@ -60,7 +60,21 @@ Item {
             id: droneChecks
             name: qsTr("Auto-Diagnostics Checks")
 
-            PreFlightSoundCheck { id: soundCheck }
+            // PreFlightSoundCheck { id: soundCheck }
+
+            PreFlightCheckButton {
+                id: droneConnectionCheck
+                name: "Drone Connection"
+                telemetryTextFailure: "No Connection to drone."
+                telemetryFailure: !_activeVehicle
+            }
+
+            PreFlightCheckButton {
+                id: gpuConnectionCheck
+                name: "Ground Unit Connection"
+                telemetryTextFailure: "No Connection to ground unit."
+                telemetryFailure: !QGroundControl.corePlugin.gpu.connected.rawValue
+            }
 
             PreFlightSensorsHealthCheck { id: healthCheck }
 
@@ -70,31 +84,32 @@ Item {
                 allowOverrideSatCount: true
             }
 
-            PreFlightCheckButton {
+            /*PreFlightCheckButton {
                 id: homePositionCheck
                 name: qsTr("Home Position")
-                telemetryFailure: globals.activeVehicle ? globals.activeVehicle.homePosition.isValid : true
+                telemetryFailure: _activeVehicle ? _activeVehicle.homePosition.isValid : true
                 telemetryTextFailure: qsTr("Waiting for drone home position.")
-            }
+            }*/
 
             PreFlightCheckButton {
                 id: preArmCheck
                 name: qsTr("Pre-Arm Checks")
-                telemetryFailure: globals.activeVehicle ? globals.activeVehicle.prearmError : true
-                telemetryTextFailure: globals.activeVehicle.prearmError
+                telemetryFailure: _activeVehicle ? _activeVehicle.prearmError : true
+                telemetryTextFailure: _activeVehicle.prearmError
             }
 
-            PreFlightCheckButton {
+            /*PreFlightCheckButton {
                 id: readyToFlyCheck
                 name: qsTr("Ready To Fly")
                 telemetryFailure: globals.activeVehicle ? globals.activeVehicle.readyToFly : true
                 telemetryTextFailure: qsTr("Not Ready To Fly.")
-            }
+            }*/
 
             PreFlightCheckButton {
                 name: qsTr("Confirm")
                 manualText: qsTr("Verify Auto Checks Passed?")
-                enabled: soundCheck.passed && healthCheck.passed && gpsCheck.passed && homePositionCheck.passed && preArmCheck.passed && readyToFlyCheck.passed
+                enabled: droneConnectionCheck.passed && /*gpuConnectionCheck.passed &&*/ healthCheck.passed && gpsCheck.passed && preArmCheck.passed
+                visible: enabled
             }
         }
 
@@ -103,35 +118,42 @@ Item {
             name: qsTr("Final Confirmation")
 
             PreFlightCheckButton {
-                name: qsTr("Ready?")
-                manualText: qsTr("Confirm")
+                id: runMotorTest
+                name: qsTr("Run Motor Test")
+                manualText: qsTr("Start Motor Test?")
+                enabled: _activeVehicle
+                onPassedChanged: {
+                    if (passed) {
+                        _activeVehicle.motorTest(1, 6, 3, true)
+                        _activeVehicle.motorTest(2, 6, 3, true)
+                        _activeVehicle.motorTest(3, 6, 3, true)
+                        _activeVehicle.motorTest(4, 6, 3, true)
+                        if (_activeVehicle.vehicleTypeString === "octorotor") {
+                            _activeVehicle.motorTest(5, 6, 3, true)
+                            _activeVehicle.motorTest(6, 6, 3, true)
+                            _activeVehicle.motorTest(7, 6, 3, true)
+                            _activeVehicle.motorTest(8, 6, 3, true)
+                        }
+                    }
+                }
+            }
+
+            PreFlightCheckButton {
+                name: qsTr("Motor Test")
+                manualText: qsTr("Verify Motor Test Passed?")
+                enabled: runMotorTest.passed
+                visible: enabled
             }
         }
     }
 }
 
-// PreFlightCheckLabel {
-//     name: "Drone Connection"
-//     telemetryTextFailure: "No Connection to drone."
-//     telemetryFailure: !DroneData.connected
-// }
-// PreFlightCheckLabel {
-//     id: groundUnitCheck
-//     name: "Ground Unit Connection"
-//     telemetryTextFailure: "No Connection to ground unit."
-//     telemetryFailure: !GPUData.connected
-// }
+
 // PreFlightCheckLabel {
 //     id: homePositionCheck
 //     name: "Home Position"
 //     telemetryFailure: !DroneData.geofence.isValid
 //     telemetryTextFailure: "Waiting for drone home position."
-// }
-// PreFlightCheckLabel {
-//     id: readyToFlyCheck
-//     name: "Ready To Fly"
-//     telemetryTextFailure: "Check Pre-arm Failures."
-//     telemetryFailure: !DroneData.readyToFly
 // }
 
 // PreFlightCheckGroup {

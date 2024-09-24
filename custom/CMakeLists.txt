@@ -47,6 +47,8 @@ qt_add_library(CustomPlugin STATIC
     src/FactGroups/NextVisionFactGroup.h
     src/FactGroups/ViewproFactGroup.cc
     src/FactGroups/ViewproFactGroup.h
+    src/FactGroups/GCSFactGroup.cc
+    src/FactGroups/GCSFactGroup.h
     src/FirmwarePlugin/CustomFirmwarePlugin.cc
     src/FirmwarePlugin/CustomFirmwarePlugin.h
     src/FirmwarePlugin/CustomFirmwarePluginFactory.cc

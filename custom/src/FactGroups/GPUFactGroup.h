@@ -1,6 +1,8 @@
 #pragma once
 
 #include <QtCore/QLoggingCategory>
+#include <QtCore/QElapsedTimer>
+#include <QtNetwork/QHostAddress>
 
 #include "FactGroup.h"
 #include "MAVLinkLib.h"
@@ -11,6 +13,8 @@ class GPUFactGroup : public FactGroup
 {
     Q_OBJECT
 
+    Q_PROPERTY(Fact* connected READ connected CONSTANT)
+    Q_PROPERTY(Fact* discovered READ discovered CONSTANT)
     Q_PROPERTY(Fact* psuTemperature READ psuTemperature CONSTANT)
     Q_PROPERTY(Fact* spoolTemperature READ spoolTemperature CONSTANT)
     Q_PROPERTY(Fact* psuFanDuty READ psuFanDuty CONSTANT)
@@ -33,6 +37,8 @@ public:
     GPUFactGroup(QObject *parent = nullptr);
     ~GPUFactGroup();
 
+    Fact *connected() { return &_connectedFact; }
+    Fact *discovered() { return &_discoveredFact; }
     Fact *psuTemperature() { return &_psuTemperatureFact; }
     Fact *spoolTemperature() { return &_spoolTemperatureFact; }
     Fact *psuFanDuty() { return &_psuFanDutyFact; }
@@ -54,8 +60,14 @@ public:
     void handleMessage(Vehicle *vehicle, mavlink_message_t &message) final;
 
 private:
+    void _handleHeartbeat(const mavlink_message_t &message);
+    void _handleGlobalPosition(const mavlink_message_t &message);
     void _handleZatGpuData(const mavlink_message_t &message);
 
+    void _setUpConnectionChecker();
+
+    const QString _connectedFactName = QStringLiteral("connected");
+    const QString _discoveredFactName = QStringLiteral("discovered");
     const QString _psuTemperatureFactName = QStringLiteral("psuTemperature");
     const QString _spoolTemperatureFactName = QStringLiteral("spoolTemperature");
     const QString _psuFanDutyFactName = QStringLiteral("psuFanDuty");
@@ -74,6 +86,8 @@ private:
     const QString _spoolTempWarningFactName = QStringLiteral("spoolTempWarning");
     const QString _spoolTempCriticalFactName = QStringLiteral("spoolTempCritical");
 
+    Fact _connectedFact = Fact(MAV_COMP_ID_ONBOARD_COMPUTER, _connectedFactName, FactMetaData::valueTypeBool);
+    Fact _discoveredFact = Fact(MAV_COMP_ID_ONBOARD_COMPUTER, _connectedFactName, FactMetaData::valueTypeBool);
     Fact _psuTemperatureFact = Fact(MAV_COMP_ID_ONBOARD_COMPUTER, _psuTemperatureFactName, FactMetaData::valueTypeInt8);
     Fact _spoolTemperatureFact = Fact(MAV_COMP_ID_ONBOARD_COMPUTER, _spoolTemperatureFactName, FactMetaData::valueTypeInt8);
     Fact _psuFanDutyFact = Fact(MAV_COMP_ID_ONBOARD_COMPUTER, _psuFanDutyFactName, FactMetaData::valueTypeUint8);
@@ -92,11 +106,20 @@ private:
     Fact _spoolTempWarningFact = Fact(MAV_COMP_ID_ONBOARD_COMPUTER, _spoolTempWarningFactName, FactMetaData::valueTypeBool);
     Fact _spoolTempCriticalFact = Fact(MAV_COMP_ID_ONBOARD_COMPUTER, _spoolTempCriticalFactName, FactMetaData::valueTypeBool);
 
-    static constexpr int8_t _psuTempWarningTemp = 50;
-    static constexpr int8_t _psuTempCriticalTemp = 65;
+    QElapsedTimer _connectionTimer;
+    QHostAddress _ipAddress;
+
+    static constexpr int8_t _psuTempWarningTemp = 55;
+    static constexpr int8_t _psuTempCriticalTemp = 70;
     static constexpr int8_t _spoolTempWarningTemp = 65;
     static constexpr int8_t _spoolTempCriticalTemp = 75;
 
     static constexpr int8_t _minTensionOffset = 0;
     static constexpr int8_t _maxTensionOffset = 5;
+
+    static constexpr uint16_t _connectionTimeout = 3000;
+
+    static constexpr uint16_t _port = 14580;
+    static constexpr mavlink_system_t _mavsys = {2, MAV_COMP_ID_ONBOARD_COMPUTER};
+    static constexpr const char *_ip = "192.168.1.8";
 };

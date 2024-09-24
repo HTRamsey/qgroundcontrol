@@ -62,6 +62,13 @@
     "shortDesc":        "Anti-Collision Light Status",
     "type":             "bool",
     "default":          false
+},
+{
+    "name":             "antiCollisionLightState",
+    "shortDesc":        "Anti-Collision Light State",
+    "type":             "uint32",
+    "enumStrings":      "Off,Visible_Short,Visible_Long,Visible_Constant,IR_Short,IR_Long,IR_Constant",
+    "enumValues":       "0,1,2,3,4,5,6"
 }
 ]
 }

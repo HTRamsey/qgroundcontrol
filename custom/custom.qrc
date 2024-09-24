@@ -16,6 +16,10 @@
         <file alias="QGroundControl/FlightDisplay/GuidedValueSlider.qml">qml/GuidedValueSlider.qml</file>
         <file alias="QGroundControl/FlightDisplay/GuidedActionPause.qml">qml/GuidedActionPause.qml</file>
         <file alias="QGroundControl/FlightDisplay/GuidedActionAltitude.qml">qml/GuidedActionAltitude.qml</file>
+        <file alias="TelemetrySettings.qml">qml/TelemetrySettings.qml</file>
+        <file alias="FlyViewSettings.qml">qml/FlyViewSettings.qml</file>
+        <file alias="MainRootWindow.qml">qml/MainRootWindow.qml</file>
+        <file alias="QGroundControl/FlightMap/PhotoVideoControl.qml">qml/PhotoVideoControl.qml</file>
     </qresource>
     <qresource prefix="/toolbar">
         <file alias="DroneIndicator.qml">qml/DroneIndicator.qml</file>
@@ -26,6 +30,7 @@
         <file alias="GPUFact.json">src/FactGroups/GPUFact.json</file>
         <file alias="NextVisionFact.json">src/FactGroups/NextVisionFact.json</file>
         <file alias="ViewproFact.json">src/FactGroups/ViewproFact.json</file>
+        <file alias="GCSFact.json">src/FactGroups/GCSFact.json</file>
     </qresource>
     <qresource prefix="/custom/img">
         <file alias="ZATBrandImage.png">res/images/ZATBrandImage.png</file>
