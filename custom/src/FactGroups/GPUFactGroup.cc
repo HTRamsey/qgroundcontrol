@@ -6,7 +6,10 @@ QGC_LOGGING_CATEGORY(GpuFactGroupLog, "qgc.custom.factgroups.gpufactgroup")
 
 GPUFactGroup::GPUFactGroup(QObject *parent)
     : FactGroup(1000, ":/json/GPUFact.json", parent)
+    , _ipAddress(_ip)
 {
+    _addFact(&_connectedFact, _connectedFactName);
+    _addFact(&_discoveredFact, _discoveredFactName);
     _addFact(&_psuTemperatureFact, _psuTemperatureFactName);
     _addFact(&_spoolTemperatureFact, _spoolTemperatureFactName);
     _addFact(&_psuFanDutyFact, _psuFanDutyFactName);
@@ -25,6 +28,8 @@ GPUFactGroup::GPUFactGroup(QObject *parent)
     _addFact(&_spoolTempWarningFact, _spoolTempWarningFactName);
     _addFact(&_spoolTempCriticalFact, _spoolTempCriticalFactName);
 
+    _setUpConnectionChecker();
+
     // qCDebug(GpuFactGroupLog) << Q_FUNC_INFO << this;
 }
 
@@ -37,7 +42,29 @@ void GPUFactGroup::handleMessage(Vehicle *vehicle, mavlink_message_t &message)
 {
     Q_UNUSED(vehicle);
 
+    if ((message.sysid != _mavsys.sysid) || (message.compid != _mavsys.compid)) {
+        return;
+    }
+
+    if (!_discoveredFact.rawValue().toBool()) {
+        _discoveredFact.setRawValue(true);
+    }
+
+    if (!_connectedFact.rawValue().toBool())
+    {
+        _connectedFact.setRawValue(true);
+    }
+
+    if (!_connectionTimer.isValid()) {
+        _connectionTimer.start();
+    } else {
+        (void) _connectionTimer.restart();
+    }
+
     switch (message.msgid) {
+    case MAVLINK_MSG_ID_HEARTBEAT:
+        _handleHeartbeat(message);
+        break;
     case MAVLINK_MSG_ID_ZAT_GPU_DATA:
         _handleZatGpuData(message);
         break;
@@ -46,6 +73,14 @@ void GPUFactGroup::handleMessage(Vehicle *vehicle, mavlink_message_t &message)
     }
 
     _setTelemetryAvailable(true);
+}
+
+void GPUFactGroup::_handleHeartbeat(const mavlink_message_t &message)
+{
+    mavlink_heartbeat_t data;
+    mavlink_msg_heartbeat_decode(&message, &data);
+
+    _connectedFact.setRawValue(true);
 }
 
 void GPUFactGroup::_handleZatGpuData(const mavlink_message_t &message)
@@ -79,4 +114,30 @@ void GPUFactGroup::_handleZatGpuData(const mavlink_message_t &message)
     _pressureTemperatureFact.setRawValue(data.pressureTemperature);
 
     _outputVoltageFact.setRawValue(data.outputVoltage);
+}
+
+void GPUFactGroup::_handleGlobalPosition(const mavlink_message_t& message)
+{
+    mavlink_global_position_int_t data;
+    mavlink_msg_global_position_int_decode(&message, &data);
+
+    /*const QGeoCoordinate position(data.lat * 1e-7, data.lon * 1e-7, data.alt * 1e-3);
+    if(position != m_position.coordinate())
+    {
+        m_position.setCoordinate(position);
+        emit positionChanged();
+    }*/
+}
+
+void GPUFactGroup::_setUpConnectionChecker()
+{
+    QTimer *const connectionTimer = new QTimer(this);
+    connectionTimer->setInterval(1000);
+    connectionTimer->setSingleShot(false);
+    (void) connectionTimer->callOnTimeout(this, [this]() {
+        if (_connectedFact.rawValue().toBool() && _connectionTimer.isValid() && _connectionTimer.hasExpired(_connectionTimeout)) {
+            _connectedFact.setRawValue(false);
+        }
+    }, Qt::AutoConnection);
+    connectionTimer->start();
 }

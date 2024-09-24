@@ -28,7 +28,9 @@ DroneFactGroup::~DroneFactGroup()
 
 void DroneFactGroup::handleMessage(Vehicle *vehicle, mavlink_message_t &message)
 {
-    Q_UNUSED(vehicle);
+    if ((message.sysid != _mavsys.sysid) || (message.compid != _mavsys.compid)) {
+        return;
+    }
 
     switch (message.msgid) {
     case MAVLINK_MSG_ID_STATUSTEXT:
@@ -53,14 +55,14 @@ void DroneFactGroup::_handleStatusText(Vehicle *vehicle, const mavlink_message_t
         static const QRegularExpression regexp("[()]");
         payload = payload.remove(regexp);
         if (payload.contains("Gimbal", Qt::CaseInsensitive)) {
-            /* const QStringList params = payload.remove(QChar(' ')).split(",");
+            const QStringList params = payload.remove(QChar(' ')).split(",");
             const QString gimbalType = params.at(1);
             const QString gimbalModel = params.at(2);
             if (!_gimbalEnabledFact.rawValue().toBool()) {
                 _gimbalEnabledFact.setRawValue(true);
                 _gimbalTypeFact.setRawValue(gimbalType);
                 _gimbalModelFact.setRawValue(gimbalModel);
-            } */
+            }
         } else if (payload.contains("Servo", Qt::CaseInsensitive)) {
             const QStringList params = payload.remove(QChar(' ')).split(",");
             const QString servoName = params.at(1);

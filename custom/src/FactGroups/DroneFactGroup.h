@@ -21,6 +21,13 @@ class DroneFactGroup : public FactGroup
     Q_PROPERTY(Fact *navigationLightStatus READ navigationLightStatus CONSTANT)
     Q_PROPERTY(Fact *antiCollisionLightEnabled READ antiCollisionLightEnabled CONSTANT)
     Q_PROPERTY(Fact *antiCollisionLightStatus READ antiCollisionLightStatus CONSTANT)
+    Q_PROPERTY(Fact *antiCollisionLightState READ antiCollisionLightState CONSTANT)
+    Q_PROPERTY(Fact *gimbalEnabled READ gimbalEnabled CONSTANT)
+    Q_PROPERTY(Fact *gimbalType READ gimbalType CONSTANT)
+    Q_PROPERTY(Fact *gimbalModel READ gimbalModel CONSTANT)
+    Q_PROPERTY(qreal liteMaxPower MEMBER _liteMaxPower CONSTANT)
+    Q_PROPERTY(qreal heavyMaxPower MEMBER _heavyMaxPower CONSTANT)
+    Q_PROPERTY(qreal minTakeoffVoltage MEMBER _minTakeoffVoltage CONSTANT)
 
 public:
     DroneFactGroup(QObject *parent = nullptr);
@@ -47,6 +54,10 @@ public:
     Fact *navigationLightStatus() { return &_navigationLightStatusFact; }
     Fact *antiCollisionLightEnabled() { return &_antiCollisionLightEnabledFact; }
     Fact *antiCollisionLightStatus() { return &_antiCollisionLightStatusFact; }
+    Fact *antiCollisionLightState() { return &_antiCollisionLightStateFact; }
+    Fact *gimbalEnabled() { return &_gimbalEnabledFact; }
+    Fact *gimbalType() { return &_gimbalEnabledFact; }
+    Fact *gimbalModel() { return &_gimbalEnabledFact; }
 
     QMap<uint8_t, uint16_t> spotlightValues() const { return _spotlightValues; }
     uint8_t beaconPort() const { return _beaconPort; }
@@ -61,6 +72,7 @@ private:
     void _handleServoOutputRaw(const mavlink_message_t &message);
 
     uint8_t _calcSpotlightStatus() const;
+    void _setUpPowerLimit();
 
     const QString _spotlightEnabledFactName = QStringLiteral("spotlightEnabled");
     const QString _spotlightStatusFactName = QStringLiteral("spotlightStatus");
@@ -72,6 +84,10 @@ private:
     const QString _navigationLightStatusFactName = QStringLiteral("navigationLightStatus");
     const QString _antiCollisionLightEnabledFactName = QStringLiteral("antiCollisionLightEnabled");
     const QString _antiCollisionLightStatusFactName = QStringLiteral("antiCollisionLightStatus");
+    const QString _antiCollisionLightStateFactName = QStringLiteral("antiCollisionLightState");
+    const QString _gimbalEnabledFactName = QStringLiteral("gimbalEnabled");
+    const QString _gimbalTypeFactName = QStringLiteral("gimbalType");
+    const QString _gimbalModelFactName = QStringLiteral("gimbalModel");
 
     Fact _spotlightEnabledFact = Fact(MAV_COMP_ID_AUTOPILOT1, _spotlightEnabledFactName, FactMetaData::valueTypeBool);
     Fact _spotlightStatusFact = Fact(MAV_COMP_ID_AUTOPILOT1, _spotlightStatusFactName, FactMetaData::valueTypeUint8);
@@ -83,6 +99,10 @@ private:
     Fact _navigationLightStatusFact = Fact(MAV_COMP_ID_AUTOPILOT1, _navigationLightStatusFactName, FactMetaData::valueTypeBool);
     Fact _antiCollisionLightEnabledFact = Fact(MAV_COMP_ID_AUTOPILOT1, _antiCollisionLightEnabledFactName, FactMetaData::valueTypeBool);
     Fact _antiCollisionLightStatusFact = Fact(MAV_COMP_ID_AUTOPILOT1, _antiCollisionLightStatusFactName, FactMetaData::valueTypeBool);
+    Fact _antiCollisionLightStateFact = Fact(MAV_COMP_ID_AUTOPILOT1, _antiCollisionLightStateFactName, FactMetaData::valueTypeUint8);
+    Fact _gimbalEnabledFact = Fact(MAV_COMP_ID_AUTOPILOT1, _gimbalEnabledFactName, FactMetaData::valueTypeBool);
+    Fact _gimbalTypeFact = Fact(MAV_COMP_ID_AUTOPILOT1, _gimbalTypeFactName, FactMetaData::valueTypeString);
+    Fact _gimbalModelFact = Fact(MAV_COMP_ID_AUTOPILOT1, _gimbalModelFactName, FactMetaData::valueTypeString);
 
     QMap<uint8_t, uint16_t> _spotlightValues;
 
@@ -107,11 +127,15 @@ private:
     static constexpr uint16_t _antiCollisionLightOn = 1900;
     static constexpr uint16_t _antiCollisionLightOff = 1100;
 
-    static constexpr float _liteMaxPower = 1500.0f;
-    static constexpr float _heavyMaxPower = 3000.0f;
+    static constexpr float _liteMaxPower = 1800.0f;
+    static constexpr float _heavyMaxPower = 3200.0f;
     static constexpr float _powerCheckTime = 2.0f;
 
     static constexpr float _defaultGeoFence = 10.0f;
 
     static constexpr float _minTakeoffVoltage = 50.0f;
+
+    static constexpr uint16_t _port = 14570;
+    static constexpr mavlink_system_t _mavsys = {1, MAV_COMP_ID_AUTOPILOT1};
+    static constexpr const char *_ip = "192.168.1.5";
 };
