@@ -18,7 +18,7 @@ public:
     explicit Drone(DroneFactGroup *droneFactGroup, QObject *parent = nullptr);
     ~Drone();
 
-    bool readyForAdjustLights();
+    bool readyForAdjustLights(Vehicle *vehicle);
     Q_INVOKABLE void adjustLights(Vehicle *vehicle, uint8_t intensity);
     bool readyForToggleBeacon();
     Q_INVOKABLE void toggleBeacon(Vehicle *vehicle);

@@ -18,12 +18,13 @@
 #include "MAVLinkLib.h"
 
 class Vehicle;
+class CustomPlugin;
 
 /// Used to group Facts together into an object hierarachy.
 class FactGroup : public QObject
 {
     Q_OBJECT
-    
+    friend class CustomPlugin; // ZAT
 public:
     FactGroup(int updateRateMsecs, const QString& metaDataFile, QObject* parent = nullptr, bool ignoreCamelCase = false);
     FactGroup(int updateRateMsecs, QObject* parent = nullptr, bool ignoreCamelCase = false);

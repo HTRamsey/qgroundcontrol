@@ -54,7 +54,7 @@ Item {
 
                         LabelledLabel {
                             label: qsTr("Ready To Fly")
-                            labelText: _activeVehicle.readyToFly
+                            labelText: _activeVehicle.readyToFly ? "True" : "False"
                         }
 
                         LabelledLabel {
@@ -132,25 +132,25 @@ Item {
 
                         LabelledLabel {
                             label:      payloadsGroup.drone.beaconStatus.shortDescription
-                            labelText:  payloadsGroup.drone.beaconStatus.valueString + " " + payloadsGroup.drone.spotlightStatus.units
+                            labelText:  payloadsGroup.drone.beaconStatus.valueString + " " + payloadsGroup.drone.beaconStatus.units
                             visible:    payloadsGroup.drone.beaconEnabled.rawValue
                         }
 
                         LabelledLabel {
                             label:      payloadsGroup.drone.remoteIdStatus.shortDescription
-                            labelText:  payloadsGroup.drone.remoteIdStatus.valueString + " " + payloadsGroup.drone.spotlightStatus.units
+                            labelText:  payloadsGroup.drone.remoteIdStatus.valueString + " " + payloadsGroup.drone.remoteIdStatus.units
                             visible:    payloadsGroup.drone.remoteIdEnabled.rawValue
                         }
 
                         LabelledLabel {
                             label:      payloadsGroup.drone.navigationLightStatus.shortDescription
-                            labelText:  payloadsGroup.drone.navigationLightStatus.valueString + " " + payloadsGroup.drone.spotlightStatus.units
+                            labelText:  payloadsGroup.drone.navigationLightStatus.valueString + " " + payloadsGroup.drone.navigationLightStatus.units
                             visible:    payloadsGroup.drone.navigationLightEnabled.rawValue
                         }
 
                         LabelledLabel {
                             label:      payloadsGroup.drone.antiCollisionLightStatus.shortDescription
-                            labelText:  payloadsGroup.drone.antiCollisionLightStatus.valueString + " " + payloadsGroup.drone.spotlightStatus.units
+                            labelText:  payloadsGroup.drone.antiCollisionLightStatus.valueString + " " + payloadsGroup.drone.antiCollisionLightStatus.units
                             visible:    payloadsGroup.drone.antiCollisionLightEnabled.rawValue
                         }
                     }

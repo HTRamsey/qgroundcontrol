@@ -17,7 +17,9 @@ NextVisionFactGroup::~NextVisionFactGroup()
 
 void NextVisionFactGroup::handleMessage(Vehicle *vehicle, mavlink_message_t &message)
 {
-    Q_UNUSED(vehicle);
+    /*if ((message.sysid != _mavsys.sysid) || (message.compid != _mavsys.compid)) {
+        return;
+    }*/
 
     switch (message.msgid) {
     case MAVLINK_MSG_ID_STATUSTEXT:
@@ -46,6 +48,7 @@ void NextVisionFactGroup::_handleStatusText(Vehicle *vehicle, const mavlink_mess
             const QString gimbalType = params.at(1);
             const QString gimbalModel = params.at(2);
             if (gimbalType.contains("NextVision", Qt::CaseInsensitive)) {
+                // TODO: Move to Custom Plugin & create Viewpro when found
                 /* if (!_nextvisionEnabledFact.rawValue().toBool()) {
                     _nextvisionEnabledFact.setRawValue(true);
                 } */

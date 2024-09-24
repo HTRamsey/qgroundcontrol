@@ -4,6 +4,11 @@
     "QGC.MetaData.Facts":
 [
 {
+    "name":             "connected",
+    "shortDesc":        "Active Connection",
+    "type":             "bool"
+},
+{
     "name":             "psuTemperature",
     "shortDesc":        "PSU Temperature",
     "type":             "int8",
