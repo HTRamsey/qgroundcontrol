@@ -507,7 +507,7 @@ if(LINUX)
         FILES ${CMAKE_BINARY_DIR}/metainfo/org.mavlink.qgroundcontrol.metainfo.xml
         DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo/
     )
-    install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/CreateAppImage.cmake")
+    # install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/CreateAppImage.cmake")
 elseif(WIN32)
     install(SCRIPT "${CMAKE_SOURCE_DIR}/cmake/CreateWinInstaller.cmake")
 elseif(MACOS)
