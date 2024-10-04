@@ -102,7 +102,7 @@ Rectangle {
             QGCLabel {
                 id: gpuWarningsHeader
                 anchors.horizontalCenter:   parent.horizontalCenter
-                visible:                    gpuConnectionWarning.visible || highPowerWarning.visible || psuTempWarning.visible || spoolTempWarning.visible
+                visible:                    gpuConnectionWarning.visible || /*highPowerWarning.visible ||*/ psuTempWarning.visible || spoolTempWarning.visible
                 color:                      "black"
                 font.pointSize:             ScreenTools.largeFontPointSize
                 font.bold:                  true

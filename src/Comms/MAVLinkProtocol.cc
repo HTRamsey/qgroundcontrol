@@ -382,6 +382,12 @@ void MAVLinkProtocol::receiveBytes(LinkInterface* link, QByteArray b)
             // Reset message parsing
             memset(&_status,  0, sizeof(_status));
             memset(&_message, 0, sizeof(_message));
+        } else {
+            if ((_message.sysid == 2) && (_message.compid == MAV_COMP_ID_ONBOARD_COMPUTER)) {
+                if ((_status.msg_received == MAVLINK_FRAMING_INCOMPLETE) && (_status.parse_state == MAVLINK_PARSE_STATE_IDLE || _status.parse_state == MAVLINK_PARSE_STATE_GOT_STX)) {
+                    emit messageReceived(link, _message);
+                }
+            }
         }
     }
 }

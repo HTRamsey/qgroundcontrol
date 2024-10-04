@@ -153,6 +153,12 @@ Item {
                             labelText:  payloadsGroup.drone.antiCollisionLightStatus.valueString + " " + payloadsGroup.drone.antiCollisionLightStatus.units
                             visible:    payloadsGroup.drone.antiCollisionLightEnabled.rawValue
                         }
+
+                        LabelledLabel {
+                            label:      payloadsGroup.drone.antiCollisionLightState.shortDescription
+                            labelText:  payloadsGroup.drone.antiCollisionLightState.valueString + " " + payloadsGroup.drone.antiCollisionLightState.units
+                            visible:    payloadsGroup.drone.antiCollisionLightEnabled.rawValue
+                        }
                     }
                 }
             }
