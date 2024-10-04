@@ -54,6 +54,6 @@ target_include_directories(MAVLink PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 # ZATQGC
 target_include_directories(MAVLink
     PUBLIC
-        ${CMAKE_SOURCE_DIR}/custom/src/mavlink
-        ${CMAKE_SOURCE_DIR}/custom/src/mavlink/zat
+        ${CMAKE_SOURCE_DIR}/custom/src/mavlink/protocol
+        ${CMAKE_SOURCE_DIR}/custom/src/mavlink/protocol/zat
 )

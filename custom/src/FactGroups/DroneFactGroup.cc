@@ -36,6 +36,9 @@ void DroneFactGroup::handleMessage(Vehicle *vehicle, mavlink_message_t &message)
     case MAVLINK_MSG_ID_STATUSTEXT:
         _handleStatusText(vehicle, message);
         break;
+    case MAVLINK_MSG_ID_SERVO_OUTPUT_RAW:
+        _handleServoOutputRaw(message);
+        break;
     default:
         return;
     }
@@ -105,15 +108,6 @@ void DroneFactGroup::_handleStatusText(Vehicle *vehicle, const mavlink_message_t
                     }
                 }
             }
-        } else if (payload.contains("Relay", Qt::CaseInsensitive)) {
-            const QStringList params = payload.remove(QChar(' ')).split(",");
-            const QString relayName = params.at(1);
-            const QString relayChannel = params.at(2);
-            bool ok = false;
-            const uint8_t ch = relayChannel.toUInt(&ok);
-            if (ok) {
-
-            }
         }
     }
 }
@@ -166,6 +160,7 @@ void DroneFactGroup::_handleServoOutputRaw(const mavlink_message_t &msg)
 
         if ((servo_raw > 0) && (servo_raw != _beaconValue)) {
             _beaconValue = servo_raw;
+            _beaconStatusFact.setRawValue(_beaconValue == _beaconOn);
         }
     }
 
@@ -185,6 +180,7 @@ void DroneFactGroup::_handleServoOutputRaw(const mavlink_message_t &msg)
 
         if ((servo_raw > 0) && (servo_raw != _navigationLightValue)) {
             _navigationLightValue = servo_raw;
+            _navigationLightStatusFact.setRawValue(_navigationLightValue == _navigationLightOn);
         }
     }
 
@@ -204,6 +200,7 @@ void DroneFactGroup::_handleServoOutputRaw(const mavlink_message_t &msg)
 
         if ((servo_raw > 0) && (servo_raw != _remoteIdValue)) {
             _remoteIdValue = servo_raw;
+            _remoteIdStatusFact.setRawValue(_remoteIdValue == _remoteIdOn);
         }
     }
 
@@ -223,6 +220,7 @@ void DroneFactGroup::_handleServoOutputRaw(const mavlink_message_t &msg)
 
         if ((servo_raw > 0) && (servo_raw != _antiCollisionLightValue)) {
             _antiCollisionLightValue = servo_raw;
+            _antiCollisionLightStatusFact.setRawValue(_antiCollisionLightValue == _antiCollisionLightOn);
         }
     }
 }

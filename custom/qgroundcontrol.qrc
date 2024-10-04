@@ -292,7 +292,6 @@
 		<file alias="SurveyItemEditor.qml">../src/PlanView/SurveyItemEditor.qml</file>
 		<file alias="SyslinkComponent.qml">../src/AutoPilotPlugins/Common/SyslinkComponent.qml</file>
 		<file alias="TcpSettings.qml">../src/UI/preferences/TcpSettings.qml</file>
-		<file alias="TelemetrySettings.qml">../src/UI/preferences/TelemetrySettings.qml</file>
 		<file alias="UdpSettings.qml">../src/UI/preferences/UdpSettings.qml</file>
 		<file alias="VehicleSummary.qml">../src/VehicleSetup/VehicleSummary.qml</file>
 		<file alias="VibrationPage.qml">../src/AnalyzeView/VibrationPage.qml</file>
