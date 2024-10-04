@@ -701,19 +701,19 @@ Item {
             _activeVehicle.guidedModeChangeHeading(actionData)
             break
         case actionAntiCollisionLight:
-            _corePlugin.drone.setAntiCollisionLight(activeVehicle, actionData)
+            _corePlugin.droneControl.setAntiCollisionLight(_activeVehicle, actionData)
             break
         case actionBeacon:
-            _corePlugin.drone.toggleBeacon(activeVehicle)
+            _corePlugin.droneControl.toggleBeacon(_activeVehicle)
             break
         case actionNavigationLight:
-            _corePlugin.drone.toggleNavigationLight(activeVehicle)
+            _corePlugin.droneControl.toggleNavigationLight(_activeVehicle)
             break
         case actionRemoteId:
-            _corePlugin.drone.toggleRemoteId(activeVehicle)
+            _corePlugin.droneControl.toggleRemoteId(_activeVehicle)
             break
         case actionSpotlight:
-            _corePlugin.drone.setSpotlight(activeVehicle, actionData)
+            _corePlugin.droneControl.setSpotlight(_activeVehicle, actionData)
             break
         default:
             console.warn(qsTr("Internal error: unknown actionCode"), actionCode)

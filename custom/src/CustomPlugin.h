@@ -20,12 +20,12 @@ class CustomPlugin : public QGCCorePlugin
 {
     Q_OBJECT
 
-    Q_PROPERTY(FactGroup* drone READ droneFactGroup CONSTANT)
-    Q_PROPERTY(FactGroup* gpu READ gpuFactGroup CONSTANT)
-    Q_PROPERTY(FactGroup* nextVision READ nextVisionFactGroup CONSTANT)
-    Q_PROPERTY(FactGroup* viewpro READ viewproFactGroup CONSTANT)
-    Q_PROPERTY(FactGroup* gcs READ gcsFactGroup CONSTANT)
-    Q_PROPERTY(Drone* droneControl READ droneControl CONSTANT)
+    Q_PROPERTY(FactGroup *drone READ droneFactGroup CONSTANT)
+    Q_PROPERTY(FactGroup *gpu READ gpuFactGroup CONSTANT)
+    Q_PROPERTY(FactGroup *nextVision READ nextVisionFactGroup CONSTANT)
+    Q_PROPERTY(FactGroup *viewpro READ viewproFactGroup CONSTANT)
+    Q_PROPERTY(FactGroup *gcs READ gcsFactGroup CONSTANT)
+    Q_PROPERTY(Drone *droneControl READ droneControl CONSTANT)
 
 public:
     CustomPlugin(QGCApplication *app, QGCToolbox *toolbox);
