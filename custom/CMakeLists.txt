@@ -78,3 +78,13 @@ target_include_directories(CustomPlugin
         src/FactGroups
         src/FirmwarePlugin
 )
+
+# FetchContent_Declare(mavlink
+#     GIT_REPOSITORY https://github.com/HTRamsey/zat-mavlink.git
+#     GIT_TAG master
+#     GIT_SHALLOW TRUE
+# )
+# set(MAVLINK_DIALECT zat)
+# set(MAVLINK_VERSION 2.0)
+# FetchContent_MakeAvailable(mavlink)
+# target_link_libraries(CustomPlugin PRIVATE mavlink)
