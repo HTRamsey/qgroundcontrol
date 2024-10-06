@@ -138,4 +138,6 @@ private:
     static constexpr uint16_t _port = 14570;
     static constexpr mavlink_system_t _mavsys = {1, MAV_COMP_ID_AUTOPILOT1};
     static constexpr const char *_ip = "192.168.1.5";
+
+    // ILLUMINATOR_STATUS
 };
