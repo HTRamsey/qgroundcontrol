@@ -31,7 +31,7 @@ public:
     QCameraDevice findCameraDevice(const QString &cameraId);
 
 public slots:
-    Q_INVOKABLE void adjustAspectRatio();
+    Q_INVOKABLE void adjustAspectRatio(qreal height);
 
 private:
     void _checkPermission();

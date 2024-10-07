@@ -17,6 +17,7 @@
 #include "QGCCameraManager.h"
 #include "QGCLoggingCategory.h"
 #include "VideoReceiver.h"
+#include "VideoReceiver/QtMultimedia/UVCReceiver.h"
 #include "VideoSettings.h"
 #include "SubtitleWriter.h"
 #ifdef QGC_GST_STREAMING
@@ -27,13 +28,13 @@
 #endif
 #ifdef QGC_QT_STREAMING
 #include "QtMultimediaReceiver.h"
-#endif
-
 #ifndef QGC_DISABLE_UVC
+#include "UVCReceiver.h"
 #include <QtMultimedia/QMediaDevices>
 #include <QtMultimedia/QCameraDevice>
 #include <QtCore/QPermissions>
 #include <QtQuick/QQuickWindow>
+#endif
 #endif
 
 #include <QtCore/QDir>
@@ -51,6 +52,9 @@ static constexpr const char* kFileExtension[VideoReceiver::FILE_FORMAT_MAX - Vid
 VideoManager::VideoManager(QGCApplication* app, QGCToolbox* toolbox)
     : QGCTool(app, toolbox)
     , _subtitleWriter(new SubtitleWriter(this))
+#ifndef QGC_DISABLE_UVC
+    , _uvcReceiver(new UVCReceiver(this))
+#endif
 {
 #ifdef QGC_GST_STREAMING
     // Gstreamer debug settings

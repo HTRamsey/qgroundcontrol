@@ -13,13 +13,13 @@
 
 #include <QtCore/QCoreApplication>
 #include <QtCore/QPermissions>
-#include <QtQuick/QQuickItem>
-#include <QtMultimedia/QMediaDevices>
-#include <QtMultimedia/QCameraDevice>
 #include <QtMultimedia/QCamera>
+#include <QtMultimedia/QCameraDevice>
 #include <QtMultimedia/QImageCapture>
 #include <QtMultimedia/QMediaCaptureSession>
+#include <QtMultimedia/QMediaDevices>
 #include <QtMultimediaQuick/private/qquickvideooutput_p.h>
+#include <QtQuick/QQuickItem>
 
 QGC_LOGGING_CATEGORY(UVCReceiverLog, "qgc.video.qtmultimedia.uvcreceiver")
 
@@ -32,9 +32,9 @@ UVCReceiver::UVCReceiver(QObject *parent)
     _captureSession->setImageCapture(_imageCapture);
     _captureSession->setVideoSink(_videoSink);
 
-    (void) connect(_captureSession, &QMediaCaptureSession::cameraChanged, this, [this] {
+    /*(void) connect(_captureSession, &QMediaCaptureSession::cameraChanged, this, [this] {
         adjustAspectRatio();
-    });
+    });*/
 
     _checkPermission();
 
@@ -46,7 +46,7 @@ UVCReceiver::~UVCReceiver()
     qCDebug(UVCReceiverLog) << Q_FUNC_INFO << this;
 }
 
-void UVCReceiver::adjustAspectRatio()
+void UVCReceiver::adjustAspectRatio(qreal height)
 {
     if (!_videoOutput) {
         return;
@@ -60,7 +60,6 @@ void UVCReceiver::adjustAspectRatio()
     const QSize resolution = cameraFormat.resolution();
     if (resolution.isValid()) {
         const qreal aspectRatio = resolution.width() / resolution.height();
-        const qreal height = height * aspectRatio;
         _videoOutput->setHeight(height * aspectRatio);
     }
 }
@@ -84,7 +83,7 @@ void UVCReceiver::_checkPermission()
     if (qApp->checkPermission(cameraPermission) == Qt::PermissionStatus::Undetermined) {
         qApp->requestPermission(cameraPermission, [this](const QPermission &permission) {
             if (permission.status() != Qt::PermissionStatus::Granted) {
-                qgcApp()->showAppMessage(QStringLiteral("Failed to get camera permission"));
+                qgcApp()->showAppMessage(tr("Failed to get camera permission"));
             }
         });
     }

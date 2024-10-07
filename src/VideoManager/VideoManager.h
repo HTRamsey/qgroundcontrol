@@ -25,6 +25,7 @@ class Vehicle;
 class Joystick;
 class VideoReceiver;
 class SubtitleWriter;
+class UVCReceiver;
 
 class VideoManager : public QGCTool
 {
@@ -150,6 +151,7 @@ protected:
     QString                 _uvcVideoSourceID;
     bool                    _fullScreen             = false;
     Vehicle*                _activeVehicle          = nullptr;
+    UVCReceiver*            _uvcReceiver            = nullptr;
 };
 
 class FinishVideoInitialization : public QRunnable
