@@ -751,13 +751,13 @@ void LinkManager::_addSerialAutoConnectLink()
 {
     // check to see if nmea gps is configured for UDP input, if so, set it up to connect
     if (_autoConnectSettings->autoConnectNmeaPort()->cookedValueString() == "UDP Port") {
-        if ((_nmeaSocket->localPort() != _autoConnectSettings->nmeaUdpPort()->rawValue().toUInt())
-                || (_nmeaSocket->state() != UdpIODevice::BoundState)) {
+        if ((_nmeaSocket->localPort() != _autoConnectSettings->nmeaUdpPort()->rawValue().toUInt()) || (_nmeaSocket->state() != UdpIODevice::BoundState)) {
             qCDebug(LinkManagerLog) << "Changing port for UDP NMEA stream";
             _nmeaSocket->close();
             _nmeaSocket->bind(QHostAddress::AnyIPv4, _autoConnectSettings->nmeaUdpPort()->rawValue().toUInt());
             _toolbox->qgcPositionManager()->setNmeaSourceDevice(_nmeaSocket);
         }
+
         if (_nmeaPort) {
             _nmeaPort->close();
             delete _nmeaPort;

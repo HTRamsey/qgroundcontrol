@@ -8,17 +8,21 @@
  ****************************************************************************/
 
 #include "UdpIODevice.h"
+#include "QGCLoggingCategory.h"
 
+QGC_LOGGING_CATEGORY(UdpIODeviceLog, "qgc.comms.udpiodevice")
 
-UdpIODevice::UdpIODevice(QObject *parent) : QUdpSocket(parent)
+UdpIODevice::UdpIODevice(QObject *parent)
+    : QUdpSocket(parent)
 {
-    // this might cause data to be available only after a second readyRead() signal
-    connect(this, &QUdpSocket::readyRead, this, &UdpIODevice::_readAvailableData);
+    // qCDebug(UdpIODeviceLog) << Q_FUNC_INFO << this;
+
+    (void) connect(this, &QUdpSocket::readyRead, this, &UdpIODevice::_readAvailableData);
 }
 
-bool UdpIODevice::canReadLine() const
+UdpIODevice::~UdpIODevice()
 {
-    return _buffer.indexOf('\n') > -1;
+    // qCDebug(UdpIODeviceLog) << Q_FUNC_INFO << this;
 }
 
 qint64 UdpIODevice::readLineData(char *data, qint64 maxSize)
@@ -27,19 +31,24 @@ qint64 UdpIODevice::readLineData(char *data, qint64 maxSize)
     if (length == 0) {
         return 0;
     }
+
     length = std::min(length, static_cast<int>(maxSize));
-    // copy lines to output
     std::copy(_buffer.data(), _buffer.data() + length, data);
+
     // trim buffer to remove consumed line
     _buffer = _buffer.right(_buffer.size() - length);
-    // return number of bytes read
+
     return length;
 }
 
-void UdpIODevice::_readAvailableData() {
+void UdpIODevice::_readAvailableData()
+{
     while (hasPendingDatagrams()) {
-        int previousSize = _buffer.size();
-        _buffer.resize(static_cast<int>(_buffer.size() + pendingDatagramSize()));
-        readDatagram((_buffer.data() + previousSize), pendingDatagramSize());
+        const int previousSize = _buffer.size();
+        const int readSize = pendingDatagramSize();
+        if (readSize > 0) {
+            _buffer.resize(static_cast<int>(_buffer.size() + readSize));
+            (void) readDatagram((_buffer.data() + previousSize), readSize);
+        }
     }
 }
