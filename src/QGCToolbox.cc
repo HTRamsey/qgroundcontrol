@@ -18,7 +18,6 @@
 #include "MissionCommandTree.h"
 #include "MultiVehicleManager.h"
 #include "PositionManager.h"
-#include "VideoManager.h"
 #include "MAVLinkLogManager.h"
 #include "QGCCorePlugin.h"
 #include "SettingsManager.h"
@@ -53,7 +52,6 @@ QGCToolbox::QGCToolbox(QGCApplication* app)
     _missionCommandTree     = new MissionCommandTree        (app, this);
     _multiVehicleManager    = new MultiVehicleManager       (app, this);
     _qgcPositionManager     = new QGCPositionManager        (app, this);
-    _videoManager           = new VideoManager              (app, this);
 
     _mavlinkLogManager      = new MAVLinkLogManager         (app, this);
 #ifndef QGC_AIRLINK_DISABLED
@@ -80,7 +78,6 @@ void QGCToolbox::setChildToolboxes(void)
     _missionCommandTree->setToolbox(this);
     _multiVehicleManager->setToolbox(this);
     _qgcPositionManager->setToolbox(this);
-    _videoManager->setToolbox(this);
     _mavlinkLogManager->setToolbox(this);
 #ifndef QGC_AIRLINK_DISABLED
     _airlinkManager->setToolbox(this);

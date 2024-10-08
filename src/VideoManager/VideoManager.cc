@@ -47,9 +47,8 @@ static constexpr const char* kFileExtension[VideoReceiver::FILE_FORMAT_MAX - Vid
     "mp4"
 };
 
-//-----------------------------------------------------------------------------
-VideoManager::VideoManager(QGCApplication* app, QGCToolbox* toolbox)
-    : QGCTool(app, toolbox)
+VideoManager::VideoManager(QObject *parent)
+    : QObject(parent)
     , _subtitleWriter(new SubtitleWriter(this))
 {
 #ifdef QGC_GST_STREAMING
@@ -95,9 +94,7 @@ VideoManager::~VideoManager()
     }
 }
 
-//-----------------------------------------------------------------------------
-void
-VideoManager::setToolbox(QGCToolbox *toolbox)
+void VideoManager::setToolbox(QGCToolbox *toolbox)
 {
    QGCTool::setToolbox(toolbox);
    QQmlEngine::setObjectOwnership(this, QQmlEngine::CppOwnership);
@@ -510,13 +507,6 @@ VideoManager::_videoSourceChanged()
     } else {
         stopVideo();
     }
-}
-
-//-----------------------------------------------------------------------------
-void
-VideoManager::_lowLatencyModeChanged()
-{
-    _restartAllVideos();
 }
 
 //-----------------------------------------------------------------------------
