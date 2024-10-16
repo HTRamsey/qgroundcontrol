@@ -1,20 +1,21 @@
 #include "Viewpro.h"
-#include "ViewproData.h"
-#include "DroneData.h"
+
 #include <QtCore/QtMath>
 #include <QtCore/QtMinMax>
 #include <QtCore/QLoggingCategory>
 
-static Q_LOGGING_CATEGORY(Log, "zat.comms.viewpro")
+QGC_LOGGING_CATEGORY(ViewproLog, "qgc.custom.drone.viewpro")
 
-Viewpro::Viewpro(QObject *parent): MavCamera(parent)
+Viewpro::Viewpro(ViewproFactGroup *viewproFactGroup, QObject *parent)
+    : QObject(parent)
+    , _viewproFactGroup(viewproFactGroup)
 {
-    qCDebug(Log) << Q_FUNC_INFO << this;
+    // qCDebug(ViewproLog) << Q_FUNC_INFO << this;
 }
 
 Viewpro::~Viewpro()
 {
-    qCDebug(Log) << Q_FUNC_INFO << this;
+    // qCDebug(ViewproLog) << Q_FUNC_INFO << this;
 }
 
 uint8_t Viewpro::s_viewlink_protocol_checksum(QByteArrayView viewlink_data_buf)
@@ -436,57 +437,3 @@ void Viewpro::sendIPQuerySerial(uint8_t ip_first_part, uint8_t ip_second_part, u
 //     packet[6] = static_cast<char>(param2);
 //     CalculateCheckSumV2(packet);
 // }
-
-/* MAVLINK COMMANDS */
-
-void Viewpro::setParamExtGimMode(uint8_t index) { (void) setExtParam("GIM MODE", index, MAV_PARAM_EXT_TYPE_UINT8); }
-
-void Viewpro::setParamExtGimModeRecenter () { (void) setParamExtGimMode(0); }
-
-void Viewpro::setParamExtGimModeFollowYaw() { (void) setParamExtGimMode(1); }
-
-void Viewpro::setParamExtGimModeLockYaw  () { (void) setParamExtGimMode(2); }
-
-void Viewpro::setParamExtGimModeLookDown () { (void) setParamExtGimMode(3); }
-
-void Viewpro::setParamExtGimSpeed        () { (void) setExtParam("GIM SPEED",      0, MAV_PARAM_EXT_TYPE_UINT8); }
-
-void Viewpro::setParamExtPitchAngle      () { (void) setExtParam("PITCH ANGLE",    0, MAV_PARAM_EXT_TYPE_REAL32); }
-
-void Viewpro::setParamExtYawAngle        () { (void) setExtParam("YAW ANGLE",      0, MAV_PARAM_EXT_TYPE_REAL32); }
-
-void Viewpro::setParamExtCamModeImage    () { (void) setExtParam("CAM MODE",       0, MAV_PARAM_EXT_TYPE_UINT8); }
-
-void Viewpro::setParamExtCamModeVideo    () { (void) setExtParam("CAM MODE",       1, MAV_PARAM_EXT_TYPE_UINT8); }
-
-void Viewpro::setParamExtTrackSW  (bool on) { (void) setExtParam("TRACK SW",       on, MAV_PARAM_EXT_TYPE_UINT8); }
-
-void Viewpro::setParamExtOSD      (bool on) { (void) setExtParam("OSD SET",        !on, MAV_PARAM_EXT_TYPE_UINT8); }
-
-void Viewpro::setParamExtPIPMode(uint8_t index) { (void) setExtParam("PIP MODE",   index, MAV_PARAM_EXT_TYPE_UINT8); }
-
-void Viewpro::setParamExtPIPModeEOIR     () { (void) setParamExtPIPMode(0); }
-
-void Viewpro::setParamExtPIPModeIR       () { (void) setParamExtPIPMode(1); }
-
-void Viewpro::setParamExtPIPModeIREO     () { (void) setParamExtPIPMode(2); }
-
-void Viewpro::setParamExtPIPModeEO       () { (void) setParamExtPIPMode(3); }
-
-void Viewpro::setParamExtUserCmd         () { (void) setExtParam("USER COMMAND",   0, MAV_PARAM_EXT_TYPE_CUSTOM); }
-
-void Viewpro::setParamExtTargetCali      () { (void) setExtParam("TARGET CALI",    0, MAV_PARAM_EXT_TYPE_UINT8); }
-
-void Viewpro::setParamExtTagCali         () { (void) setExtParam("TAG UP/DW CALI", 0, MAV_PARAM_EXT_TYPE_REAL32); }
-
-void Viewpro::setParamExtIRMode(uint8_t index) { (void) setExtParam("IR MODE",    index, MAV_PARAM_EXT_TYPE_UINT8); }
-
-void Viewpro::setParamExtIRModeWhiteHot  () { (void) setParamExtIRMode(0); }
-
-void Viewpro::setParamExtIRModeBlackHot  () { (void) setParamExtIRMode(1); }
-
-void Viewpro::setParamExtIRModeColor     () { (void) setParamExtIRMode(2); }
-
-void Viewpro::setParamExtIRDZoom(uint index) { (void) setExtParam("IR DZOOM",   index, MAV_PARAM_EXT_TYPE_UINT8); }
-
-// void Viewpro::setParamExtEOCam           () { (void) s_setExtParam("VISIBLE_LIGHT_CAMERA",   0, MAV_PARAM_EXT_TYPE_UINT32); }

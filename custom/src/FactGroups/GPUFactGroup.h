@@ -63,6 +63,10 @@ private:
     void _handleHeartbeat(const mavlink_message_t &message);
     void _handleGlobalPosition(const mavlink_message_t &message);
     void _handleZatGpuData(const mavlink_message_t &message);
+    void _handleWinchStatus(const mavlink_message_t &message);
+    void _handleOnboardComputerStatus(const mavlink_message_t &message);
+    void _handlePowerStatus(const mavlink_message_t &message);
+    void _handleGeneratorStatus(const mavlink_message_t &message);
 
     void _setUpConnectionChecker();
 
