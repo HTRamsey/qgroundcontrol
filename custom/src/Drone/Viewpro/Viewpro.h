@@ -1,19 +1,19 @@
 #pragma once
 
-#include "MavlinkTasks.h"
-#include "MavCamera.h"
+#include <QtCore/QLoggingCategory>
 #include <QtCore/QVariant>
-#include <QtQmlIntegration/QtQmlIntegration>
 #include <QtPositioning/QGeoCoordinate>
 
-class Viewpro : public MavCamera
+#include "ViewproFactGroup.h"
+
+Q_DECLARE_LOGGING_CATEGORY(ViewproLog)
+
+class Viewpro : public QObject
 {
     Q_OBJECT
-    QML_ELEMENT
-    QML_SINGLETON
 
 public:
-    explicit Viewpro(QObject *parent = nullptr);
+    explicit Viewpro(ViewproFactGroup *viewproFactGroup, QObject *parent = nullptr);
     ~Viewpro();
 
                 void setProtocolControlSerial(uint8_t LRF=0x00, uint8_t NMEA=0x00, uint8_t gimbal3E=0x3E, uint8_t tracking7E=0x7E, uint8_t sonyVISCA=0x00, uint8_t targetPositionCalc=0x00, uint8_t mavlink=0xED, uint8_t pelco_d=0x00, uint8_t feedback=0x00);
@@ -85,30 +85,6 @@ public:
 
                 void sendIPQuerySerial(uint8_t ip_first_part, uint8_t ip_second_part, uint8_t ip_third_part, uint8_t ip_fourth_part);
 
-    void setParamExtGimModeRecenter();
-    void setParamExtGimModeFollowYaw();
-    void setParamExtGimModeLockYaw();
-    void setParamExtGimModeLookDown();
-    void setParamExtGimSpeed();
-    void setParamExtPitchAngle();
-    void setParamExtYawAngle();
-    void setParamExtCamModeImage();
-    void setParamExtCamModeVideo();
-    void setParamExtTrackSW(bool on);
-    void setParamExtOSD(bool on);
-    void setParamExtIRDZoom(uint index);
-    void setParamExtPIPModeEOIR();
-    void setParamExtPIPModeIR();
-    void setParamExtPIPModeIREO();
-    void setParamExtPIPModeEO();
-    void setParamExtUserCmd();
-    void setParamExtTargetCali();
-    void setParamExtTagCali();
-    void setParamExtIRModeWhiteHot();
-    void setParamExtIRModeBlackHot();
-    void setParamExtIRModeColor();
-    // void setParamExtEOCam();
-
 private:
     void sendUCmd(uint8_t cmd, uint8_t param1=0U, uint8_t param2=0U, uint8_t param3=0U, uint8_t param4=0U, uint8_t param5=0U, uint8_t param6=0U, uint8_t param7=0U, uint8_t param8=0U, uint8_t param9=0U);
     void sendA1Cmd(uint8_t control, uint16_t param1=0U, uint16_t param2=0U, uint16_t param3=0U, uint16_t param4=0U);
@@ -123,6 +99,8 @@ private:
     void setParamExtPIPMode(uint8_t index);
     void setParamExtIRMode(uint8_t index);
     static uint8_t s_viewlink_protocol_checksum(QByteArrayView viewlink_data_buf);
+
+    ViewproFactGroup *_viewproFactGroup = nullptr;
 
     static constexpr uint8_t HEADER_LEN   = 3;
     static constexpr uint8_t BODY_LEN     = 1;

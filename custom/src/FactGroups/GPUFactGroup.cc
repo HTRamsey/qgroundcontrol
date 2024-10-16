@@ -68,11 +68,39 @@ void GPUFactGroup::handleMessage(Vehicle *vehicle, mavlink_message_t &message)
     case MAVLINK_MSG_ID_ZAT_GPU_DATA:
         _handleZatGpuData(message);
         break;
+    case MAVLINK_MSG_ID_GLOBAL_POSITION_INT:
+        _handleGlobalPosition(message);
+        break;
+    case MAVLINK_MSG_ID_WINCH_STATUS:
+        _handleWinchStatus(message);
+        break;
+    case MAVLINK_MSG_ID_ONBOARD_COMPUTER_STATUS:
+        _handleOnboardComputerStatus(message);
+        break;
+    case MAVLINK_MSG_ID_POWER_STATUS:
+        _handlePowerStatus(message);
+        break;
+    case MAVLINK_MSG_ID_GENERATOR_STATUS:
+        _handleGeneratorStatus(message);
+        break;
     default:
         return;
     }
 
     _setTelemetryAvailable(true);
+}
+
+void GPUFactGroup::_setUpConnectionChecker()
+{
+    QTimer *const connectionTimer = new QTimer(this);
+    connectionTimer->setInterval(1000);
+    connectionTimer->setSingleShot(false);
+    (void) connectionTimer->callOnTimeout(this, [this]() {
+        if (_connectedFact.rawValue().toBool() && _connectionTimer.isValid() && _connectionTimer.hasExpired(_connectionTimeout)) {
+            _connectedFact.setRawValue(false);
+        }
+    }, Qt::AutoConnection);
+    connectionTimer->start();
 }
 
 void GPUFactGroup::_handleHeartbeat(const mavlink_message_t &message)
@@ -116,7 +144,7 @@ void GPUFactGroup::_handleZatGpuData(const mavlink_message_t &message)
     _outputVoltageFact.setRawValue(data.outputVoltage);
 }
 
-void GPUFactGroup::_handleGlobalPosition(const mavlink_message_t& message)
+void GPUFactGroup::_handleGlobalPosition(const mavlink_message_t &message)
 {
     mavlink_global_position_int_t data;
     mavlink_msg_global_position_int_decode(&message, &data);
@@ -129,15 +157,26 @@ void GPUFactGroup::_handleGlobalPosition(const mavlink_message_t& message)
     }*/
 }
 
-void GPUFactGroup::_setUpConnectionChecker()
+void GPUFactGroup::_handleWinchStatus(const mavlink_message_t &message)
 {
-    QTimer *const connectionTimer = new QTimer(this);
-    connectionTimer->setInterval(1000);
-    connectionTimer->setSingleShot(false);
-    (void) connectionTimer->callOnTimeout(this, [this]() {
-        if (_connectedFact.rawValue().toBool() && _connectionTimer.isValid() && _connectionTimer.hasExpired(_connectionTimeout)) {
-            _connectedFact.setRawValue(false);
-        }
-    }, Qt::AutoConnection);
-    connectionTimer->start();
+    mavlink_winch_status_t data;
+    mavlink_msg_winch_status_decode(&message, &data);
+}
+
+void GPUFactGroup::_handleOnboardComputerStatus(const mavlink_message_t &message)
+{
+    mavlink_onboard_computer_status_t data;
+    mavlink_msg_onboard_computer_status_decode(&message, &data);
+}
+
+void GPUFactGroup::_handlePowerStatus(const mavlink_message_t &message)
+{
+    mavlink_power_status_t data;
+    mavlink_msg_power_status_decode(&message, &data);
+}
+
+void GPUFactGroup::_handleGeneratorStatus(const mavlink_message_t &message)
+{
+    mavlink_generator_status_t data;
+    mavlink_msg_generator_status_decode(&message, &data);
 }
