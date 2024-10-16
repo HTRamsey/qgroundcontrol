@@ -41,6 +41,8 @@ void CustomPlugin::setToolbox(QGCToolbox *toolbox)
     _gcsFactGroup = new GCSFactGroup(this);
 
     _droneControl = new Drone(_droneFactGroup, this);
+    _gpuControl = new GPU(_gpuFactGroup, this);
+    _viewproControl = new Viewpro(_viewproFactGroup, this);
 
     MAVLinkProtocol *const mavlink = qgcApp()->toolbox()->mavlinkProtocol();
     mavlink->setSystemId(_mavsys.sysid);
@@ -382,9 +384,9 @@ bool CustomPlugin::mavlinkMessage(Vehicle *vehicle, LinkInterface *link, mavlink
     if (_droneFactGroup) {
         _droneFactGroup->handleMessage(vehicle, message);
     }
-    // if (_gpuFactGroup) {
-    //     _gpuFactGroup->handleMessage(vehicle, message);
-    // }
+    if (_gpuFactGroup) {
+        _gpuFactGroup->handleMessage(vehicle, message);
+    }
     if (_nextVisionFactGroup) {
         _nextVisionFactGroup->handleMessage(vehicle, message);
     }

@@ -51,6 +51,8 @@ public:
     FactGroup *gcsFactGroup() { return _gcsFactGroup; }
 
     Drone *droneControl() { return _droneControl; }
+    GPU *gpuControl() { return _gpuControl; }
+    Viewpro *viewproControl() { return _viewproControl; }
 
 private:
     // void _requestHomePosition(Vehicle *vehicle);
@@ -65,6 +67,8 @@ private:
     GCSFactGroup *_gcsFactGroup = nullptr;
 
     Drone *_droneControl = nullptr;
+    GPU *_gpuControl = nullptr;
+    Viewpro *_viewproControl = nullptr;
 
     const QString _droneFactGroupName = QStringLiteral("drone");
     const QString _gpuFactGroupName = QStringLiteral("gpu");

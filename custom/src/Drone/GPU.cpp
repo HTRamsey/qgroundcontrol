@@ -6,7 +6,9 @@
 
 QGC_LOGGING_CATEGORY(GPULog, "qgc.custom.drone.gpu")
 
-GPU::GPU(QObject* parent): QObject(parent)
+GPU::GPU(GPUFactGroup *gpuFactGroup, QObject* parent)
+    : QObject(parent)
+    , _gpuFactGroup(gpuFactGroup)
 {
     // qCDebug(DroneLog) << Q_FUNC_INFO << this;
 }
