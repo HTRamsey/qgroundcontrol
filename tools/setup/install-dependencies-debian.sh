@@ -143,3 +143,25 @@ if apt-cache show libgeographic-dev >/dev/null 2>&1 && apt-cache show libgeograp
 elif apt-cache show libgeographiclib-dev >/dev/null 2>&1 && apt-cache show libgeographiclib-dev 2>/dev/null | grep -q "^Package: libgeographiclib-dev"; then
     DEBIAN_FRONTEND=noninteractive apt-get install -y --quiet libgeographiclib-dev
 fi
+
+# Build GStreamer
+# DEBIAN_FRONTEND=noninteractive apt -y --quiet install \
+#     build-essential \
+#     libglib2.0-dev \
+#     libgudev-1.0-dev \
+#     libssl-dev \
+#     libcairo-dev \
+#     libxml2-dev \
+#     libjpeg-dev \
+#     libmjpegtools-dev \
+#     libopenjp2-7-dev \
+#     libwxgtk3.0-gtk3-dev \
+#     libsoup2.4-dev \
+#     libjson-glib-1.0-0 \
+#     libjson-glib-dev \
+#     gcc \
+#     pkg-config \
+#     git \
+#     python3-pip \
+#     flex \
+#     bison
