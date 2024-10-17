@@ -41,6 +41,8 @@ jobs:
     steps:
       - name: Free Disk Space (Ubuntu)
         uses: jlumbroso/free-disk-space@main
+        with:
+          large-packages: false
         continue-on-error: true
 
       - name: Checkout repo
@@ -58,12 +60,12 @@ jobs:
 
       - uses: lukka/get-cmake@latest
 
-      - name: Install Vulkan
-        run: |
-          wget -qO - http://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
-          sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-1.3.283-focal.list https://packages.lunarg.com/vulkan/1.3.283/lunarg-vulkan-1.3.283-focal.list
-          sudo apt update
-          sudo apt install vulkan-sdk
+      # - name: Install Vulkan
+      #   run: |
+      #     wget -qO - http://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
+      #     sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-1.3.283-focal.list https://packages.lunarg.com/vulkan/1.3.283/lunarg-vulkan-1.3.283-focal.list
+      #     sudo apt update
+      #     sudo apt install vulkan-sdk
 
       - name: Install Compiler
         run: |
