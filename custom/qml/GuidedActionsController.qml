@@ -713,7 +713,7 @@ Item {
             _corePlugin.droneControl.toggleRemoteId(_activeVehicle)
             break
         case actionSpotlight:
-            _corePlugin.droneControl.setSpotlight(_activeVehicle, actionData)
+            _corePlugin.droneControl.adjustLights(_activeVehicle, actionData)
             break
         default:
             console.warn(qsTr("Internal error: unknown actionCode"), actionCode)

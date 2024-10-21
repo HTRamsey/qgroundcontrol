@@ -13,6 +13,9 @@
 class CustomOptions;
 class QGCOptions;
 class Vehicle;
+class GPU;
+class Viewpro;
+class NextVision;
 
 Q_DECLARE_LOGGING_CATEGORY(CustomLog)
 

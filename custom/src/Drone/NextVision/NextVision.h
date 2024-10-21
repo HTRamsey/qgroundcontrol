@@ -1,7 +1,6 @@
 #pragma once
 
-#include "MavLib.h"
-#include "MavlinkTasks.h"
+#include "MAVLinkLib.h"
 #include <QtGui/QVector3D>
 #include <QtCore/QList>
 #include <QtPositioning/QGeoCoordinate>

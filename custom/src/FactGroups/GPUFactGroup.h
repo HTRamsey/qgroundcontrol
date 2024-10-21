@@ -67,6 +67,7 @@ private:
     void _handleOnboardComputerStatus(const mavlink_message_t &message);
     void _handlePowerStatus(const mavlink_message_t &message);
     void _handleGeneratorStatus(const mavlink_message_t &message);
+    void _handleRawPressure(const mavlink_message_t &message);
 
     void _setUpConnectionChecker();
 

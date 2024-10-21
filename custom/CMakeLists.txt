@@ -39,6 +39,14 @@ qt_add_library(CustomPlugin STATIC
     src/AutoPilotPlugin/CustomAutoPilotPlugin.h
     src/Drone/Drone.cc
     src/Drone/Drone.h
+    src/Drone/GPU.cpp
+    src/Drone/GPU.h
+    # src/Drone/NextVision/NextVision.cpp
+    # src/Drone/NextVision/NextVision.h
+    # src/Drone/NextVision/NextVisionData.cpp
+    # src/Drone/NextVision/NextVisionData.h
+    # src/Drone/Viewpro/Viewpro.cpp
+    # src/Drone/Viewpro/Viewpro.h
     src/FactGroups/DroneFactGroup.cc
     src/FactGroups/DroneFactGroup.h
     src/FactGroups/GPUFactGroup.cc
@@ -75,6 +83,8 @@ target_include_directories(CustomPlugin
         src
         src/AutoPilotPlugin
         src/Drone
+        src/Drone/Viewpro
+        src/Drone/NextVision
         src/FactGroups
         src/FirmwarePlugin
 )

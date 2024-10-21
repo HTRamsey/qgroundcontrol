@@ -83,6 +83,9 @@ void GPUFactGroup::handleMessage(Vehicle *vehicle, mavlink_message_t &message)
     case MAVLINK_MSG_ID_GENERATOR_STATUS:
         _handleGeneratorStatus(message);
         break;
+    case MAVLINK_MSG_ID_RAW_PRESSURE:
+        _handleRawPressure(message);
+        break;
     default:
         return;
     }
@@ -149,6 +152,10 @@ void GPUFactGroup::_handleGlobalPosition(const mavlink_message_t &message)
     mavlink_global_position_int_t data;
     mavlink_msg_global_position_int_decode(&message, &data);
 
+    _latitudeFact.setRawValue(data.lat * 1e-7);
+    _longitudeFact.setRawValue(data.lon * 1e-7);
+    _altitudeFact.setRawValue(data.alt * 1e-3);
+
     /*const QGeoCoordinate position(data.lat * 1e-7, data.lon * 1e-7, data.alt * 1e-3);
     if(position != m_position.coordinate())
     {
@@ -161,12 +168,25 @@ void GPUFactGroup::_handleWinchStatus(const mavlink_message_t &message)
 {
     mavlink_winch_status_t data;
     mavlink_msg_winch_status_decode(&message, &data);
+
+    _tetherTensionFact.setRawValue(data.tension);
+    _tetherLengthFact.setRawValue(data.line_length);
+    _outputVoltageFact.setRawValue(data.voltage);
+    _motorDutyFact.setRawValue(data.speed);
+    _spoolTemperatureFact.setRawValue(data.temperature);
+    _spoolTempWarningFact.setRawValue(_spoolTemperatureFact.rawValue().toInt() >= _spoolTempWarningTemp); // convert to signal
+    _spoolTempCriticalFact.setRawValue(_spoolTemperatureFact.rawValue().toInt() >= _spoolTempCriticalTemp);
 }
 
 void GPUFactGroup::_handleOnboardComputerStatus(const mavlink_message_t &message)
 {
     mavlink_onboard_computer_status_t data;
     mavlink_msg_onboard_computer_status_decode(&message, &data);
+
+    // const uint32_t uptime = data.uptime;
+
+    _psuFanDutyFact.setRawValue(data.fan_speed[0]);
+    _spoolFanDutyFact.setRawValue(data.fan_speed[1]);
 }
 
 void GPUFactGroup::_handlePowerStatus(const mavlink_message_t &message)
@@ -179,4 +199,18 @@ void GPUFactGroup::_handleGeneratorStatus(const mavlink_message_t &message)
 {
     mavlink_generator_status_t data;
     mavlink_msg_generator_status_decode(&message, &data);
+
+    _outputVoltageFact.setRawValue(data.bus_voltage);
+    _psuTemperatureFact.setRawValue(data.rectifier_temperature);
+    _psuTempWarningFact.setRawValue(_psuTemperatureFact.rawValue().toInt() >= _psuTempWarningTemp);
+    _psuTempCriticalFact.setRawValue(_psuTemperatureFact.rawValue().toInt() >= _psuTempCriticalTemp);
+}
+
+void GPUFactGroup::_handleRawPressure(const mavlink_message_t &message)
+{
+    mavlink_raw_pressure_t data;
+    mavlink_msg_raw_pressure_decode(&message, &data);
+
+    _pressureFact.setRawValue(data.press_abs);
+    _pressureTemperatureFact.setRawValue(data.temperature);
 }

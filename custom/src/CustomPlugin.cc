@@ -8,6 +8,9 @@
 #include "SettingsManager.h"
 #include "MAVLinkProtocol.h"
 #include "Vehicle.h"
+#include "GPU.h"
+// #include "Viewpro.h"
+// #include "NextVision.h"
 #include "LinkInterface.h"
 #include "MultiVehicleManager.h"
 #include "JoystickManager.h"
@@ -41,8 +44,9 @@ void CustomPlugin::setToolbox(QGCToolbox *toolbox)
     _gcsFactGroup = new GCSFactGroup(this);
 
     _droneControl = new Drone(_droneFactGroup, this);
-    _gpuControl = new GPU(_gpuFactGroup, this);
-    _viewproControl = new Viewpro(_viewproFactGroup, this);
+    // _gpuControl = new GPU(_gpuFactGroup, this);
+    // _viewproControl = new Viewpro(_viewproFactGroup, this);
+    // _nextVisionControl = new NextVision(_nextVisionFactGroup, this);
 
     MAVLinkProtocol *const mavlink = qgcApp()->toolbox()->mavlinkProtocol();
     mavlink->setSystemId(_mavsys.sysid);
@@ -74,6 +78,19 @@ void CustomPlugin::setToolbox(QGCToolbox *toolbox)
         // joystick->totalButtonCount();
         // joystick->buttonActions()
     }, Qt::AutoConnection);
+
+    // TODO: FIX THIS FOR GEOFENCE
+    /*connect(_gpuFactGroup->tetherLength(), &Fact::rawValueChanged, this, [this]() {
+        } else if (metaData.name() == FlyViewSettings::guidedMaximumAltitudeName) {
+            metaData.setRawDefaultValue(121.92);
+            return true;
+        } else if (metaData.name() == FlyViewSettings::maxGoToLocationDistanceName) {
+            // TODO: Adjust based on Geofence - FENCE_RADIUS
+            metaData.setRawDefaultValue(40);
+            return false;
+        }
+    });*/
+
 
     /*ParameterManager *const parameterManager = qgcApp()->toolbox()->multiVehicleManager()->activeVehicle()->parameterManager();
     (void) connect(parameterManager, &ParameterManager::parametersReadyChanged, this, [parameterManager](bool parametersReady) {

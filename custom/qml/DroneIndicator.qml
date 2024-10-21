@@ -68,6 +68,21 @@ Item {
                         }
 
                         LabelledLabel {
+                            label: _activeVehicle.altitudeRelative.shortDescription
+                            labelText: _activeVehicle.altitudeRelative.valueString + " " + _activeVehicle.altitudeRelative.units
+                        }
+
+                        LabelledLabel {
+                            label: qsTr("Voltage")
+                            labelText: _activeVehicle.batteries.count > 0 ? _activeVehicle.batteries.get(0).voltage.valueString + " " + _activeVehicle.batteries.get(0).voltage.units : ""
+                        }
+
+                        LabelledLabel {
+                            label: qsTr("Power")
+                            labelText: _activeVehicle.batteries.count > 0 ? _activeVehicle.batteries.get(0).instantPower.valueString + " " + _activeVehicle.batteries.get(0).instantPower.units : ""
+                        }
+
+                        LabelledLabel {
                             label: qsTr("Latitude")
                             labelText: _activeVehicle.latitude.toFixed(7) + "°"
                         }

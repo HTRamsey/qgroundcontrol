@@ -162,10 +162,10 @@ void Viewpro::gimbalManualRCSerial(float yaw, float tilt)
             tilt_angle = 1500;
         }
         uint16_t yaw_speed = (std::abs(yaw) * 32768);
-        yaw_speed /= (ViewproData::viewprodata()->zoom() * 3);
+        yaw_speed /= (_viewproFactGroup->zoom() * 3);
         yaw_speed = qBound(0U, yaw_speed, 32768U);
         uint16_t tilt_speed = (std::abs(tilt) * 32768);
-        tilt_speed /= (ViewproData::viewprodata()->zoom() * 3);
+        tilt_speed /= (_viewproFactGroup->zoom() * 3);
         tilt_speed = qBound(0U, tilt_speed, 32768U);
         sendA1Cmd(0x0D, yaw_speed, yaw_angle, tilt_speed, tilt_angle);
         last_yaw = yaw;
@@ -211,27 +211,27 @@ void Viewpro::setVideoSourceEO1IRPIPSerial() { sendC1Cmd(0, 0, 3, 0); }
 
 void Viewpro::setVideoSourceIREO1PIPSerial() { sendC1Cmd(0, 0, 4, 0); }
 
-void Viewpro::focusZoomStopSerial() { sendC1Cmd(0x01, 0, ViewproData::viewprodata()->pipMode(), 0); }
+void Viewpro::focusZoomStopSerial() { sendC1Cmd(0x01, 0, _viewproFactGroup->pipMode(), 0); }
 
 // void Viewpro::brightnessUpSerial() { sendC1Cmd(0x02, 0, Viewpro::viewprodata()->pipMode(), 0); }
 
 // void Viewpro::brightnessDownSerial() { sendC1Cmd(0x03, 0, Viewpro::viewprodata()->pipMode(), 0); }
 
-void Viewpro::zoomOutSerial(int speed) { sendC1Cmd(0x08, static_cast<uint8_t>(speed), ViewproData::viewprodata()->pipMode(), 0); }
+void Viewpro::zoomOutSerial(int speed) { sendC1Cmd(0x08, static_cast<uint8_t>(speed), _viewproFactGroup->pipMode(), 0); }
 
-void Viewpro::zoomInSerial(int speed) { sendC1Cmd(0x09, static_cast<uint8_t>(speed), ViewproData::viewprodata()->pipMode(), 0); }
+void Viewpro::zoomInSerial(int speed) { sendC1Cmd(0x09, static_cast<uint8_t>(speed), _viewproFactGroup->pipMode(), 0); }
 
-void Viewpro::focusInSerial() { sendC1Cmd(0x0A, 0, ViewproData::viewprodata()->pipMode(), 0); }
+void Viewpro::focusInSerial() { sendC1Cmd(0x0A, 0, _viewproFactGroup->pipMode(), 0); }
 
-void Viewpro::focusOutSerial() { sendC1Cmd(0x0B, 0, ViewproData::viewprodata()->pipMode(), 0); }
+void Viewpro::focusOutSerial() { sendC1Cmd(0x0B, 0, _viewproFactGroup->pipMode(), 0); }
 
 // void Viewpro::setIRModePseudoSerial() { sendC1Cmd(0x0D, 0, Viewpro::viewprodata()->pipMode(), 0); }
 
-void Viewpro::setIRModeWhiteHotSerial() { sendC1Cmd(0x0E, 0, ViewproData::viewprodata()->pipMode(), 0); }
+void Viewpro::setIRModeWhiteHotSerial() { sendC1Cmd(0x0E, 0, _viewproFactGroup->pipMode(), 0); }
 
-void Viewpro::setIRModeBlackHotSerial() { sendC1Cmd(0x0F, 0, ViewproData::viewprodata()->pipMode(), 0); }
+void Viewpro::setIRModeBlackHotSerial() { sendC1Cmd(0x0F, 0, _viewproFactGroup->pipMode(), 0); }
 
-void Viewpro::rainbowIRSerial() { sendC1Cmd(0x12, 0, ViewproData::viewprodata()->pipMode(), 0); }
+void Viewpro::rainbowIRSerial() { sendC1Cmd(0x12, 0, _viewproFactGroup->pipMode(), 0); }
 
 // void Viewpro::takePictureSerial() { sendC1Cmd(0x13, 0, Viewpro::viewprodata()->pipMode(), 0); }
 
@@ -245,13 +245,13 @@ void Viewpro::rainbowIRSerial() { sendC1Cmd(0x12, 0, ViewproData::viewprodata()-
 
 // void Viewpro::switchModeSerial() { sendC1Cmd(0x18, 0, Viewpro::viewprodata()->pipMode(), 0); }
 
-void Viewpro::setAutoFocusSerial(bool enabled) { sendC1Cmd((enabled ? 0x19 : 0x1A), 0, ViewproData::viewprodata()->pipMode(), 0); }
+void Viewpro::setAutoFocusSerial(bool enabled) { sendC1Cmd((enabled ? 0x19 : 0x1A), 0, _viewproFactGroup->pipMode(), 0); }
 
-void Viewpro::zoomInIRDigitalSerial() { sendC1Cmd(0x1B, 0, ViewproData::viewprodata()->pipMode(), 0); }
+void Viewpro::zoomInIRDigitalSerial() { sendC1Cmd(0x1B, 0, _viewproFactGroup->pipMode(), 0); }
 
-void Viewpro::zoomOutIRDigitalSerial() { sendC1Cmd(0x1C, 0, ViewproData::viewprodata()->pipMode(), 0); }
+void Viewpro::zoomOutIRDigitalSerial() { sendC1Cmd(0x1C, 0, _viewproFactGroup->pipMode(), 0); }
 
-void Viewpro::setIRColorExtSerial(int value) { if(value >= 1 && value <= 6) sendC1Cmd(0x20 | value, 0, ViewproData::viewprodata()->pipMode(), 0); }
+void Viewpro::setIRColorExtSerial(int value) { if(value >= 1 && value <= 6) sendC1Cmd(0x20 | value, 0, _viewproFactGroup->pipMode(), 0); }
 
 /* C2 Optical Control Infrequently Used */
 
@@ -317,17 +317,17 @@ void Viewpro::sendE1Cmd(uint8_t cmd, uint8_t source, uint8_t param1, uint8_t par
     sendSerialCmd(packet);
 }
 
-void Viewpro::trackingStopSerial() { sendE1Cmd(0x01, ViewproData::viewprodata()->pipMode(), 0, 0); }
+void Viewpro::trackingStopSerial() { sendE1Cmd(0x01, _viewproFactGroup->pipMode(), 0, 0); }
 
-void Viewpro::trackingSearchYawSerial(int yaw, int pitch) { sendE1Cmd(0x02, ViewproData::viewprodata()->pipMode(), static_cast<uint8_t>(yaw), static_cast<uint8_t>(pitch)); }
+void Viewpro::trackingSearchYawSerial(int yaw, int pitch) { sendE1Cmd(0x02, _viewproFactGroup->pipMode(), static_cast<uint8_t>(yaw), static_cast<uint8_t>(pitch)); }
 
-void Viewpro::trackingOnSerial() { sendE1Cmd(0x03, ViewproData::viewprodata()->pipMode(), 0, 0); }
+void Viewpro::trackingOnSerial() { sendE1Cmd(0x03, _viewproFactGroup->pipMode(), 0, 0); }
 
-void Viewpro::trackingAISerial(bool enabled) { sendE1Cmd(0x05, ViewproData::viewprodata()->pipMode(), 0, enabled); }
+void Viewpro::trackingAISerial(bool enabled) { sendE1Cmd(0x05, _viewproFactGroup->pipMode(), 0, enabled); }
 
-void Viewpro::trackingAIAutotrackSerial() { sendE1Cmd(0x08, ViewproData::viewprodata()->pipMode(), 0, 0); }
+void Viewpro::trackingAIAutotrackSerial() { sendE1Cmd(0x08, _viewproFactGroup->pipMode(), 0, 0); }
 
-void Viewpro::trackingTemplateSizeSerial(int size) { sendE1Cmd(0x20 | (size + 1), ViewproData::viewprodata()->pipMode(), 0, 0); }
+void Viewpro::trackingTemplateSizeSerial(int size) { sendE1Cmd(0x20 | (size + 1), _viewproFactGroup->pipMode(), 0, 0); }
 
 
 /* E2 Tracking Command Infrequently Used */

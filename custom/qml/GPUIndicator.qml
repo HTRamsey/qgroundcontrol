@@ -54,7 +54,7 @@ Item {
 
                             LabelledLabel {
                                 label:      gpuGroup.gpu.tetherTension.shortDescription
-                                labelText:  gpuGroup.gpu.tetherTension.valueString + " " + gpuGroup.gpu.tetherTension.units
+                                labelText:  gpuGroup.gpu.tetherTension.enumStringValue
                             }
 
                             LabelledLabel {
