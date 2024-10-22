@@ -17,6 +17,9 @@ public:
 
     void handleMessage(Vehicle *vehicle, mavlink_message_t &message) final;
 
+    uint32_t pipMode() const { return 0; }
+    uint32_t zoom() const { return 0; }
+
 private:
     void _handleStatusText(Vehicle *vehicle, const mavlink_message_t &message);
 

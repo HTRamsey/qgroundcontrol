@@ -245,12 +245,12 @@ Item {
                 _activeVehicle.altitudeRelative.value,
                 qsTr("Alt (rel)"))
         } else if (actionCode === actionSpotlight) {
-            /*guidedValueSlider.setupSlider(
-                GuidedValueSlider.SliderType.XXX,
-                _corePlugin.drone.spotlightMinimum,
-                _corePlugin.drone.spotlightMaximum,
-                _corePlugin.drone.spotlightStatus,
-                qsTr("Brightness"))*/
+            guidedValueSlider.setupSlider(
+                GuidedValueSlider.SliderType.Lights,
+                0,
+                100,
+                _corePlugin.drone.spotlightStatus.value,
+                qsTr("Brightness"))
         }
     }
 
@@ -585,8 +585,10 @@ Item {
             confirmDialog.message = remoteIdMessage
             break
         case actionSpotlight:
+            confirmDialog.hideTrigger = true
             confirmDialog.title = spotlightTitle
             confirmDialog.message = spotlightMessage
+            guidedValueSlider.visible = true
             break
         default:
             console.warn("Unknown actionCode", actionCode)
@@ -713,7 +715,7 @@ Item {
             _corePlugin.droneControl.toggleRemoteId(_activeVehicle)
             break
         case actionSpotlight:
-            _corePlugin.droneControl.adjustLights(_activeVehicle, actionData)
+            _corePlugin.droneControl.adjustLights(_activeVehicle, sliderOutputValue)
             break
         default:
             console.warn(qsTr("Internal error: unknown actionCode"), actionCode)

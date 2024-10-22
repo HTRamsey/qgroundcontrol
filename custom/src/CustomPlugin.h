@@ -10,6 +10,7 @@
 #include "GCSFactGroup.h"
 #include "Drone.h"
 
+class QQmlApplicationEngine;
 class CustomOptions;
 class QGCOptions;
 class Vehicle;
@@ -44,6 +45,7 @@ public:
     bool mavlinkMessage(Vehicle *vehicle, LinkInterface *link, mavlink_message_t message) final;
     QList<int> firstRunPromptStdIds() final;
     const QVariantList &toolBarIndicators();
+    QQmlApplicationEngine *createQmlApplicationEngine(QObject *parent = nullptr) final;
 
     void setToolbox(QGCToolbox *toolbox) final;
 

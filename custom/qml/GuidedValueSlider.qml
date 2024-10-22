@@ -17,7 +17,8 @@ Item {
     enum SliderType {
         Altitude,
         Takeoff,
-        Speed
+        Speed,
+        Lights
     }
 
     property real   _sliderMaxVal:          0
@@ -210,9 +211,16 @@ Item {
             text:                   _clampedSliderValue(_sliderValue) + " " + unitsString
             font.pointSize:         ScreenTools.largeFontPointSize
 
-            property var unitsString: _sliderType === GuidedValueSlider.Speed ? 
-                                        QGroundControl.unitsConversion.appSettingsSpeedUnitsString : 
-                                            QGroundControl.unitsConversion.appSettingsVerticalDistanceUnitsString
+            property var unitsString: {
+                switch(_sliderType) {
+                    case GuidedValueSlider.Speed:
+                        return QGroundControl.unitsConversion.appSettingsSpeedUnitsString;
+                    case GuidedValueSlider.Lights:
+                        return "%"
+                    default:
+                        return QGroundControl.unitsConversion.appSettingsVerticalDistanceUnitsString
+                }
+            }
         }
     }
 

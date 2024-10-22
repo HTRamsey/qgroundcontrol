@@ -45,8 +45,8 @@ qt_add_library(CustomPlugin STATIC
     # src/Drone/NextVision/NextVision.h
     # src/Drone/NextVision/NextVisionData.cpp
     # src/Drone/NextVision/NextVisionData.h
-    # src/Drone/Viewpro/Viewpro.cpp
-    # src/Drone/Viewpro/Viewpro.h
+    src/Drone/Viewpro/Viewpro.cpp
+    src/Drone/Viewpro/Viewpro.h
     src/FactGroups/DroneFactGroup.cc
     src/FactGroups/DroneFactGroup.h
     src/FactGroups/GPUFactGroup.cc

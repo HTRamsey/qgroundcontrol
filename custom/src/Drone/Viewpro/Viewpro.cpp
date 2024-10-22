@@ -1,4 +1,12 @@
 #include "Viewpro.h"
+#include "ViewproFactGroup.h"
+#include "QGCApplication.h"
+#include "QGCToolbox.h"
+#include "MultiVehicleManager.h"
+#include "Vehicle.h"
+#include "LinkInterface.h"
+#include "MAVLinkProtocol.h"
+#include "QGCLoggingCategory.h"
 
 #include <QtCore/QtMath>
 #include <QtCore/QtMinMax>
@@ -29,6 +37,49 @@ uint8_t Viewpro::s_viewlink_protocol_checksum(QByteArrayView viewlink_data_buf)
     return checksum;
 }
 
+void Viewpro::_sendSerialCmd(const QByteArray &data)
+{
+    MultiVehicleManager *const multiVehicleManager = qgcApp()->toolbox()->multiVehicleManager();
+    Vehicle *const vehicle = multiVehicleManager->activeVehicle();
+
+    if (!vehicle) {
+        qWarning() << "Internal error";
+        return;
+    }
+
+    SharedLinkInterfacePtr sharedLink = vehicle->vehicleLinkManager()->primaryLink().lock();
+    if (!sharedLink) {
+        return;
+    }
+
+    QByteArray outputData = QByteArray(data);
+    // Send maximum sized chunks until the complete buffer is transmitted
+    while(outputData.size()) {
+        QByteArray chunk{outputData.left(MAVLINK_MSG_SERIAL_CONTROL_FIELD_DATA_LEN)};
+        int dataSize = chunk.size();
+        // Ensure the buffer is large enough, as the MAVLink parser expects MAVLINK_MSG_SERIAL_CONTROL_FIELD_DATA_LEN bytes
+        chunk.append(MAVLINK_MSG_SERIAL_CONTROL_FIELD_DATA_LEN - chunk.size(), '\0');
+        uint8_t flags = SERIAL_CONTROL_FLAG_EXCLUSIVE; // | SERIAL_CONTROL_FLAG_BLOCKING;
+        auto protocol = qgcApp()->toolbox()->mavlinkProtocol();
+        auto link = vehicle->vehicleLinkManager()->primaryLink();
+        mavlink_message_t msg;
+        mavlink_msg_serial_control_pack_chan(
+                    protocol->getSystemId(),
+                    protocol->getComponentId(),
+                    sharedLink->mavlinkChannel(),
+                    &msg,
+                    SERIAL_CONTROL_DEV_TELEM2,
+                    flags,
+                    0,
+                    0,
+                    dataSize,
+                    reinterpret_cast<uint8_t*>(chunk.data()),
+                    vehicle->id(), vehicle->defaultComponentId());
+        vehicle->sendMessageOnLinkThreadSafe(sharedLink.get(), msg);
+        outputData.remove(0, chunk.size());
+    }
+}
+
 /* U Communication Configuration Control */
 
 void Viewpro::sendUCmd(uint8_t cmd, uint8_t param1, uint8_t param2, uint8_t param3, uint8_t param4, uint8_t param5, uint8_t param6, uint8_t param7, uint8_t param8, uint8_t param9)
@@ -50,7 +101,7 @@ void Viewpro::sendUCmd(uint8_t cmd, uint8_t param1, uint8_t param2, uint8_t para
     packet[13] = static_cast<char>(param8);
     packet[14] = static_cast<char>(param9);
     packet[15] = static_cast<char>(s_viewlink_protocol_checksum(packet));
-    sendSerialCmd(packet);
+    _sendSerialCmd(packet);
 }
 
 void Viewpro::setProtocolControlSerial(uint8_t LRF, uint8_t NMEA, uint8_t gimbal3E, uint8_t tracking7E, uint8_t sonyVISCA, uint8_t targetPositionCalc, uint8_t mavlink, uint8_t pelco_d, uint8_t feedback)
@@ -98,7 +149,7 @@ void Viewpro::sendA1Cmd(uint8_t control, uint16_t param1, uint16_t param2, uint1
     packet[12] = static_cast<char>((param4 & 0xff00) >> 8);
     packet[13] = static_cast<char>(param4 & 0xff);
     packet[14] = static_cast<char>(s_viewlink_protocol_checksum(packet));
-    sendSerialCmd(packet);
+    _sendSerialCmd(packet);
 }
 
 void Viewpro::gimbalMotorSerial(bool on) { sendA1Cmd(0x00, on ? 0x0100 : 0x0001); }
@@ -200,7 +251,7 @@ void Viewpro::sendC1Cmd(uint8_t cmd, uint8_t speed, uint8_t sensor, uint8_t LRF=
     packet[5] = static_cast<char>(data >> 8);
     packet[6] = static_cast<char>(data & 0xff);
     packet[7] = static_cast<char>(s_viewlink_protocol_checksum(packet));
-    sendSerialCmd(packet);
+    _sendSerialCmd(packet);
 }
 
 void Viewpro::setVideoSourceEO1Serial() { sendC1Cmd(0, 0, 1, 0); }
@@ -267,7 +318,7 @@ void Viewpro::sendC2Cmd(uint8_t cmd, uint16_t param)
     packet[6] = static_cast<char>(param >> 8);
     packet[7] = static_cast<char>(param & 0xff);
     packet[8] = static_cast<char>(s_viewlink_protocol_checksum(packet));
-    sendSerialCmd(packet);
+    _sendSerialCmd(packet);
 }
 
 void Viewpro::digitalZoomEOSerial(bool on) { sendC2Cmd(on ? 0x06 : 0x07, 0); }
@@ -314,7 +365,7 @@ void Viewpro::sendE1Cmd(uint8_t cmd, uint8_t source, uint8_t param1, uint8_t par
     packet[6] = static_cast<char>(cmd);
     packet[7] = static_cast<char>(param2);
     packet[8] = static_cast<char>(s_viewlink_protocol_checksum(packet));
-    sendSerialCmd(packet);
+    _sendSerialCmd(packet);
 }
 
 void Viewpro::trackingStopSerial() { sendE1Cmd(0x01, _viewproFactGroup->pipMode(), 0, 0); }
@@ -346,7 +397,7 @@ void Viewpro::sendE2Cmd(uint8_t cmd, uint16_t param1, uint16_t param2)
     packet[8] = static_cast<char>(param2 >> 8);
     packet[9] = static_cast<char>(param2 & 0xff);
     packet[10] = static_cast<char>(s_viewlink_protocol_checksum(packet));
-    sendSerialCmd(packet);
+    _sendSerialCmd(packet);
 }
 
 void Viewpro::trackingPointSerial(int yaw, int tilt) { sendE2Cmd(0x0A, yaw, tilt); }
@@ -380,7 +431,7 @@ void Viewpro::sendS1Cmd(uint8_t cmd, uint32_t param1, uint32_t param2, uint32_t 
     packet[16] = static_cast<char>(param3 >> 8);
     packet[17] = static_cast<char>(param3 & 0xff);
     packet[18] = s_viewlink_protocol_checksum(packet);
-    sendSerialCmd(packet);
+    _sendSerialCmd(packet);
 }
 
 void Viewpro::gimbalToTargetSerial(QGeoCoordinate coord) { sendS1Cmd(0x01, coord.latitude(), coord.longitude(), coord.altitude()); }
@@ -400,7 +451,7 @@ void Viewpro::sendIPQuerySerial(uint8_t ip_first_part, uint8_t ip_second_part, u
     packet[7] = static_cast<char>(ip_third_part);
     packet[8] = static_cast<char>(ip_fourth_part);
     packet[9] = static_cast<char>(s_viewlink_protocol_checksum(packet));
-    sendSerialCmd(packet);
+    _sendSerialCmd(packet);
 }
 
 // void Viewpro::sbusModeSerial(bool enabled)

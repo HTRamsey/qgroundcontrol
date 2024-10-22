@@ -27,7 +27,7 @@ void Drone::_setServo(Vehicle *vehicle, uint8_t ch, uint16_t pwm)
 bool Drone::readyForAdjustLights(Vehicle *vehicle)
 {
     if (!_droneFactGroup->spotlightEnabled()->rawValue().toBool()) return false;
-    if (!vehicle->flying()) return false;
+    // if (!vehicle->flying()) return false;
     // if (vehicle->vehicleFactGroup()->altitudeRelative()->rawValue() < (vehicle->minimumTakeoffAltitudeMeters() - .5)) return false;
     return true;
 }
@@ -54,13 +54,19 @@ void Drone::adjustLights(Vehicle *vehicle, uint8_t intensity)
     } while (diff != 0);
 
     QTimer* const timer = new QTimer(this);
-    timer->setInterval(25);
+    timer->setInterval(50);
     timer->setSingleShot(true);
     (void) timer->callOnTimeout([this, vehicle, timer]() {
         if (!_lightTargets.isEmpty()) {
             const uint16_t pwm = 1000 + (_lightTargets.takeFirst() * 9);
             for (const uint8_t port: _droneFactGroup->spotlightValues().keys()) {
-                _setServo(vehicle, port, pwm);
+                QTimer* const porttimer = new QTimer(this);
+                porttimer->setInterval(25);
+                porttimer->setSingleShot(true);
+                (void) porttimer->callOnTimeout([this, vehicle, porttimer, pwm, port]() {
+                    _setServo(vehicle, port, pwm);
+                    porttimer->deleteLater();
+                });
             }
             timer->start();
         } else {

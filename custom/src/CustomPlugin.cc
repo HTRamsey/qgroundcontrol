@@ -9,13 +9,17 @@
 #include "MAVLinkProtocol.h"
 #include "Vehicle.h"
 #include "GPU.h"
-// #include "Viewpro.h"
+#include "Viewpro.h"
 // #include "NextVision.h"
 #include "LinkInterface.h"
 #include "MultiVehicleManager.h"
 #include "JoystickManager.h"
 #include "ParameterManager.h"
 #include "QGCLoggingCategory.h"
+#include "AppMessages.h"
+
+#include <QtQml/QQmlApplicationEngine>
+#include <QtQml/QQmlContext>
 
 QGC_LOGGING_CATEGORY(CustomLog, "qgc.custom.customplugin")
 
@@ -45,7 +49,7 @@ void CustomPlugin::setToolbox(QGCToolbox *toolbox)
 
     _droneControl = new Drone(_droneFactGroup, this);
     // _gpuControl = new GPU(_gpuFactGroup, this);
-    // _viewproControl = new Viewpro(_viewproFactGroup, this);
+    _viewproControl = new Viewpro(_viewproFactGroup, this);
     // _nextVisionControl = new NextVision(_nextVisionFactGroup, this);
 
     MAVLinkProtocol *const mavlink = qgcApp()->toolbox()->mavlinkProtocol();
@@ -79,17 +83,9 @@ void CustomPlugin::setToolbox(QGCToolbox *toolbox)
         // joystick->buttonActions()
     }, Qt::AutoConnection);
 
-    // TODO: FIX THIS FOR GEOFENCE
-    /*connect(_gpuFactGroup->tetherLength(), &Fact::rawValueChanged, this, [this]() {
-        } else if (metaData.name() == FlyViewSettings::guidedMaximumAltitudeName) {
-            metaData.setRawDefaultValue(121.92);
-            return true;
-        } else if (metaData.name() == FlyViewSettings::maxGoToLocationDistanceName) {
-            // TODO: Adjust based on Geofence - FENCE_RADIUS
-            metaData.setRawDefaultValue(40);
-            return false;
-        }
-    });*/
+    (void) connect(_gpuFactGroup->tetherLength(), &Fact::rawValueChanged, this, [this](QVariant value) {
+        qgcApp()->toolbox()->settingsManager()->flyViewSettings()->guidedMaximumAltitude()->setRawValue(value);
+    });
 
 
     /*ParameterManager *const parameterManager = qgcApp()->toolbox()->multiVehicleManager()->activeVehicle()->parameterManager();
@@ -254,8 +250,7 @@ bool CustomPlugin::adjustSettingMetaData(const QString &settingsGroup, FactMetaD
             metaData.setRawDefaultValue(false);
             return false;
         } else if (metaData.name() == FlyViewSettings::maxGoToLocationDistanceName) {
-            // TODO: Adjust based on Geofence - FENCE_RADIUS
-            metaData.setRawDefaultValue(40);
+            metaData.setRawDefaultValue(60);
             return false;
         }
     } else if (settingsGroup == MapsSettings::settingsGroup) {
@@ -381,9 +376,9 @@ void CustomPlugin::factValueGridCreateDefaultSettings(const QString &defaultSett
     value->setFact("Gpu", "tetherTension");
     value->setText("Tension");*/
 
-    rowIndex = 0;
-    factValueGrid.appendColumn();
-    column = factValueGrid.columns()->value<QmlObjectListModel*>(columnIndex++);
+    // rowIndex = 0;
+    // factValueGrid.appendColumn();
+    // column = factValueGrid.columns()->value<QmlObjectListModel*>(columnIndex++);
 
     /*value = column->value<InstrumentValueData*>(rowIndex++);
     value->setFact("Battery0", "instantPower");
@@ -479,3 +474,19 @@ void CustomPlugin::_requestHomePosition(Vehicle *vehicle)
         MAVLINK_MSG_ID_HOME_POSITION
     );
 }*/
+
+QQmlApplicationEngine *CustomPlugin::createQmlApplicationEngine(QObject *parent)
+{
+    QQmlApplicationEngine *const qmlEngine = new QQmlApplicationEngine(parent);
+    /* EventDatabase eventDatabase;
+    EventMonitor eventMonitor;
+    qmlEngine->setInitialProperties({
+        { "eventDatabase", QVariant::fromValue(&eventDatabase) },
+        { "eventMonitor", QVariant::fromValue(&eventMonitor) }
+    }); */
+    qmlEngine->addImportPath("qrc:/qml");
+    qmlEngine->rootContext()->setContextProperty("viewpro", _viewproControl);
+    qmlEngine->rootContext()->setContextProperty("joystickManager", qgcApp()->toolbox()->joystickManager());
+    qmlEngine->rootContext()->setContextProperty("debugMessageModel", AppMessages::getModel());
+    return qmlEngine;
+}

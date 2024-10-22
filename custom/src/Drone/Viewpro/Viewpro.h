@@ -4,9 +4,9 @@
 #include <QtCore/QVariant>
 #include <QtPositioning/QGeoCoordinate>
 
-#include "ViewproFactGroup.h"
-
 Q_DECLARE_LOGGING_CATEGORY(ViewproLog)
+
+class ViewproFactGroup;
 
 class Viewpro : public QObject
 {
@@ -99,6 +99,8 @@ private:
     void setParamExtPIPMode(uint8_t index);
     void setParamExtIRMode(uint8_t index);
     static uint8_t s_viewlink_protocol_checksum(QByteArrayView viewlink_data_buf);
+
+    void _sendSerialCmd(const QByteArray &data);
 
     ViewproFactGroup *_viewproFactGroup = nullptr;
 

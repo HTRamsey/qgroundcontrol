@@ -63,14 +63,14 @@ Item {
                             }
                         }
 
-                        SettingsGroupLayout {
+                        /*SettingsGroupLayout {
                             heading: qsTr("Power")
 
                             LabelledLabel {
                                 label:      gpuGroup.gpu.outputVoltage.shortDescription
                                 labelText:  gpuGroup.gpu.outputVoltage.valueString + " " + gpuGroup.gpu.outputVoltage.units
                             }
-                        }
+                        }*/
 
                         SettingsGroupLayout {
                             heading: qsTr("Temperature")

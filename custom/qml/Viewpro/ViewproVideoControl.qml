@@ -2,32 +2,41 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
 
-import video
-import utils
-
 Pane {
     id: root
     signal snapshot
     signal record
 
+    property Viewpro viewpro  // Reference to your Viewpro class instance
+
+    // Properties for settings
+    property int zoomSpeed: 1  // Default zoom speed
+    property bool autoFocus: false  // Default autofocus setting
+    property bool digitalZoomEO: false
+    property bool showOSD: false
+    property bool imageFlipEO: false
+    property int irDZoom: 1
+    property bool imageFlipIR: false
+    property int trackingTemplate: 0
+
     ColumnLayout {
-        enabled: ViewproData.linkUp
+        enabled: true  // Adjust based on your application logic
 
         Label {
             text: "Camera Controls"
             font.pointSize: ScreenTools.isAndroid ? ScreenTools.mediumFontPointSize : ScreenTools.largeFontPointSize
             Layout.alignment: Qt.AlignHCenter
-            //Layout.fillWidth: true
         }
 
+        // Zoom Controls
         RowLayout {
             spacing: ScreenTools.defaultFontPixelHeight
 
             Button {
                 text: "+"
                 horizontalPadding: ScreenTools.defaultFontPixelWidth * 2
-                onPressed: Viewpro.zoomInSerial(ViewproCamSettings.zoomSpeed)
-                onReleased: Viewpro.focusZoomStopSerial()
+                onPressed: viewpro.zoomInSerial(zoomSpeed)
+                onReleased: viewpro.focusZoomStopSerial()
                 Layout.fillWidth: true
             }
 
@@ -40,21 +49,22 @@ Pane {
             Button {
                 text: "-"
                 horizontalPadding: ScreenTools.defaultFontPixelWidth * 2
-                onPressed: Viewpro.zoomOutSerial(ViewproCamSettings.zoomSpeed)
-                onReleased: Viewpro.focusZoomStopSerial()
+                onPressed: viewpro.zoomOutSerial(zoomSpeed)
+                onReleased: viewpro.focusZoomStopSerial()
                 Layout.fillWidth: true
             }
         }
 
+        // Focus Controls
         RowLayout {
             spacing: ScreenTools.defaultFontPixelHeight
-            visible: !ViewproCamSettings.autoFocus
+            visible: !autoFocus
 
             Button {
                 text: "+"
                 horizontalPadding: ScreenTools.defaultFontPixelWidth * 2
-                onPressed: Viewpro.focusInSerial()
-                onReleased: Viewpro.focusZoomStopSerial()
+                onPressed: viewpro.focusInSerial()
+                onReleased: viewpro.focusZoomStopSerial()
                 Layout.fillWidth: true
             }
 
@@ -67,12 +77,13 @@ Pane {
             Button {
                 text: "-"
                 horizontalPadding: ScreenTools.defaultFontPixelWidth * 2
-                onPressed: Viewpro.focusOutSerial()
-                onReleased: Viewpro.focusZoomStopSerial()
+                onPressed: viewpro.focusOutSerial()
+                onReleased: viewpro.focusZoomStopSerial()
                 Layout.fillWidth: true
             }
         }
 
+        // PIP Mode Controls
         RowLayout {
             spacing: ScreenTools.defaultFontPixelHeight
 
@@ -85,22 +96,21 @@ Pane {
                 model: ["EO/IR", "IR", "IR/EO", "EO"]
 
                 onActivated: function (currentIndex) {
-                    ViewproCamSettings.videoSource = currentIndex
                     switch (currentIndex) {
                         case 0:
-                            Viewpro.setVideoSourceEO1IRPIPSerial()
+                            viewpro.setVideoSourceEO1IRPIPSerial()
                             break
 
                         case 1:
-                            Viewpro.setVideoSourceIRSerial()
+                            viewpro.setVideoSourceIRSerial()
                             break
 
                         case 2:
-                            Viewpro.setVideoSourceIREO1PIPSerial()
+                            viewpro.setVideoSourceIREO1PIPSerial()
                             break
 
                         case 3:
-                            Viewpro.setVideoSourceEO1Serial()
+                            viewpro.setVideoSourceEO1Serial()
                             break
 
                         default:
@@ -110,6 +120,7 @@ Pane {
             }
         }
 
+        // IR Mode Controls
         RowLayout {
             spacing: ScreenTools.defaultFontPixelHeight
 
@@ -122,27 +133,23 @@ Pane {
                 model: ["White Hot", "Black Hot", "Pseudo Color", "Ext1", "Ext2", "Ext3"]
 
                 onActivated: function (currentIndex) {
-                    ViewproCamSettings.irMode = currentIndex
                     switch (currentIndex) {
                         case 0:
-                            Viewpro.setIRModeWhiteHotSerial()
+                            viewpro.setIRModeWhiteHotSerial()
                             break
 
                         case 1:
-                            Viewpro.setIRModeBlackHotSerial()
+                            viewpro.setIRModeBlackHotSerial()
                             break
 
                         case 2:
-                            Viewpro.rainbowIRSerial()
+                            viewpro.rainbowIRSerial()
                             break
 
                         case 3:
                         case 4:
                         case 5:
-                        case 6:
-                        case 7:
-                        case 8:
-                            Viewpro.setIRColorExtSerial(currentIndex + 1 - 3)
+                            viewpro.setIRColorExtSerial(currentIndex - 2)
                             break
 
                         default:
@@ -152,6 +159,7 @@ Pane {
             }
         }
 
+        // Gimbal Mode Controls
         RowLayout {
             spacing: ScreenTools.defaultFontPixelHeight
 
@@ -166,19 +174,19 @@ Pane {
                 onActivated: function (currentIndex) {
                     switch (currentIndex) {
                         case 0:
-                            Viewpro.gimbalHomeSerial()
+                            viewpro.gimbalHomeSerial()
                             break
 
                         case 1:
-                            Viewpro.gimbalFollowYawSerial()
+                            viewpro.gimbalFollowYawSerial()
                             break
 
                         case 2:
-                            Viewpro.gimbalFollowYawDisableSerial()
+                            viewpro.gimbalFollowYawDisableSerial()
                             break
 
                         case 3:
-                            Viewpro.gimbalLookDownSerial()
+                            viewpro.gimbalLookDownSerial()
                             break
 
                         default:
@@ -188,6 +196,7 @@ Pane {
             }
         }
 
+        // Tracking Control
         Button {
             id: trackButton
             Layout.fillWidth: true
@@ -195,32 +204,150 @@ Pane {
             text: "Track Center"
             checkable: true
             checked: false
-            onToggled: checked ? Viewpro.trackingOnSerial() : Viewpro.trackingStopSerial()
-
-            /*Connections {
-                target: VideoSettings
-                onTrackingSWChanged: trackButton.checked = VideoSettings.trackingSW
-            }*/
+            onToggled: checked ? viewpro.trackingOnSerial() : viewpro.trackingStopSerial()
         }
 
+        // Tracking Template Size
         RowLayout {
             spacing: ScreenTools.defaultFontPixelHeight
-            visible: VideoSettings.recordingType !== VideoSettings.RecordingType.Disabled
+
+            Label {
+                text: "Template Size:"
+            }
+
+            ComboBox {
+                Layout.fillWidth: true
+                model: ["small", "medium", "big", "small-medium", "small-big", "medium-big", "small-medium-big"]
+
+                onActivated: function (currentIndex) {
+                    viewpro.trackingTemplateSizeSerial(currentIndex)
+                    trackingTemplate = currentIndex
+                }
+            }
+        }
+
+        // EO Stream Settings Label
+        Label {
+            text: "EO Stream Settings"
+            font.bold: true
+            Layout.alignment: Qt.AlignHCenter
+        }
+
+        // Auto Focus
+        CheckBox {
+            text: "Auto Focus"
+            checked: autoFocus
+            onCheckedChanged: {
+                viewpro.setAutoFocusSerial(checked)
+                autoFocus = checked
+            }
+        }
+
+        // Digital Zoom EO
+        CheckBox {
+            text: "Digital Zoom"
+            checked: digitalZoomEO
+            onCheckedChanged: {
+                viewpro.setEODigitalZoomSerial(checked)
+                digitalZoomEO = checked
+            }
+        }
+
+        // Show On Screen Display
+        CheckBox {
+            text: "Show OSD"
+            checked: showOSD
+            onCheckedChanged: {
+                viewpro.setOSD1Serial(checked)
+                viewpro.setOSD2Serial(checked)
+                showOSD = checked
+            }
+        }
+
+        // Image Flip EO
+        CheckBox {
+            text: "Image Flip EO"
+            checked: imageFlipEO
+            onCheckedChanged: {
+                viewpro.imageFlipEOSerial(checked)
+                imageFlipEO = checked
+            }
+        }
+
+        // Zoom Speed
+        RowLayout {
+            spacing: ScreenTools.defaultFontPixelHeight
+
+            Label {
+                text: "Zoom Speed:"
+            }
+
+            ComboBox {
+                Layout.fillWidth: true
+                model: ["1", "2", "3", "4", "5", "6", "7"]
+
+                onActivated: function (currentIndex) {
+                    zoomSpeed = currentIndex + 1
+                }
+            }
+        }
+
+        // IR Stream Settings Label
+        Label {
+            text: "IR Stream Settings"
+            font.bold: true
+            Layout.alignment: Qt.AlignHCenter
+        }
+
+        // IR Digital Zoom
+        RowLayout {
+            spacing: ScreenTools.defaultFontPixelHeight
+
+            Label {
+                text: "IR Digital Zoom:"
+            }
+
+            ComboBox {
+                Layout.fillWidth: true
+                model: ["1x", "2x", "3x", "4x"]
+
+                onActivated: function (currentIndex) {
+                    viewpro.zoomToIRSerial(currentIndex + 1)
+                    irDZoom = currentIndex + 1
+                }
+            }
+        }
+
+        // Image Flip IR
+        CheckBox {
+            text: "Image Flip IR"
+            checked: imageFlipIR
+            onCheckedChanged: {
+                viewpro.imageFlipIRSerial(checked)
+                imageFlipIR = checked
+            }
+        }
+
+        // Recording Controls
+        RowLayout {
+            spacing: ScreenTools.defaultFontPixelHeight
 
             Button {
                 Layout.fillWidth: true
-                text: VideoSettings.recordingType === VideoSettings.RecordingType.Local ? "Screenshot" : "Picture"
+                text: "Screenshot"
                 horizontalPadding: ScreenTools.defaultFontPixelWidth * 2
-                enabled: ViewproData.linkUp
                 onReleased: root.snapshot()
             }
 
             Button {
+                id: recordButton
                 Layout.fillWidth: true
                 text: recording ? "Stop" : "Record"
                 horizontalPadding: ScreenTools.defaultFontPixelWidth * 2
-                enabled: ViewproData.linkUp
-                onReleased: { root.record(VideoSettings.recordingFormat, VideoSettings.recordingLocation); recording = !recording; }
+                onReleased: {
+                    root.record()
+                    recording = !recording
+                }
                 property bool recording: false
             }
         }
