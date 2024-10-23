@@ -21,6 +21,7 @@
         <file alias="MainRootWindow.qml">qml/MainRootWindow.qml</file>
         <file alias="QGroundControl/FlightMap/PhotoVideoControl.qml">qml/PhotoVideoControl.qml</file>
         <file alias="ViewproVideoControl.qml">qml/Viewpro/ViewproVideoControl.qml</file>
+        <file alias="VirtualJoystick.qml">qml/VirtualJoystick.qml</file>
     </qresource>
     <qresource prefix="/toolbar">
         <file alias="DroneIndicator.qml">qml/DroneIndicator.qml</file>

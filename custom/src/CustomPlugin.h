@@ -41,7 +41,7 @@ public:
     bool adjustSettingMetaData(const QString &settingsGroup, FactMetaData &metaData) final;
     QString brandImageIndoor() const final;
     QString brandImageOutdoor() const final;
-    void factValueGridCreateDefaultSettings(const QString &defaultSettingsGroup) final;
+    // void factValueGridCreateDefaultSettings(const QString &defaultSettingsGroup) final;
     bool mavlinkMessage(Vehicle *vehicle, LinkInterface *link, mavlink_message_t message) final;
     QList<int> firstRunPromptStdIds() final;
     const QVariantList &toolBarIndicators();

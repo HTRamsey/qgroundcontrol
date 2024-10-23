@@ -11,3 +11,4 @@
 <file alias="FlyViewSettings.qml">src/UI/preferences/FlyViewSettings.qml</file>
 <file alias="MainRootWindow.qml">src/UI/MainRootWindow.qml</file>
 <file alias="QGroundControl/FlightMap/PhotoVideoControl.qml">src/FlightMap/Widgets/PhotoVideoControl.qml</file>
+<file alias="VirtualJoystick.qml">src/FlightDisplay/VirtualJoystick.qml</file>

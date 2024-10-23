@@ -1,12 +1,22 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
-import QGroundControl.ScreenTools
 
-Pane {
+import QGroundControl
+import QGroundControl.ScreenTools
+import QGroundControl.Controls
+import QGroundControl.Palette
+
+Rectangle {
     id: root
+    width: mainLayout.width + (_margins * 2)
+    height: mainLayout.height + (_margins * 2)
+    color: Qt.rgba(qgcPal.window.r, qgcPal.window.g, qgcPal.window.b, 0.5)
+    radius: _margins
     signal snapshot
     signal record
+
+    property real _margins: ScreenTools.defaultFontPixelHeight / 2
 
     // property Viewpro viewpro  // Reference to your Viewpro class instance
 
@@ -20,10 +30,60 @@ Pane {
     property bool imageFlipIR: false
     property int trackingTemplate: 0
 
-    ColumnLayout {
-        enabled: true  // Adjust based on your application logic
+    QGCPalette { id: qgcPal; colorGroupEnabled: enabled }
 
-        Label {
+    /*RoundButton {
+        id: hideVideoControl
+        visible: CameraSettings.showCameraControl
+        anchors {
+            right: videoControlLoader.right
+            top: root.top
+        }
+        icon.source: "qrc:///qt/qml/comms/res/images/cheveron-outline-right.svg"
+        onClicked: {
+            show = !show
+            icon.source = show ? "qrc:///qt/qml/comms/res/images/cheveron-outline-right.svg" : "qrc:///qt/qml/comms/res/images/video-camera.svg"
+        }
+        property bool show: true
+    }*/
+
+    /*Loader {
+        width: Math.min(root.height * 0.25, ScreenTools.defaultFontPixelWidth * 16)
+        height: Math.min(root.height * 0.25, ScreenTools.defaultFontPixelWidth * 16)
+        anchors {
+            margins: ScreenTools.defaultFontPixelWidth * 2
+            right: root.right
+            bottom: root.bottom
+        }
+        active: CameraSettings.virtualCamJoystick
+        sourceComponent: VirtualJoystick {
+            id: camStick
+            enabled: (DroneData.viewproEnabled && ViewproData.linkUp) || (DroneData.nextvisionEnabled && NextVisionData.linkUp)
+
+            Timer {
+                interval: 250
+                running: camStick.enabled
+                repeat: true
+                onTriggered: {
+                    if(DroneData.nextvisionEnabled) {
+                        NextVision.sendGimbalVirtualCmd(-camStick.axis.x, camStick.axis.y)
+                    } else if(DroneData.viewproEnabled) {
+                        Viewpro.gimbalManualRCSerial(camStick.axis.x, camStick.axis.y)
+                    }
+                }
+            }
+        }
+    }*/
+
+    ColumnLayout {
+        id: mainLayout
+        enabled: true  // Adjust based on your application logic
+        anchors.margins: _margins
+        anchors.top: parent.top
+        anchors.left: parent.left
+        spacing: _margins
+
+        QGCLabel {
             text: "Camera Controls"
             font.pointSize: ScreenTools.isAndroid ? ScreenTools.mediumFontPointSize : ScreenTools.largeFontPointSize
             Layout.alignment: Qt.AlignHCenter
@@ -33,7 +93,7 @@ Pane {
         RowLayout {
             spacing: ScreenTools.defaultFontPixelHeight
 
-            Button {
+            QGCButton {
                 text: "+"
                 horizontalPadding: ScreenTools.defaultFontPixelWidth * 2
                 onPressed: viewpro.zoomInSerial(zoomSpeed)
@@ -41,13 +101,13 @@ Pane {
                 Layout.fillWidth: true
             }
 
-            Label {
+            QGCLabel {
                 text: "Zoom"
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
             }
 
-            Button {
+            QGCButton {
                 text: "-"
                 horizontalPadding: ScreenTools.defaultFontPixelWidth * 2
                 onPressed: viewpro.zoomOutSerial(zoomSpeed)
@@ -61,7 +121,7 @@ Pane {
             spacing: ScreenTools.defaultFontPixelHeight
             visible: !autoFocus
 
-            Button {
+            QGCButton {
                 text: "+"
                 horizontalPadding: ScreenTools.defaultFontPixelWidth * 2
                 onPressed: viewpro.focusInSerial()
@@ -69,13 +129,13 @@ Pane {
                 Layout.fillWidth: true
             }
 
-            Label {
+            QGCLabel {
                 text: "Focus"
                 Layout.fillWidth: true
                 horizontalAlignment: Text.AlignHCenter
             }
 
-            Button {
+            QGCButton {
                 text: "-"
                 horizontalPadding: ScreenTools.defaultFontPixelWidth * 2
                 onPressed: viewpro.focusOutSerial()
@@ -88,13 +148,14 @@ Pane {
         RowLayout {
             spacing: ScreenTools.defaultFontPixelHeight
 
-            Label {
+            QGCLabel {
                 text: "PIP Mode:"
             }
 
-            ComboBox {
+            QGCComboBox {
                 Layout.fillWidth: true
                 model: ["EO/IR", "IR", "IR/EO", "EO"]
+                sizeToContents: true
 
                 onActivated: function (currentIndex) {
                     switch (currentIndex) {
@@ -125,13 +186,14 @@ Pane {
         RowLayout {
             spacing: ScreenTools.defaultFontPixelHeight
 
-            Label {
+            QGCLabel {
                 text: "IR Mode:"
             }
 
-            ComboBox {
+            QGCComboBox {
                 Layout.fillWidth: true
                 model: ["White Hot", "Black Hot", "Pseudo Color", "Ext1", "Ext2", "Ext3"]
+                sizeToContents: true
 
                 onActivated: function (currentIndex) {
                     switch (currentIndex) {
@@ -164,13 +226,14 @@ Pane {
         RowLayout {
             spacing: ScreenTools.defaultFontPixelHeight
 
-            Label {
+            QGCLabel {
                 text: "Gimbal Mode:"
             }
 
-            ComboBox {
+            QGCComboBox {
                 Layout.fillWidth: true
                 model: ["Recenter", "Follow Yaw", "Lock Yaw", "Look Down"]
+                sizeToContents: true
 
                 onActivated: function (currentIndex) {
                     switch (currentIndex) {
@@ -198,7 +261,7 @@ Pane {
         }
 
         // Tracking Control
-        Button {
+        QGCButton {
             id: trackButton
             Layout.fillWidth: true
             horizontalPadding: ScreenTools.defaultFontPixelWidth * 2
@@ -212,13 +275,14 @@ Pane {
         RowLayout {
             spacing: ScreenTools.defaultFontPixelHeight
 
-            Label {
+            QGCLabel {
                 text: "Template Size:"
             }
 
-            ComboBox {
+            QGCComboBox {
                 Layout.fillWidth: true
                 model: ["small", "medium", "big", "small-medium", "small-big", "medium-big", "small-medium-big"]
+                sizeToContents: true
 
                 onActivated: function (currentIndex) {
                     viewpro.trackingTemplateSizeSerial(currentIndex)
@@ -228,14 +292,14 @@ Pane {
         }
 
         // EO Stream Settings Label
-        Label {
+        QGCLabel {
             text: "EO Stream Settings"
             font.bold: true
             Layout.alignment: Qt.AlignHCenter
         }
 
         // Auto Focus
-        CheckBox {
+        QGCCheckBox {
             text: "Auto Focus"
             checked: autoFocus
             onCheckedChanged: {
@@ -245,7 +309,7 @@ Pane {
         }
 
         // Digital Zoom EO
-        CheckBox {
+        QGCCheckBox {
             text: "Digital Zoom"
             checked: digitalZoomEO
             onCheckedChanged: {
@@ -255,7 +319,7 @@ Pane {
         }
 
         // Show On Screen Display
-        CheckBox {
+        QGCCheckBox {
             text: "Show OSD"
             checked: showOSD
             onCheckedChanged: {
@@ -266,7 +330,7 @@ Pane {
         }
 
         // Image Flip EO
-        CheckBox {
+        QGCCheckBox {
             text: "Image Flip EO"
             checked: imageFlipEO
             onCheckedChanged: {
@@ -279,13 +343,14 @@ Pane {
         RowLayout {
             spacing: ScreenTools.defaultFontPixelHeight
 
-            Label {
+            QGCLabel {
                 text: "Zoom Speed:"
             }
 
-            ComboBox {
+            QGCComboBox {
                 Layout.fillWidth: true
                 model: ["1", "2", "3", "4", "5", "6", "7"]
+                sizeToContents: true
 
                 onActivated: function (currentIndex) {
                     zoomSpeed = currentIndex + 1
@@ -294,7 +359,7 @@ Pane {
         }
 
         // IR Stream Settings Label
-        Label {
+        QGCLabel {
             text: "IR Stream Settings"
             font.bold: true
             Layout.alignment: Qt.AlignHCenter
@@ -304,13 +369,14 @@ Pane {
         RowLayout {
             spacing: ScreenTools.defaultFontPixelHeight
 
-            Label {
+            QGCLabel {
                 text: "IR Digital Zoom:"
             }
 
-            ComboBox {
+            QGCComboBox {
                 Layout.fillWidth: true
                 model: ["1x", "2x", "3x", "4x"]
+                sizeToContents: true
 
                 onActivated: function (currentIndex) {
                     viewpro.zoomToIRSerial(currentIndex + 1)
@@ -320,7 +386,7 @@ Pane {
         }
 
         // Image Flip IR
-        CheckBox {
+        QGCCheckBox {
             text: "Image Flip IR"
             checked: imageFlipIR
             onCheckedChanged: {
@@ -333,14 +399,14 @@ Pane {
         RowLayout {
             spacing: ScreenTools.defaultFontPixelHeight
 
-            Button {
+            QGCButton {
                 Layout.fillWidth: true
                 text: "Screenshot"
                 horizontalPadding: ScreenTools.defaultFontPixelWidth * 2
                 onReleased: root.snapshot()
             }
 
-            Button {
+            QGCButton {
                 id: recordButton
                 Layout.fillWidth: true
                 text: recording ? "Stop" : "Record"

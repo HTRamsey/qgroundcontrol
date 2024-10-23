@@ -189,6 +189,8 @@ bool CustomPlugin::adjustSettingMetaData(const QString &settingsGroup, FactMetaD
         } else if (metaData.name() == AppSettings::indoorPaletteName) {
             metaData.setRawDefaultValue(1);
             return true;
+        } else if (metaData.name() == AppSettings::virtualJoystickAutoCenterThrottleName) {
+            return false;
         }
     } else if (settingsGroup == AutoConnectSettings::settingsGroup) {
         if (metaData.name() == AutoConnectSettings::autoConnectUDPName) {
@@ -323,7 +325,7 @@ QString CustomPlugin::brandImageOutdoor() const
     return QStringLiteral("/custom/img/ZATBrandImage.png");
 }
 
-void CustomPlugin::factValueGridCreateDefaultSettings(const QString &defaultSettingsGroup)
+/*void CustomPlugin::factValueGridCreateDefaultSettings(const QString &defaultSettingsGroup)
 {
     HorizontalFactValueGrid factValueGrid(defaultSettingsGroup);
 
@@ -372,24 +374,24 @@ void CustomPlugin::factValueGridCreateDefaultSettings(const QString &defaultSett
     value->setText(value->fact()->shortDescription());
     value->setShowUnits(false);
 
-    /*value = column->value<InstrumentValueData*>(rowIndex++);
-    value->setFact("Gpu", "tetherTension");
-    value->setText("Tension");*/
+    // value = column->value<InstrumentValueData*>(rowIndex++);
+    // value->setFact("Gpu", "tetherTension");
+    // value->setText("Tension");
 
     // rowIndex = 0;
     // factValueGrid.appendColumn();
     // column = factValueGrid.columns()->value<QmlObjectListModel*>(columnIndex++);
 
-    /*value = column->value<InstrumentValueData*>(rowIndex++);
-    value->setFact("Battery0", "instantPower");
-    value->setText(value->fact()->shortDescription());
-    value->setShowUnits(true);
+    // value = column->value<InstrumentValueData*>(rowIndex++);
+    // value->setFact("Battery0", "instantPower");
+    // value->setText(value->fact()->shortDescription());
+    // value->setShowUnits(true);
 
-    value = column->value<InstrumentValueData*>(rowIndex++);
-    value->setFact("Battery0", "voltage");
-    value->setText(value->fact()->shortDescription());
-    value->setShowUnits(true);*/
-}
+    // value = column->value<InstrumentValueData*>(rowIndex++);
+    // value->setFact("Battery0", "voltage");
+    // value->setText(value->fact()->shortDescription());
+    // value->setShowUnits(true);
+}*/
 
 bool CustomPlugin::mavlinkMessage(Vehicle *vehicle, LinkInterface *link, mavlink_message_t message)
 {
