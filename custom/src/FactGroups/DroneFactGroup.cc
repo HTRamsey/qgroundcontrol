@@ -99,7 +99,7 @@ void DroneFactGroup::_handleStatusText(Vehicle *vehicle, const mavlink_message_t
                         _remoteIdEnabledFact.setRawValue(true);
                         _remoteIdValue = 0;
                     }
-                } else if (servoName.contains("Light", Qt::CaseInsensitive)) {
+                } else if (servoName.contains("Spotlight", Qt::CaseInsensitive)) {
                     if (!_spotlightValues.contains(ch)) {
                         (void) _spotlightValues.insert(ch, 0);
                     }

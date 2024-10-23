@@ -13,7 +13,7 @@
     "name":             "spotlightStatus",
     "shortDesc":        "Spotlight Status",
     "type":             "uint8",
-    "units":            "x"
+    "units":            "%"
 },
 {
     "name":             "beaconEnabled",
