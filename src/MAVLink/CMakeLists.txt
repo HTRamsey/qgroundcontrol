@@ -33,20 +33,42 @@ target_include_directories(MAVLink PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 ############# MAVLink
 
-include(FetchContent)
-FetchContent_Declare(mavlink
-        GIT_REPOSITORY https://github.com/mavlink/c_library_v2.git
-        GIT_TAG 052b8579f8aeb941f34cc9896af22cf1f38939b9
-)
-FetchContent_MakeAvailable(mavlink)
+# include(FetchContent)
+# FetchContent_Declare(mavlink
+#         GIT_REPOSITORY https://github.com/mavlink/c_library_v2.git
+#         GIT_TAG 052b8579f8aeb941f34cc9896af22cf1f38939b9
+# )
+# FetchContent_MakeAvailable(mavlink)
 
-target_include_directories(MAVLink
-    PUBLIC
-        ${mavlink_SOURCE_DIR}
-        ${mavlink_SOURCE_DIR}/all
-        ${mavlink_SOURCE_DIR}/common
-)
+# target_include_directories(MAVLink
+#     PUBLIC
+#         ${mavlink_SOURCE_DIR}
+#         ${mavlink_SOURCE_DIR}/all
+#         ${mavlink_SOURCE_DIR}/common
+# )
 
 # if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 #   target_compile_options(comm PRIVATE -Wno-address-of-packed-member)
 # endif()
+
+# ZATQGC
+# target_include_directories(MAVLink
+#    PUBLIC
+#        ${CMAKE_SOURCE_DIR}/custom/src/mavlink/protocol
+#        ${CMAKE_SOURCE_DIR}/custom/src/mavlink/protocol/zat
+#)
+
+FetchContent_Declare(mavlink
+    GIT_REPOSITORY https://github.com/HTRamsey/zat-mavlink.git
+    GIT_TAG master
+    GIT_SHALLOW TRUE
+)
+set(MAVLINK_DIALECT zat)
+set(MAVLINK_VERSION 2.0)
+FetchContent_MakeAvailable(mavlink)
+target_link_libraries(CustomPlugin PRIVATE mavlink)
+target_include_directories(MAVLink
+    PUBLIC
+        ${mavlink_BINARY_DIR}/include/mavlink
+        ${mavlink_BINARY_DIR}/include/mavlink/zat
+)

@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<mavlinkcamera>
+    <definition version="1">
+        <model>CAMERA TRACK</model>
+        <vendor>SUMBOY</vendor>
+    </definition>
+    <parameters>
+        <parameter name="CAM_MODE" type="uint32" default="0">
+            <description>Camera Mode</description>
+            <options>
+                <option name="VIS IR" value="0"/>
+                <option name="IR ONLY" value="1"/>
+                <option name="IR VIS" value="2"/>
+                <option name="VIS ONLY" value="3"/>
+            </options>
+        </parameter>
+        <parameter name="IR_MODE" type="uint32" default="0">
+            <description>IR Color Mode</description>
+            <options>
+                <option name="gray" value="0"/>
+                <option name="pseudo-color" value="1"/>
+            </options>
+        </parameter>
+        <parameter name="OSD_SET" type="uint32" default="0">
+            <description>OSD</description>
+            <options default="0">
+                <option name="ON" value="0"/>
+                <option name="OFF" value="1">
+                    <exclusions>
+                        <exclude>CROSS_FRAME</exclude>
+                        <exclude>GPS</exclude>
+                        <exclude>TIME</exclude>
+                        <exclude>FIELD_OF_VIEW</exclude>
+                        <exclude>All_TRACK_STATES</exclude>
+                        <exclude>FONT</exclude>
+                        <exclude>ATTITUDE</exclude>
+                        <exclude>CHARACTER_BORDER</exclude>
+                        <exclude>FIELD_OR_ANGLE</exclude>
+                    </exclusions>
+                </option>
+            </options>
+        </parameter>
+        <parameter name="CROSS_FRAME" type="bool" default="0">
+            <description>Cross Frame</description>
+        </parameter>
+        <parameter name="GPS" type="bool" default="0">
+            <description>Display of GPS</description>
+        </parameter>
+        <parameter name="TIME" type="bool" default="0">
+            <description>Display of Time</description>
+        </parameter>
+        <parameter name="FIELD_OF_VIEW" type="bool" default="0">
+            <description>Field of View</description>
+        </parameter>
+        <parameter name="All_TRACK_STATES" type="bool" default="0">
+            <description>Display of All Track States</description>
+        </parameter>
+        <parameter name="FONT" type="bool" default="0">
+            <description>Large Font</description>
+        </parameter>
+        <parameter name="ATTITUDE" type="bool" default="0">
+            <description>Display of Attitude</description>
+        </parameter>
+        <parameter name="CHARACTER_BORDER" type="bool" default="0">
+            <description>Display of Character Border</description>
+        </parameter>
+        <parameter name="FIELD_OR_ANGLE" type="bool" default="0">
+            <description>Display of Field or Angle</description>
+        </parameter>
+        <parameter name="TIME_INPUT" type="bool" default="0">
+            <description>Time Input</description>
+        </parameter>
+        <parameter name="GPS_INPUT" type="bool" default="0">
+            <description>GPS Input</description>
+        </parameter>
+        <parameter name="ATTITUDE_INPUT" type="bool" default="0">
+            <description>Attitude Input</description>
+        </parameter>
+        <parameter name="VISIBLE_LIGHT_CAMERA" type="uint32" default="0">
+            <description>Select Visible Light Camera </description>
+            <options>
+                <option name="sony 7520" value="0"/>
+                <option name="homemade camera 1" value="1"/>
+                <option name="homemade camera 2" value="2"/>
+                <option name="sony 7520 60Hz" value="3"/>
+                <option name="homemade camera 1 60Hz" value="4"/>
+                <option name="homemade camera 2 60Hz" value="5"/>
+            </options>
+        </parameter>
+    </parameters>
+    <!--
+     Video Streams (Optional. If not present, the standard MAVLink video stream discovery will be used instead) 
+    -->
+    <videostreams>
+    <!--
+     If exclusive is 0, all streams run at the same time. The layer defines the order. 
+    -->
+    <!--
+     If exclusive is 1, the user will select one of the availabe streams and only that one is shown. 
+    -->
+        <videostream exclusive="0" layer="0">
+        <description>Visible Light</description>
+        <url>rtsp://192.168.1.4:554/stream0</url>
+        </videostream>
+        <!--
+                <videostream exclusive="0" layer="1">
+                    <description>IR </description>
+                    <url>rtsp://192.168.1.4:554/stream1</url>
+                </videostream>
+        -->
+    </videostreams>
+</mavlinkcamera>

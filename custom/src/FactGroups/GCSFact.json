@@ -1,0 +1,12 @@
+{
+    "version":      1,
+    "fileType":  "FactMetaData",
+    "QGC.MetaData.Facts":
+[
+{
+    "name":             "connected",
+    "shortDesc":        "Active Connection",
+    "type":             "bool"
+}
+]
+}
