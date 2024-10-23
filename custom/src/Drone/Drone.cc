@@ -36,7 +36,21 @@ void Drone::adjustLights(Vehicle *vehicle, uint8_t intensity)
 {
     if (!readyForAdjustLights(vehicle)) return;
 
-    uint8_t current = qBound(0U, _droneFactGroup->spotlightStatus()->rawValue().toUInt(), 100U);
+    const uint16_t pwm = 1000 + (intensity * 9);
+    uint8_t count = 1;
+    for (const uint8_t port: _droneFactGroup->spotlightValues().keys()) {
+        QTimer* const porttimer = new QTimer(this);
+        porttimer->setInterval(50 * count);
+        porttimer->setSingleShot(true);
+        (void) porttimer->callOnTimeout([this, vehicle, porttimer, pwm, port]() {
+            _setServo(vehicle, port, pwm);
+            porttimer->deleteLater();
+        });
+        porttimer->start();
+        count++;
+    }
+
+    /*uint8_t current = qBound(0U, _droneFactGroup->spotlightStatus()->rawValue().toUInt(), 100U);
     int8_t diff;
     do {
         diff = static_cast<int8_t>(current) - static_cast<int8_t>(intensity);
@@ -54,26 +68,27 @@ void Drone::adjustLights(Vehicle *vehicle, uint8_t intensity)
     } while (diff != 0);
 
     QTimer* const timer = new QTimer(this);
-    timer->setInterval(50);
+    timer->setInterval(100);
     timer->setSingleShot(true);
     (void) timer->callOnTimeout([this, vehicle, timer]() {
-        if (!_lightTargets.isEmpty()) {
+        // if (!_lightTargets.isEmpty()) {
             const uint16_t pwm = 1000 + (_lightTargets.takeFirst() * 9);
             for (const uint8_t port: _droneFactGroup->spotlightValues().keys()) {
                 QTimer* const porttimer = new QTimer(this);
-                porttimer->setInterval(25);
+                porttimer->setInterval(50);
                 porttimer->setSingleShot(true);
                 (void) porttimer->callOnTimeout([this, vehicle, porttimer, pwm, port]() {
                     _setServo(vehicle, port, pwm);
                     porttimer->deleteLater();
                 });
+                porttimer->start();
             }
             timer->start();
         } else {
             timer->deleteLater();
         }
     });
-    timer->start();
+    timer->start();*/
 }
 
 bool Drone::readyForToggleBeacon()

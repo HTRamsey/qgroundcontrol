@@ -1,25 +1,25 @@
 name: MacOS
 
-on:
-  push:
-    branches:
-      - master
-      - 'Stable*'
-    tags:
-      - 'v*'
-    paths-ignore:
-      - 'android/**'
-      - 'deploy/**'
-      - 'docs/**'
-  pull_request:
-    paths-ignore:
-      - 'android/**'
-      - 'deploy/**'
-      - 'docs/**'
-      - '.github/workflows/docs_deploy.yml'
-      - '.github/workflows/android.yml'
-      - '.github/workflows/linux.yml'
-      - '.github/workflows/windows.yml'
+# on:
+#   push:
+#     branches:
+#       - master
+#       - 'Stable*'
+#     tags:
+#       - 'v*'
+#     paths-ignore:
+#       - 'android/**'
+#       - 'deploy/**'
+#       - 'docs/**'
+#   pull_request:
+#     paths-ignore:
+#       - 'android/**'
+#       - 'deploy/**'
+#       - 'docs/**'
+#       - '.github/workflows/docs_deploy.yml'
+#       - '.github/workflows/android.yml'
+#       - '.github/workflows/linux.yml'
+#       - '.github/workflows/windows.yml'
 
 jobs:
   build:
