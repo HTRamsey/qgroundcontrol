@@ -85,6 +85,15 @@ void CustomPlugin::setToolbox(QGCToolbox *toolbox)
 
     (void) connect(_gpuFactGroup->tetherLength(), &Fact::rawValueChanged, this, [this](QVariant value) {
         qgcApp()->toolbox()->settingsManager()->flyViewSettings()->guidedMaximumAltitude()->setRawValue(value);
+        bool ok = false;
+        const uint8_t tetherLength = value.toUInt(&ok) + 4;
+        if (ok) {
+            ParameterManager *const parameterManager = qgcApp()->toolbox()->multiVehicleManager()->activeVehicle()->parameterManager();
+            if (parameterManager->parameterExists(ParameterManager::defaultComponentId, "FENCE_ALT_MAX")) {
+                Fact *const maxAlt = parameterManager->getParameter(ParameterManager::defaultComponentId, "FENCE_ALT_MAX");
+                maxAlt->setRawValue(tetherLength);
+            }
+        }
     });
 
 
@@ -243,10 +252,10 @@ bool CustomPlugin::adjustSettingMetaData(const QString &settingsGroup, FactMetaD
         }
     } else if (settingsGroup == FlyViewSettings::settingsGroup) {
         if (metaData.name() == FlyViewSettings::guidedMinimumAltitudeName) {
-            metaData.setRawDefaultValue(10);
+            metaData.setRawDefaultValue(32.8084);
             return true;
         } else if (metaData.name() == FlyViewSettings::guidedMaximumAltitudeName) {
-            metaData.setRawDefaultValue(121.92);
+            metaData.setRawDefaultValue(60.96);
             return true;
         } else if (metaData.name() == FlyViewSettings::showSimpleCameraControlName) {
             metaData.setRawDefaultValue(false);
