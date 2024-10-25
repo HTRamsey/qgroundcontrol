@@ -27,54 +27,132 @@
 QGC_LOGGING_CATEGORY(GPSProviderLog, "qgc.gps.gpsprovider")
 QGC_LOGGING_CATEGORY(GPSDriversLog, "qgc.gps.drivers")
 
-GPSProvider::GPSProvider(const QString &device, GPSType type, const rtk_data_s &rtkData, const std::atomic_bool &requestStop, QObject *parent)
-    : QThread(parent)
-    , _device(device)
-    , _type(type)
-    , _requestStop(requestStop)
-    , _rtkData(rtkData)
-    , _serial(new QSerialPort(this))
+GPSProvider::GPSProvider(const QString &device,
+                         GPSType type,
+                         const rtk_data_s &rtkData,
+                         std::atomic_bool &requestStop,
+                         QObject *parent)
+    : QObject(parent)
+    , _worker(std::make_unique<GPSProviderWorker>(device, type, rtkData, requestStop, this))
+    , _workerThread(new QThread(this))
 {
-    // qCDebug(GPSProviderLog) << Q_FUNC_INFO << this;
+    // Move the worker to the thread
+    _worker->moveToThread(_workerThread);
 
-    qCDebug(GPSProviderLog) << QString("Survey in accuracy: %1 | duration: %2").arg(_rtkData.surveyInAccMeters).arg(_rtkData.surveyInDurationSecs);
+    // Connect signals and slots
+    (void) connect(_workerThread, &QThread::started, _worker.get(), &GPSProviderWorker::process);
+    (void) connect(_worker.get(), &GPSProviderWorker::finished, _workerThread, &QThread::quit);
+    (void) connect(_worker.get(), &GPSProviderWorker::finished, _worker.get(), &GPSProviderWorker::deleteLater);
 
-    _serial->setPortName(_device);
+    // Relay worker signals to GPSProvider signals
+    (void) connect(_worker.get(), &GPSProviderWorker::satelliteInfoUpdate, this, &GPSProvider::satelliteInfoUpdate);
+    (void) connect(_worker.get(), &GPSProviderWorker::sensorGnssRelativeUpdate, this, &GPSProvider::sensorGnssRelativeUpdate);
+    (void) connect(_worker.get(), &GPSProviderWorker::sensorGpsUpdate, this, &GPSProvider::sensorGpsUpdate);
+    (void) connect(_worker.get(), &GPSProviderWorker::RTCMDataUpdate, this, &GPSProvider::RTCMDataUpdate);
+    (void) connect(_worker.get(), &GPSProviderWorker::surveyInStatus, this, &GPSProvider::surveyInStatus);
+    (void) connect(_worker.get(), &GPSProviderWorker::errorOccurred, this, &GPSProvider::errorOccurred);
+    (void) connect(_worker.get(), &GPSProviderWorker::finished, this, &GPSProvider::finished);
+
+    // Start the thread
+    _workerThread->start();
 }
 
 GPSProvider::~GPSProvider()
 {
-    // qCDebug(GPSProviderLog) << Q_FUNC_INFO << this;
+    stopProvider();
+
+    if (_workerThread->isRunning()) {
+        _worker->stopProvider();
+        _workerThread->quit();
+        if (!_workerThread->wait(5000)) { // Wait up to 5 seconds
+            qCWarning(GPSProviderLog) << "GPSProvider thread did not finish in time.";
+            _workerThread->terminate();
+        }
+    }
 }
 
-void GPSProvider::_publishSatelliteInfo()
+bool GPSProvider::isRunning() const
+{
+    return _workerThread->isRunning();
+}
+
+void GPSProvider::startProvider()
+{
+    if (!_workerThread->isRunning()) {
+        _workerThread->start();
+    }
+}
+
+void GPSProvider::stopProvider()
+{
+    if (_workerThread->isRunning()) {
+        _worker->stopProvider();
+        _workerThread->quit();
+        if (!_workerThread->wait(5000)) {
+            qCWarning(GPSProviderLog) << "GPSProvider thread did not finish in time.";
+            _workerThread->terminate();
+        }
+    }
+}
+
+/*===========================================================================*/
+
+GPSProviderWorker::GPSProviderWorker(
+    const QString &device,
+    GPSProvider::GPSType type,
+    const GPSProvider::rtk_data_s &rtkData,
+    std::atomic_bool &requestStop,
+    QObject *parent
+) : QObject(parent)
+  , _device(device)
+  , _type(type)
+  , _requestStop(requestStop)
+  , _rtkData(rtkData)
+{
+    // Initialize GPS configuration
+    _gpsConfig.output_mode = GPSHelper::OutputMode::RTCM;
+}
+
+GPSProviderWorker::~GPSProviderWorker()
+{
+    if (_serial && _serial->isOpen()) {
+        _serial->close();
+    }
+}
+
+void GPSProviderWorker::_publishSatelliteInfo()
 {
     emit satelliteInfoUpdate(_satelliteInfo);
 }
 
-void GPSProvider::_publishSensorGNSSRelative()
+void GPSProviderWorker::_publishSensorGNSSRelative()
 {
     emit sensorGnssRelativeUpdate(_sensorGnssRelative);
 }
 
-void GPSProvider::_publishSensorGPS()
+void GPSProviderWorker::_publishSensorGPS()
 {
     emit sensorGpsUpdate(_sensorGps);
 }
 
-void GPSProvider::_gotRTCMData(const uint8_t *data, size_t len)
+void GPSProviderWorker::_gotRTCMData(const uint8_t *data, size_t len)
 {
     const QByteArray message(reinterpret_cast<const char*>(data), len);
     emit RTCMDataUpdate(message);
 }
 
-int GPSProvider::_callbackEntry(GPSCallbackType type, void *data1, int data2, void *user)
+void GPSProviderWorker::stopProvider()
 {
-    GPSProvider* const gps = reinterpret_cast<GPSProvider*>(user);
-    return gps->callback(type, data1, data2);
+    _requestStop = true;
 }
 
-int GPSProvider::callback(GPSCallbackType type, void *data1, int data2)
+int GPSProviderWorker::_callbackEntry(GPSCallbackType type, void *data1, int data2, void *user)
+{
+    GPSProviderWorker *gps = reinterpret_cast<GPSProviderWorker*>(user);
+    return gps->_callback(type, data1, data2);
+}
+
+int GPSProviderWorker::_callback(GPSCallbackType type, void *data1, int data2)
 {
     switch (type) {
     case GPSCallbackType::readDeviceData:
@@ -119,68 +197,95 @@ int GPSProvider::callback(GPSCallbackType type, void *data1, int data2)
     return 0;
 }
 
-void GPSProvider::run()
+void GPSProviderWorker::process()
 {
+    qCDebug(GPSProviderLog) << "GPSProviderWorker started.";
+
 #ifdef SIMULATE_RTCM_OUTPUT
-    _sendRTCMData();
+    _simulateRTCM = true;
 #endif
 
-    _connectSerial();
+    if (!_simulateRTCM) {
+        if (!_connectSerial()) {
+            emit errorOccurred(QString("Failed to connect to serial port: %1").arg(_device));
+            emit finished();
+            return;
+        }
+
+        _gpsDriver = _connectGPS();
+        if (!_gpsDriver) {
+            emit errorOccurred(QString("Failed to initialize GPS driver for type: %1").arg(static_cast<int>(_type)));
+            emit finished();
+            return;
+        }
+    }
 
     GPSBaseStationSupport *gpsDriver = nullptr;
 
     while (!_requestStop) {
-        if (gpsDriver) {
-            delete gpsDriver;
-            gpsDriver = nullptr;
+        if (_simulateRTCM) {
+            _sendRTCMData();
+            continue;
         }
 
-        gpsDriver = _connectGPS();
-        if (gpsDriver) {
-            (void) memset(&_sensorGps, 0, sizeof(_sensorGps));
+        if (!_gpsDriver) {
+            emit errorOccurred(tr("GPS driver is not initialized."));
+            break;
+        }
 
-            uint8_t numTries = 0;
-            while (!_requestStop && (numTries < 3)) {
-                const int helperRet = gpsDriver->receive(kGPSReceiveTimeout);
+        (void) std::memset(&_sensorGps, 0, sizeof(_sensorGps));
 
-                if (helperRet > 0) {
+        uint8_t numTries = 0;
+        while (!_requestStop && (numTries < 3)) {
+            const int helperRet = _gpsDriver->receive(GPSReceiveTimeout);
+
+            if (helperRet > 0) {
+                numTries = 0;
+
+                if (helperRet & GPSReceiveType::Position) {
+                    _publishSensorGPS();
                     numTries = 0;
-
-                    if (helperRet & GPSReceiveType::Position) {
-                        _publishSensorGPS();
-                        numTries = 0;
-                    }
-
-                    if (helperRet & GPSReceiveType::Satellite) {
-                        _publishSatelliteInfo();
-                        numTries = 0;
-                    }
-                } else {
-                    ++numTries;
                 }
-            }
 
-            if ((_serial->error() != QSerialPort::NoError) && (_serial->error() != QSerialPort::TimeoutError)) {
-                break;
+                if (helperRet & GPSReceiveType::Satellite) {
+                    _publishSatelliteInfo();
+                    numTries = 0;
+                }
+            } else {
+                ++numTries;
+                QThread::msleep(100);
             }
+        }
+
+        if ((_serial->error() != QSerialPort::NoError) && (_serial->error() != QSerialPort::TimeoutError)) {
+            emit errorOccurred(tr("Serial port error: %1").arg(_serial->errorString()));
+            break;
         }
     }
 
-    delete gpsDriver;
-    gpsDriver = nullptr;
+    if (_gpsDriver) {
+        _gpsDriver.reset();
+    }
 
-    qCDebug(GPSProviderLog) << Q_FUNC_INFO << "Exiting GPS thread";
+    if (_serial && _serial->isOpen()) {
+        _serial->close();
+    }
+
+    qCDebug(GPSProviderLog) << "GPSProviderWorker exiting.";
+    emit finished();
 }
 
-bool GPSProvider::_connectSerial()
+bool GPSProviderWorker::_connectSerial()
 {
+    _serial = std::make_unique<QSerialPort>();
+    _serial->setPortName(_device);
     if (!_serial->open(QIODevice::ReadWrite)) {
         // Give the device some time to come up. In some cases the device is not
         // immediately accessible right after startup for some reason. This can take 10-20s.
-        uint32_t retries = 60;
+        uint32_t retries = MaxSerialRetries;
         while ((retries-- > 0) && (_serial->error() == QSerialPort::PermissionError)) {
-            qCDebug(GPSProviderLog) << "Cannot open device... retrying";
-            msleep(500);
+            qCWarning(GPSProviderLog) << "Cannot open device" << _device << "... retrying";
+            QThread::msleep(SerialRetryIntervalMs);
             if (_serial->open(QIODevice::ReadWrite)) {
                 _serial->clearError();
                 break;
@@ -202,31 +307,33 @@ bool GPSProvider::_connectSerial()
     return true;
 }
 
-GPSBaseStationSupport *GPSProvider::_connectGPS()
+std::unique_ptr<GPSBaseStationSupport> GPSProviderWorker::_createGPSDriver(GPSProvider::GPSType type)
 {
-    GPSBaseStationSupport *gpsDriver = nullptr;
-    uint32_t baudrate = 0;
-    switch(_type) {
-    case GPSType::trimble:
-        gpsDriver = new GPSDriverAshtech(&_callbackEntry, this, &_sensorGps, &_satelliteInfo);
-        baudrate = 115200;
-        break;
-    case GPSType::septentrio:
-        gpsDriver = new GPSDriverSBF(&_callbackEntry, this, &_sensorGps, &_satelliteInfo, kGPSHeadingOffset);
-        baudrate = 0;
-        break;
-    case GPSType::u_blox:
-        gpsDriver = new GPSDriverUBX(GPSDriverUBX::Interface::UART, &_callbackEntry, this, &_sensorGps, &_satelliteInfo);
-        baudrate = 0;
-        break;
-    case GPSType::femto:
-        gpsDriver = new GPSDriverFemto(&_callbackEntry, this, &_sensorGps, &_satelliteInfo);
-        baudrate = 0;
-        break;
+    switch (type) {
+    case GPSProvider::GPSType::trimble:
+        return std::make_unique<GPSDriverAshtech>(&GPSProviderWorker::_callbackEntry, this, &_sensorGps, &_satelliteInfo);
+    case GPSProvider::GPSType::septentrio:
+        return std::make_unique<GPSDriverSBF>(&GPSProviderWorker::_callbackEntry, this, &_sensorGps, &_satelliteInfo, GPSHeadingOffset);
+    case GPSProvider::GPSType::u_blox:
+        return std::make_unique<GPSDriverUBX>(GPSDriverUBX::Interface::UART, &GPSProviderWorker::_callbackEntry, this, &_sensorGps, &_satelliteInfo);
+    case GPSProvider::GPSType::femto:
+        return std::make_unique<GPSDriverFemto>(&GPSProviderWorker::_callbackEntry, this, &_sensorGps, &_satelliteInfo);
     default:
-        // GPSDriverEmlidReach, GPSDriverMTK, GPSDriverNMEA
-        qCWarning(GPSProviderLog) << "Unsupported GPS Type:" << static_cast<int>(_type);
+        qCWarning(GPSProviderLog) << "Unsupported GPS Type:" << static_cast<int>(type);
         return nullptr;
+    }
+}
+
+std::unique_ptr<GPSBaseStationSupport> GPSProviderWorker::_connectGPS()
+{
+    std::unique_ptr<GPSBaseStationSupport> gpsDriver = _createGPSDriver(_type);
+    if (!gpsDriver) {
+        return nullptr;
+    }
+
+    uint32_t baudrate = 0;
+    if (_type == GPSProvider::GPSType::trimble) {
+        baudrate = 115200;
     }
 
     gpsDriver->setSurveyInSpecs(_rtkData.surveyInAccMeters * 10000.f, _rtkData.surveyInDurationSecs);
@@ -235,28 +342,27 @@ GPSBaseStationSupport *GPSProvider::_connectGPS()
         gpsDriver->setBasePosition(_rtkData.fixedBaseLatitude, _rtkData.fixedBaseLongitude, _rtkData.fixedBaseAltitudeMeters, _rtkData.fixedBaseAccuracyMeters * 1000.0f);
     }
 
-    _gpsConfig.output_mode = GPSHelper::OutputMode::RTCM;
-
     if (gpsDriver->configure(baudrate, _gpsConfig) != 0) {
+        qCWarning(GPSProviderLog) << "Failed to configure GPS driver.";
         return nullptr;
     }
 
     return gpsDriver;
 }
 
-void GPSProvider::_sendRTCMData()
+void GPSProviderWorker::_sendRTCMData()
 {
     RTCMMavlink *const rtcm = new RTCMMavlink(this);
 
     const int fakeMsgLengths[3] = { 30, 170, 240 };
-    const uint8_t* const fakeData = new uint8_t[fakeMsgLengths[2]];
+    std::unique_ptr<uint8_t[]> fakeData = std::make_unique<uint8_t[]>(fakeMsgLengths[2]);
+
     while (!_requestStop) {
         for (int i = 0; i < 3; ++i) {
-            const QByteArray message(reinterpret_cast<const char*>(fakeData), fakeMsgLengths[i]);
+            const QByteArray message(reinterpret_cast<const char*>(fakeData.get()), fakeMsgLengths[i]);
             rtcm->RTCMDataUpdate(message);
-            msleep(4);
+            QThread::msleep(4);
         }
-        msleep(100);
+        QThread::msleep(100);
     }
-    delete[] fakeData;
 }

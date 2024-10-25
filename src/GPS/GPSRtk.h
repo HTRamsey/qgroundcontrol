@@ -44,12 +44,13 @@ private slots:
     void _onGPSConnect();
     void _onGPSDisconnect();
     void _onGPSSurveyInStatus(float duration, float accuracyMM, double latitude, double longitude, float altitude, bool valid, bool active);
+    void _updateConnectionStatus();
+    void _handleGPSError(const QString &error);
 
 private:
     GPSProvider *_gpsProvider = nullptr;
     RTCMMavlink *_rtcmMavlink = nullptr;
     GPSRTKFactGroup *_gpsRtkFactGroup = nullptr;
-
     std::atomic_bool _requestGpsStop = false;
 
     static constexpr uint32_t kGPSThreadDisconnectTimeout = 2000;

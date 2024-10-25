@@ -24,9 +24,9 @@ GPSRtk::GPSRtk(QObject *parent)
 {
     // qCDebug(GPSRtkLog) << Q_FUNC_INFO << this;
 
-    qRegisterMetaType<satellite_info_s>("satellite_info_s");
-    qRegisterMetaType<sensor_gnss_relative_s>("sensor_gnss_relative_s");
-    qRegisterMetaType<sensor_gps_s>("sensor_gps_s");
+    (void) qRegisterMetaType<satellite_info_s>("satellite_info_s");
+    (void) qRegisterMetaType<sensor_gnss_relative_s>("sensor_gnss_relative_s");
+    (void) qRegisterMetaType<sensor_gps_s>("sensor_gps_s");
 }
 
 GPSRtk::~GPSRtk()
@@ -87,33 +87,31 @@ void GPSRtk::connectGPS(const QString &device, QStringView gps_type)
         rtkSettings->fixedBasePositionAltitude()->rawValue().toFloat(),
         rtkSettings->fixedBasePositionAccuracy()->rawValue().toFloat()
     };
-    _gpsProvider = new GPSProvider(
-        device,
-        type,
-        rtkData,
-        _requestGpsStop,
-        this
-    );
-    (void) QMetaObject::invokeMethod(_gpsProvider, "start", Qt::AutoConnection);
 
-    _rtcmMavlink = new RTCMMavlink(this);
-    (void) connect(_gpsProvider, &GPSProvider::RTCMDataUpdate, _rtcmMavlink, &RTCMMavlink::RTCMDataUpdate);
+    _gpsProvider = new GPSProvider(device, type, rtkData, _requestGpsStop, this);
 
     (void) connect(_gpsProvider, &GPSProvider::satelliteInfoUpdate, this, &GPSRtk::_satelliteInfoUpdate);
     (void) connect(_gpsProvider, &GPSProvider::sensorGpsUpdate, this, &GPSRtk::_sensorGpsUpdate);
     (void) connect(_gpsProvider, &GPSProvider::surveyInStatus, this, &GPSRtk::_onGPSSurveyInStatus);
     (void) connect(_gpsProvider, &GPSProvider::finished, this, &GPSRtk::_onGPSDisconnect);
+    (void) connect(_gpsProvider, &GPSProvider::errorOccurred, this, &GPSRtk::_handleGPSError);
 
-    (void) QMetaObject::invokeMethod(this, "_onGPSConnect", Qt::AutoConnection);
+    _rtcmMavlink = new RTCMMavlink(this);
+    (void) connect(_gpsProvider, &GPSProvider::RTCMDataUpdate, _rtcmMavlink, &RTCMMavlink::RTCMDataUpdate);
+
+    (void) connect(_gpsProvider, &GPSProvider::finished, this, &GPSRtk::_onGPSDisconnect);
+    (void) connect(this, &GPSRtk::_onGPSConnect, this, &GPSRtk::_updateConnectionStatus, Qt::AutoConnection);
+
+    (void) QMetaObject::invokeMethod(_gpsProvider, "startProvider", Qt::AutoConnection);
+
+    QTimer::singleShot(1000, this, &GPSRtk::_onGPSConnect);
 }
 
 void GPSRtk::disconnectGPS()
 {
     if (_gpsProvider) {
         _requestGpsStop = true;
-        if (!_gpsProvider->wait(kGPSThreadDisconnectTimeout)) {
-            qCWarning(GPSRtkLog) << "Failed to wait for GPS thread exit. Consider increasing the timeout";
-        }
+        _gpsProvider->stopProvider();
 
         _gpsProvider->deleteLater();
         _gpsProvider = nullptr;
@@ -149,4 +147,14 @@ void GPSRtk::_sensorGnssRelativeUpdate(const sensor_gnss_relative_s &msg)
 void GPSRtk::_sensorGpsUpdate(const sensor_gps_s &msg)
 {
     qCDebug(GPSRtkLog) << Q_FUNC_INFO << QStringLiteral("alt=%1, long=%2, lat=%3").arg(msg.altitude_msl_m).arg(msg.longitude_deg).arg(msg.latitude_deg);
+}
+
+void GPSRtk::_handleGPSError(const QString &error)
+{
+    qCWarning(GPSRtkLog) << "GPS Error:" << error;
+}
+
+void GPSRtk::_updateConnectionStatus()
+{
+
 }
