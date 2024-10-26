@@ -28,43 +28,6 @@ QGC_LOGGING_CATEGORY(ParameterManagerVerbose1Log,           "ParameterManagerVer
 QGC_LOGGING_CATEGORY(ParameterManagerVerbose2Log,           "ParameterManagerVerbose2Log")
 QGC_LOGGING_CATEGORY(ParameterManagerDebugCacheFailureLog,  "ParameterManagerDebugCacheFailureLog") // Turn on to debug parameter cache crc misses
 
-const QHash<int, QString> _mavlinkCompIdHash {
-    { MAV_COMP_ID_CAMERA,   "Camera1" },
-    { MAV_COMP_ID_CAMERA2,  "Camera2" },
-    { MAV_COMP_ID_CAMERA3,  "Camera3" },
-    { MAV_COMP_ID_CAMERA4,  "Camera4" },
-    { MAV_COMP_ID_CAMERA5,  "Camera5" },
-    { MAV_COMP_ID_CAMERA6,  "Camera6" },
-    { MAV_COMP_ID_SERVO1,   "Servo1" },
-    { MAV_COMP_ID_SERVO2,   "Servo2" },
-    { MAV_COMP_ID_SERVO3,   "Servo3" },
-    { MAV_COMP_ID_SERVO4,   "Servo4" },
-    { MAV_COMP_ID_SERVO5,   "Servo5" },
-    { MAV_COMP_ID_SERVO6,   "Servo6" },
-    { MAV_COMP_ID_SERVO7,   "Servo7" },
-    { MAV_COMP_ID_SERVO8,   "Servo8" },
-    { MAV_COMP_ID_SERVO9,   "Servo9" },
-    { MAV_COMP_ID_SERVO10,  "Servo10" },
-    { MAV_COMP_ID_SERVO11,  "Servo11" },
-    { MAV_COMP_ID_SERVO12,  "Servo12" },
-    { MAV_COMP_ID_SERVO13,  "Servo13" },
-    { MAV_COMP_ID_SERVO14,  "Servo14" },
-    { MAV_COMP_ID_GIMBAL,   "Gimbal1" },
-    { MAV_COMP_ID_ADSB,     "ADSB" },
-    { MAV_COMP_ID_OSD,      "OSD" },
-    { MAV_COMP_ID_FLARM,    "FLARM" },
-    { MAV_COMP_ID_GIMBAL2,  "Gimbal2" },
-    { MAV_COMP_ID_GIMBAL3,  "Gimbal3" },
-    { MAV_COMP_ID_GIMBAL4,  "Gimbal4" },
-    { MAV_COMP_ID_GIMBAL5,  "Gimbal5" },
-    { MAV_COMP_ID_GIMBAL6,  "Gimbal6" },
-    { MAV_COMP_ID_IMU,      "IMU1" },
-    { MAV_COMP_ID_IMU_2,    "IMU2" },
-    { MAV_COMP_ID_IMU_3,    "IMU3" },
-    { MAV_COMP_ID_GPS,      "GPS1" },
-    { MAV_COMP_ID_GPS2,     "GPS2" }
-};
-
 ParameterManager::ParameterManager(Vehicle* vehicle)
     : QObject                           (vehicle)
     , _vehicle                          (vehicle)

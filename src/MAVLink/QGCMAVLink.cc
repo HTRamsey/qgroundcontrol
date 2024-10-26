@@ -15,6 +15,43 @@
 
 QGC_LOGGING_CATEGORY(QGCMAVLinkLog, "qgc.mavlink.qgcmavlink")
 
+const QHash<int, QString> QGCMAVLink::mavlinkCompIdHash = {
+    { MAV_COMP_ID_CAMERA,   "Camera1" },
+    { MAV_COMP_ID_CAMERA2,  "Camera2" },
+    { MAV_COMP_ID_CAMERA3,  "Camera3" },
+    { MAV_COMP_ID_CAMERA4,  "Camera4" },
+    { MAV_COMP_ID_CAMERA5,  "Camera5" },
+    { MAV_COMP_ID_CAMERA6,  "Camera6" },
+    { MAV_COMP_ID_SERVO1,   "Servo1" },
+    { MAV_COMP_ID_SERVO2,   "Servo2" },
+    { MAV_COMP_ID_SERVO3,   "Servo3" },
+    { MAV_COMP_ID_SERVO4,   "Servo4" },
+    { MAV_COMP_ID_SERVO5,   "Servo5" },
+    { MAV_COMP_ID_SERVO6,   "Servo6" },
+    { MAV_COMP_ID_SERVO7,   "Servo7" },
+    { MAV_COMP_ID_SERVO8,   "Servo8" },
+    { MAV_COMP_ID_SERVO9,   "Servo9" },
+    { MAV_COMP_ID_SERVO10,  "Servo10" },
+    { MAV_COMP_ID_SERVO11,  "Servo11" },
+    { MAV_COMP_ID_SERVO12,  "Servo12" },
+    { MAV_COMP_ID_SERVO13,  "Servo13" },
+    { MAV_COMP_ID_SERVO14,  "Servo14" },
+    { MAV_COMP_ID_GIMBAL,   "Gimbal1" },
+    { MAV_COMP_ID_ADSB,     "ADSB" },
+    { MAV_COMP_ID_OSD,      "OSD" },
+    { MAV_COMP_ID_FLARM,    "FLARM" },
+    { MAV_COMP_ID_GIMBAL2,  "Gimbal2" },
+    { MAV_COMP_ID_GIMBAL3,  "Gimbal3" },
+    { MAV_COMP_ID_GIMBAL4,  "Gimbal4" },
+    { MAV_COMP_ID_GIMBAL5,  "Gimbal5" },
+    { MAV_COMP_ID_GIMBAL6,  "Gimbal6" },
+    { MAV_COMP_ID_IMU,      "IMU1" },
+    { MAV_COMP_ID_IMU_2,    "IMU2" },
+    { MAV_COMP_ID_IMU_3,    "IMU3" },
+    { MAV_COMP_ID_GPS,      "GPS1" },
+    { MAV_COMP_ID_GPS2,     "GPS2" }
+};
+
 #ifdef MAVLINK_EXTERNAL_RX_STATUS
     mavlink_status_t m_mavlink_status[MAVLINK_COMM_NUM_BUFFERS];
 #endif
@@ -269,7 +306,7 @@ QString QGCMAVLink::mavSysStatusSensorToString(MAV_SYS_STATUS_SENSOR sysStatusSe
         }
     }
 
-    qWarning() << "QGCMAVLink::mavSysStatusSensorToString: Unknown sensor" << sysStatusSensor;
+    qCWarning() << "QGCMAVLink::mavSysStatusSensorToString: Unknown sensor" << sysStatusSensor;
 
     return QT_TRANSLATE_NOOP("MAVLink unknown SYS_STATUS_SENSOR value", "Unknown sensor");
 }
@@ -413,4 +450,141 @@ uint32_t QGCMAVLink::highLatencyFailuresToMavSysStatus(mavlink_high_latency2_t& 
     }
 
     return onboardControlSensorsEnabled;
+}
+
+QVariant QGCMAVLink::parseParamValue(const mavlink_message_t &message)
+{
+    mavlink_param_value_t param_value;
+    mavlink_msg_param_value_decode(&message, &param_value);
+
+    mavlink_param_union_t paramUnion;
+    paramUnion.param_float = param_value.param_value;
+    paramUnion.type = param_value.param_type;
+
+    QVariant parameterValue;
+
+    switch (paramUnion.type) {
+    case MAV_PARAM_TYPE_REAL32:
+        parameterValue = QVariant(paramUnion.param_float);
+        break;
+    case MAV_PARAM_TYPE_UINT8:
+        parameterValue = QVariant(paramUnion.param_uint8);
+        break;
+    case MAV_PARAM_TYPE_INT8:
+        parameterValue = QVariant(paramUnion.param_int8);
+        break;
+    case MAV_PARAM_TYPE_UINT16:
+        parameterValue = QVariant(paramUnion.param_uint16);
+        break;
+    case MAV_PARAM_TYPE_INT16:
+        parameterValue = QVariant(paramUnion.param_int16);
+        break;
+    case MAV_PARAM_TYPE_UINT32:
+        parameterValue = QVariant(paramUnion.param_uint32);
+        break;
+    case MAV_PARAM_TYPE_INT32:
+        parameterValue = QVariant(paramUnion.param_int32);
+        break;
+    default:
+        qCCritical(QGCMAVLinkLog) << "unsupported MAV_PARAM_TYPE" << paramUnion.type;
+        break;
+    }
+}
+
+mavlink_param_set_t QGCMAVLink::createParamSet(const mavlink_message_t &message)
+{
+    mavlink_param_set_t paramSet{};
+    mavlink_param_union_t paramUnion{};
+
+    mavlink_msg_param_set_decode(message, &paramSet);
+
+    paramUnion.param_float = paramSet.param_value;
+
+    switch (paramSet.param_type) {
+    case MAV_PARAM_TYPE_UINT8:
+        paramSet.param_value = paramUnion.param_uint8;
+        break;
+    case MAV_PARAM_TYPE_INT8:
+        paramSet.param_value = paramUnion.param_int8;
+        break;
+    case MAV_PARAM_TYPE_UINT16:
+        paramSet.param_value = paramUnion.param_uint16;
+        break;
+    case MAV_PARAM_TYPE_INT16:
+        paramSet.param_value = paramUnion.param_int16;
+        break;
+    case MAV_PARAM_TYPE_UINT32:
+        paramSet.param_value = paramUnion.param_uint32;
+        break;
+    case MAV_PARAM_TYPE_INT32:
+        paramSet.param_value = paramUnion.param_int32;
+        break;
+    case MAV_PARAM_TYPE_REAL32:
+        // Already in param_float
+        break;
+    default:
+        qCCritical(QGCMAVLinkLog) << "Invalid/Unsupported data type used in parameter:" << paramSet.param_type;
+    }
+}
+
+float QGCMAVLink::floatUnionForParam(MAV_PARAM_TYPE paramType, QVariant paramVar, MAV_AUTOPILOT firmwareType)
+{
+    mavlink_param_union_t valueUnion;
+
+    switch (paramType) {
+    case MAV_PARAM_TYPE_REAL32:
+        valueUnion.param_float = paramVar.toFloat();
+        break;
+    case MAV_PARAM_TYPE_UINT32:
+        if (firmwareType == MAV_AUTOPILOT_ARDUPILOTMEGA) {
+            valueUnion.param_float = paramVar.toUInt();
+        } else {
+            valueUnion.param_uint32 = paramVar.toUInt();
+        }
+        break;
+    case MAV_PARAM_TYPE_INT32:
+        if (firmwareType == MAV_AUTOPILOT_ARDUPILOTMEGA) {
+            valueUnion.param_float = paramVar.toInt();
+        } else {
+            valueUnion.param_int32 = paramVar.toInt();
+        }
+        break;
+    case MAV_PARAM_TYPE_UINT16:
+        if (firmwareType == MAV_AUTOPILOT_ARDUPILOTMEGA) {
+            valueUnion.param_float = paramVar.toUInt();
+        } else {
+            valueUnion.param_uint16 = paramVar.toUInt();
+        }
+        break;
+    case MAV_PARAM_TYPE_INT16:
+        if (firmwareType == MAV_AUTOPILOT_ARDUPILOTMEGA) {
+            valueUnion.param_float = paramVar.toInt();
+        } else {
+            valueUnion.param_int16 = paramVar.toInt();
+        }
+        break;
+    case MAV_PARAM_TYPE_UINT8:
+        if (firmwareType == MAV_AUTOPILOT_ARDUPILOTMEGA) {
+            valueUnion.param_float = paramVar.toUInt();
+        } else {
+            valueUnion.param_uint8 = paramVar.toUInt();
+        }
+        break;
+    case MAV_PARAM_TYPE_INT8:
+        if (firmwareType == MAV_AUTOPILOT_ARDUPILOTMEGA) {
+            valueUnion.param_float = (unsigned char)paramVar.toChar().toLatin1();
+        } else {
+            valueUnion.param_int8 = (unsigned char)paramVar.toChar().toLatin1();
+        }
+        break;
+    default:
+        if (firmwareType == MAV_AUTOPILOT_ARDUPILOTMEGA) {
+            valueUnion.param_float = paramVar.toInt();
+        } else {
+            valueUnion.param_int32 = paramVar.toInt();
+        }
+        qCCritical(QGCMAVLinkLog) << "Invalid parameter type" << paramType;
+    }
+
+    return valueUnion.param_float;
 }
