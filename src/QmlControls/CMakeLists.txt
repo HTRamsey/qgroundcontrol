@@ -1,3 +1,5 @@
+add_subdirectory(GraphicalEffects)
+
 target_sources(${CMAKE_PROJECT_NAME}
     PRIVATE
         EditPositionDialogController.cc
