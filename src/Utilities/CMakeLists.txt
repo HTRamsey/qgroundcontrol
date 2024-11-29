@@ -86,3 +86,11 @@ if(NOT Shapelib_FOUND)
     set(BUILD_TESTING ${saved_BUILD_TESTING} CACHE INTERNAL "Restore BUILD_TESTING")
     target_link_libraries(Utilities PRIVATE shp)
 endif()
+
+# TODO:
+# include(FetchContent)
+# FetchContent_Declare(QSimpleUpdater
+#     GIT_REPOSITORY https://github.com/alex-spataru/QSimpleUpdater.git
+#     GIT_TAG master
+#     GIT_SHALLOW TRUE
+# )
