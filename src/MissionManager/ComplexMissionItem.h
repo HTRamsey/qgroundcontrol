@@ -16,6 +16,7 @@
 class PlanMasterController;
 class MissionController;
 class KMLPlanDomDocument;
+class FactMetaData;
 
 class ComplexMissionItem : public VisualMissionItem
 {

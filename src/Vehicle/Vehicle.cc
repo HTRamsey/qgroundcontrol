@@ -51,10 +51,11 @@
 #include "VehicleObjectAvoidance.h"
 #include "VideoManager.h"
 #include "VideoSettings.h"
-#include <DeviceInfo.h>
-#include <StatusTextHandler.h>
-#include <MAVLinkSigning.h>
+#include "DeviceInfo.h"
+#include "StatusTextHandler.h"
+#include "MAVLinkSigning.h"
 #include "GimbalController.h"
+#include "QGCLoggingCategory.h"
 
 #ifdef QGC_UTM_ADAPTER
 #include "UTMSPVehicle.h"
