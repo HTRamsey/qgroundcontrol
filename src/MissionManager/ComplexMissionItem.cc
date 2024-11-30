@@ -16,6 +16,7 @@
 #include "MissionController.h"
 #include "KMLPlanDomDocument.h"
 #include "SettingsManager.h"
+#include "FactMetaData.h"
 
 #include <QtCore/QCborMap>
 #include <QtCore/QSettings>
