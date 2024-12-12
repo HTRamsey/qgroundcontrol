@@ -57,10 +57,6 @@ VideoManager::VideoManager(QObject *parent)
     , _videoSettings(SettingsManager::instance()->videoSettings())
 {
     // qCDebug(VideoManagerLog) << Q_FUNC_INFO << this;
-
-    if (qgcApp()->runningUnitTests()) {
-        return;
-    }
 }
 
 VideoManager::~VideoManager()
@@ -111,10 +107,6 @@ void VideoManager::init()
         return;
     }
 
-#ifdef QGC_GST_STREAMING
-    
-#endif
-
     // TODO: Those connections should be Per Video, not per VideoManager.
     (void) connect(_videoSettings->videoSource(), &Fact::rawValueChanged, this, &VideoManager::_videoSourceChanged);
     (void) connect(_videoSettings->udpPort(), &Fact::rawValueChanged, this, &VideoManager::_videoSourceChanged);
@@ -124,6 +116,9 @@ void VideoManager::init()
     (void) connect(_videoSettings->lowLatencyMode(), &Fact::rawValueChanged, this, &VideoManager::_lowLatencyModeChanged);
     (void) connect(MultiVehicleManager::instance(), &MultiVehicleManager::activeVehicleChanged, this, &VideoManager::_setActiveVehicle);
 
+    const QStringList widgetTypes = {"videoContent", "thermalVideo"};
+    Q_ASSERT(widgetTypes.length() <= _videoReceiverData.length());
+
     int index = 0;
     for (VideoReceiverData &videoReceiver : _videoReceiverData) {
         videoReceiver.index = index++;
@@ -131,6 +126,7 @@ void VideoManager::init()
         if (!videoReceiver.receiver) {
             continue;
         }
+        videoReceiver.name = widgetTypes[videoReceiver.index];
 
         (void) connect(videoReceiver.receiver, &VideoReceiver::onStartComplete, this, [this, &videoReceiver](VideoReceiver::STATUS status) {
             qCDebug(VideoManagerLog) << "Video" << videoReceiver.index << "Start complete, status:" << status;
@@ -445,25 +441,26 @@ void VideoManager::setfullScreen(bool on)
 void VideoManager::_initVideo()
 {
     QQuickWindow *const root = qgcApp()->mainRootWindow();
-    if (root == nullptr) {
+    if (!root) {
         qCDebug(VideoManagerLog) << "mainRootWindow() failed. No root window";
         return;
     }
 
-    const QStringList widgetTypes = {"videoContent", "thermalVideo"};
     for (VideoReceiverData &videoReceiver : _videoReceiverData) {
-        QQuickItem* const widget = root->findChild<QQuickItem*>(widgetTypes.at(videoReceiver.index));
-        if ((widget != nullptr) && (videoReceiver.receiver != nullptr)) {
-            videoReceiver.sink = QGCCorePlugin::instance()->createVideoSink(this, widget);
-            if (videoReceiver.sink != nullptr) {
-                if (videoReceiver.started) {
-                    videoReceiver.receiver->startDecoding(videoReceiver.sink);
-                }
-            } else {
-                qCDebug(VideoManagerLog) << "createVideoSink() failed" << videoReceiver.index;
-            }
-        } else {
-            qCDebug(VideoManagerLog) << widgetTypes.at(videoReceiver.index) << "receiver disabled";
+        QQuickItem* const widget = root->findChild<QQuickItem*>(videoReceiver.name);
+        if (!widget || !videoReceiver.receiver) {
+            qCDebug(VideoManagerLog) << videoReceiver.name << "receiver disabled";
+            continue;
+        }
+
+        videoReceiver.sink = QGCCorePlugin::instance()->createVideoSink(this, widget);
+        if (!videoReceiver.sink) {
+            qCDebug(VideoManagerLog) << "createVideoSink() failed" << videoReceiver.index;
+            continue;
+        }
+
+        if (videoReceiver.started) {
+            videoReceiver.receiver->startDecoding(videoReceiver.sink);
         }
     }
 }
@@ -758,7 +755,7 @@ void VideoManager::_startReceiver(unsigned id)
     const unsigned rtsptimeout = _videoSettings->rtspTimeout()->rawValue().toUInt();
     /* The gstreamer rtsp source will switch to tcp if udp is not available after 5 seconds.
        So we should allow for some negotiation time for rtsp */
-    const unsigned timeout = (source == VideoSettings::videoSourceRTSP ? rtsptimeout : 2);
+    const unsigned timeout = (source == VideoSettings::videoSourceRTSP ? rtsptimeout : 8);
 
     _videoReceiverData[id].receiver->start(_videoReceiverData[id].uri, timeout, _videoReceiverData[id].lowLatencyStreaming ? -1 : 0);
 }

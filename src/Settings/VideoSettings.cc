@@ -60,27 +60,7 @@ DECLARE_SETTINGGROUP(Video, "Video")
     _nameToMetaDataMap[videoSourceName]->setEnumInfo(videoSourceCookedList, videoSourceList);
 
 #ifdef QGC_GST_STREAMING
-    const QVariantList removeForceVideoDecodeList{
-#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
-        GStreamer::VideoDecoderOptions::ForceVideoDecoderDirectX3D,
-        GStreamer::VideoDecoderOptions::ForceVideoDecoderVideoToolbox,
-#elif defined(Q_OS_WIN)
-        GStreamer::VideoDecoderOptions::ForceVideoDecoderVAAPI,
-        GStreamer::VideoDecoderOptions::ForceVideoDecoderVideoToolbox,
-#elif defined(Q_OS_MAC)
-        GStreamer::VideoDecoderOptions::ForceVideoDecoderDirectX3D,
-        GStreamer::VideoDecoderOptions::ForceVideoDecoderVAAPI,
-#elif defined(Q_OS_ANDROID)
-        GStreamer::VideoDecoderOptions::ForceVideoDecoderDirectX3D,
-        GStreamer::VideoDecoderOptions::ForceVideoDecoderVideoToolbox,
-        GStreamer::VideoDecoderOptions::ForceVideoDecoderVAAPI,
-        GStreamer::VideoDecoderOptions::ForceVideoDecoderNVIDIA,
-#endif
-    };
-
-    for (const auto &value : removeForceVideoDecodeList) {
-        _nameToMetaDataMap[forceVideoDecoderName]->removeEnumInfo(value);
-    }
+    _setForceVideoDecodeList();
 #endif
 
     // Set default value for videoSource
@@ -103,10 +83,8 @@ DECLARE_SETTINGSFACT(VideoSettings, showRecControl)
 DECLARE_SETTINGSFACT(VideoSettings, recordingFormat)
 DECLARE_SETTINGSFACT(VideoSettings, maxVideoSize)
 DECLARE_SETTINGSFACT(VideoSettings, enableStorageLimit)
-DECLARE_SETTINGSFACT(VideoSettings, rtspTimeout)
 DECLARE_SETTINGSFACT(VideoSettings, streamEnabled)
 DECLARE_SETTINGSFACT(VideoSettings, disableWhenDisarmed)
-DECLARE_SETTINGSFACT(VideoSettings, lowLatencyMode)
 
 DECLARE_SETTINGSFACT_NO_FUNC(VideoSettings, videoSource)
 {
@@ -123,24 +101,6 @@ DECLARE_SETTINGSFACT_NO_FUNC(VideoSettings, videoSource)
         connect(_videoSourceFact, &Fact::valueChanged, this, &VideoSettings::_configChanged);
     }
     return _videoSourceFact;
-}
-
-DECLARE_SETTINGSFACT_NO_FUNC(VideoSettings, forceVideoDecoder)
-{
-    if (!_forceVideoDecoderFact) {
-        _forceVideoDecoderFact = _createSettingsFact(forceVideoDecoderName);
-
-        _forceVideoDecoderFact->setVisible(
-#ifdef QGC_GST_STREAMING
-            true
-#else
-            false
-#endif
-        );
-
-        connect(_forceVideoDecoderFact, &Fact::valueChanged, this, &VideoSettings::_configChanged);
-    }
-    return _forceVideoDecoderFact;
 }
 
 DECLARE_SETTINGSFACT_NO_FUNC(VideoSettings, udpPort)
@@ -168,6 +128,60 @@ DECLARE_SETTINGSFACT_NO_FUNC(VideoSettings, tcpUrl)
         connect(_tcpUrlFact, &Fact::valueChanged, this, &VideoSettings::_configChanged);
     }
     return _tcpUrlFact;
+}
+
+DECLARE_SETTINGSFACT_NO_FUNC(VideoSettings, forceVideoDecoder)
+{
+    if (!_forceVideoDecoderFact) {
+        _forceVideoDecoderFact = _createSettingsFact(forceVideoDecoderName);
+
+        _forceVideoDecoderFact->setVisible(
+#ifdef QGC_GST_STREAMING
+            true
+#else
+            false
+#endif
+        );
+
+        connect(_forceVideoDecoderFact, &Fact::valueChanged, this, &VideoSettings::_configChanged);
+    }
+    return _forceVideoDecoderFact;
+}
+
+DECLARE_SETTINGSFACT_NO_FUNC(VideoSettings, lowLatencyMode)
+{
+    if (!_lowLatencyModeFact) {
+        _lowLatencyModeFact = _createSettingsFact(lowLatencyModeName);
+
+        _lowLatencyModeFact->setVisible(
+#ifdef QGC_GST_STREAMING
+            true
+#else
+            false
+#endif
+        );
+
+        connect(_lowLatencyModeFact, &Fact::valueChanged, this, &VideoSettings::_configChanged);
+    }
+    return _lowLatencyModeFact;
+}
+
+DECLARE_SETTINGSFACT_NO_FUNC(VideoSettings, rtspTimeout)
+{
+    if (!_rtspTimeoutFact) {
+        _rtspTimeoutFact = _createSettingsFact(rtspTimeoutName);
+
+        _rtspTimeoutFact->setVisible(
+#ifdef QGC_GST_STREAMING
+            true
+#else
+            false
+#endif
+        );
+
+        connect(_rtspTimeoutFact, &Fact::valueChanged, this, &VideoSettings::_configChanged);
+    }
+    return _rtspTimeoutFact;
 }
 
 bool VideoSettings::streamConfigured(void)
@@ -228,3 +242,30 @@ void VideoSettings::_configChanged(QVariant)
 {
     emit streamConfiguredChanged(streamConfigured());
 }
+
+#ifdef QGC_GST_STREAMING
+void VideoSettings::_setForceVideoDecodeList()
+{
+    const QVariantList removeForceVideoDecodeList{
+#if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
+        GStreamer::VideoDecoderOptions::ForceVideoDecoderDirectX3D,
+        GStreamer::VideoDecoderOptions::ForceVideoDecoderVideoToolbox,
+#elif defined(Q_OS_WIN)
+        GStreamer::VideoDecoderOptions::ForceVideoDecoderVAAPI,
+        GStreamer::VideoDecoderOptions::ForceVideoDecoderVideoToolbox,
+#elif defined(Q_OS_MAC)
+        GStreamer::VideoDecoderOptions::ForceVideoDecoderDirectX3D,
+        GStreamer::VideoDecoderOptions::ForceVideoDecoderVAAPI,
+#elif defined(Q_OS_ANDROID)
+        GStreamer::VideoDecoderOptions::ForceVideoDecoderDirectX3D,
+        GStreamer::VideoDecoderOptions::ForceVideoDecoderVideoToolbox,
+        GStreamer::VideoDecoderOptions::ForceVideoDecoderVAAPI,
+        GStreamer::VideoDecoderOptions::ForceVideoDecoderNVIDIA,
+#endif
+    };
+
+    for (const auto &value : removeForceVideoDecodeList) {
+        _nameToMetaDataMap[forceVideoDecoderName]->removeEnumInfo(value);
+    }
+}
+#endif

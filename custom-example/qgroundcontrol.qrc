@@ -44,8 +44,8 @@
 		<file alias="QGroundControl/FlightDisplay/QGCVideoBackground.qml">../src/FlightDisplay/QGCVideoBackground.qml</file>
 		<file alias="FlightDisplayViewDummy.qml">../src/FlightDisplay/FlightDisplayViewDummy.qml</file>
 		<file alias="FlightDisplayViewUVC.qml">../src/FlightDisplay/FlightDisplayViewUVC.qml</file>
-		<file alias="QGroundControl/FlightDisplay/FlightDisplayViewGStreamer.qml">../src/FlightDisplay/FlightDisplayViewGStreamer.qml</file>
-		<file alias="QGroundControl/FlightDisplay/FlightDisplayViewQtMultimedia.qml">../src/FlightDisplay/FlightDisplayViewQtMultimedia.qml</file>
+		<file alias="QGroundControl/FlightDisplay/FlightDisplayViewGStreamer.qml">../src/VideoManager/VideoReceiver/GStreamer/FlightDisplayViewGStreamer.qml</file>
+		<file alias="QGroundControl/FlightDisplay/FlightDisplayViewQtMultimedia.qml">../src/VideoManager/VideoReceiver/QtMultimedia/FlightDisplayViewQtMultimedia.qml</file>
 		<file alias="FlyViewSettings.qml">../src/UI/preferences/FlyViewSettings.qml</file>
 		<file alias="FWLandingPatternEditor.qml">../src/PlanView/FWLandingPatternEditor.qml</file>
 		<file alias="GeneralSettings.qml">../src/UI/preferences/GeneralSettings.qml</file>
