@@ -7,50 +7,44 @@
  *
  ****************************************************************************/
 
-/// @file
-/// @brief SDL Joystick Interface
-
 #pragma once
 
 #include "Joystick.h"
 
-#define SDL_MAIN_HANDLED
+struct _SDL_Joystick;
+typedef struct _SDL_Joystick SDL_Joystick;
 
-#include <SDL.h>
+struct _SDL_GameController;
+typedef struct _SDL_GameController SDL_GameController;
 
-class MultiVehicleManager;
-
-/// @brief SDL Joystick Interface
 class JoystickSDL : public Joystick
 {
 public:
-    JoystickSDL(const QString& name, int axisCount, int buttonCount, int hatCount, int index, bool isGameController);
+    JoystickSDL(const QString &name, int axisCount, int buttonCount, int hatCount, int index, bool isGameController);
     ~JoystickSDL();
 
-    static QMap<QString, Joystick*> discover();
-    static bool init(void);
-
-    int index(void) const { return _index; }
+    int index() const { return _index; }
     void setIndex(int index) { _index = index; }
 
-    // This can be uncommented to hide the calibration buttons for gamecontrollers in the future
-    // bool requiresCalibration(void) final { return !_isGameController; }
+    // bool requiresCalibration() final { return !_isGameController; }
+
+    static QMap<QString, Joystick*> discover();
+    static bool init();
 
 private:
+    bool _open() final;
+    void _close() final;
+    bool _update() final;
+
+    bool _getButton(int i) final;
+    int  _getAxis(int i) final;
+    bool _getHat(int hat, int i) final;
+
     static void _loadGameControllerMappings();
 
-    bool _open      () final;
-    void _close     () final;
-    bool _update    () final;
+    bool _isGameController = false;
+    int _index = -1;
 
-    bool _getButton (int i) final;
-    int  _getAxis   (int i) final;
-    bool _getHat    (int hat,int i) final;
-
-    SDL_Joystick*       sdlJoystick;
-    SDL_GameController* sdlController;
-
-    bool    _isGameController;
-    int     _index;      ///< Index for SDL_JoystickOpen
-
+    SDL_Joystick *_sdlJoystick = nullptr;
+    SDL_GameController *_sdlController = nullptr;
 };

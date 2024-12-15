@@ -40,7 +40,7 @@ target_sources(Joystick
         JoystickSDL.h
 )
 
-target_compile_definitions(Joystick PRIVATE QGC_SDL_JOYSTICK)
+target_compile_definitions(Joystick PRIVATE QGC_SDL_JOYSTICK SDL_MAIN_HANDLED)
 
 FetchContent_Declare(SDL_GameControllerDB
     GIT_REPOSITORY https://github.com/mdqinc/SDL_GameControllerDB.git

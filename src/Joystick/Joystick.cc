@@ -22,7 +22,7 @@
 #include <QtCore/QSettings>
 #include <QtCore/QThread>
 
-// JoystickLog Category declaration moved to QGCLoggingCategory.cc to allow access in Vehicle
+QGC_LOGGING_CATEGORY(JoystickLog, "Joystick")
 QGC_LOGGING_CATEGORY(JoystickValuesLog, "JoystickValuesLog")
 
 int Joystick::_transmitterMode = 2;
