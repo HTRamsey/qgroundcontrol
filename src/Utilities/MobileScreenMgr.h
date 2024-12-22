@@ -13,7 +13,8 @@
 
 #if defined(Q_OS_ANDROID) || defined(Q_OS_IOS)
 
-namespace MobileScreenMgr {
+namespace MobileScreenMgr
+{
     /// Turns on/off screen sleep on mobile devices
     void setKeepScreenOn(bool keepScreenOn);
 };
