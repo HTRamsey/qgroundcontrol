@@ -29,13 +29,8 @@ qt_add_library(Utilities STATIC
     StateMachine.h
 )
 
-if(MOBILE)
-    target_sources(Utilities PRIVATE MobileScreenMgr.h)
-    if(ANDROID)
-        target_sources(Utilities PRIVATE MobileScreenMgr.cc)
-    elseif(IOS)
-        target_sources(Utilities PRIVATE MobileScreenMgr.mm)
-    endif()
+if(IOS)
+    target_sources(Utilities PRIVATE MobileScreenMgr.mm MobileScreenMgr.h)
 endif()
 
 target_include_directories(Utilities PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
