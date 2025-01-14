@@ -9,23 +9,20 @@
 
 #pragma once
 
-#include <QtCore/QVector>
 #include <QtCore/QLoggingCategory>
 
 Q_DECLARE_LOGGING_CATEGORY(MAVLinkStreamConfigLog)
 
-/**
- * @class MAVLinkStreamConfig
- * Allows to configure a set of mavlink streams to a specific rate,
- * and restore back to default.
- * Note that only one set is active at a time.
- */
+/// Allows to configure a set of mavlink streams to a specific rate,
+/// and restore back to default.
+/// Note that only one set is active at a time.
 class MAVLinkStreamConfig
 {
 public:
     using SetMessageIntervalCb = std::function<void(int messageId, int rate)>;
 
-    MAVLinkStreamConfig(const SetMessageIntervalCb& messageIntervalCb);
+    MAVLinkStreamConfig(const SetMessageIntervalCb &messageIntervalCb);
+    ~MAVLinkStreamConfig();
 
     void setHighRateRateAndAttitude();
     void setHighRateVelAndPos();
@@ -34,6 +31,7 @@ public:
     void restoreDefaults();
 
     void gotSetMessageIntervalAck();
+
 private:
     enum class State {
         Idle,
@@ -51,11 +49,11 @@ private:
     void setNextState(State state);
 
     State _state{State::Idle};
-    QVector<DesiredStreamRate> _desiredRates;
-    QVector<int> _changedIds;
+    QList<DesiredStreamRate> _desiredRates;
+    QList<int> _changedIds;
 
     State _nextState{State::Idle};
-    QVector<DesiredStreamRate> _nextDesiredRates;
+    QList<DesiredStreamRate> _nextDesiredRates;
 
     const SetMessageIntervalCb _messageIntervalCb;
 };

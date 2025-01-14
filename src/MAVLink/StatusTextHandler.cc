@@ -8,7 +8,7 @@
  ****************************************************************************/
 
 #include "StatusTextHandler.h"
-#include <QGCLoggingCategory.h>
+#include "QGCLoggingCategory.h"
 
 #include <QtCore/QTimer>
 #include <QtCore/QDateTime>
