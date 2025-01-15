@@ -541,8 +541,8 @@ install(
 )
 
 set(deploy_tool_options_arg "")
-if(APPLE)
-    set(deploy_tool_options_arg -qmldir=${CMAKE_SOURCE_DIR}/src -hardened-runtime -timestamp -appstore-compliant)
+if(MACOS)
+    set(deploy_tool_options_arg -qmldir=${CMAKE_SOURCE_DIR}/src -hardened-runtime -timestamp -appstore-compliant) # -dmg
 endif()
 
 qt_generate_deploy_qml_app_script(

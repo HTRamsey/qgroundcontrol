@@ -27,9 +27,14 @@ file(REMOVE ${REMOVE_LIB_FILES})
 file(REMOVE_RECURSE ${BUNDLE_FRAMEWORK_PATH}/GStreamer.framework/Versions/1.0/lib/gstreamer-1.0/include)
 file(REMOVE_RECURSE ${BUNDLE_FRAMEWORK_PATH}/GStreamer.framework/Versions/1.0/lib/gstreamer-1.0/pkgconfig)
 
+# execute_process(COMMAND otool -L ${SYSTEM_FRAMEWORK_PATH}/GStreamer.framework/GStreamer)
+
 # Fix up library paths to point into bundle
-execute_process(COMMAND ln -sf ${BUNDLE_FRAMEWORK_PATH} ${BUNDLE_FRAMEWORK_PATH}/GStreamer.framework/Versions/1.0/libexec/Frameworks)
+execute_process(COMMAND ln -sf ${BUNDLE_FRAMEWORK_PATH} ${BUNDLE_FRAMEWORK_PATH}/GStreamer.framework/Versions/1.0/libexec)
+execute_process(COMMAND install_name_tool -id @executable_path/../Frameworks/GStreamer.framework/Versions/1.0/lib/GStreamer staging/${TARGET_NAME}.app/Contents/Frameworks/GStreamer.framework/Versions/1.0/GStreamer)
 execute_process(COMMAND install_name_tool -change ${SYSTEM_FRAMEWORK_PATH}/GStreamer.framework/Versions/1.0/lib/GStreamer @executable_path/../Frameworks/GStreamer.framework/Versions/1.0/lib/GStreamer staging/${TARGET_NAME}.app/Contents/MacOS/${TARGET_NAME})
+
+execute_process(COMMAND otool -L staging/${TARGET_NAME}.app/Contents/MacOS/${TARGET_NAME})
 
 # include(BundleUtilities)
 # include(CMakePrintHelpers)
