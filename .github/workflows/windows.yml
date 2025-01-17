@@ -39,6 +39,10 @@ jobs:
       SCCACHE_GHA_ENABLED: "true"
 
     steps:
+      - name: Disk info
+        shell: pwsh
+        run: Get-PSDrive
+
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
@@ -118,6 +122,10 @@ jobs:
               -DQT_HOST_PATH="${{ env.QT_ROOT_DIR }}/../msvc2022_64"
               -DQT_DEBUG_FIND_PACKAGE=ON
               -DQGC_STABLE_BUILD=${{ github.ref_type == 'tag' || contains(github.ref, 'Stable') && 'ON' || 'OFF' }}
+
+      - name: Disk info
+        shell: pwsh
+        run: Get-PSDrive
 
       - name: Build
         working-directory: ${{ runner.temp }}\shadow_build_dir

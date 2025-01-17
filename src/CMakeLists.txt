@@ -128,6 +128,25 @@ endif()
 
 target_precompile_headers(QGC
     PRIVATE
-        ${CMAKE_SOURCE_DIR}/src/pch.h
+        <QtCore/QFile>
+        <QtCore/QRegularExpression>
+        <QtGui/QFontDatabase>
+        <QtGui/QIcon>
+        <QtNetwork/QNetworkProxyFactory>
+        <QtQml/QQmlApplicationEngine>
+        <QtQml/QQmlContext>
+        <QtQuick/QQuickImageProvider>
+        <QtQuick/QQuickWindow>
+        <QtQuickControls2/QQuickStyle>
+        ${CMAKE_CURRENT_SOURCE_DIR}/pch.h
+    PUBLIC
         <QtWidgets/QApplication>
+        <QtCore/QTimer>
+        <QtCore/QElapsedTimer>
+        <QtCore/QMap>
+        <QtCore/QSet>
+        <QtCore/QEvent>
+        <QtCore/QMetaMethod>
+        <QtCore/QMetaObject>
+        <QtCore/QTranslator>
 )
