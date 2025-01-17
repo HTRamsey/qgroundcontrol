@@ -39,6 +39,7 @@ jobs:
       QT_ANDROID_KEYSTORE_STORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       QT_ANDROID_KEYSTORE_KEY_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
       QT_ANDROID_ABIS: 'arm64-v8a'
+      SCCACHE_GHA_ENABLED: "true"
 
     steps:
       - name: Checkout repo

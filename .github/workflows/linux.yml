@@ -36,6 +36,7 @@ jobs:
       PACKAGE: QGroundControl-x86_64
       QT_VERSION: 6.8.1
       GST_VERSION: 1.22.12
+      SCCACHE_GHA_ENABLED: "true"
 
     steps:
       - name: Checkout repo
@@ -72,15 +73,18 @@ jobs:
           cd ccache-*-linux-x86_64
           sudo make install
 
+      - name: Set Up sccache
+        uses: mozilla-actions/sccache-action@v0.0.7
+
       - name: Set Up Cache
         uses: hendrikmuhs/ccache-action@main
         with:
           create-symlink: true
           key: ${{ runner.os }}-${{ matrix.BuildType }}
           max-size: 1G
+          variant: sccache
           save: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
           verbose: 1
-          evict-old-files: 'job'
 
       - name: Install Qt for Linux (x64)
         uses: jurplel/install-qt-action@v4

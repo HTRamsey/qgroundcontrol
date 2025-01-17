@@ -35,6 +35,7 @@ jobs:
       PACKAGE: QGroundControl
       QT_VERSION: 6.8.1
       GST_VERSION: 1.22.12
+      SCCACHE_GHA_ENABLED: "true"
 
     steps:
       - name: Checkout repo
@@ -67,14 +68,17 @@ jobs:
           done
           echo "PKG_CONFIG_PATH=/Library/Frameworks/GStreamer.framework/lib/pkgconfig:/Library/Frameworks/GStreamer.framework/lib/gstreamer-1.0/pkgconfig:${{ env.PKG_CONFIG_PATH }}" >> "$GITHUB_ENV"
 
+      - name: Set Up sccache
+        uses: mozilla-actions/sccache-action@v0.0.7
+
       - name: Set Up Cache
         uses: hendrikmuhs/ccache-action@main
         with:
           key: ${{ runner.os }}-${{ matrix.BuildType }}
           max-size: 1G
+          variant: sccache
           save: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
           verbose: 1
-          evict-old-files: 'job'
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
