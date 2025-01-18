@@ -1,6 +1,6 @@
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Qml Quick)
 
-set(GST_COMPONENTS Allocators App Audio Codecparsers Controller Fft GlEGL GlPrototypes GlWayland GlX11 Mpegts Net Pbutils Photography Riff Rtp Rtsp Sdp Tag Va)
+set(GST_COMPONENTS Allocators App Audio Codecparsers Controller Fft GlEGL GlPrototypes GlWayland GlX11 Mpegts Net Pbutils Photography Play Riff Rtp Rtsp Sdp Tag Va)
 find_package(GStreamer REQUIRED COMPONENTS OPTIONAL_COMPONENTS ${GST_COMPONENTS})
 
 qt_add_library(gstqml6gl STATIC)
@@ -18,7 +18,7 @@ target_link_libraries(gstqml6gl
 
 foreach(component IN LISTS GST_COMPONENTS)
     if(GStreamer_${component}_FOUND)
-        target_link_libraries(gstqml6gl INTERFACE GStreamer::${component})
+        target_link_libraries(gstqml6gl PUBLIC GStreamer::${component})
     endif()
 endforeach()
 
@@ -71,11 +71,7 @@ elseif(MACOS)
         target_compile_definitions(gstqml6gl PUBLIC QGC_GST_MACOS_FRAMEWORK)
     endif()
 elseif(ANDROID)
-    if(CMAKE_HOST_WIN32)
-        cmake_path(CONVERT "${GSTREAMER_PREFIX}/share/gst-android/ndk-build/tools/windows/*.dll" TO_CMAKE_PATH_LIST GST_WIN_TOOLS_PATH)
-        file(GLOB GST_WIN_TOOLS ${GST_WIN_TOOLS_PATH})
-        install(FILES ${GST_WIN_TOOLS} DESTINATION ${CMAKE_INSTALL_BINDIR})
-    endif()
+
 endif()
 
 ################################################################################
