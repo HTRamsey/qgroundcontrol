@@ -16,7 +16,6 @@ target_link_libraries(VehicleSetup
         Settings
         Utilities
         Vehicle
-        VehicleComponents
     PUBLIC
         Qt6::Core
         Qt6::Gui
