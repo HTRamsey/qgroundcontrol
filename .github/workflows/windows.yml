@@ -36,7 +36,7 @@ jobs:
       PACKAGE: QGroundControl-installer
       QT_VERSION: 6.8.1
       GST_VERSION: 1.22.12
-      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_GHA_ENABLED: true
 
     steps:
       - name: Checkout repo
