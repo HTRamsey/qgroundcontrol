@@ -41,6 +41,7 @@
 #include <windows.h>
 #include <iostream>
 
+
 /// @brief CRT Report Hook installed using _CrtSetReportHook. We install this hook when
 /// we don't want asserts to pop a dialog on windows.
 int WindowsCrtReportHook(int reportType, char* message, int* returnValue)
