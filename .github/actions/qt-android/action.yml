@@ -53,20 +53,12 @@ runs:
       run: sdkmanager --update
       shell: bash
 
-    - name: Set Up Cache
-      uses: hendrikmuhs/ccache-action@main
+    - name: Setup Caching
+      uses: ./.github/actions/cache
       with:
-        create-symlink: ${{ runner.os != 'Windows' }}
-        key: ${{ runner.os }}-Android-${{ matrix.BuildType }}
-        max-size: 1G
-        save: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
-        verbose: 1
-        evict-old-files: 'job'
-
-    - uses: actions/cache@v4
-      with:
-        path: ${{ inputs.cpm-cache }}
-        key: ${{ github.workflow }}-cpm-modules-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake') }}
+        host: ${{ inputs.host }}
+        target: ${{ inputs.arch }}
+        build-type: ${{ matrix.BuildType }}
 
     - name: Install Qt for ${{ runner.os }}
       uses: jurplel/install-qt-action@v4

@@ -36,7 +36,6 @@ jobs:
       ARTIFACT: QGroundControl-installer.exe
       QT_VERSION: 6.8.1
       GST_VERSION: 1.22.12
-      SCCACHE_GHA_ENABLED: "true"
 
     steps:
       - name: Checkout repo
@@ -61,17 +60,12 @@ jobs:
         with:
           version: ${{ env.GST_VERSION }}
 
-      - name: Set Up SCCache
-        uses: mozilla-actions/sccache-action@v0.0.7
-
-      - name: Set Up Cache
-        uses: hendrikmuhs/ccache-action@main
+      - name: Setup Caching
+        uses: ./.github/actions/cache
         with:
-          key: ${{ runner.os }}-${{ matrix.Arch }}-${{ matrix.BuildType }}-custom
-          max-size: 1G
-          variant: sccache
-          save: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
-          verbose: 1
+          host: windows
+          target: win64_msvc2022_64
+          build-type: ${{ matrix.BuildType }}
 
       - name: Install Qt for Windows (x64)
         if: matrix.Arch == 'x64'
