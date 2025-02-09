@@ -16,37 +16,9 @@
 #include <QtCore/QPointF>
 #include <QtPositioning/QGeoCoordinate>
 
-class ADSBVehicleManager;
-class FactGroup;
-class LinkManager;
-class MissionCommandTree;
-class MultiVehicleManager;
-class QGCCorePlugin;
-class QGCMapEngineManager;
 class QGCPalette;
-class QGCPositionManager;
-class SettingsManager;
-class VideoManager;
-class UTMSPManager;
-class AirLinkManager;
 
-Q_MOC_INCLUDE("ADSBVehicleManager.h")
-Q_MOC_INCLUDE("FactGroup.h")
-Q_MOC_INCLUDE("LinkManager.h")
-Q_MOC_INCLUDE("MissionCommandTree.h")
-Q_MOC_INCLUDE("MultiVehicleManager.h")
-Q_MOC_INCLUDE("QGCCorePlugin.h")
-Q_MOC_INCLUDE("QGCMapEngineManager.h")
 Q_MOC_INCLUDE("QGCPalette.h")
-Q_MOC_INCLUDE("PositionManager.h")
-Q_MOC_INCLUDE("SettingsManager.h")
-Q_MOC_INCLUDE("VideoManager.h")
-#ifdef QGC_UTM_ADAPTER
-Q_MOC_INCLUDE("UTMSPManager.h")
-#endif
-#ifndef QGC_AIRLINK_DISABLED
-Q_MOC_INCLUDE("AirLinkManager.h")
-#endif
 
 class QGroundControlQmlGlobal : public QObject
 {
@@ -69,21 +41,6 @@ public:
     Q_ENUM(AltMode)
 
     Q_PROPERTY(QString              appName                 READ    appName                 CONSTANT)
-    Q_PROPERTY(LinkManager*         linkManager             READ    linkManager             CONSTANT)
-    Q_PROPERTY(MultiVehicleManager* multiVehicleManager     READ    multiVehicleManager     CONSTANT)
-    Q_PROPERTY(QGCMapEngineManager* mapEngineManager        READ    mapEngineManager        CONSTANT)
-    Q_PROPERTY(QGCPositionManager*  qgcPositionManger       READ    qgcPositionManger       CONSTANT)
-    Q_PROPERTY(VideoManager*        videoManager            READ    videoManager            CONSTANT)
-    Q_PROPERTY(SettingsManager*     settingsManager         READ    settingsManager         CONSTANT)
-    Q_PROPERTY(ADSBVehicleManager*  adsbVehicleManager      READ    adsbVehicleManager      CONSTANT)
-    Q_PROPERTY(QGCCorePlugin*       corePlugin              READ    corePlugin              CONSTANT)
-    Q_PROPERTY(MissionCommandTree*  missionCommandTree      READ    missionCommandTree      CONSTANT)
-#ifndef QGC_NO_SERIAL_LINK
-    Q_PROPERTY(FactGroup*           gpsRtk                  READ    gpsRtkFactGroup         CONSTANT)
-#endif
-#ifndef QGC_AIRLINK_DISABLED
-    Q_PROPERTY(AirLinkManager*      airlinkManager          READ    airlinkManager          CONSTANT)
-#endif
     Q_PROPERTY(bool                 airlinkSupported        READ    airlinkSupported        CONSTANT)
     Q_PROPERTY(QGCPalette*          globalPalette           MEMBER  _globalPalette          CONSTANT)   ///< This palette will always return enabled colors
     Q_PROPERTY(QmlUnitsConversion*  unitsConversion         READ    unitsConversion         CONSTANT)
@@ -123,10 +80,6 @@ public:
 
     Q_PROPERTY(bool              utmspSupported           READ    utmspSupported              CONSTANT)
 
-#ifdef QGC_UTM_ADAPTER
-    Q_PROPERTY(UTMSPManager*     utmspManager             READ    utmspManager                CONSTANT)
-#endif
-
     Q_INVOKABLE void    saveGlobalSetting       (const QString& key, const QString& value);
     Q_INVOKABLE QString loadGlobalSetting       (const QString& key, const QString& defaultValue);
     Q_INVOKABLE void    saveBoolGlobalSetting   (const QString& key, bool value);
@@ -163,24 +116,11 @@ public:
     // Property accessors
 
     QString                 appName             ();
-    LinkManager*            linkManager         ()  { return _linkManager; }
-    MultiVehicleManager*    multiVehicleManager ()  { return _multiVehicleManager; }
-    QGCMapEngineManager*    mapEngineManager    ()  { return _mapEngineManager; }
-    QGCPositionManager*     qgcPositionManger   ()  { return _qgcPositionManager; }
-    MissionCommandTree*     missionCommandTree  ()  { return _missionCommandTree; }
-    VideoManager*           videoManager        ()  { return _videoManager; }
-    QGCCorePlugin*          corePlugin          ()  { return _corePlugin; }
-    SettingsManager*        settingsManager     ()  { return _settingsManager; }
-#ifndef QGC_NO_SERIAL_LINK
-    FactGroup*              gpsRtkFactGroup     ()  { return _gpsRtkFactGroup; }
-#endif
-    ADSBVehicleManager*     adsbVehicleManager  ()  { return _adsbVehicleManager; }
     QmlUnitsConversion*     unitsConversion     ()  { return &_unitsConversion; }
     static QGeoCoordinate   flightMapPosition   ()  { return _coord; }
     static double           flightMapZoom       ()  { return _zoom; }
 
 #ifndef QGC_AIRLINK_DISABLED
-    AirLinkManager*         airlinkManager      ()  { return _airlinkManager; }
     bool                    airlinkSupported    ()  { return true; }
 #else
     bool                    airlinkSupported    ()  { return false; }
@@ -228,7 +168,6 @@ public:
     QString qgcVersion              (void) const;
 
 #ifdef QGC_UTM_ADAPTER
-    UTMSPManager* utmspManager() {return _utmspManager;}
     bool utmspSupported() { return true; }
 #else
     bool utmspSupported() { return false; }
@@ -242,26 +181,7 @@ signals:
     void flightMapZoomChanged           (double flightMapZoom);
 
 private:
-    QGCMapEngineManager*    _mapEngineManager       = nullptr;
-    ADSBVehicleManager*     _adsbVehicleManager     = nullptr;
-    QGCPositionManager*     _qgcPositionManager     = nullptr;
-    MissionCommandTree*     _missionCommandTree     = nullptr;
-    VideoManager*           _videoManager           = nullptr;
-    LinkManager*            _linkManager            = nullptr;
-    MultiVehicleManager*    _multiVehicleManager    = nullptr;
-    SettingsManager*        _settingsManager        = nullptr;
-    QGCCorePlugin*          _corePlugin             = nullptr;
     QGCPalette*             _globalPalette          = nullptr;
-#ifndef QGC_NO_SERIAL_LINK
-    FactGroup*              _gpsRtkFactGroup        = nullptr;
-#endif
-#ifndef QGC_AIRLINK_DISABLED
-    AirLinkManager*         _airlinkManager         = nullptr;
-#endif
-#ifdef QGC_UTM_ADAPTER
-    UTMSPManager*           _utmspManager           = nullptr;
-#endif
-
     double                  _flightMapInitialZoom   = 17.0;
     QmlUnitsConversion      _unitsConversion;
 

@@ -64,33 +64,29 @@ target_link_libraries(QmlControls
     PRIVATE
         Qt6::Concurrent
         Qt6::Location
+        API
+        Comms
+        FactControls
         FirmwarePlugin
         Geo
         GPS
         MockLink
+        PositionManager
+        QGC
+        QGCLocation
+        Settings
+        Vehicle
     PUBLIC
         Qt6::Core
         Qt6::Gui
         Qt6::Positioning
         Qt6::QmlIntegration
         Qt6::Quick
-        ADSB
-        AirLink
-        API
-        Comms
-        FactControls
         FactSystem
         MAVLink
         MissionManager
-        PositionManager
-        QGC
-        QGCLocation
-        Settings
         Terrain
         Utilities
-        UTMSP
-        Vehicle
-        VideoManager
 )
 
 target_include_directories(QmlControls PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

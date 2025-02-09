@@ -12,6 +12,8 @@ qt_add_library(API STATIC
 target_link_libraries(API
     PRIVATE
         Qt6::Qml
+        ADSB
+        AirLink
         AnalyzeView
         FactSystem
         GStreamerReceiver
@@ -20,6 +22,7 @@ target_link_libraries(API
         QtMultimediaReceiver
         Settings
         Utilities
+        UTMSP
         VideoManager
         VideoReceiver
     PUBLIC

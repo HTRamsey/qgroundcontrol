@@ -18,6 +18,9 @@
 #include "InstrumentValueData.h"
 #include "JoystickManager.h"
 #include "LogDownloadController.h"
+#include "ADSBVehicleManager.h"
+#include "QGCMapEngineManager.h"
+#include "LinkManager.h"
 #include "MAVLinkLib.h"
 #include "QGCLoggingCategory.h"
 #include "QGCOptions.h"
@@ -239,6 +242,24 @@ QQmlApplicationEngine *QGCCorePlugin::createQmlApplicationEngine(QObject *parent
     qmlEngine->rootContext()->setContextProperty(QStringLiteral("joystickManager"), JoystickManager::instance());
     qmlEngine->rootContext()->setContextProperty(QStringLiteral("debugMessageModel"), AppMessages::getModel());
     qmlEngine->rootContext()->setContextProperty(QStringLiteral("logDownloadController"), LogDownloadController::instance());
+    qmlEngine->rootContext()->setContextProperty(QStringLiteral("adsbVehicleManager"), ADSBVehicleManager::instance());
+    qmlEngine->rootContext()->setContextProperty(QStringLiteral("mapEngineManager"), QGCMapEngineManager::instance());
+    qmlEngine->rootContext()->setContextProperty(QStringLiteral("linkManager"), LinkManager::instance());
+    qmlEngine->rootContext()->setContextProperty(QStringLiteral("multiVehicleManager"), MultiVehicleManager::instance());
+    qmlEngine->rootContext()->setContextProperty(QStringLiteral("qgcPositionManager"), QGCPositionManager::instance());
+    qmlEngine->rootContext()->setContextProperty(QStringLiteral("missionCommandTree"), MissionCommandTree::instance());
+    qmlEngine->rootContext()->setContextProperty(QStringLiteral("videoManager"), VideoManager::instance());
+    qmlEngine->rootContext()->setContextProperty(QStringLiteral("settingsManager"), SettingsManager::instance());
+    qmlEngine->rootContext()->setContextProperty(QStringLiteral("corePlugin"), this);
+#ifndef QGC_NO_SERIAL_LINK
+    qmlEngine->rootContext()->setContextProperty(QStringLiteral("gpsRtkFactGroup"), gpsRtkFactGroup);
+#endif
+#ifndef QGC_AIRLINK_DISABLED
+    qmlEngine->rootContext()->setContextProperty(QStringLiteral("airlinkManager"), AirLinkManager::instance());
+#endif
+#ifdef QGC_UTM_ADAPTER
+    qmlEngine->rootContext()->setContextProperty(QStringLiteral("utmspManager"), UTMSPManager::instance());
+#endif
     return qmlEngine;
 }
 

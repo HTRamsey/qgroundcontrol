@@ -10,17 +10,11 @@
 #include "QGroundControlQmlGlobal.h"
 
 #include "QGCApplication.h"
-#include "QGCCorePlugin.h"
-#include "LinkManager.h"
 #include "MAVLinkProtocol.h"
 #include "FirmwarePluginManager.h"
 #include "AppSettings.h"
 #include "FlightMapSettings.h"
 #include "SettingsManager.h"
-#include "PositionManager.h"
-#include "QGCMapEngineManager.h"
-#include "ADSBVehicleManager.h"
-#include "MissionCommandTree.h"
 #include "HorizontalFactValueGrid.h"
 #include "FlightPathSegment.h"
 #include "InstrumentValueData.h"
@@ -41,20 +35,8 @@
 #include "TerrainProfile.h"
 #include "ToolStripAction.h"
 #include "ToolStripActionList.h"
-#include "VideoManager.h"
-#include "MultiVehicleManager.h"
-#ifndef QGC_NO_SERIAL_LINK
-#include "GPSManager.h"
-#include "GPSRtk.h"
-#endif
 #ifdef QT_DEBUG
 #include "MockLink.h"
-#endif
-#ifndef QGC_AIRLINK_DISABLED
-#include "AirLinkManager.h"
-#endif
-#ifdef QGC_UTM_ADAPTER
-#include "UTMSPManager.h"
 #endif
 
 #include <QtCore/QSettings>
@@ -106,25 +88,7 @@ void QGroundControlQmlGlobal::registerQmlTypes()
 
 QGroundControlQmlGlobal::QGroundControlQmlGlobal(QObject *parent)
     : QObject(parent)
-    , _mapEngineManager(QGCMapEngineManager::instance())
-    , _adsbVehicleManager(ADSBVehicleManager::instance())
-    , _qgcPositionManager(QGCPositionManager::instance())
-    , _missionCommandTree(MissionCommandTree::instance())
-    , _videoManager(VideoManager::instance())
-    , _linkManager(LinkManager::instance())
-    , _multiVehicleManager(MultiVehicleManager::instance())
-    , _settingsManager(SettingsManager::instance())
-    , _corePlugin(QGCCorePlugin::instance())
     , _globalPalette(new QGCPalette(this))
-#ifndef QGC_NO_SERIAL_LINK
-    , _gpsRtkFactGroup(GPSManager::instance()->gpsRtk()->gpsRtkFactGroup())
-#endif
-#ifndef QGC_AIRLINK_DISABLED
-    , _airlinkManager(AirLinkManager::instance())
-#endif
-#ifdef QGC_UTM_ADAPTER
-    , _utmspManager(UTMSPManager::instance())
-#endif
 {
     // We clear the parent on this object since we run into shutdown problems caused by hybrid qml app. Instead we let it leak on shutdown.
     // setParent(nullptr);
@@ -392,12 +356,12 @@ int QGroundControlQmlGlobal::mavlinkSystemID()
 
 QString QGroundControlQmlGlobal::elevationProviderName()
 {
-    return _settingsManager->flightMapSettings()->elevationMapProvider()->rawValue().toString();
+    return SettingsManager::instance()->flightMapSettings()->elevationMapProvider()->rawValue().toString();
 }
 
 QString QGroundControlQmlGlobal::elevationProviderNotice()
 {
-    return _settingsManager->flightMapSettings()->elevationMapProvider()->rawValue().toString();
+    return SettingsManager::instance()->flightMapSettings()->elevationMapProvider()->rawValue().toString();
 }
 
 QString QGroundControlQmlGlobal::parameterFileExtension() const
