@@ -1,4 +1,4 @@
-find_package(Qt6 REQUIRED COMPONENTS Core Positioning)
+find_package(Qt6 REQUIRED COMPONENTS Core)
 
 qt_add_library(Gimbal STATIC
     GimbalController.cc
@@ -8,12 +8,12 @@ qt_add_library(Gimbal STATIC
 target_link_libraries(Gimbal
     PRIVATE
         Comms
+        FactSystem
         Settings
         Utilities
         Vehicle
     PUBLIC
         Qt6::Core
-        FactSystem
         MAVLink
         QmlControls
 )
