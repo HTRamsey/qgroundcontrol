@@ -7,10 +7,6 @@
  *
  ****************************************************************************/
 
-
-/// @file
-///     @author Don Gagne <don@thegagnes.com>
-
 #include "FirmwarePluginManager.h"
 #include "FirmwarePlugin.h"
 #include "FirmwarePluginFactory.h"

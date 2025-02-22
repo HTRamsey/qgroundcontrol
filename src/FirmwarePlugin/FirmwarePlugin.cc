@@ -23,25 +23,19 @@
 #include <QtCore/QRegularExpression>
 #include <QtCore/QThread>
 
-QGC_LOGGING_CATEGORY(FirmwarePluginLog, "FirmwarePluginLog")
+QGC_LOGGING_CATEGORY(FirmwarePluginLog, "qgc.firmwareplugin.firmwareplugin")
 
-const QString guided_mode_not_supported_by_vehicle = QObject::tr("Guided mode not supported by Vehicle.");
+static const QString guided_mode_not_supported_by_vehicle = QObject::tr("Guided mode not supported by Vehicle.");
 
-FirmwarePlugin::FirmwarePlugin(void)
+FirmwarePlugin::FirmwarePlugin(QObject *parent)
+    : QObject(parent)
 {
-    qmlRegisterType<RadioComponentController>       ("QGroundControl.Controllers",                       1, 0, "RadioComponentController");
+    (void) qmlRegisterType<RadioComponentController>("QGroundControl.Controllers", 1, 0, "RadioComponentController");
 }
 
-AutoPilotPlugin* FirmwarePlugin::autopilotPlugin(Vehicle* vehicle)
+AutoPilotPlugin *FirmwarePlugin::autopilotPlugin(Vehicle *vehicle)
 {
     return new GenericAutoPilotPlugin(vehicle, vehicle);
-}
-
-bool FirmwarePlugin::isCapable(const Vehicle *vehicle, FirmwareCapabilities capabilities)
-{
-    Q_UNUSED(vehicle);
-    Q_UNUSED(capabilities);
-    return false;
 }
 
 QList<VehicleComponent*> FirmwarePlugin::componentsForVehicle(AutoPilotPlugin* vehicle)
@@ -53,28 +47,29 @@ QList<VehicleComponent*> FirmwarePlugin::componentsForVehicle(AutoPilotPlugin* v
 
 QString FirmwarePlugin::flightMode(uint8_t base_mode, uint32_t custom_mode) const
 {
-    QString flightMode;
-
-    struct Bit2Name {
-        uint8_t     baseModeBit;
-        const char* name;
-    };
-    static const struct Bit2Name rgBit2Name[] = {
-    { MAV_MODE_FLAG_MANUAL_INPUT_ENABLED,   "Manual" },
-    { MAV_MODE_FLAG_STABILIZE_ENABLED,      "Stabilize" },
-    { MAV_MODE_FLAG_GUIDED_ENABLED,         "Guided" },
-    { MAV_MODE_FLAG_AUTO_ENABLED,           "Auto" },
-    { MAV_MODE_FLAG_TEST_ENABLED,           "Test" },
-};
-
     Q_UNUSED(custom_mode);
 
+    struct Bit2Name {
+        const uint8_t baseModeBit;
+        const char *name;
+    };
+
+    static constexpr Bit2Name rgBit2Name[] = {
+        { MAV_MODE_FLAG_MANUAL_INPUT_ENABLED, "Manual" },
+        { MAV_MODE_FLAG_STABILIZE_ENABLED, "Stabilize" },
+        { MAV_MODE_FLAG_GUIDED_ENABLED, "Guided" },
+        { MAV_MODE_FLAG_AUTO_ENABLED, "Auto" },
+        { MAV_MODE_FLAG_TEST_ENABLED, "Test" },
+    };
+
+
+    QString flightMode;
     if (base_mode == 0) {
         flightMode = "PreFlight";
     } else if (base_mode & MAV_MODE_FLAG_CUSTOM_MODE_ENABLED) {
         flightMode = _modeEnumToString.value(custom_mode, QString("Custom:0x%1").arg(custom_mode, 0, 16));
     } else {
-        for (size_t i=0; i<sizeof(rgBit2Name)/sizeof(rgBit2Name[0]); i++) {
+        for (size_t i = 0; std::size(rgBit2Name); i++) {
             if (base_mode & rgBit2Name[i].baseModeBit) {
                 if (i != 0) {
                     flightMode += " ";
@@ -93,75 +88,9 @@ bool FirmwarePlugin::setFlightMode(const QString& flightMode, uint8_t* base_mode
     Q_UNUSED(base_mode);
     Q_UNUSED(custom_mode);
 
-    qWarning() << "FirmwarePlugin::setFlightMode called on base class, not supported";
+    qCWarning(FirmwarePluginLog) << "FirmwarePlugin::setFlightMode called on base class, not supported";
 
     return false;
-}
-
-int FirmwarePlugin::defaultJoystickTXMode(void)
-{
-    return 2;
-}
-
-bool FirmwarePlugin::supportsThrottleModeCenterZero(void)
-{
-    // By default, this is supported
-    return true;
-}
-
-bool FirmwarePlugin::supportsNegativeThrust(Vehicle* /*vehicle*/)
-{
-    // By default, this is not supported
-    return false;
-}
-
-bool FirmwarePlugin::supportsRadio(void)
-{
-    return true;
-}
-
-bool FirmwarePlugin::supportsMotorInterference(void)
-{
-    return true;
-}
-
-bool FirmwarePlugin::supportsJSButton(void)
-{
-    return false;
-}
-
-bool FirmwarePlugin::adjustIncomingMavlinkMessage(Vehicle* vehicle, mavlink_message_t* message)
-{
-    Q_UNUSED(vehicle);
-    Q_UNUSED(message);
-    // Generic plugin does no message adjustment
-    return true;
-}
-
-void FirmwarePlugin::adjustOutgoingMavlinkMessageThreadSafe(Vehicle* /*vehicle*/, LinkInterface* /*outgoingLink*/, mavlink_message_t* /*message*/)
-{
-    // Generic plugin does no message adjustment
-}
-
-void FirmwarePlugin::initializeVehicle(Vehicle* vehicle)
-{
-    Q_UNUSED(vehicle);
-
-    // Generic Flight Stack is by definition "generic", so no extra work
-}
-
-bool FirmwarePlugin::sendHomePositionToVehicle(void)
-{
-    // Generic stack does not want home position sent in the first position.
-    // Subsequent sequence numbers must be adjusted.
-    // This is the mavlink spec default.
-    return false;
-}
-
-QList<MAV_CMD> FirmwarePlugin::supportedMissionCommands(QGCMAVLink::VehicleClass_t /* vehicleClass */) const
-{
-    // Generic supports all commands
-    return QList<MAV_CMD>();
 }
 
 QString FirmwarePlugin::missionCommandOverrides(QGCMAVLink::VehicleClass_t vehicleClass) const
@@ -180,65 +109,53 @@ QString FirmwarePlugin::missionCommandOverrides(QGCMAVLink::VehicleClass_t vehic
     case QGCMAVLink::VehicleClassRoverBoat:
         return QStringLiteral(":/json/MavCmdInfoRover.json");
     default:
-        qWarning() << "FirmwarePlugin::missionCommandOverrides called with bad VehicleClass_t:" << vehicleClass;
+        qCWarning(FirmwarePluginLog) << "FirmwarePlugin::missionCommandOverrides called with bad VehicleClass_t:" << vehicleClass;
         return QString();
     }
 }
 
-void FirmwarePlugin::_getParameterMetaDataVersionInfo(const QString& metaDataFile, int& majorVersion, int& minorVersion)
+void FirmwarePlugin::_getParameterMetaDataVersionInfo(const QString &metaDataFile, int &majorVersion, int &minorVersion)
 {
     Q_UNUSED(metaDataFile);
     majorVersion = -1;
     minorVersion = -1;
 }
 
-bool FirmwarePlugin::isGuidedMode(const Vehicle* vehicle) const
-{
-    // Not supported by generic vehicle
-    Q_UNUSED(vehicle);
-    return false;
-}
-
-void FirmwarePlugin::setGuidedMode(Vehicle* vehicle, bool guidedMode)
+void FirmwarePlugin::setGuidedMode(Vehicle *vehicle, bool guidedMode)
 {
     Q_UNUSED(vehicle);
     Q_UNUSED(guidedMode);
     qgcApp()->showAppMessage(guided_mode_not_supported_by_vehicle);
 }
 
-void FirmwarePlugin::pauseVehicle(Vehicle* vehicle)
+void FirmwarePlugin::pauseVehicle(Vehicle *vehicle)
 {
-    // Not supported by generic vehicle
     Q_UNUSED(vehicle);
     qgcApp()->showAppMessage(guided_mode_not_supported_by_vehicle);
 }
 
-void FirmwarePlugin::guidedModeRTL(Vehicle* vehicle, bool smartRTL)
+void FirmwarePlugin::guidedModeRTL(Vehicle *vehicle, bool smartRTL)
 {
-    // Not supported by generic vehicle
     Q_UNUSED(vehicle);
     Q_UNUSED(smartRTL);
     qgcApp()->showAppMessage(guided_mode_not_supported_by_vehicle);
 }
 
-void FirmwarePlugin::guidedModeLand(Vehicle* vehicle)
+void FirmwarePlugin::guidedModeLand(Vehicle *vehicle)
 {
-    // Not supported by generic vehicle
     Q_UNUSED(vehicle);
     qgcApp()->showAppMessage(guided_mode_not_supported_by_vehicle);
 }
 
-void FirmwarePlugin::guidedModeTakeoff(Vehicle* vehicle, double takeoffAltRel)
+void FirmwarePlugin::guidedModeTakeoff(Vehicle *vehicle, double takeoffAltRel)
 {
-    // Not supported by generic vehicle
     Q_UNUSED(vehicle);
     Q_UNUSED(takeoffAltRel);
     qgcApp()->showAppMessage(guided_mode_not_supported_by_vehicle);
 }
 
-void FirmwarePlugin::guidedModeGotoLocation(Vehicle* vehicle, const QGeoCoordinate& gotoCoord)
+void FirmwarePlugin::guidedModeGotoLocation(Vehicle *vehicle, const QGeoCoordinate &gotoCoord)
 {
-    // Not supported by generic vehicle
     Q_UNUSED(vehicle);
     Q_UNUSED(gotoCoord);
     qgcApp()->showAppMessage(guided_mode_not_supported_by_vehicle);
@@ -246,7 +163,6 @@ void FirmwarePlugin::guidedModeGotoLocation(Vehicle* vehicle, const QGeoCoordina
 
 void FirmwarePlugin::guidedModeChangeAltitude(Vehicle*, double, bool pauseVehicle)
 {
-    // Not supported by generic vehicle
     Q_UNUSED(pauseVehicle);
     qgcApp()->showAppMessage(guided_mode_not_supported_by_vehicle);
 }
@@ -254,14 +170,12 @@ void FirmwarePlugin::guidedModeChangeAltitude(Vehicle*, double, bool pauseVehicl
 void
 FirmwarePlugin::guidedModeChangeGroundSpeedMetersSecond(Vehicle*, double)
 {
-    // Not supported by generic vehicle
     qgcApp()->showAppMessage(guided_mode_not_supported_by_vehicle);
 }
 
 void
 FirmwarePlugin::guidedModeChangeEquivalentAirspeedMetersSecond(Vehicle*, double)
 {
-    // Not supported by generic vehicle
     qgcApp()->showAppMessage(guided_mode_not_supported_by_vehicle);
 }
 
@@ -273,41 +187,20 @@ void FirmwarePlugin::guidedModeChangeHeading(Vehicle *vehicle, const QGeoCoordin
 
 void FirmwarePlugin::startMission(Vehicle*)
 {
-    // Not supported by generic vehicle
     qgcApp()->showAppMessage(guided_mode_not_supported_by_vehicle);
 }
 
-const FirmwarePlugin::remapParamNameMajorVersionMap_t& FirmwarePlugin::paramNameRemapMajorVersionMap(void) const
+const FirmwarePlugin::remapParamNameMajorVersionMap_t &FirmwarePlugin::paramNameRemapMajorVersionMap(void) const
 {
     static const remapParamNameMajorVersionMap_t remap;
 
     return remap;
 }
 
-int FirmwarePlugin::remapParamNameHigestMinorVersionNumber(int) const
-{
-    return 0;
-}
-
-QString FirmwarePlugin::vehicleImageOpaque(const Vehicle*) const
-{
-    return QStringLiteral("/qmlimages/vehicleArrowOpaque.svg");
-}
-
-QString FirmwarePlugin::vehicleImageOutline(const Vehicle*) const
-{
-    return QStringLiteral("/qmlimages/vehicleArrowOutline.svg");
-}
-
-QVariant FirmwarePlugin::mainStatusIndicatorContentItem(const Vehicle*) const
-{
-    return QVariant();
-}
-
-const QVariantList& FirmwarePlugin::toolIndicators(const Vehicle*)
+const QVariantList &FirmwarePlugin::toolIndicators(const Vehicle*)
 {
     //-- Default list of indicators for all vehicles.
-    if(_toolIndicatorList.size() == 0) {
+    if (_toolIndicatorList.isEmpty()) {
         _toolIndicatorList = QVariantList({
             QVariant::fromValue(QUrl::fromUserInput("qrc:/qml/QGroundControl/Controls/FlightModeIndicator.qml")),
             QVariant::fromValue(QUrl::fromUserInput("qrc:/toolbar/MessageIndicator.qml")),
@@ -319,27 +212,24 @@ const QVariantList& FirmwarePlugin::toolIndicators(const Vehicle*)
             QVariant::fromValue(QUrl::fromUserInput("qrc:/toolbar/GimbalIndicator.qml")),
         });
     }
+
     return _toolIndicatorList;
 }
 
-const QVariantList& FirmwarePlugin::modeIndicators(const Vehicle*)
+const QVariantList &FirmwarePlugin::modeIndicators(const Vehicle*)
 {
     //-- Default list of indicators for all vehicles.
-    if(_modeIndicatorList.size() == 0) {
+    if (_modeIndicatorList.isEmpty()) {
         _modeIndicatorList = QVariantList({
             QVariant::fromValue(QUrl::fromUserInput("qrc:/toolbar/MultiVehicleSelector.qml")),
             QVariant::fromValue(QUrl::fromUserInput("qrc:/toolbar/LinkIndicator.qml")),
         });
     }
+
     return _modeIndicatorList;
 }
 
-QMap<QString, FactGroup*>* FirmwarePlugin::factGroups(void) {
-    // Generic plugin has no FactGroups
-    return nullptr;
-}
-
-bool FirmwarePlugin::_armVehicleAndValidate(Vehicle* vehicle)
+bool FirmwarePlugin::_armVehicleAndValidate(Vehicle *vehicle)
 {
     if (vehicle->armed()) {
         return true;
@@ -384,6 +274,7 @@ bool FirmwarePlugin::_setFlightModeAndValidate(Vehicle* vehicle, const QString& 
             QThread::msleep(100);
             QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
         }
+
         if (flightModeChanged) {
             break;
         }
@@ -393,7 +284,7 @@ bool FirmwarePlugin::_setFlightModeAndValidate(Vehicle* vehicle, const QString& 
 }
 
 
-void FirmwarePlugin::batteryConsumptionData(Vehicle* vehicle, int& mAhBattery, double& hoverAmps, double& cruiseAmps) const
+void FirmwarePlugin::batteryConsumptionData(Vehicle *vehicle, int &mAhBattery, double &hoverAmps, double &cruiseAmps) const
 {
     Q_UNUSED(vehicle);
     mAhBattery  = 0;
@@ -401,13 +292,7 @@ void FirmwarePlugin::batteryConsumptionData(Vehicle* vehicle, int& mAhBattery, d
     cruiseAmps  = 0;
 }
 
-QString FirmwarePlugin::autoDisarmParameter(Vehicle* vehicle)
-{
-    Q_UNUSED(vehicle);
-    return QString();
-}
-
-bool FirmwarePlugin::hasGimbal(Vehicle* vehicle, bool& rollSupported, bool& pitchSupported, bool& yawSupported)
+bool FirmwarePlugin::hasGimbal(Vehicle *vehicle, bool &rollSupported, bool &pitchSupported, bool &yawSupported) const
 {
     Q_UNUSED(vehicle);
     rollSupported = false;
@@ -421,15 +306,9 @@ QGCCameraManager* FirmwarePlugin::createCameraManager(Vehicle* vehicle)
     return new QGCCameraManager(vehicle);
 }
 
-MavlinkCameraControl* FirmwarePlugin::createCameraControl(const mavlink_camera_information_t *info, Vehicle *vehicle, int compID, QObject* parent)
+MavlinkCameraControl* FirmwarePlugin::createCameraControl(const mavlink_camera_information_t *info, Vehicle *vehicle, int compID, QObject *parent)
 {
     return new VehicleCameraControl(info, vehicle, compID, parent);
-}
-
-uint32_t FirmwarePlugin::highLatencyCustomModeTo32Bits(uint16_t hlCustomMode)
-{
-    // Standard implementation assumes no special handling. Upper part of 32 bit value is not used.
-    return hlCustomMode;
 }
 
 void FirmwarePlugin::checkIfIsLatestStable(Vehicle* vehicle)
@@ -439,6 +318,7 @@ void FirmwarePlugin::checkIfIsLatestStable(Vehicle* vehicle)
         qCDebug(FirmwarePluginLog) << "Skipping version check";
         return;
     }
+
     QString versionFile = _getLatestVersionFileUrl(vehicle);
     qCDebug(FirmwarePluginLog) << "Downloading" << versionFile;
     QGCFileDownload* downloader = new QGCFileDownload(this);
@@ -494,13 +374,13 @@ void FirmwarePlugin::_versionFileDownloadFinished(QString& remoteFile, QString& 
     }
 }
 
-int FirmwarePlugin::versionCompare(const Vehicle* vehicle, int major, int minor, int patch) const
+int FirmwarePlugin::versionCompare(const Vehicle *vehicle, int major, int minor, int patch) const
 {
-    int currMajor = vehicle->firmwareMajorVersion();
-    int currMinor = vehicle->firmwareMinorVersion();
-    int currPatch = vehicle->firmwarePatchVersion();
+    const int currMajor = vehicle->firmwareMajorVersion();
+    const int currMinor = vehicle->firmwareMinorVersion();
+    const int currPatch = vehicle->firmwarePatchVersion();
 
-    if (currMajor == major && currMinor == minor && currPatch == patch) {
+    if ((currMajor == major) && (currMinor == minor) && (currPatch == patch)) {
         return 0;
     }
 
@@ -513,22 +393,19 @@ int FirmwarePlugin::versionCompare(const Vehicle* vehicle, int major, int minor,
     return -1;
 }
 
-int FirmwarePlugin::versionCompare(const Vehicle* vehicle, QString& compare) const
+int FirmwarePlugin::versionCompare(const Vehicle *vehicle, const QString &compare) const
 {
-    QStringList versionNumbers = compare.split(".");
-    if(versionNumbers.size() != 3) {
+    const QStringList versionNumbers = compare.split(".");
+    if (versionNumbers.size() != 3) {
         qCWarning(FirmwarePluginLog) << "Error parsing version number: wrong format";
         return -1;
     }
-    int major = versionNumbers[0].toInt();
-    int minor = versionNumbers[1].toInt();
-    int patch = versionNumbers[2].toInt();
-    return versionCompare(vehicle, major, minor, patch);
-}
 
-QString FirmwarePlugin::gotoFlightMode(void) const
-{
-    return QString();
+    const int major = versionNumbers[0].toInt();
+    const int minor = versionNumbers[1].toInt();
+    const int patch = versionNumbers[2].toInt();
+
+    return versionCompare(vehicle, major, minor, patch);
 }
 
 void FirmwarePlugin::sendGCSMotionReport(Vehicle *vehicle, FollowMe::GCSMotionReport &motionReport, uint8_t estimationCapabilities)
@@ -540,7 +417,7 @@ void FirmwarePlugin::sendGCSMotionReport(Vehicle *vehicle, FollowMe::GCSMotionRe
         return;
     }
 
-    mavlink_follow_target_t follow_target{0};
+    mavlink_follow_target_t follow_target{};
 
     follow_target.timestamp = qgcApp()->msecsSinceBoot();
     follow_target.est_capabilities = estimationCapabilities;
@@ -552,7 +429,7 @@ void FirmwarePlugin::sendGCSMotionReport(Vehicle *vehicle, FollowMe::GCSMotionRe
     follow_target.vel[0] = static_cast<float>(motionReport.vxMetersPerSec);
     follow_target.vel[1] = static_cast<float>(motionReport.vyMetersPerSec);
 
-    mavlink_message_t message;
+    mavlink_message_t message{};
     mavlink_msg_follow_target_encode_chan(
         static_cast<uint8_t>(MAVLinkProtocol::instance()->getSystemId()),
         static_cast<uint8_t>(MAVLinkProtocol::getComponentId()),
@@ -560,22 +437,13 @@ void FirmwarePlugin::sendGCSMotionReport(Vehicle *vehicle, FollowMe::GCSMotionRe
         &message,
         &follow_target
     );
+
     vehicle->sendMessageOnLinkThreadSafe(sharedLink.get(), message);
 }
 
-Autotune* FirmwarePlugin::createAutotune(Vehicle *vehicle)
+Autotune *FirmwarePlugin::createAutotune(Vehicle *vehicle)
 {
     return new Autotune(vehicle);
-}
-
-void FirmwarePlugin::updateAvailableFlightModes(FlightModeList modeList)
-{
-    _updateModeMappings(modeList);
-}
-
-void FirmwarePlugin::_setModeEnumToModeStringMapping(FlightModeCustomModeMap enumToString)
-{
-    _modeEnumToString = enumToString;
 }
 
 void FirmwarePlugin::_updateModeMappings(FlightModeList &modeList){
@@ -598,13 +466,25 @@ void FirmwarePlugin::_updateModeMappings(FlightModeList &modeList){
     }
 }
 
-void FirmwarePlugin::_addNewFlightMode(FirmwareFlightMode &mode)
+void FirmwarePlugin::_addNewFlightMode(FirmwareFlightMode mode)
 {
-    for(auto &m:_availableFlightModeList){
-        if(m.custom_mode == mode.custom_mode){
+    for (const auto &m : _availableFlightModeList){
+        if (m.custom_mode == mode.custom_mode){
             // Already Exist
             return;
         }
     }
+
     _availableFlightModeList += mode;
+}
+
+/*===========================================================================*/
+
+CommandSupportedResult FirmwarePluginInstanceData::getCommandSupported(MAV_CMD cmd) const
+{
+    if (anyVersionSupportsCommand(cmd) == CommandSupportedResult::UNSUPPORTED) {
+        return CommandSupportedResult::UNSUPPORTED;
+    }
+
+    return MAV_CMD_supported.value(cmd, CommandSupportedResult::UNKNOWN);
 }
