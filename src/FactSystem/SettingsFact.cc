@@ -7,25 +7,28 @@
  *
  ****************************************************************************/
 
-
 #include "SettingsFact.h"
 #include "QGCApplication.h"
 #include "QGCCorePlugin.h"
+#include "QGCLoggingCategory.h"
 
 #include <QtCore/QSettings>
 #include <QtQml/QQmlEngine>
 
-SettingsFact::SettingsFact(QObject* parent)
+QGC_LOGGING_CATEGORY(SettingsFactLog, "qgc.factsystem.settingsfact");
+
+SettingsFact::SettingsFact(QObject *parent)
     : Fact(parent)
-{    
+{
+    // qCDebug(SettingsFactLog) << Q_FUNC_INFO << this;
     QQmlEngine::setObjectOwnership(this, QQmlEngine::CppOwnership);
 }
 
-SettingsFact::SettingsFact(QString settingsGroup, FactMetaData* metaData, QObject* parent)
-    : Fact          (0, metaData->name(), metaData->type(), parent)
+SettingsFact::SettingsFact(const QString &settingsGroup, FactMetaData *metaData, QObject *parent)
+    : Fact(0, metaData->name(), metaData->type(), parent)
     , _settingsGroup(settingsGroup)
-    , _visible      (true)
 {
+    // qCDebug(SettingsFactLog) << Q_FUNC_INFO << this;
     QSettings settings;
 
     if (!_settingsGroup.isEmpty()) {
@@ -37,7 +40,7 @@ SettingsFact::SettingsFact(QString settingsGroup, FactMetaData* metaData, QObjec
     setMetaData(metaData);
 
     if (metaData->defaultValueAvailable()) {
-        QVariant rawDefaultValue = metaData->rawDefaultValue();
+        const QVariant rawDefaultValue = metaData->rawDefaultValue();
         if (qgcApp()->runningUnitTests()) {
             // Don't use saved settings
             _rawValue = rawDefaultValue;
@@ -45,7 +48,7 @@ SettingsFact::SettingsFact(QString settingsGroup, FactMetaData* metaData, QObjec
             if (_visible) {
                 QVariant typedValue;
                 QString errorString;
-                metaData->convertAndValidateRaw(settings.value(_name, rawDefaultValue), true /* conertOnly */, typedValue, errorString);
+                metaData->convertAndValidateRaw(settings.value(_name, rawDefaultValue), true /* convertOnly */, typedValue, errorString);
                 _rawValue = typedValue;
             } else {
                 // Setting is not visible, force to default value always
@@ -55,19 +58,25 @@ SettingsFact::SettingsFact(QString settingsGroup, FactMetaData* metaData, QObjec
         }
     }
 
-    connect(this, &Fact::rawValueChanged, this, &SettingsFact::_rawValueChanged);
+    (void) connect(this, &Fact::rawValueChanged, this, &SettingsFact::_rawValueChanged);
 }
 
-SettingsFact::SettingsFact(const SettingsFact& other, QObject* parent)
+SettingsFact::SettingsFact(const SettingsFact &other, QObject *parent)
     : Fact(other, parent)
 {
+    // qCDebug(AudioOutputLog) << Q_FUNC_INFO << this;
     *this = other;
 }
 
-const SettingsFact& SettingsFact::operator=(const SettingsFact& other)
+SettingsFact::~SettingsFact()
+{
+    // qCDebug(AudioOutputLog) << Q_FUNC_INFO << this;
+}
+
+const SettingsFact &SettingsFact::operator=(const SettingsFact &other)
 {
     Fact::operator=(other);
-    
+
     _settingsGroup = other._settingsGroup;
 
     return *this;

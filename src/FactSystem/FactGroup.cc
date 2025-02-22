@@ -7,12 +7,14 @@
  *
  ****************************************************************************/
 
-
 #include "FactGroup.h"
+#include "QGCLoggingCategory.h"
 
 #include <QtQml/QQmlEngine>
 
-FactGroup::FactGroup(int updateRateMsecs, const QString& metaDataFile, QObject* parent, bool ignoreCamelCase)
+QGC_LOGGING_CATEGORY(FactGroupLog, "qgc.factsystem.factgroup");
+
+FactGroup::FactGroup(int updateRateMsecs, const QString &metaDataFile, QObject *parent, bool ignoreCamelCase)
     : QObject(parent)
     , _updateRateMSecs(updateRateMsecs)
     , _ignoreCamelCase(ignoreCamelCase)
@@ -22,7 +24,7 @@ FactGroup::FactGroup(int updateRateMsecs, const QString& metaDataFile, QObject* 
     QQmlEngine::setObjectOwnership(this, QQmlEngine::CppOwnership);
 }
 
-FactGroup::FactGroup(int updateRateMsecs, QObject* parent, bool ignoreCamelCase)
+FactGroup::FactGroup(int updateRateMsecs, QObject *parent, bool ignoreCamelCase)
     : QObject(parent)
     , _updateRateMSecs(updateRateMsecs)
     , _ignoreCamelCase(ignoreCamelCase)
@@ -40,86 +42,85 @@ void FactGroup::_loadFromJsonArray(const QJsonArray jsonArray)
 void FactGroup::_setupTimer()
 {
     if (_updateRateMSecs > 0) {
-        connect(&_updateTimer, &QTimer::timeout, this, &FactGroup::_updateAllValues);
+        (void) connect(&_updateTimer, &QTimer::timeout, this, &FactGroup::_updateAllValues);
         _updateTimer.setSingleShot(false);
         _updateTimer.setInterval(_updateRateMSecs);
         _updateTimer.start();
     }
 }
 
-bool FactGroup::factExists(const QString& name)
+bool FactGroup::factExists(const QString &name)
 {
     if (name.contains(".")) {
-        QStringList parts = name.split(".");
+        const QStringList parts = name.split(".");
         if (parts.count() != 2) {
-            qWarning() << "Only single level of hierarchy supported";
+            qcWarning(FactGroup) << "Only single level of hierarchy supported";
             return false;
         }
 
-        FactGroup * factGroup = getFactGroup(parts[0]);
+        const FactGroup *const factGroup = getFactGroup(parts[0]);
         if (!factGroup) {
-            qWarning() << "Unknown FactGroup" << parts[0];
+            qcWarning(FactGroup) << "Unknown FactGroup" << parts[0];
             return false;
         }
 
         return factGroup->factExists(parts[1]);
     }
 
-    QString camelCaseName = _ignoreCamelCase ? name : _camelCase(name);
-
+    const QString camelCaseName = _ignoreCamelCase ? name : _camelCase(name);
     return _nameToFactMap.contains(camelCaseName);
 }
 
-Fact* FactGroup::getFact(const QString& name)
+Fact *FactGroup::getFact(const QString &name)
 {
     if (name.contains(".")) {
         QStringList parts = name.split(".");
         if (parts.count() != 2) {
-            qWarning() << "Only single level of hierarchy supported";
+            qCWarning(FactGroup) << "Only single level of hierarchy supported";
             return nullptr;
         }
 
-        FactGroup * factGroup = getFactGroup(parts[0]);
+        const FactGroup *const factGroup = getFactGroup(parts[0]);
         if (!factGroup) {
-            qWarning() << "Unknown FactGroup" << parts[0];
+            qCWarning(FactGroup) << "Unknown FactGroup" << parts[0];
             return nullptr;
         }
 
         return factGroup->getFact(parts[1]);
     }
 
-    Fact*   fact =          nullptr;
-    QString camelCaseName = _ignoreCamelCase ? name : _camelCase(name);
+    Fact *fact = nullptr;
+    const QString camelCaseName = _ignoreCamelCase ? name : _camelCase(name);
 
     if (_nameToFactMap.contains(camelCaseName)) {
         fact = _nameToFactMap[camelCaseName];
         QQmlEngine::setObjectOwnership(fact, QQmlEngine::CppOwnership);
     } else {
-        qWarning() << "Unknown Fact" << camelCaseName;
+        qCWarning(FactGroup) << "Unknown Fact" << camelCaseName;
     }
 
     return fact;
 }
 
-FactGroup* FactGroup::getFactGroup(const QString& name)
+FactGroup *FactGroup::getFactGroup(const QString &name)
 {
-    FactGroup*  factGroup = nullptr;
-    QString     camelCaseName = _ignoreCamelCase ? name : _camelCase(name);
+    FactGroup *factGroup = nullptr;
+    const QString camelCaseName = _ignoreCamelCase ? name : _camelCase(name);
 
     if (_nameToFactGroupMap.contains(camelCaseName)) {
         factGroup = _nameToFactGroupMap[camelCaseName];
         QQmlEngine::setObjectOwnership(factGroup, QQmlEngine::CppOwnership);
     } else {
-        qWarning() << "Unknown FactGroup" << camelCaseName;
+        qCWarning(FactGroup) << "Unknown FactGroup" << camelCaseName;
     }
 
     return factGroup;
 }
 
-void FactGroup::_addFact(Fact* fact, const QString& name)
+void FactGroup::_addFact(Fact *fact, const QString &name)
 {
     if (_nameToFactMap.contains(name)) {
-        qWarning() << "Duplicate Fact" << name;
+        qCWarning(FactGroup) << "Duplicate Fact" << name;
         return;
     }
 
@@ -133,10 +134,10 @@ void FactGroup::_addFact(Fact* fact, const QString& name)
     emit factNamesChanged();
 }
 
-void FactGroup::_addFactGroup(FactGroup* factGroup, const QString& name)
+void FactGroup::_addFactGroup(FactGroup *factGroup, const QString &name)
 {
     if (_nameToFactGroupMap.contains(name)) {
-        qWarning() << "Duplicate FactGroup" << name;
+        qCWarning(FactGroup) << "Duplicate FactGroup" << name;
         return;
     }
 
@@ -145,9 +146,9 @@ void FactGroup::_addFactGroup(FactGroup* factGroup, const QString& name)
     emit factGroupNamesChanged();
 }
 
-void FactGroup::_updateAllValues(void)
+void FactGroup::_updateAllValues()
 {
-    for(Fact* fact: _nameToFactMap) {
+    for (Fact *const fact: _nameToFactMap) {
         fact->sendDeferredValueChangedSignal();
     }
 }
@@ -163,23 +164,19 @@ void FactGroup::setLiveUpdates(bool liveUpdates)
     } else {
         _updateTimer.start();
     }
-    for(Fact* fact: _nameToFactMap) {
+
+    for (Fact *const fact: _nameToFactMap) {
         fact->setSendValueChangedSignals(liveUpdates);
     }
 }
 
 
-QString FactGroup::_camelCase(const QString& text)
+QString FactGroup::_camelCase(const QString &text)
 {
-    return text[0].toLower() + text.right(text.length() - 1);
+    return (text[0].toLower() + text.right(text.length() - 1));
 }
 
-void FactGroup::handleMessage(Vehicle* /* vehicle */, mavlink_message_t& /* message */)
-{
-    // Default implementation does nothing
-}
-
-void FactGroup::_setTelemetryAvailable (bool telemetryAvailable)
+void FactGroup::_setTelemetryAvailable(bool telemetryAvailable)
 {
     if (telemetryAvailable != _telemetryAvailable) {
         _telemetryAvailable = telemetryAvailable;

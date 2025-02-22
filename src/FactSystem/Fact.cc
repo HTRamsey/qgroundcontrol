@@ -11,8 +11,11 @@
 #include "FactValueSliderListModel.h"
 #include "QGCApplication.h"
 #include "QGCCorePlugin.h"
+#include "QGCLoggingCategory.h"
 
 #include <QtQml/QQmlEngine>
+
+QGC_LOGGING_CATEGORY(FactLog, "qgc.factsystem.fact");
 
 Fact::Fact(QObject* parent)
     : QObject                   (parent)
@@ -24,7 +27,7 @@ Fact::Fact(QObject* parent)
     , _deferredValueChangeSignal(false)
     , _valueSliderModel         (nullptr)
     , _ignoreQGCRebootRequired  (false)
-{    
+{
     FactMetaData* metaData = new FactMetaData(_type, this);
     setMetaData(metaData);
 

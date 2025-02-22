@@ -9,77 +9,81 @@
 
 #pragma once
 
-#include <QtCore/QStringList>
-#include <QtCore/QMap>
-#include <QtCore/QTimer>
 #include <QtCore/QJsonArray>
+#include <QtCore/QLoggingCategory>
+#include <QtCore/QMap>
+#include <QtCore/QStringList>
+#include <QtCore/QTimer>
 
 #include "Fact.h"
 #include "MAVLinkLib.h"
 
 class Vehicle;
 
+Q_DECLARE_LOGGING_CATEGORY(FactGroupLog)
+
 /// Used to group Facts together into an object hierarachy.
 class FactGroup : public QObject
 {
     Q_OBJECT
-    
-public:
-    FactGroup(int updateRateMsecs, const QString& metaDataFile, QObject* parent = nullptr, bool ignoreCamelCase = false);
-    FactGroup(int updateRateMsecs, QObject* parent = nullptr, bool ignoreCamelCase = false);
 
     Q_PROPERTY(QStringList  factNames           READ factNames          NOTIFY factNamesChanged)
     Q_PROPERTY(QStringList  factGroupNames      READ factGroupNames     NOTIFY factGroupNamesChanged)
     Q_PROPERTY(bool         telemetryAvailable  READ telemetryAvailable NOTIFY telemetryAvailableChanged)   ///< false: No telemetry for these values has been received
 
-    /// @ return true: if the fact exists in the group
-    Q_INVOKABLE bool factExists(const QString& name);
+public:
+    explicit FactGroup(int updateRateMsecs, const QString &metaDataFile, QObject *parent = nullptr, bool ignoreCamelCase = false);
+    explicit FactGroup(int updateRateMsecs, QObject *parent = nullptr, bool ignoreCamelCase = false);
+    virtual ~FactGroup();
+
+    /// @return true: if the fact exists in the group
+    Q_INVOKABLE bool factExists(const QString &name);
 
     /// @return Fact for specified name, NULL if not found
     /// Note: Requesting a fact which doesn't exists is considered an internal error and will spit out a qWarning
-    Q_INVOKABLE Fact* getFact(const QString& name);
+    Q_INVOKABLE Fact* getFact(const QString &name);
 
     /// @return FactGroup for specified name, NULL if not found
     /// Note: Requesting a fact group which doesn't exists is considered an internal error and will spit out a qWarning
-    Q_INVOKABLE FactGroup* getFactGroup(const QString& name);
+    Q_INVOKABLE FactGroup* getFactGroup(const QString &name);
 
     /// Turning on live updates will allow value changes to flow through as they are received.
     Q_INVOKABLE void setLiveUpdates(bool liveUpdates);
 
-    QStringList factNames           (void) const { return _factNames; }
-    QStringList factGroupNames      (void) const { return _nameToFactGroupMap.keys(); }
-    bool        telemetryAvailable  (void) const { return _telemetryAvailable; }
-    const QMap<QString, FactGroup*>& factGroups() const { return _nameToFactGroupMap; }
+    QStringList factNames() const { return _factNames; }
+    QStringList factGroupNames() const { return _nameToFactGroupMap.keys(); }
+    bool telemetryAvailable() const { return _telemetryAvailable; }
+    const QMap<QString, FactGroup*> &factGroups() const { return _nameToFactGroupMap; }
 
     /// Allows a FactGroup to parse incoming messages and fill in values
-    virtual void handleMessage(Vehicle* vehicle, mavlink_message_t& message);
+    virtual void handleMessage(Vehicle *vehicle, mavlink_message_t &message) { Q_UNUSED(vehicle); Q_UNUSED(message) };
 
 signals:
-    void factNamesChanged           (void);
-    void factGroupNamesChanged      (void);
-    void telemetryAvailableChanged  (bool telemetryAvailable);
+    void factNamesChanged();
+    void factGroupNamesChanged();
+    void telemetryAvailableChanged(bool telemetryAvailable);
 
 protected slots:
-    virtual void _updateAllValues(void);
+    virtual void _updateAllValues();
 
 protected:
-    void _addFact               (Fact* fact, const QString& name);
-    void _addFactGroup          (FactGroup* factGroup, const QString& name);
-    void _loadFromJsonArray     (const QJsonArray jsonArray);
-    void _setTelemetryAvailable (bool telemetryAvailable);
+    void _addFact(Fact *fact, const QString &name);
+    void _addFactGroup(FactGroup *factGroup, const QString &name);
+    void _loadFromJsonArray(const QJsonArray &jsonArray);
+    void _setTelemetryAvailable(bool telemetryAvailable);
 
-    int  _updateRateMSecs;   ///< Update rate for Fact::valueChanged signals, 0: immediate update
+    int _updateRateMSecs;   ///< Update rate for Fact::valueChanged signals, 0: immediate update
 
-    QMap<QString, Fact*>            _nameToFactMap;
-    QMap<QString, FactGroup*>       _nameToFactGroupMap;
-    QMap<QString, FactMetaData*>    _nameToFactMetaDataMap;
-    QStringList                     _factNames;
+    QMap<QString, Fact*> _nameToFactMap;
+    QMap<QString, FactGroup*> _nameToFactGroupMap;
+    QMap<QString, FactMetaData*> _nameToFactMetaDataMap;
+    QStringList _factNames;
 
 private:
-    void    _setupTimer (void);
-    QString _camelCase  (const QString& text);
+    void _setupTimer();
+    QString _camelCase(const QString &text);
 
-    bool    _ignoreCamelCase    = false;
-    QTimer  _updateTimer;
-    bool    _telemetryAvailable = false;
+    bool _ignoreCamelCase = false;
+    QTimer _updateTimer;
+    bool _telemetryAvailable = false;
 };

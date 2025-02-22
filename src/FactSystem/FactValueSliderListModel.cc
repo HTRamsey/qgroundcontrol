@@ -9,30 +9,27 @@
 
 #include "FactValueSliderListModel.h"
 #include "Fact.h"
+#include "QGCLoggingCategory.h"
 
 #include <QtQml/QQmlEngine>
 #include <QtCore/QtMath>
 
-FactValueSliderListModel::FactValueSliderListModel(Fact& fact, QObject* parent)
-    : QAbstractListModel        (parent)
-    , _fact                     (fact)
-    , _cValues                  (0)
-    , _firstValueIndexInWindow  (0)
-    , _initialValueIndex        (0)
-    , _cPrevValues              (0)
-    , _cNextValues              (0)
-    , _initialValue             (0)
-    , _initialValueAtPrecision  (0)
-    , _increment                (0)
+QGC_LOGGING_CATEGORY(FactValueSliderListModelLog, "qgc.factsystem.factvaluesliderlistmodel");
+
+FactValueSliderListModel::FactValueSliderListModel(Fact &fact, QObject *parent)
+    : QAbstractListModel(parent)
+    , _fact(fact)
 {
+    // qCDebug(FactValueSliderListModelLog) << Q_FUNC_INFO << this;
     QQmlEngine::setObjectOwnership(this, QQmlEngine::CppOwnership);
 }
 
 FactValueSliderListModel::~FactValueSliderListModel()
 {
+    // qCDebug(FactValueSliderListModelLog) << Q_FUNC_INFO << this;
 }
 
-int FactValueSliderListModel::resetInitialValue(void)
+int FactValueSliderListModel::resetInitialValue()
 {
     if (_cValues > 0) {
         // Remove any old rows
@@ -52,7 +49,7 @@ int FactValueSliderListModel::resetInitialValue(void)
     _cNextValues = qMin((_fact.cookedMax().toDouble() - _initialValue)  / _increment, 100.0);
     _initialValueIndex = _cPrevValues;
 
-    int totalValueCount = _cPrevValues + 1 + _cNextValues;
+    const int totalValueCount = _cPrevValues + 1 + _cNextValues;
     beginInsertRows(QModelIndex(), 0, totalValueCount - 1);
     _cValues = totalValueCount;
     endInsertRows();
@@ -62,10 +59,10 @@ int FactValueSliderListModel::resetInitialValue(void)
     return _initialValueIndex;
 }
 
-int FactValueSliderListModel::rowCount(const QModelIndex& parent) const
+int FactValueSliderListModel::rowCount(const QModelIndex &parent) const
 {
     Q_UNUSED(parent);
-    
+
     return _cValues;
 }
 
@@ -76,31 +73,30 @@ QVariant FactValueSliderListModel::data(const QModelIndex &index, int role) cons
     if (!index.isValid()) {
         return QVariant();
     }
-    
-    int valueIndex = index.row();
+
+    const int valueIndex = index.row();
     if (valueIndex >= _cValues) {
         return QVariant();
     }
 
     if (role == _valueRole) {
         double value;
-        int cIncrementCount = valueIndex - _initialValueIndex;
+        const int cIncrementCount = valueIndex - _initialValueIndex;
         if (cIncrementCount == 0) {
             value = _initialValue;
         } else {
             value = initialValueAtPrecision() + (cIncrementCount * _increment);
         }
+
         return QVariant(_valueAtPrecision(value));
     } else if (role == _valueIndexRole) {
         return QVariant::fromValue(valueIndex);
     } else {
         return QVariant();
     }
-
-
 }
 
-QHash<int, QByteArray> FactValueSliderListModel::roleNames(void) const
+QHash<int, QByteArray> FactValueSliderListModel::roleNames() const
 {
     QHash<int, QByteArray> hash;
 
@@ -113,7 +109,6 @@ QHash<int, QByteArray> FactValueSliderListModel::roleNames(void) const
 double FactValueSliderListModel::valueAtModelIndex(int index)
 {
     return data(createIndex(index, 0), _valueRole).toDouble();
-
 }
 
 int FactValueSliderListModel::valueIndexAtModelIndex(int index)
@@ -123,6 +118,6 @@ int FactValueSliderListModel::valueIndexAtModelIndex(int index)
 
 double FactValueSliderListModel::_valueAtPrecision(double value) const
 {
-    double precision = qPow(10, _fact.decimalPlaces());
-    return qRound(value * precision) / precision;
+    const double precision = qPow(10, _fact.decimalPlaces());
+    return (qRound(value * precision) / precision);
 }
