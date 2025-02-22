@@ -35,8 +35,8 @@ public:
 
     Q_PROPERTY(Vehicle* vehicle MEMBER _vehicle CONSTANT)
 
-    Q_INVOKABLE Fact*   getParameterFact    (int componentId, const QString& name, bool reportMissing = true);
-    Q_INVOKABLE bool    parameterExists     (int componentId, const QString& name);
+    Q_INVOKABLE Fact*   getParameterFact    (int componentId, const QString& name, bool reportMissing = true) const;
+    Q_INVOKABLE bool    parameterExists     (int componentId, const QString& name) const;
 
     /// Queries the vehicle for parameters which were not available on initial download but should be available now.
     /// Signals missingParametersAvailable when done. Only works for MAV_COMP_ID_AUTOPILOT1 parameters.
@@ -51,7 +51,7 @@ protected:
     bool _allParametersExists(int componentId, QStringList names);
 
     /// Report a missing parameter
-    void _reportMissingParameter(int componentId, const QString& name);
+    void _reportMissingParameter(int componentId, const QString& name) const;
 
     Vehicle*            _vehicle    = nullptr;
     AutoPilotPlugin*    _autopilot  = nullptr;
