@@ -10,11 +10,18 @@
 #include "TrajectoryPoints.h"
 #include "Vehicle.h"
 
-TrajectoryPoints::TrajectoryPoints(Vehicle* vehicle, QObject* parent)
-    : QObject       (parent)
-    , _vehicle      (vehicle)
-    , _lastAzimuth  (qQNaN())
+QGC_LOGGING_CATEGORY(TrajectoryPointsLog, "qgc.vehicle.trajectorypoints")
+
+TrajectoryPoints::TrajectoryPoints(Vehicle *vehicle, QObject *parent)
+    : QObject(parent)
+    , _vehicle(vehicle)
+{.
+    // qCDebug(TrajectoryPointsLog) << Q_FUNC_INFO << this;
+}
+
+TrajectoryPoints::~TrajectoryPoints()
 {
+    // qCDebug(TrajectoryPointsLog) << Q_FUNC_INFO << this;
 }
 
 void TrajectoryPoints::_vehicleCoordinateChanged(QGeoCoordinate coordinate)
@@ -23,12 +30,12 @@ void TrajectoryPoints::_vehicleCoordinateChanged(QGeoCoordinate coordinate)
     // Fewer points means higher performance of map display.
 
     if (_lastPoint.isValid()) {
-        double distance = _lastPoint.distanceTo(coordinate);
+        const double distance = _lastPoint.distanceTo(coordinate);
         if (distance > _distanceTolerance) {
             //-- Update flight distance
             _vehicle->updateFlightDistance(distance);
             // Vehicle has moved far enough from previous point for an update
-            double newAzimuth = _lastPoint.azimuthTo(coordinate);
+            const double newAzimuth = _lastPoint.azimuthTo(coordinate);
             if (qIsNaN(_lastAzimuth) || qAbs(newAzimuth - _lastAzimuth) > _azimuthTolerance) {
                 // The new position IS NOT colinear with the last segment. Append the new position to the list.
                 _lastAzimuth = _lastPoint.azimuthTo(coordinate);
@@ -51,18 +58,18 @@ void TrajectoryPoints::_vehicleCoordinateChanged(QGeoCoordinate coordinate)
     }
 }
 
-void TrajectoryPoints::start(void)
+void TrajectoryPoints::start()
 {
     clear();
     connect(_vehicle, &Vehicle::coordinateChanged, this, &TrajectoryPoints::_vehicleCoordinateChanged);
 }
 
-void TrajectoryPoints::stop(void)
+void TrajectoryPoints::stop()
 {
     disconnect(_vehicle, &Vehicle::coordinateChanged, this, &TrajectoryPoints::_vehicleCoordinateChanged);
 }
 
-void TrajectoryPoints::clear(void)
+void TrajectoryPoints::clear()
 {
     _points.clear();
     _lastPoint = QGeoCoordinate();

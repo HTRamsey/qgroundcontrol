@@ -9,61 +9,65 @@
 
 #pragma once
 
-#include "QGCMAVLink.h"
-
+#include <QtCore/QLoggingCategory>
 #include <QtCore/QObject>
 #include <QtCore/QVector>
 #include <QtCore/QPointF>
 
+#include "QGCMAVLink.h"
+
 class Vehicle;
+
+Q_DECLARE_LOGGING_CATEGORY(VehicleObjectAvoidanceLog)
 
 class VehicleObjectAvoidance : public QObject
 {
     Q_OBJECT
+    Q_PROPERTY(bool         available   READ available      NOTIFY objectAvoidanceChanged)
+    Q_PROPERTY(bool         enabled     READ enabled        NOTIFY objectAvoidanceChanged)
+    Q_PROPERTY(QList<int>   distances   READ distances      NOTIFY objectAvoidanceChanged)
+    Q_PROPERTY(qreal        increment   READ increment      NOTIFY objectAvoidanceChanged)
+    Q_PROPERTY(int          minDistance READ minDistance    NOTIFY objectAvoidanceChanged)
+    Q_PROPERTY(int          maxDistance READ maxDistance    NOTIFY objectAvoidanceChanged)
+    Q_PROPERTY(qreal        angleOffset READ angleOffset    NOTIFY objectAvoidanceChanged)
+    Q_PROPERTY(int          gridSize    READ gridSize       NOTIFY objectAvoidanceChanged)
+
 public:
-    VehicleObjectAvoidance(Vehicle* vehicle, QObject* parent = nullptr);
+    explicit VehicleObjectAvoidance(Vehicle *vehicle, QObject *parent = nullptr);
+    ~VehicleObjectAvoidance();
 
-    Q_PROPERTY(bool             available   READ available      NOTIFY objectAvoidanceChanged)
-    Q_PROPERTY(bool             enabled     READ enabled        NOTIFY objectAvoidanceChanged)
-    Q_PROPERTY(QList<int>       distances   READ distances      NOTIFY objectAvoidanceChanged)
-    Q_PROPERTY(qreal            increment   READ increment      NOTIFY objectAvoidanceChanged)
-    Q_PROPERTY(int              minDistance READ minDistance    NOTIFY objectAvoidanceChanged)
-    Q_PROPERTY(int              maxDistance READ maxDistance    NOTIFY objectAvoidanceChanged)
-    Q_PROPERTY(qreal            angleOffset READ angleOffset    NOTIFY objectAvoidanceChanged)
-    Q_PROPERTY(int              gridSize    READ gridSize       NOTIFY objectAvoidanceChanged)
+    /// Start collision avoidance. Argument is minimum distance the vehicle should keep to all obstacles
+    Q_INVOKABLE void start(int minDistance);
+    /// Stop collision avoidance.
+    Q_INVOKABLE void stop();
+    /// Object locations (in relationship to vehicle)
+    Q_INVOKABLE QPointF grid(int i) const;
+    Q_INVOKABLE qreal distance(int i) const;
 
-    //-- Start collision avoidance. Argument is minimum distance the vehicle should keep to all obstacles
-    Q_INVOKABLE void    start   (int minDistance);
-    //-- Stop collision avoidance.
-    Q_INVOKABLE void    stop    ();
-    //-- Object locations (in relationship to vehicle)
-    Q_INVOKABLE QPointF grid    (int i);
-    Q_INVOKABLE qreal   distance(int i);
+    bool available() const { return !_distances.isEmpty(); }
+    bool enabled() const;
+    QList<int> distances() const { return _distances; }
+    qreal increment() const { return _increment; }
+    int minDistance() const { return _minDistance; }
+    int maxDistance() const { return _maxDistance; }
+    qreal angleOffset() const { return _angleOffset; }
+    int gridSize() { return _objGrid.count(); }
 
-    bool            available   () { return _distances.count() > 0; }
-    bool            enabled     ();
-    QList<int>      distances   () { return _distances; }
-    qreal           increment   () const{ return _increment; }
-    int             minDistance () const{ return _minDistance; }
-    int             maxDistance () const{ return _maxDistance; }
-    qreal           angleOffset () const{ return _angleOffset; }
-    int             gridSize    () { return _objGrid.count(); }
-
-    void            update      (mavlink_obstacle_distance_t* message);
+    void update(mavlink_obstacle_distance_t *message);
 
 signals:
-    void            objectAvoidanceChanged  ();
+    void objectAvoidanceChanged();
 
 private:
-    QList<int>      _distances;
+    Vehicle *_vehicle = nullptr;
+    QList<int> _distances;
     QVector<QPointF>_objGrid;
-    QVector<qreal>  _objDistance;
-    qreal           _increment      = 0;
-    int             _minDistance    = 0;
-    int             _maxDistance    = 0;
-    qreal           _angleOffset    = 0;
-    Vehicle*        _vehicle        = nullptr;
+    QVector<qreal> _objDistance;
+    qreal _increment = 0;
+    int _minDistance = 0;
+    int _maxDistance = 0;
+    qreal _angleOffset = 0;
 
-    static constexpr const char* kColPrevParam = "CP_DIST";
+    static constexpr const char *kColPrevParam = "CP_DIST";
 };
 
