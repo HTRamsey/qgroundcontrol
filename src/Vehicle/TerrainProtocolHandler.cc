@@ -14,6 +14,7 @@
 #include "QGCLoggingCategory.h"
 
 #include <QtCore/QTimer>
+#include <QtPositioning/QGeoCoordinate>
 
 QGC_LOGGING_CATEGORY(TerrainProtocolHandlerLog, "qgc.vehicle.terrainprotocolhandler")
 
@@ -69,7 +70,7 @@ void TerrainProtocolHandler::_handleTerrainReport(const mavlink_message_t &messa
         QList<double> altitudes;
         QList<QGeoCoordinate> coordinates;
         QGeoCoordinate coord(static_cast<double>(terrainReport.lat) / 1e7, static_cast<double>(terrainReport.lon) / 1e7);
-        (void) coordinates.append(coord);
+        coordinates.append(coord);
         const bool altAvailable = TerrainAtCoordinateQuery::getAltitudesForCoordinates(coordinates, altitudes, error);
         const QString vehicleAlt = terrainReport.spacing ? QStringLiteral("%1").arg(terrainReport.terrain_height) : QStringLiteral("n/a");
         QString qgcAlt;
@@ -90,7 +91,7 @@ void TerrainProtocolHandler::_sendNextTerrainData()
         return;
     }
 
-    QGeoCoordinate terrainRequestCoordSWCorner(static_cast<double>(_currentTerrainRequest.lat) / 1e7, static_cast<double>(_currentTerrainRequest.lon) / 1e7);
+    const QGeoCoordinate terrainRequestCoordSWCorner(static_cast<double>(_currentTerrainRequest.lat) / 1e7, static_cast<double>(_currentTerrainRequest.lon) / 1e7);
     const int spacingBetweenGrids = _currentTerrainRequest.grid_spacing * 4;
 
     // Each TERRAIN_DATA sent to vehicle contains a 4x4 grid of heights
@@ -160,7 +161,7 @@ void TerrainProtocolHandler::_sendTerrainData(const QGeoCoordinate &swCorner, ui
 
     SharedLinkInterfacePtr sharedLink = _vehicle->vehicleLinkManager()->primaryLink().lock();
     if (sharedLink) {
-        mavlink_message_t msg;
+        mavlink_message_t msg{};
         (void) mavlink_msg_terrain_data_pack_chan(
             MAVLinkProtocol::instance()->getSystemId(),
             MAVLinkProtocol::getComponentId(),

@@ -23,17 +23,11 @@ class Vehicle;
 
 class StandardModes : public QObject
 {
-Q_OBJECT
+    Q_OBJECT
 
 public:
-    struct Mode {
-        QString name;
-        uint8_t standardMode;
-        bool advanced;
-        bool cannotBeSet;
-    };
-
-    StandardModes(QObject* parent, Vehicle* vehicle);
+    explicit StandardModes(QObject* parent, Vehicle* vehicle);
+    ~StandardModes();
 
     void request();
 
@@ -42,7 +36,6 @@ public:
     bool supported() const { return _hasModes; }
 
     QStringList flightModes();
-
     QString flightMode(uint32_t custom_mode) const;
 
     bool setFlightMode(const QString& flightMode, uint32_t* custom_mode);
@@ -57,17 +50,23 @@ private:
     void requestMode(int modeIndex);
     void ensureUniqueModeNames();
 
-    Vehicle*const _vehicle;
+    Vehicle *const _vehicle;
 
-    bool _requestActive{false};
-    bool _wantReset{false};
+    bool _requestActive = false;
+    bool _wantReset = false;
+
+    struct Mode {
+        QString name;
+        uint8_t standardMode;
+        bool advanced;
+        bool cannotBeSet;
+    };
     QMap<uint32_t, Mode> _nextModes; ///< Modes added by current request
 
-    bool _hasModes{false};
-
-    int _lastSeq{-1};
+    bool _hasModes = false;
+    int _lastSeq = -1;
 
     QMap<uint32_t, Mode> _modes; ///< key is custom_mode
-    FlightModeList       _modeList;
+    FlightModeList _modeList;
 };
 

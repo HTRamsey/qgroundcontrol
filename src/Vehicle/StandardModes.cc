@@ -11,19 +11,26 @@
 #include "Vehicle.h"
 #include "QGCLoggingCategory.h"
 
-QGC_LOGGING_CATEGORY(StandardModesLog, "StandardModesLog")
+QGC_LOGGING_CATEGORY(StandardModesLog, "qgc.vehicle.standardmodes")
 
 static void requestMessageResultHandler(void *resultHandlerData, MAV_RESULT result,
                                         [[maybe_unused]] Vehicle::RequestMessageResultHandlerFailureCode_t failureCode,
                                         const mavlink_message_t &message)
 {
-    StandardModes* standardModes = static_cast<StandardModes*>(resultHandlerData);
+    StandardModes *const standardModes = static_cast<StandardModes*>(resultHandlerData);
     standardModes->gotMessage(result, message);
 }
 
 StandardModes::StandardModes(QObject *parent, Vehicle *vehicle)
-        : QObject(parent), _vehicle(vehicle)
+    : QObject(parent)
+    , _vehicle(vehicle)
 {
+    // qCDebug(StandardModesLog) << Q_FUNC_INFO << this;
+}
+
+StandardModes::~StandardModes()
+{
+    // qCDebug(StandardModesLog) << Q_FUNC_INFO << this;
 }
 
 void StandardModes::gotMessage(MAV_RESULT result, const mavlink_message_t &message)
