@@ -1,7 +1,7 @@
 find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick Test)
 
-qt_add_library(FactSystemTest
-    STATIC
+target_sources(qgctest
+    PRIVATE
         FactSystemTestBase.cc
         FactSystemTestBase.h
         FactSystemTestGeneric.cc
@@ -12,18 +12,17 @@ qt_add_library(FactSystemTest
         ParameterManagerTest.h
 )
 
-target_link_libraries(FactSystemTest
+target_link_libraries(qgctest
     PRIVATE
         Qt6::Quick
         Qt6::Test
     PUBLIC
         QGC
-        qgcunittest
 )
 
-target_include_directories(FactSystemTest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(qgctest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-qt_add_qml_module(FactSystemTest
+qt_add_qml_module(qgctest
     URI factsystemtest
     VERSION 1.0
     QML_FILES

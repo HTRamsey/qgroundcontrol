@@ -10,6 +10,7 @@
 #include "SigningTest.h"
 #include "MAVLinkSigning.h"
 
+#include <QtCore/QCryptographicHash>
 #include <QtTest/QTest>
 
 void SigningTest::_testInitSigning()

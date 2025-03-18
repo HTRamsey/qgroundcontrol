@@ -8,6 +8,13 @@ find_package(Qt6 REQUIRED COMPONENTS Core Test)
     # include(AndroidTestUtilities)
 # endif()
 
+qt_add_library(qgctest
+    STATIC
+        UnitTestList.cc
+        UnitTestList.h
+        # ${UNIT_TESTING_RESOURCES}
+)
+
 add_custom_target(check
     COMMAND ctest --output-on-failure .
     USES_TERMINAL
@@ -122,33 +129,11 @@ add_qgc_test(VehicleLinkManagerTest)
 # set(UNIT_TESTING_RESOURCES)
 # qt_add_resources(UNIT_TESTING_RESOURCES UnitTest.qrc)
 
-qt_add_library(qgctest
-    STATIC
-        UnitTestList.cc
-        UnitTestList.h
-        # ${UNIT_TESTING_RESOURCES}
-)
-
 target_link_libraries(qgctest
     PRIVATE
-        ADSBTest
-        AnalyzeViewTest
-        CameraTest
-        CommsTest
-        FactSystemTest
-        FollowMeTest
-        GpsTest
-        MAVLinkTest
-        MissionManagerTest
         QGC
-        QmlControlsTest
-        TerrainTest
-        UITest
-        VehicleTest
-        UtilitiesTest
     PUBLIC
         Qt6::Core
-        qgcunittest
 )
 
-target_include_directories(qgctest INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(qgctest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

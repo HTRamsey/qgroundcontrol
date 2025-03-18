@@ -12,9 +12,8 @@ target_sources(QGC
 
 target_link_libraries(QGC
     PRIVATE
-        Qt6::Network
-    PUBLIC
         Qt6::Core
+        Qt6::Network
         Qt6::Positioning
         Qt6::QmlIntegration
 )

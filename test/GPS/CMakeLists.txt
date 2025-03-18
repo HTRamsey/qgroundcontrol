@@ -1,17 +1,15 @@
 find_package(Qt6 REQUIRED COMPONENTS Core Positioning Test)
 
-qt_add_library(GpsTest
-    STATIC
+target_sources(qgctest
+    PRIVATE
         GpsTest.cc
         GpsTest.h
 )
 
-target_link_libraries(GpsTest
+target_link_libraries(qgctest
     PRIVATE
         Qt6::Test
         QGC
-    PUBLIC
-        qgcunittest
 )
 
-target_include_directories(GpsTest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(qgctest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

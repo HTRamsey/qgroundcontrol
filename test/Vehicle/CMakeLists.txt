@@ -23,7 +23,6 @@ target_link_libraries(VehicleTest
         Qt6::Test
     PUBLIC
         QGC
-        qgcunittest
 )
 
 target_include_directories(VehicleTest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

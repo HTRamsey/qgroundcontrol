@@ -1,18 +1,17 @@
 find_package(Qt6 REQUIRED COMPONENTS Core Positioning Test Widgets)
 
-qt_add_library(AutoPilotPluginsTest
-    STATIC
+target_sources(qgctest
+    PRIVATE
         RadioConfigTest.cc
         RadioConfigTest.h
 )
 
-target_link_libraries(AutoPilotPluginsTest
+target_link_libraries(qgctest
     PRIVATE
         Qt6::Test
     PUBLIC
         Qt6::Core
         QGC
-        qgcunittest
 )
 
-target_include_directories(AutoPilotPluginsTest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(qgctest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

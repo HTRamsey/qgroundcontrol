@@ -1,7 +1,7 @@
 find_package(Qt6 REQUIRED COMPONENTS Core Positioning Test)
 
-qt_add_library(qgcunittest
-    STATIC
+target_sources(qgctest
+    PRIVATE
         MultiSignalSpy.cc
         MultiSignalSpy.h
         MultiSignalSpyV2.cc
@@ -10,7 +10,7 @@ qt_add_library(qgcunittest
         UnitTest.h
 )
 
-target_link_libraries(qgcunittest
+target_link_libraries(qgctest
     PRIVATE
         Qt6::Test
     PUBLIC
@@ -19,4 +19,4 @@ target_link_libraries(qgcunittest
         QGC
 )
 
-target_include_directories(qgcunittest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(qgctest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

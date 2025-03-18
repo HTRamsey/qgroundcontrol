@@ -10,11 +10,10 @@ target_sources(QGC
 
 target_link_libraries(QGC
     PRIVATE
-        Qt6::Qml
-        Qt6::PositioningPrivate
-    PUBLIC
         Qt6::Core
         Qt6::Positioning
+        Qt6::PositioningPrivate
+        Qt6::Qml
         Qt6::QmlIntegration
 )
 

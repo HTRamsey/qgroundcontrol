@@ -1,8 +1,6 @@
 find_package(Qt6 REQUIRED COMPONENTS Core Qml)
 
-qt_add_library(UIPreferencesQmlTest STATIC)
-
-qt_add_qml_module(UIPreferencesQmlTest
+qt_add_qml_module(qgctest
     URI uipreferencesqmltest
     VERSION 1.0
     QML_FILES

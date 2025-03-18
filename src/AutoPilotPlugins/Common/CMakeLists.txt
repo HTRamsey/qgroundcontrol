@@ -17,7 +17,7 @@ target_sources(QGC
 )
 
 target_link_libraries(QGC
-    PUBLIC
+    PRIVATE
         Qt6::Core
         Qt6::Network
         Qt6::Quick

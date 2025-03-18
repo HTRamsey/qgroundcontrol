@@ -8,9 +8,8 @@ target_sources(QGC
 
 target_link_libraries(QGC
     PRIVATE
-        Qt6::TextToSpeech
-    PUBLIC
         Qt6::Core
+        Qt6::TextToSpeech
 )
 
 target_include_directories(QGC PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

@@ -5,6 +5,7 @@
 #include "QmlObjectListModel.h"
 
 #include <QtNetwork/QTcpServer>
+#include <QtNetwork/QTcpSocket>
 #include <QtTest/QTest>
 #include <QtTest/QSignalSpy>
 

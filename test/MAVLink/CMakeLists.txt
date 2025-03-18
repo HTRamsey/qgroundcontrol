@@ -1,18 +1,17 @@
 find_package(Qt6 REQUIRED COMPONENTS Core)
 
-qt_add_library(MAVLinkTest STATIC
-    StatusTextHandlerTest.cc
-    StatusTextHandlerTest.h
-    SigningTest.cc
-    SigningTest.h
+target_sources(qgctest
+    PRIVATE
+        StatusTextHandlerTest.cc
+        StatusTextHandlerTest.h
+        SigningTest.cc
+        SigningTest.h
 )
 
-target_link_libraries(MAVLinkTest
+target_link_libraries(qgctest
     PRIVATE
         Qt6::Test
         QGC
-    PUBLIC
-        qgcunittest
 )
 
-target_include_directories(MAVLinkTest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(qgctest PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})

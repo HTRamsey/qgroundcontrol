@@ -13,9 +13,8 @@ if(NOT QGC_AIRLINK_DISABLED)
 
     target_link_libraries(QGC
         PRIVATE
-            Qt6::Network
-        PUBLIC
             Qt6::Core
+            Qt6::Network
             Qt6::QmlIntegration
     )
 
@@ -45,5 +44,5 @@ if(NOT QGC_AIRLINK_DISABLED)
     # cmake_print_variables(AirLink_targets)
     # target_link_libraries(QGC PRIVATE AirLinkplugin)
 else()
-    target_compile_definitions(QGC PUBLIC QGC_AIRLINK_DISABLED)
+    target_compile_definitions(QGC PRIVATE QGC_AIRLINK_DISABLED)
 endif()

@@ -31,7 +31,7 @@ if(NOT QGC_DISABLE_APM_PLUGIN)
 endif()
 
 target_link_libraries(QGC
-    PUBLIC
+    PRIVATE
         Qt6::Core
         Qt6::Network
 )

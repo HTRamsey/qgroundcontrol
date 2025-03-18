@@ -6,9 +6,6 @@ target_sources(QGC
         GimbalController.h
 )
 
-target_link_libraries(QGC
-    PUBLIC
-        Qt6::Core
-)
+target_link_libraries(QGC PRIVATE Qt6::Core)
 
 target_include_directories(QGC PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
