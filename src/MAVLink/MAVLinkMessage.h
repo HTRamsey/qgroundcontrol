@@ -1,0 +1,53 @@
+/****************************************************************************
+ *
+ * (c) 2009-2024 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
+ *
+ * QGroundControl is licensed according to the terms in the file
+ * COPYING.md in the root of the source code directory.
+ *
+ ****************************************************************************/
+
+#pragma once
+
+#include <QtCore/QLoggingCategory>
+#include <QtCore/QObject>
+#include <QtCore/QString>
+
+#include "MAVLinkLib.h"
+
+Q_DECLARE_LOGGING_CATEGORY(MAVLinkMessageLog)
+
+class QGCMAVLinkMessage : public QObject
+{
+    Q_OBJECT
+
+public:
+    explicit QGCMAVLinkMessage(const mavlink_message_t &message, QObject *parent = nullptr);
+    ~QGCMAVLinkMessage();
+
+    quint32 id() const { return _message.msgid;  }
+    quint8 sysId() const { return _message.sysid; }
+    quint8 compId() const { return _message.compid; }
+    QString name() const { return _name;  }
+    qreal actualRateHz() const { return _actualRateHz; }
+    int32_t targetRateHz() const { return _targetRateHz; }
+    quint64 count() const { return _count; }
+    quint64 lastCount() const { return _lastCount; }
+
+    void update(const mavlink_message_t &message);
+    void updateFreq();
+    void setTargetRateHz(int32_t rate);
+
+signals:
+    void countChanged();
+    void actualRateHzChanged();
+    void targetRateHzChanged();
+
+private:
+    mavlink_message_t _message{};
+    QString _name;
+    qreal _actualRateHz = 0.0;
+    int32_t _targetRateHz = 0;
+    uint64_t _count = 1;
+    uint64_t _lastCount = 0;
+};
