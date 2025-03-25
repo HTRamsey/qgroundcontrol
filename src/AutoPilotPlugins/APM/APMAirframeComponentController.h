@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include <QtCore/QLoggingCategory>
 #include <QtCore/QObject>
 
 #include "FactPanelController.h"
@@ -17,41 +18,40 @@ class APMAirframeModel;
 class APMAirframeType;
 class QmlObjectListModel;
 
+Q_DECLARE_LOGGING_CATEGORY(APMAirframeComponentControllerLog)
+
 /// MVC Controller for APMAirframeComponent.qml.
 class APMAirframeComponentController : public FactPanelController
 {
     Q_OBJECT
     Q_MOC_INCLUDE("QmlObjectListModel.h")
-    
-public:
-    APMAirframeComponentController(void);
-    ~APMAirframeComponentController();
-    
-    Q_PROPERTY(QmlObjectListModel*  frameClassModel     MEMBER _frameClassModel CONSTANT)
+    Q_PROPERTY(QmlObjectListModel *frameClassModel MEMBER _frameClassModel CONSTANT)
 
-    Q_INVOKABLE void loadParameters(const QString& paramFile);
+public:
+    explicit APMAirframeComponentController(QObject *parent = nullptr);
+    ~APMAirframeComponentController();
+
+
+    Q_INVOKABLE void loadParameters(const QString &paramFile);
 
 private slots:
-    void _githubJsonDownloadComplete(QString remoteFile, QString localFile, QString errorMsg);
-    void _paramFileDownloadComplete(QString remoteFile, QString localFile, QString errorMsg);
+    void _githubJsonDownloadComplete(const QString &remoteFile, const QString &localFile, const QString &errorMsg);
+    void _paramFileDownloadComplete(const QString &remoteFile, const QString &localFile, const QString &errorMsg);
 
 private:
-    void _fillFrameClasses(void);
-    void _loadParametersFromDownloadFile(const QString& downloadedParamFile);
+    void _fillFrameClasses();
+    void _loadParametersFromDownloadFile(const QString &downloadedParamFile);
 
-    Fact*               _frameClassFact;
-    Fact*               _frameTypeFact;
-    QmlObjectListModel* _frameClassModel;
+    Fact *_frameClassFact = nullptr;
+    Fact *_frameTypeFact = nullptr;
+    QmlObjectListModel *_frameClassModel = nullptr;
 };
+
+/*===========================================================================*/
 
 class APMFrameClass : public QObject
 {
     Q_OBJECT
-    
-public:
-    APMFrameClass(const QString& name, bool copter, int frameClass, Fact* frameTypeFact, QObject* parent = nullptr);
-    ~APMFrameClass();
-    
     Q_PROPERTY(QString      name                    MEMBER _name                    CONSTANT)
     Q_PROPERTY(int          frameClass              MEMBER _frameClass              CONSTANT)
     Q_PROPERTY(int          frameType               READ   frameType                NOTIFY frameTypeChanged)
@@ -62,23 +62,27 @@ public:
     Q_PROPERTY(QString      imageResourceDefault    MEMBER _imageResourceDefault    CONSTANT)
     Q_PROPERTY(bool         frameTypeSupported      MEMBER _frameTypeSupported      CONSTANT)
 
-    int     frameType       (void);
-    QString imageResource   (void);
+public:
+    explicit APMFrameClass(const QString &name, bool copter, int frameClass, Fact *frameTypeFact, QObject *parent = nullptr);
+    ~APMFrameClass();
 
-    QString         _name;
-    bool            _copter;
-    QString         _imageResource;
-    QString         _imageResourceDefault;
-    int             _frameClass;
-    QStringList     _frameTypeEnumStrings;
-    QVariantList    _frameTypeEnumValues;
-    int             _defaultFrameType;
-    bool            _frameTypeSupported;
+    int frameType() const;
+    QString imageResource() const;
+
+    const QString _name;
+    const bool _copter;
+    QString _imageResource;
+    QString _imageResourceDefault;
+    int _frameClass;
+    QStringList _frameTypeEnumStrings;
+    QVariantList _frameTypeEnumValues;
+    int _defaultFrameType = -1;
+    bool _frameTypeSupported = false;
 
 signals:
-    void imageResourceChanged(void);
+    void imageResourceChanged();
     void frameTypeChanged();
 
 private:
-    Fact* _frameTypeFact;
+    Fact *_frameTypeFact = nullptr;
 };

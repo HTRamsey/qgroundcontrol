@@ -7,7 +7,6 @@
  *
  ****************************************************************************/
 
-
 #include "APMAutoPilotPlugin.h"
 #include "VehicleComponent.h"
 #include "Vehicle.h"
@@ -38,26 +37,11 @@
 // #endif
 
 /// This is the AutoPilotPlugin implementatin for the MAV_AUTOPILOT_ARDUPILOT type.
-APMAutoPilotPlugin::APMAutoPilotPlugin(Vehicle* vehicle, QObject* parent)
-    : AutoPilotPlugin           (vehicle, parent)
-    , _incorrectParameterVersion(false)
-    , _airframeComponent        (nullptr)
-    , _cameraComponent          (nullptr)
-    , _lightsComponent          (nullptr)
-    , _subFrameComponent        (nullptr)
-    , _flightModesComponent     (nullptr)
-    , _powerComponent           (nullptr)
-    , _motorComponent           (nullptr)
-    , _radioComponent           (nullptr)
-    , _safetyComponent          (nullptr)
-    , _sensorsComponent         (nullptr)
-    , _tuningComponent          (nullptr)
-    , _esp8266Component         (nullptr)
-    , _heliComponent            (nullptr)
-    , _apmRemoteSupportComponent(nullptr)
+APMAutoPilotPlugin::APMAutoPilotPlugin(Vehicle *vehicle, QObject *parent)
+    : AutoPilotPlugin(vehicle, parent)
 {
-#if !defined(QGC_NO_SERIAL_LINK) && !defined(Q_OS_ANDROID)
-    connect(vehicle->parameterManager(), &ParameterManager::parametersReadyChanged, this, &APMAutoPilotPlugin::_checkForBadCubeBlack);
+#if !defined(QGC_NO_SERIAL_LINK)
+    (void) connect(vehicle->parameterManager(), &ParameterManager::parametersReadyChanged, this, &APMAutoPilotPlugin::_checkForBadCubeBlack);
 #endif
 }
 
@@ -66,44 +50,44 @@ APMAutoPilotPlugin::~APMAutoPilotPlugin()
 
 }
 
-const QVariantList& APMAutoPilotPlugin::vehicleComponents(void)
+const QVariantList &APMAutoPilotPlugin::vehicleComponents()
 {
-    if (_components.count() == 0 && !_incorrectParameterVersion) {
+    if (_components.isEmpty() && !_incorrectParameterVersion) {
         if (_vehicle->parameterManager()->parametersReady()) {
             _airframeComponent = new APMAirframeComponent(_vehicle, this);
             _airframeComponent->setupTriggerSignals();
-            _components.append(QVariant::fromValue((VehicleComponent*)_airframeComponent));
+            _components.append(QVariant::fromValue(qobject_cast<VehicleComponent*>(_airframeComponent)));
 
-            if ( _vehicle->supportsRadio() ) {
+            if (_vehicle->supportsRadio()) {
                 _radioComponent = new APMRadioComponent(_vehicle, this);
                 _radioComponent->setupTriggerSignals();
-                _components.append(QVariant::fromValue((VehicleComponent*)_radioComponent));
+                _components.append(QVariant::fromValue(qobject_cast<VehicleComponent*>(_radioComponent)));
             }
 
             // No flight modes component for Sub versions 3.5 and up
             if (!_vehicle->sub() || (_vehicle->versionCompare(3, 5, 0) < 0)) {
                 _flightModesComponent = new APMFlightModesComponent(_vehicle, this);
                 _flightModesComponent->setupTriggerSignals();
-                _components.append(QVariant::fromValue((VehicleComponent*)_flightModesComponent));
+                _components.append(QVariant::fromValue(qobject_cast<VehicleComponent*>(_flightModesComponent)));
             }
 
             _sensorsComponent = new APMSensorsComponent(_vehicle, this);
             _sensorsComponent->setupTriggerSignals();
-            _components.append(QVariant::fromValue((VehicleComponent*)_sensorsComponent));
+            _components.append(QVariant::fromValue(qobject_cast<VehicleComponent*>(_sensorsComponent)));
 
             _powerComponent = new APMPowerComponent(_vehicle, this);
             _powerComponent->setupTriggerSignals();
-            _components.append(QVariant::fromValue((VehicleComponent*)_powerComponent));
+            _components.append(QVariant::fromValue(qobject_cast<VehicleComponent*>(_powerComponent)));
 
-            if (!_vehicle->sub() || (_vehicle->sub() && _vehicle->versionCompare(3, 5, 3) >= 0)) {
+            if (!_vehicle->sub() || (_vehicle->sub() && (_vehicle->versionCompare(3, 5, 3) >= 0))) {
                 _motorComponent = new APMMotorComponent(_vehicle, this);
                 _motorComponent->setupTriggerSignals();
-                _components.append(QVariant::fromValue((VehicleComponent*)_motorComponent));
+                _components.append(QVariant::fromValue(qobject_cast<VehicleComponent*>(_motorComponent)));
             }
 
             _safetyComponent = new APMSafetyComponent(_vehicle, this);
             _safetyComponent->setupTriggerSignals();
-            _components.append(QVariant::fromValue((VehicleComponent*)_safetyComponent));
+            _components.append(QVariant::fromValue(qobject_cast<VehicleComponent*>(_safetyComponent)));
 
 #ifdef QT_DEBUG
             if ((qobject_cast<ArduCopterFirmwarePlugin*>(_vehicle->firmwarePlugin()) || qobject_cast<ArduRoverFirmwarePlugin*>(_vehicle->firmwarePlugin())) &&
@@ -117,41 +101,41 @@ const QVariantList& APMAutoPilotPlugin::vehicleComponents(void)
             if (_vehicle->vehicleType() == MAV_TYPE_HELICOPTER && (_vehicle->versionCompare(4, 0, 0) >= 0)) {
                 _heliComponent = new APMHeliComponent(_vehicle, this);
                 _heliComponent->setupTriggerSignals();
-                _components.append(QVariant::fromValue((VehicleComponent*)_heliComponent));
+                _components.append(QVariant::fromValue(qobject_cast<VehicleComponent*>(_heliComponent)));
             }
 
             _tuningComponent = new APMTuningComponent(_vehicle, this);
             _tuningComponent->setupTriggerSignals();
-            _components.append(QVariant::fromValue((VehicleComponent*)_tuningComponent));
+            _components.append(QVariant::fromValue(qobject_cast<VehicleComponent*>(_tuningComponent)));
 
-            if(_vehicle->parameterManager()->parameterExists(-1, "MNT1_TYPE")) {
+            if (_vehicle->parameterManager()->parameterExists(-1, "MNT1_TYPE")) {
                 _cameraComponent = new APMCameraComponent(_vehicle, this);
                 _cameraComponent->setupTriggerSignals();
-                _components.append(QVariant::fromValue((VehicleComponent*)_cameraComponent));
+                _components.append(QVariant::fromValue(qobject_cast<VehicleComponent*>(_cameraComponent)));
             }
 
             if (_vehicle->sub()) {
                 _lightsComponent = new APMLightsComponent(_vehicle, this);
                 _lightsComponent->setupTriggerSignals();
-                _components.append(QVariant::fromValue((VehicleComponent*)_lightsComponent));
+                _components.append(QVariant::fromValue(qobject_cast<VehicleComponent*>(_lightsComponent)));
 
-                if(_vehicle->versionCompare(3, 5, 0) >= 0) {
+                if (_vehicle->versionCompare(3, 5, 0) >= 0) {
                     _subFrameComponent = new APMSubFrameComponent(_vehicle, this);
                     _subFrameComponent->setupTriggerSignals();
-                    _components.append(QVariant::fromValue((VehicleComponent*)_subFrameComponent));
+                    _components.append(QVariant::fromValue(qobject_cast<VehicleComponent*>(_subFrameComponent)));
                 }
             }
 
             //-- Is there an ESP8266 Connected?
-            if(_vehicle->parameterManager()->parameterExists(MAV_COMP_ID_UDP_BRIDGE, "SW_VER")) {
+            if (_vehicle->parameterManager()->parameterExists(MAV_COMP_ID_UDP_BRIDGE, "SW_VER")) {
                 _esp8266Component = new ESP8266Component(_vehicle, this);
                 _esp8266Component->setupTriggerSignals();
-                _components.append(QVariant::fromValue((VehicleComponent*)_esp8266Component));
+                _components.append(QVariant::fromValue(qobject_cast<VehicleComponent*>(_esp8266Component)));
             }
 
             _apmRemoteSupportComponent = new APMRemoteSupportComponent(_vehicle, this);
             _apmRemoteSupportComponent->setupTriggerSignals();
-            _components.append(QVariant::fromValue((VehicleComponent*)_apmRemoteSupportComponent));
+            _components.append(QVariant::fromValue(qobject_cast<VehicleComponent*>(_apmRemoteSupportComponent)));
         } else {
             qWarning() << "Call to vehicleCompenents prior to parametersReady";
         }
@@ -160,7 +144,7 @@ const QVariantList& APMAutoPilotPlugin::vehicleComponents(void)
     return _components;
 }
 
-QString APMAutoPilotPlugin::prerequisiteSetup(VehicleComponent* component) const
+QString APMAutoPilotPlugin::prerequisiteSetup(VehicleComponent *component) const
 {
     bool requiresAirframeCheck = false;
 
@@ -195,9 +179,9 @@ QString APMAutoPilotPlugin::prerequisiteSetup(VehicleComponent* component) const
     return QString();
 }
 
-#if !defined(QGC_NO_SERIAL_LINK) && !defined(Q_OS_ANDROID)
+#if !defined(QGC_NO_SERIAL_LINK)
 /// The following code is executed when the Vehicle is parameter ready. It checks for the service bulletin against Cube Blacks.
-void APMAutoPilotPlugin::_checkForBadCubeBlack(void)
+void APMAutoPilotPlugin::_checkForBadCubeBlack()
 {
     bool cubeBlackFound = false;
 #if 0
@@ -214,15 +198,15 @@ void APMAutoPilotPlugin::_checkForBadCubeBlack(void)
         return;
     }
 
-    ParameterManager* paramMgr = _vehicle->parameterManager();
+    ParameterManager *const paramMgr = _vehicle->parameterManager();
 
-    QString paramAcc3("INS_ACC3_ID");
-    QString paramGyr3("INS_GYR3_ID");
-    QString paramEnableMask("INS_ENABLE_MASK");
+    const QString paramAcc3("INS_ACC3_ID");
+    const QString paramGyr3("INS_GYR3_ID");
+    const QString paramEnableMask("INS_ENABLE_MASK");
 
-    if (paramMgr->parameterExists(-1, paramAcc3) && paramMgr->getParameter(-1, paramAcc3)->rawValue().toInt() == 0 &&
-            paramMgr->parameterExists(-1, paramGyr3) && paramMgr->getParameter(-1, paramGyr3)->rawValue().toInt() == 0 &&
-            paramMgr->parameterExists(-1, paramEnableMask) && paramMgr->getParameter(-1, paramEnableMask)->rawValue().toInt() >= 7) {
+    if (paramMgr->parameterExists(-1, paramAcc3) && (paramMgr->getParameter(-1, paramAcc3)->rawValue().toInt() == 0) &&
+        paramMgr->parameterExists(-1, paramGyr3) && (paramMgr->getParameter(-1, paramGyr3)->rawValue().toInt() == 0) &&
+        paramMgr->parameterExists(-1, paramEnableMask) && (paramMgr->getParameter(-1, paramEnableMask)->rawValue().toInt() >= 7)) {
         qgcApp()->showAppMessage(tr("WARNING: The flight board you are using has a critical service bulletin against it which advises against flying. For details see: https://discuss.cubepilot.org/t/sb-0000002-critical-service-bulletin-for-cubes-purchased-between-january-2019-to-present-do-not-fly/406"));
 
     }

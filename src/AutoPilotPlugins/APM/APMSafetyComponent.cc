@@ -7,26 +7,17 @@
  *
  ****************************************************************************/
 
-
-/// @file
-///     @author Don Gagne <don@thegagnes.com>
-
 #include "APMSafetyComponent.h"
 #include "Vehicle.h"
 #include "QGCMAVLink.h"
 
-APMSafetyComponent::APMSafetyComponent(Vehicle* vehicle, AutoPilotPlugin* autopilot, QObject* parent)
+APMSafetyComponent::APMSafetyComponent(Vehicle *vehicle, AutoPilotPlugin *autopilot, QObject *parent)
     : VehicleComponent(vehicle, autopilot, AutoPilotPlugin::KnownSafetyVehicleComponent, parent)
-    , _name(tr("Safety"))
 {
+
 }
 
-QString APMSafetyComponent::name(void) const
-{
-    return _name;
-}
-
-QString APMSafetyComponent::description(void) const
+QString APMSafetyComponent::description() const
 {
     switch (_vehicle->vehicleType()) {
     case MAV_TYPE_SUBMARINE:
@@ -42,32 +33,10 @@ QString APMSafetyComponent::description(void) const
     case MAV_TYPE_TRICOPTER:
     default:
         return tr("Safety Setup is used to setup triggers for Return to Land as well as the settings for Return to Land itself.");
-        break;
     }
 }
 
-QString APMSafetyComponent::iconResource(void) const
-{
-    return QStringLiteral("/qmlimages/SafetyComponentIcon.png");
-}
-
-bool APMSafetyComponent::requiresSetup(void) const
-{
-    return false;
-}
-
-bool APMSafetyComponent::setupComplete(void) const
-{
-    // FIXME: What aboout invalid settings?
-    return true;
-}
-
-QStringList APMSafetyComponent::setupCompleteChangedTriggerList(void) const
-{
-    return QStringList();
-}
-
-QUrl APMSafetyComponent::setupSource(void) const
+QUrl APMSafetyComponent::setupSource() const
 {
     QString qmlFile;
 
@@ -93,7 +62,7 @@ QUrl APMSafetyComponent::setupSource(void) const
     return QUrl::fromUserInput(qmlFile);
 }
 
-QUrl APMSafetyComponent::summaryQmlSource(void) const
+QUrl APMSafetyComponent::summaryQmlSource() const
 {
     QString qmlFile;
 

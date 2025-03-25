@@ -7,17 +7,16 @@
  *
  ****************************************************************************/
 
-
 #include "APMSubMotorComponentController.h"
 #include "Vehicle.h"
 
-
-APMSubMotorComponentController::APMSubMotorComponentController(void)
-{   
-    connect(_vehicle, &Vehicle::textMessageReceived, this, &APMSubMotorComponentController::handleNewMessages);
+APMSubMotorComponentController::APMSubMotorComponentController(QObject *parent)
+    : FactPanelController(parent)
+{
+    (void) connect(_vehicle, &Vehicle::textMessageReceived, this, &APMSubMotorComponentController::handleNewMessages);
 }
 
-void APMSubMotorComponentController::handleNewMessages(int uasid, int componentid, int severity, QString text)
+void APMSubMotorComponentController::handleNewMessages(int uasid, int componentid, int severity, const QString &text)
 {
     Q_UNUSED(uasid);
     Q_UNUSED(componentid);
