@@ -30,14 +30,14 @@ QGCFileDialogController::~QGCFileDialogController()
 
 QStringList QGCFileDialogController::getFiles(const QString &directoryPath, const QStringList &nameFilters)
 {
-    qCDebug(QGCFileDialogControllerLog) << "getFiles" << directoryPath << nameFilters;
+    qCDebug(QGCFileDialogControllerLog) << directoryPath << nameFilters;
 
     QDir fileDir(directoryPath);
     const QFileInfoList fileInfoList = fileDir.entryInfoList(nameFilters,  QDir::Files, QDir::Name);
 
     QStringList files;
     for (const QFileInfo &fileInfo: fileInfoList) {
-        qCDebug(QGCFileDialogControllerLog) << "getFiles found" << fileInfo.fileName();
+        qCDebug(QGCFileDialogControllerLog) << "found" << fileInfo.fileName();
         files << fileInfo.fileName();
     }
 
@@ -58,7 +58,7 @@ QString QGCFileDialogController::fullyQualifiedFilename(const QString& directory
     bool extensionFound = true;
     if (nameFilters.count()) {
         extensionFound = false;
-        for (const QString& nameFilter: nameFilters) {
+        for (const QString &nameFilter: nameFilters) {
             if (nameFilter.startsWith("*.")) {
                 const QString fileExtension = nameFilter.right(nameFilter.length() - 2);
                 if (fileExtension != "*") {
@@ -99,7 +99,7 @@ QString QGCFileDialogController::fullFolderPathToShortMobilePath(const QString &
         return (QCoreApplication::applicationName() + QStringLiteral("/") + fullFolderPath.right(fullFolderPath.length() - lastDirSepIndex));
     }
 #else
-    qCWarning(QGCFileDialogControllerLog) << Q_FUNC_INFO << "should only be used in mobile builds";
+    qCWarning(QGCFileDialogControllerLog) << "should only be used in mobile builds";
 #endif
     return fullFolderPath;
 }

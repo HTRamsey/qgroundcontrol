@@ -16,16 +16,15 @@ class InstrumentValueData;
 class HorizontalFactValueGrid : public FactValueGrid
 {
     Q_OBJECT
-
-public:
-    HorizontalFactValueGrid(QQuickItem *parent = nullptr);
-    HorizontalFactValueGrid(const QString& defaultSettingsGroup);
-
     Q_PROPERTY(QString telemetryBarDefaultSettingsGroup MEMBER telemetryBarDefaultSettingsGroup CONSTANT)
     Q_PROPERTY(QString telemetryBarUserSettingsGroup    MEMBER telemetryBarUserSettingsGroup    CONSTANT)
 
     Q_PROPERTY(QString vehicleCardDefaultSettingsGroup  MEMBER vehicleCardDefaultSettingsGroup  CONSTANT)
     Q_PROPERTY(QString vehicleCardUserSettingsGroup     MEMBER vehicleCardUserSettingsGroup     CONSTANT)
+
+public:
+    explicit HorizontalFactValueGrid(QQuickItem *parent = nullptr);
+    HorizontalFactValueGrid(const QString &defaultSettingsGroup);
 
     static const QString telemetryBarDefaultSettingsGroup;
     static const QString telemetryBarUserSettingsGroup;
@@ -36,5 +35,4 @@ public:
 private:
     Q_DISABLE_COPY(HorizontalFactValueGrid)
 };
-
 QML_DECLARE_TYPE(HorizontalFactValueGrid)

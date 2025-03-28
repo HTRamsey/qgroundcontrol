@@ -8,11 +8,11 @@
  ****************************************************************************/
 
 #include "RCToParamDialogController.h"
-#include "ParameterManager.h"
-#include "MultiVehicleManager.h"
-#include "Vehicle.h"
-#include "QGCLoggingCategory.h"
 #include "Fact.h"
+#include "MultiVehicleManager.h"
+#include "ParameterManager.h"
+#include "QGCLoggingCategory.h"
+#include "Vehicle.h"
 
 QGC_LOGGING_CATEGORY(RCToParamDialogControllerLog, "qgc.qmlcontrols.rctoparamdialogcontroller")
 
@@ -57,6 +57,8 @@ void RCToParamDialogController::setTuningFact(Fact *tuningFact)
 
 void RCToParamDialogController::_parameterUpdated()
 {
-    _ready = true;
-    emit readyChanged(_ready);
+    if (!_ready) {
+        _ready = true;
+        emit readyChanged(_ready);
+    }
 }

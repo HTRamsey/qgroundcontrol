@@ -15,43 +15,40 @@
 class QGCFencePolygon : public QGCMapPolygon
 {
     Q_OBJECT
+    Q_PROPERTY(bool inclusion READ inclusion WRITE setInclusion NOTIFY inclusionChanged)
 
 public:
-    QGCFencePolygon(bool inclusion, QObject* parent = nullptr);
-    QGCFencePolygon(const QGCFencePolygon& other, QObject* parent = nullptr);
+    explicit QGCFencePolygon(bool inclusion, QObject* parent = nullptr);
+    explicit QGCFencePolygon(const QGCFencePolygon& other, QObject* parent = nullptr);
 
-    const QGCFencePolygon& operator=(const QGCFencePolygon& other);
-
-    Q_PROPERTY(bool inclusion READ inclusion WRITE setInclusion NOTIFY inclusionChanged)
+    const QGCFencePolygon &operator=(const QGCFencePolygon &other);
 
     /// Saves the QGCFencePolygon to the json object.
     ///     @param json Json object to save to
-    void saveToJson(QJsonObject& json);
+    void saveToJson(QJsonObject &json);
 
     /// Load a QGCFencePolygon from json
     ///     @param json Json object to load from
     ///     @param required true: no polygon in object will generate error
     ///     @param errorString Error string if return is false
     /// @return true: success, false: failure (errorString set)
-    bool loadFromJson(const QJsonObject& json, bool required, QString& errorString);
+    bool loadFromJson(const QJsonObject &json, bool required, QString &errorString);
 
     // Property methods
-
-    bool inclusion      (void) const { return _inclusion; }
-    void setInclusion   (bool inclusion);
+    bool inclusion() const { return _inclusion; }
+    void setInclusion(bool inclusion);
 
 signals:
-    void inclusionChanged   (bool inclusion);
+    void inclusionChanged(bool inclusion);
 
 private slots:
-    void _setDirty(void);
+    void _setDirty();
 
 private:
-    void _init(void);
+    void _init();
 
-    bool _inclusion;
+    bool _inclusion = false;
 
     static constexpr int _jsonCurrentVersion = 1;
-
-    static constexpr const char* _jsonInclusionKey = "inclusion";
+    static constexpr const char *_jsonInclusionKey = "inclusion";
 };

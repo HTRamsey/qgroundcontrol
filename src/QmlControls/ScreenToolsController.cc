@@ -7,22 +7,18 @@
  *
  ****************************************************************************/
 
-
-/// @file
-/// @author Gus Grubba <gus@auterion.com>
-
 #include "ScreenToolsController.h"
+#include "AppSettings.h"
 #include "QGCApplication.h"
 #include "QGCLoggingCategory.h"
 #include "SettingsManager.h"
-#include "AppSettings.h"
 
 #include <QtGui/QCursor>
 #include <QtGui/QFontDatabase>
 #include <QtGui/QFontMetrics>
 #include <QtGui/QInputDevice>
 
-#if defined(Q_OS_IOS)
+#ifdef Q_OS_IOS
 #include <sys/utsname.h>
 #endif
 
@@ -61,7 +57,7 @@ bool ScreenToolsController::hasTouch()
 
 QString ScreenToolsController::iOSDevice()
 {
-#if defined(Q_OS_IOS)
+#ifdef Q_OS_IOS
     struct utsname systemInfo;
     uname(&systemInfo);
     return QString(systemInfo.machine);
@@ -77,9 +73,9 @@ QString ScreenToolsController::fixedFontFamily()
 
 QString ScreenToolsController::normalFontFamily()
 {
-    //-- See App.SettinsGroup.json for index
-    const int langID = SettingsManager::instance()->appSettings()->qLocaleLanguage()->rawValue().toInt();
-    if (langID == QLocale::Korean) {
+    bool ok = false;
+    const int langID = SettingsManager::instance()->appSettings()->qLocaleLanguage()->rawValue().toInt(&ok);
+    if (ok && (langID == QLocale::Korean)) {
         return QStringLiteral("NanumGothic");
     }
 

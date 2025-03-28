@@ -52,10 +52,10 @@ public:
     ~QGCApplication();
 
     /// Sets the persistent flag to delete all settings the next time QGroundControl is started.
-    void deleteAllSettingsNextBoot();
+    static void deleteAllSettingsNextBoot();
 
     /// Clears the persistent flag to delete all settings the next time QGroundControl is started.
-    void clearDeleteAllSettingsNextBoot();
+    static void clearDeleteAllSettingsNextBoot();
 
     /// Returns true if unit tests are being run
     bool runningUnitTests() const { return _runningUnitTests; }
@@ -175,8 +175,8 @@ private:
 
     CompressedSignalList _compressedSignals;
 
-    const QString _settingsVersionKey = QStringLiteral("SettingsVersion"); ///< Settings key which hold settings version
-    const QString _deleteAllSettingsKey = QStringLiteral("DeleteAllSettingsNextBoot"); ///< If this settings key is set on boot, all settings will be deleted
+    static constexpr const char *_settingsVersionKey = "SettingsVersion"; ///< Settings key which hold settings version
+    static constexpr const char *_deleteAllSettingsKey = "DeleteAllSettingsNextBoot"; ///< If this settings key is set on boot, all settings will be deleted
 
-    const QString _qgcImageProviderId = QStringLiteral("QGCImages");
+    static constexpr const char *_qgcImageProviderId = "QGCImages";
 };

@@ -70,8 +70,8 @@ void MavlinkActionManager::_loadActionsFile()
         return;
     }
 
-    constexpr const char *kQgcFileType = "MavlinkActions";
-    constexpr const char *kActionListKey = "actions";
+    static constexpr const char *kQgcFileType = "MavlinkActions";
+    static constexpr const char *kActionListKey = "actions";
 
     _actions->clearAndDeleteContents();
 
@@ -99,7 +99,7 @@ void MavlinkActionManager::_loadActionsFile()
             return;
         }
 
-        const QList<JsonHelper::KeyValidateInfo> actionKeyInfoList = {
+        static const QList<JsonHelper::KeyValidateInfo> actionKeyInfoList = {
             { "label",          QJsonValue::String, /* required= */ true },
             { "description",    QJsonValue::String, /* required= */ true },
             { "mavCmd",         QJsonValue::Double, /* required= */ true },
@@ -135,6 +135,6 @@ void MavlinkActionManager::_loadActionsFile()
 
         MavlinkAction *const action = new MavlinkAction(label, description, mavCmd, compId, param1, param2, param3, param4, param5, param6, param7, this);
         QQmlEngine::setObjectOwnership(action, QQmlEngine::CppOwnership);
-        (void) _actions->append(action);
+        _actions->append(action);
     }
 }

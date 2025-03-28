@@ -149,6 +149,7 @@ QGCApplication::QGCApplication(int &argc, char *argv[], bool unitTesting)
 #endif
     }
     setApplicationName(applicationName);
+    setApplicationDisplayName(applicationName);
     setOrganizationName(QGC_ORG_NAME);
     setOrganizationDomain(QGC_ORG_DOMAIN);
     setApplicationVersion(QString(QGC_APP_VERSION_STR));

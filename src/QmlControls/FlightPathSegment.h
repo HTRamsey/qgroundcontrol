@@ -9,13 +9,12 @@
 
 #pragma once
 
-#include "TerrainQuery.h"
-
-#include <QtCore/QObject>
-#include <QtPositioning/QGeoCoordinate>
-#include <QtCore/QTimer>
 #include <QtCore/QLoggingCategory>
+#include <QtCore/QObject>
+#include <QtCore/QTimer>
+#include <QtPositioning/QGeoCoordinate>
 
+#include "TerrainQuery.h"
 
 Q_DECLARE_LOGGING_CATEGORY(FlightPathSegmentLog)
 
@@ -23,18 +22,6 @@ Q_DECLARE_LOGGING_CATEGORY(FlightPathSegmentLog)
 class FlightPathSegment : public QObject
 {
     Q_OBJECT
-    
-public:
-    enum SegmentType {
-        SegmentTypeTakeoff,         // Takeoff segments ignore the first part of the segment for terrain collisions
-        SegmentTypeGeneric,         // Generic segments take into account the entire segment for terrain collisions
-        SegmentTypeLand,            // Land segments ignore the last part of the segment for terrain collisions
-        SegmentTypeTerrainFrame,    // Flight path in between the two coords follows terrain
-    };
-    Q_ENUM(SegmentType)
-
-    FlightPathSegment(SegmentType segmentType, const QGeoCoordinate& coord1, double coord1AMSLAlt, const QGeoCoordinate& coord2, double coord2AMSLAlt, bool queryTerrainData, QObject* parent);
-
     Q_PROPERTY(QGeoCoordinate   coordinate1             MEMBER _coord1                                          NOTIFY coordinate1Changed)
     Q_PROPERTY(QGeoCoordinate   coordinate2             MEMBER _coord2                                          NOTIFY coordinate2Changed)
     Q_PROPERTY(double           coord1AMSLAlt           MEMBER _coord1AMSLAlt                                   NOTIFY coord1AMSLAltChanged)
@@ -47,59 +34,71 @@ public:
     Q_PROPERTY(bool             terrainCollision        MEMBER _terrainCollision                                NOTIFY terrainCollisionChanged)
     Q_PROPERTY(SegmentType      segmentType             MEMBER _segmentType                                     CONSTANT)
 
-    QGeoCoordinate      coordinate1         (void) const { return _coord1; }
-    QGeoCoordinate      coordinate2         (void) const { return _coord2; }
-    double              coord1AMSLAlt       (void) const { return _coord1AMSLAlt; }
-    double              coord2AMSLAlt       (void) const { return _coord2AMSLAlt; }
-    const QVariantList& amslTerrainHeights  (void) const { return _amslTerrainHeights; }
-    double              distanceBetween     (void) const { return _distanceBetween; }
-    double              finalDistanceBetween(void) const { return _finalDistanceBetween; }
-    double              totalDistance       (void) const { return _totalDistance; }
-    bool                specialVisual       (void) const { return _specialVisual; }
-    bool                terrainCollision    (void) const { return _terrainCollision; }
-    SegmentType         segmentType         (void) const { return _segmentType; }
+public:
+    enum SegmentType {
+        SegmentTypeTakeoff,         // Takeoff segments ignore the first part of the segment for terrain collisions
+        SegmentTypeGeneric,         // Generic segments take into account the entire segment for terrain collisions
+        SegmentTypeLand,            // Land segments ignore the last part of the segment for terrain collisions
+        SegmentTypeTerrainFrame,    // Flight path in between the two coords follows terrain
+    };
+    Q_ENUM(SegmentType)
+
+    explicit FlightPathSegment(SegmentType segmentType, const QGeoCoordinate &coord1, double coord1AMSLAlt, const QGeoCoordinate &coord2, double coord2AMSLAlt, bool queryTerrainData, QObject *parent = nullptr);
+
+    QGeoCoordinate coordinate1() const { return _coord1; }
+    QGeoCoordinate coordinate2() const { return _coord2; }
+    double coord1AMSLAlt() const { return _coord1AMSLAlt; }
+    double coord2AMSLAlt() const { return _coord2AMSLAlt; }
+    const QVariantList &amslTerrainHeights() const { return _amslTerrainHeights; }
+    double distanceBetween() const { return _distanceBetween; }
+    double finalDistanceBetween() const { return _finalDistanceBetween; }
+    double totalDistance() const { return _totalDistance; }
+    bool specialVisual() const { return _specialVisual; }
+    bool terrainCollision() const { return _terrainCollision; }
+    SegmentType segmentType() const { return _segmentType; }
 
     void setSpecialVisual(bool specialVisual);
 
 public slots:
-    void setCoordinate1     (const QGeoCoordinate& coordinate);
-    void setCoordinate2     (const QGeoCoordinate& coordinate);
-    void setCoord1AMSLAlt   (double alt);
-    void setCoord2AMSLAlt   (double alt);
+    void setCoordinate1(const QGeoCoordinate &coordinate);
+    void setCoordinate2(const QGeoCoordinate &coordinate);
+    void setCoord1AMSLAlt(double alt);
+    void setCoord2AMSLAlt(double alt);
 
 signals:
-    void coordinate1Changed         (QGeoCoordinate coordinate);
-    void coordinate2Changed         (QGeoCoordinate coordinate);
-    void coord1AMSLAltChanged       (void);
-    void coord2AMSLAltChanged       (void);
-    void specialVisualChanged       (bool specialVisual);
-    void amslTerrainHeightsChanged  (void);
-    void distanceBetweenChanged     (double distanceBetween);
+    void coordinate1Changed(const QGeoCoordinate &coordinate);
+    void coordinate2Changed(const QGeoCoordinate &coordinate);
+    void coord1AMSLAltChanged();
+    void coord2AMSLAltChanged();
+    void specialVisualChanged(bool specialVisual);
+    void amslTerrainHeightsChanged();
+    void distanceBetweenChanged(double distanceBetween);
     void finalDistanceBetweenChanged(double finalDistanceBetween);
-    void totalDistanceChanged       (double totalDistance);
-    void terrainCollisionChanged    (bool terrainCollision);
+    void totalDistanceChanged(double totalDistance);
+    void terrainCollisionChanged(bool terrainCollision);
 
 private slots:
-    void _sendTerrainPathQuery      (void);
-    void _terrainDataReceived       (bool success, const TerrainPathQuery::PathHeightInfo_t& pathHeightInfo);
-    void _updateTotalDistance       (void);
-    void _updateTerrainCollision    (void);
+    void _sendTerrainPathQuery();
+    void _terrainDataReceived(bool success, const TerrainPathQuery::PathHeightInfo_t &pathHeightInfo);
+    void _updateTotalDistance();
+    void _updateTerrainCollision();
 
 private:
-    QGeoCoordinate      _coord1;
-    QGeoCoordinate      _coord2;
-    double              _coord1AMSLAlt =                qQNaN();
-    double              _coord2AMSLAlt =                qQNaN();
-    bool                _queryTerrainData;
-    bool                _terrainCollision =             false;
-    bool                _specialVisual =                false;
-    QTimer              _delayedTerrainPathQueryTimer;
-    TerrainPathQuery*   _currentTerrainPathQuery =      nullptr;
-    QVariantList        _amslTerrainHeights;
-    double              _distanceBetween =              0;
-    double              _finalDistanceBetween =         0;
-    double              _totalDistance =                0;
-    SegmentType         _segmentType =                  SegmentTypeGeneric;
+    QGeoCoordinate _coord1;
+    QGeoCoordinate _coord2;
+    double _coord1AMSLAlt = qQNaN();
+    double _coord2AMSLAlt = qQNaN();
+    const bool _queryTerrainData = false;
+    const SegmentType _segmentType = SegmentTypeGeneric;
+    bool _terrainCollision = false;
+    SegmentType _segmentType = SegmentTypeGeneric;
+    bool _specialVisual = false;
+    QTimer _delayedTerrainPathQueryTimer;
+    TerrainPathQuery *_currentTerrainPathQuery = nullptr;
+    QVariantList _amslTerrainHeights;
+    double _distanceBetween = 0;
+    double _finalDistanceBetween = 0;
+    double _totalDistance = 0;
 
-    static constexpr double _collisionIgnoreMeters =    10; // Distance to ignore for takeoff/land segments
+    static constexpr double _collisionIgnoreMeters = 10; // Distance to ignore for takeoff/land segments
 };

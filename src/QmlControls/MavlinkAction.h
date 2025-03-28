@@ -29,7 +29,7 @@ class MavlinkAction: public QObject
 
 public:
     explicit MavlinkAction(QObject *parent = nullptr);
-    MavlinkAction(
+    explicit MavlinkAction(
         const QString &label,
         const QString &description,
         MAV_CMD mavCmd,

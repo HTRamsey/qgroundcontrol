@@ -7,10 +7,6 @@
  *
  ****************************************************************************/
 
-
-/// @file
-///     @author Gus Grubba <gus@auterion.com>
-
 #pragma once
 
 #include <QtCore/QLoggingCategory>

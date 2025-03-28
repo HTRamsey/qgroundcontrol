@@ -126,7 +126,8 @@ public:
 
     void setHomePositionSpecialCase (bool homePositionSpecialCase) { _homePositionSpecialCase = homePositionSpecialCase; }
 
-    FlightPathSegment* simpleFlightPathSegment(void) { return _simpleFlightPathSegment; }
+    FlightPathSegment *simpleFlightPathSegment() { return _simpleFlightPathSegment; }
+    const FlightPathSegment *simpleFlightPathSegment() const { return _simpleFlightPathSegment; }
     void setSimpleFlighPathSegment  (FlightPathSegment* segment) { _simpleFlightPathSegment = segment; }
     void clearSimpleFlighPathSegment(void) { _simpleFlightPathSegment = nullptr; }
 

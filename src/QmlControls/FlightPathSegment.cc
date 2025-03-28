@@ -11,16 +11,16 @@
 #include "QGC.h"
 #include "QGCLoggingCategory.h"
 
-QGC_LOGGING_CATEGORY(FlightPathSegmentLog, "FlightPathSegmentLog")
+QGC_LOGGING_CATEGORY(FlightPathSegmentLog, "qgc.qmlcontrols.flightpathsegment")
 
-FlightPathSegment::FlightPathSegment(SegmentType segmentType, const QGeoCoordinate& coord1, double amslCoord1Alt, const QGeoCoordinate& coord2, double amslCoord2Alt, bool queryTerrainData, QObject* parent)
-    : QObject           (parent)
-    , _coord1           (coord1)
-    , _coord2           (coord2)
-    , _coord1AMSLAlt     (amslCoord1Alt)
-    , _coord2AMSLAlt     (amslCoord2Alt)
-    , _queryTerrainData (queryTerrainData)
-    , _segmentType      (segmentType)
+FlightPathSegment::FlightPathSegment(SegmentType segmentType, const QGeoCoordinate &coord1, double amslCoord1Alt, const QGeoCoordinate &coord2, double amslCoord2Alt, bool queryTerrainData, QObject *parent)
+    : QObject(parent)
+    , _coord1(coord1)
+    , _coord2(coord2)
+    , _coord1AMSLAlt(amslCoord1Alt)
+    , _coord2AMSLAlt(amslCoord2Alt)
+    , _queryTerrainData(queryTerrainData)
+    , _segmentType(segmentType)
 {
     _delayedTerrainPathQueryTimer.setSingleShot(true);
     _delayedTerrainPathQueryTimer.setInterval(200);
@@ -78,14 +78,14 @@ void FlightPathSegment::setSpecialVisual(bool specialVisual)
     }
 }
 
-void FlightPathSegment::_sendTerrainPathQuery(void)
+void FlightPathSegment::_sendTerrainPathQuery()
 {
     if (_queryTerrainData && _coord1.isValid() && _coord2.isValid()) {
-        qCDebug(FlightPathSegmentLog) << this << "_sendTerrainPathQuery";
+        qCDebug(FlightPathSegmentLog) << this;
         // Clear any previous query
         if (_currentTerrainPathQuery) {
             // We are already waiting on another query. We don't care about those results any more.
-            disconnect(_currentTerrainPathQuery, &TerrainPathQuery::terrainDataReceived, this, &FlightPathSegment::_terrainDataReceived);
+            (void) disconnect(_currentTerrainPathQuery, &TerrainPathQuery::terrainDataReceived, this, &FlightPathSegment::_terrainDataReceived);
             _currentTerrainPathQuery = nullptr;
         }
 
@@ -98,14 +98,14 @@ void FlightPathSegment::_sendTerrainPathQuery(void)
         emit amslTerrainHeightsChanged();
 
         _currentTerrainPathQuery = new TerrainPathQuery(true /* autoDelete */);
-        connect(_currentTerrainPathQuery, &TerrainPathQuery::terrainDataReceived, this, &FlightPathSegment::_terrainDataReceived);
+        (void) connect(_currentTerrainPathQuery, &TerrainPathQuery::terrainDataReceived, this, &FlightPathSegment::_terrainDataReceived);
         _currentTerrainPathQuery->requestData(_coord1, _coord2);
     }
 }
 
-void FlightPathSegment::_terrainDataReceived(bool success, const TerrainPathQuery::PathHeightInfo_t& pathHeightInfo)
+void FlightPathSegment::_terrainDataReceived(bool success, const TerrainPathQuery::PathHeightInfo_t &pathHeightInfo)
 {
-    qCDebug(FlightPathSegmentLog) << this << "_terrainDataReceived" << success << pathHeightInfo.heights.count();
+    qCDebug(FlightPathSegmentLog) << this << success << pathHeightInfo.heights.count();
     if (success) {
         if (!QGC::fuzzyCompare(pathHeightInfo.distanceBetween, _distanceBetween)) {
             _distanceBetween = pathHeightInfo.distanceBetween;
@@ -117,7 +117,7 @@ void FlightPathSegment::_terrainDataReceived(bool success, const TerrainPathQuer
         }
 
         _amslTerrainHeights.clear();
-        for (const double& amslTerrainHeight: pathHeightInfo.heights) {
+        for (const double &amslTerrainHeight: pathHeightInfo.heights) {
             _amslTerrainHeights.append(amslTerrainHeight);
         }
         emit amslTerrainHeightsChanged();
@@ -129,7 +129,7 @@ void FlightPathSegment::_terrainDataReceived(bool success, const TerrainPathQuer
     _updateTerrainCollision();
 }
 
-void FlightPathSegment::_updateTotalDistance(void)
+void FlightPathSegment::_updateTotalDistance()
 {
     double newTotalDistance = 0;
     if (_coord1.isValid() && _coord2.isValid()) {
@@ -142,32 +142,32 @@ void FlightPathSegment::_updateTotalDistance(void)
     }
 }
 
-void FlightPathSegment::_updateTerrainCollision(void)
+void FlightPathSegment::_updateTerrainCollision()
 {
     bool newTerrainCollision = false;
 
     if (_segmentType != SegmentTypeTerrainFrame) {
-        double slope =      (_coord2AMSLAlt - _coord1AMSLAlt) / _totalDistance;
-        double yIntercept = _coord1AMSLAlt;
+        const double slope = (_coord2AMSLAlt - _coord1AMSLAlt) / _totalDistance;
+        const double yIntercept = _coord1AMSLAlt;
 
         double x = 0;
-        for (int i=0; i<_amslTerrainHeights.count(); i++) {
+        for (int i = 0; i < _amslTerrainHeights.count(); i++) {
             bool ignoreCollision = false;
-            if (_segmentType == SegmentTypeTakeoff && x < _collisionIgnoreMeters) {
+            if ((_segmentType == SegmentTypeTakeoff) && (x < _collisionIgnoreMeters)) {
                 ignoreCollision = true;
-            } else if (_segmentType == SegmentTypeLand && x > _totalDistance - _collisionIgnoreMeters) {
+            } else if ((_segmentType == SegmentTypeLand) && (x > (_totalDistance - _collisionIgnoreMeters))) {
                 ignoreCollision = true;
             }
 
             if (!ignoreCollision) {
-                double y = _amslTerrainHeights[i].value<double>();
-                if (y > (slope * x) + yIntercept) {
+                const double y = _amslTerrainHeights[i].value<double>();
+                if (y > ((slope * x) + yIntercept)) {
                     newTerrainCollision = true;
                     break;
                 }
             }
 
-            if (i == _amslTerrainHeights.count() - 2) {
+            if (i == (_amslTerrainHeights.count() - 2)) {
                 x += _finalDistanceBetween;
             } else {
                 x += _distanceBetween;
@@ -175,7 +175,7 @@ void FlightPathSegment::_updateTerrainCollision(void)
         }
     }
 
-    qCDebug(FlightPathSegmentLog) << this << "_updateTerrainCollision new:old" << newTerrainCollision << _terrainCollision;
+    qCDebug(FlightPathSegmentLog) << this << "new:old" << newTerrainCollision << _terrainCollision;
 
     if (newTerrainCollision != _terrainCollision) {
         _terrainCollision = newTerrainCollision;

@@ -9,9 +9,9 @@
 
 #pragma once
 
+#include <QtCore/QMap>
 #include <QtCore/QObject>
 #include <QtGui/QColor>
-#include <QtCore/QMap>
 #include <QtQmlIntegration/QtQmlIntegration>
 
 #define DECLARE_QGC_COLOR(name, lightDisabled, lightEnabled, darkDisabled, darkEnabled) \
@@ -92,6 +92,9 @@ class QGCPalette : public QObject
 {
     Q_OBJECT
     // QML_ELEMENT
+    Q_PROPERTY(Theme        globalTheme         READ globalTheme        WRITE setGlobalTheme        NOTIFY paletteChanged)
+    Q_PROPERTY(bool         colorGroupEnabled   READ colorGroupEnabled  WRITE setColorGroupEnabled  NOTIFY paletteChanged)
+    Q_PROPERTY(QStringList  colors              READ colors                                         CONSTANT)
 
 public:
     enum ColorGroup {
@@ -108,10 +111,6 @@ public:
     Q_ENUM(Theme)
 
     typedef QColor PaletteColorInfo_t[cMaxTheme][cMaxColorGroup];
-
-    Q_PROPERTY(Theme        globalTheme         READ globalTheme        WRITE setGlobalTheme        NOTIFY paletteChanged)
-    Q_PROPERTY(bool         colorGroupEnabled   READ colorGroupEnabled  WRITE setColorGroupEnabled  NOTIFY paletteChanged)
-    Q_PROPERTY(QStringList  colors              READ colors             CONSTANT)
 
     DEFINE_QGC_COLOR(window,                        setWindow)
     DEFINE_QGC_COLOR(windowShadeLight,              setWindowShadeLight)
@@ -164,29 +163,29 @@ public:
     DEFINE_QGC_COLOR(successNotifyUTMSP,             setSuccessNotifyUTMSP)
 #endif
 
-     QGCPalette(QObject* parent = nullptr);
+    explicit QGCPalette(QObject *parent = nullptr);
     ~QGCPalette();
 
-    QStringList colors                      () const { return _colors; }
-    bool        colorGroupEnabled           () const { return _colorGroupEnabled; }
-    void        setColorGroupEnabled        (bool enabled);
+    QStringList colors() const { return _colors; }
+    bool colorGroupEnabled() const { return _colorGroupEnabled; }
+    void setColorGroupEnabled(bool enabled);
 
-    static Theme    globalTheme             () { return _theme; }
-    static void     setGlobalTheme          (Theme newTheme);
+    static Theme globalTheme() { return _theme; }
+    static void setGlobalTheme(Theme newTheme);
 
 signals:
-    void paletteChanged ();
+    void paletteChanged();
 
 private:
-    static void _buildMap                   ();
-    static void _signalPaletteChangeToAll   ();
-    void        _signalPaletteChanged       ();
-    void        _themeChanged               ();
+    static void _buildMap();
+    static void _signalPaletteChangeToAll();
+    void _signalPaletteChanged();
+    void _themeChanged();
 
-    static Theme                _theme;             ///< There is a single theme for all palettes
-    bool                        _colorGroupEnabled; ///< Currently selected ColorGroup. true: enabled, false: disabled
-    static QStringList          _colors;
+    static Theme _theme;             ///< There is a single theme for all palettes
+    bool _colorGroupEnabled = true;  ///< Currently selected ColorGroup. true: enabled, false: disabled
+    static QStringList _colors;
 
-    static QMap<int, QMap<int, QMap<QString, QColor>>> _colorInfoMap;   // theme -> colorGroup -> color name -> color
-    static QList<QGCPalette*> _paletteObjects;    ///< List of all active QGCPalette objects
+    static QMap<int, QMap<int, QMap<QString, QColor>>> _colorInfoMap;   ///< theme -> colorGroup -> color name -> color
+    static QList<QGCPalette*> _paletteObjects;                          ///< List of all active QGCPalette objects
 };

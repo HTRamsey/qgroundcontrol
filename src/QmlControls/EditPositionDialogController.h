@@ -41,7 +41,7 @@ public:
     Q_INVOKABLE void setFromMGRS();
     Q_INVOKABLE void setFromVehicle();
 
-    void setCoordinate(QGeoCoordinate coordinate);
+    void setCoordinate(const QGeoCoordinate &coordinate);
     QGeoCoordinate coordinate() const { return _coordinate; }
 
     Fact *latitude() { return _latitudeFact; }
@@ -58,13 +58,13 @@ signals:
 private:
     QGeoCoordinate _coordinate;
 
-    Fact *_latitudeFact = nullptr;
-    Fact *_longitudeFact = nullptr;
-    Fact *_zoneFact = nullptr;
-    Fact *_hemisphereFact = nullptr;
-    Fact *_eastingFact = nullptr;
-    Fact *_northingFact = nullptr;
-    Fact *_mgrsFact = nullptr;
+    Fact *_latitudeFact = Fact(0, _latitudeFactName, FactMetaData::valueTypeDouble);
+    Fact *_longitudeFact = Fact(0, _longitudeFactName, FactMetaData::valueTypeDouble);
+    Fact *_zoneFact = Fact(0, _zoneFactName, FactMetaData::valueTypeUint8);
+    Fact *_hemisphereFact = Fact(0, _hemisphereFactName, FactMetaData::valueTypeUint8);
+    Fact *_eastingFact = Fact(0, _eastingFactName, FactMetaData::valueTypeDouble);
+    Fact *_northingFact = Fact(0, _northingFactName, FactMetaData::valueTypeDouble);
+    Fact *_mgrsFact = Fact(0, _mgrsFactName, FactMetaData::valueTypeString);
 
     static QMap<QString, FactMetaData*> _metaDataMap;
 

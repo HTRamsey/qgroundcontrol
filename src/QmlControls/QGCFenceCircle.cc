@@ -10,60 +10,59 @@
 #include "QGCFenceCircle.h"
 #include "JsonHelper.h"
 
-QGCFenceCircle::QGCFenceCircle(QObject* parent)
-    : QGCMapCircle  (parent)
-    , _inclusion    (true)
+QGCFenceCircle::QGCFenceCircle(QObject *parent)
+    : QGCMapCircle(parent)
 {
     _init();
 }
 
-QGCFenceCircle::QGCFenceCircle(const QGeoCoordinate& center, double radius, bool inclusion, QObject* parent)
-    : QGCMapCircle  (center, radius, false /* showRotation */, true /* clockwiseRotation */, parent)
-    , _inclusion    (inclusion)
+QGCFenceCircle::QGCFenceCircle(const QGeoCoordinate &center, double radius, bool inclusion, QObject *parent)
+    : QGCMapCircle(center, radius, false /* showRotation */, true /* clockwiseRotation */, parent)
+    , _inclusion(inclusion)
 {
     _init();
 }
 
-QGCFenceCircle::QGCFenceCircle(const QGCFenceCircle& other, QObject* parent)
-    : QGCMapCircle  (other, parent)
-    , _inclusion    (other._inclusion)
+QGCFenceCircle::QGCFenceCircle(const QGCFenceCircle &other, QObject *parent)
+    : QGCMapCircle(other, parent)
+    , _inclusion(other.inclusion())
 {
     _init();
 }
 
-void QGCFenceCircle::_init(void)
+void QGCFenceCircle::_init()
 {
-    connect(this, &QGCFenceCircle::inclusionChanged, this, &QGCFenceCircle::_setDirty);
+    (void) connect(this, &QGCFenceCircle::inclusionChanged, this, &QGCFenceCircle::_setDirty);
 }
 
-const QGCFenceCircle& QGCFenceCircle::operator=(const QGCFenceCircle& other)
+const QGCFenceCircle &QGCFenceCircle::operator=(const QGCFenceCircle &other)
 {
     QGCMapCircle::operator=(other);
 
-    setInclusion(other._inclusion);
+    setInclusion(other.inclusion());
 
     return *this;
 }
 
-void QGCFenceCircle::_setDirty(void)
+void QGCFenceCircle::_setDirty()
 {
     setDirty(true);
 }
 
-void QGCFenceCircle::saveToJson(QJsonObject& json)
+void QGCFenceCircle::saveToJson(QJsonObject &json)
 {
     json[JsonHelper::jsonVersionKey] = _jsonCurrentVersion;
     json[_jsonInclusionKey] = _inclusion;
     QGCMapCircle::saveToJson(json);
 }
 
-bool QGCFenceCircle::loadFromJson(const QJsonObject& json, QString& errorString)
+bool QGCFenceCircle::loadFromJson(const QJsonObject &json, QString &errorString)
 {
     errorString.clear();
 
-    QList<JsonHelper::KeyValidateInfo> keyInfoList = {
-        { JsonHelper::jsonVersionKey,   QJsonValue::Double, true },
-        { _jsonInclusionKey,            QJsonValue::Bool,   true },
+    static const QList<JsonHelper::KeyValidateInfo> keyInfoList = {
+        { JsonHelper::jsonVersionKey, QJsonValue::Double, true },
+        { _jsonInclusionKey, QJsonValue::Bool, true },
     };
     if (!JsonHelper::validateKeys(json, keyInfoList, errorString)) {
         return false;

@@ -15,30 +15,28 @@
 class QGCFenceCircle : public QGCMapCircle
 {
     Q_OBJECT
+    Q_PROPERTY(bool inclusion READ inclusion WRITE setInclusion NOTIFY inclusionChanged)
 
 public:
-    QGCFenceCircle(QObject* parent = nullptr);
-    QGCFenceCircle(const QGeoCoordinate& center, double radius, bool inclusion, QObject* parent = nullptr);
-    QGCFenceCircle(const QGCFenceCircle& other, QObject* parent = nullptr);
+    explicit QGCFenceCircle(QObject *parent = nullptr);
+    explicit QGCFenceCircle(const QGeoCoordinate &center, double radius, bool inclusion, QObject *parent = nullptr);
+    explicit QGCFenceCircle(const QGCFenceCircle &other, QObject *parent = nullptr);
 
-    const QGCFenceCircle& operator=(const QGCFenceCircle& other);
-
-    Q_PROPERTY(bool inclusion READ inclusion WRITE setInclusion NOTIFY inclusionChanged)
+    const QGCFenceCircle &operator=(const QGCFenceCircle &other);
 
     /// Saves the QGCFenceCircle to the json object.
     ///     @param json Json object to save to
-    void saveToJson(QJsonObject& json);
+    void saveToJson(QJsonObject &json);
 
     /// Load a QGCFenceCircle from json
     ///     @param json Json object to load from
     ///     @param errorString Error string if return is false
     /// @return true: success, false: failure (errorString set)
-    bool loadFromJson(const QJsonObject& json, QString& errorString);
+    bool loadFromJson(const QJsonObject &json, QString &errorString);
 
     // Property methods
-
-    bool inclusion      (void) const { return _inclusion; }
-    void setInclusion   (bool inclusion);
+    bool inclusion() const { return _inclusion; }
+    void setInclusion(bool inclusion);
 
 signals:
     void inclusionChanged(bool inclusion);
@@ -49,9 +47,8 @@ private slots:
 private:
     void _init(void);
 
-    bool _inclusion;
+    bool _inclusion = true;
 
     static constexpr int _jsonCurrentVersion = 1;
-
-    static constexpr const char* _jsonInclusionKey = "inclusion";
+    static constexpr const char *_jsonInclusionKey = "inclusion";
 };

@@ -7,7 +7,6 @@
  *
  ****************************************************************************/
 
-
 #pragma once
 
 #include <QtCore/QObject>
@@ -15,64 +14,64 @@
 
 // A bounding "cube" for small surface areas (doesn't take in consideration earth's curvature)
 // Coordinate system makes NW Up Left Bottom (0,0,0) and SE Bottom Right Top (y,x,z)
-class QGCGeoBoundingCube : public QObject {
+class QGCGeoBoundingCube : public QObject
+{
     Q_OBJECT
-public:
-    QGCGeoBoundingCube(QObject* parent = nullptr);
+    Q_PROPERTY(QGeoCoordinate pointNW MEMBER pointNW CONSTANT)
+    Q_PROPERTY(QGeoCoordinate pointSE MEMBER pointSE CONSTANT)
 
-    QGCGeoBoundingCube(const QGCGeoBoundingCube& other)
+public:
+    explicit QGCGeoBoundingCube(QObject *parent = nullptr);
+
+    QGCGeoBoundingCube(const QGCGeoBoundingCube &other)
         : QObject()
     {
         pointNW = other.pointNW;
         pointSE = other.pointSE;
     }
 
-    QGCGeoBoundingCube(QGeoCoordinate p1, QGeoCoordinate p2)
+    QGCGeoBoundingCube(const QGeoCoordinate &p1, const QGeoCoordinate &p2)
         : pointNW(p1)
         , pointSE(p2)
     {
     }
 
-    Q_PROPERTY(QGeoCoordinate pointNW MEMBER pointNW CONSTANT)
-    Q_PROPERTY(QGeoCoordinate pointSE MEMBER pointSE CONSTANT)
+    Q_INVOKABLE void reset();
+    Q_INVOKABLE bool isValid() const;
+    Q_INVOKABLE QGeoCoordinate center() const;
 
-    Q_INVOKABLE void            reset   ();
-    Q_INVOKABLE bool            isValid () const;
-    Q_INVOKABLE QGeoCoordinate  center  () const;
-
-    inline bool operator ==(const QGCGeoBoundingCube& other) const
+    inline bool operator==(const QGCGeoBoundingCube &other) const
     {
-        return pointNW == other.pointNW && pointSE == other.pointSE;
+        return ((pointNW == other.pointNW) && (pointSE == other.pointSE));
     }
 
-    bool operator ==(const QList<QGeoCoordinate>& coords) const;
+    bool operator==(const QList<QGeoCoordinate> &coords) const;
 
-    inline bool operator !=(const QGCGeoBoundingCube& other)
+    inline bool operator!=(const QGCGeoBoundingCube& other)
     {
         return !(*this == other);
     }
 
-    inline const QGCGeoBoundingCube& operator =(const QGCGeoBoundingCube& other)
+    inline const QGCGeoBoundingCube &operator=(const QGCGeoBoundingCube &other)
     {
         pointNW = other.pointNW;
         pointSE = other.pointSE;
         return *this;
     }
 
-    //-- 2D
     Q_INVOKABLE QList<QGeoCoordinate> polygon2D(double clipTo = 0.0) const;
 
-    Q_INVOKABLE double width    () const;
-    Q_INVOKABLE double height   () const;
-    Q_INVOKABLE double area     () const;
-    Q_INVOKABLE double radius   () const;
+    Q_INVOKABLE double width() const;
+    Q_INVOKABLE double height() const;
+    Q_INVOKABLE double area() const;
+    Q_INVOKABLE double radius() const;
 
-    QGeoCoordinate  pointNW;
-    QGeoCoordinate  pointSE;
-    static double MaxAlt;
-    static double MinAlt;
-    static double MaxNorth;
-    static double MaxSouth;
-    static double MaxWest;
-    static double MaxEast;
+    QGeoCoordinate pointNW;
+    QGeoCoordinate pointSE;
+    static constexpr double MaxAlt = 1000000.0;
+    static constexpr double MinAlt = -1000000.0;
+    static constexpr double MaxNorth =  90.0;
+    static constexpr double MaxSouth = -90.0;
+    static constexpr double MaxWest = -180.0;
+    static constexpr double MaxEast = 180.0;
 };

@@ -10,53 +10,53 @@
 #include "QGCFencePolygon.h"
 #include "JsonHelper.h"
 
-QGCFencePolygon::QGCFencePolygon(bool inclusion, QObject* parent)
-    : QGCMapPolygon (parent)
-    , _inclusion    (inclusion)
+QGCFencePolygon::QGCFencePolygon(bool inclusion, QObject *parent)
+    : QGCMapPolygon(parent)
+    , _inclusion(inclusion)
 {
     _init();
 }
 
-QGCFencePolygon::QGCFencePolygon(const QGCFencePolygon& other, QObject* parent)
-    : QGCMapPolygon (other, parent)
-    , _inclusion    (other._inclusion)
+QGCFencePolygon::QGCFencePolygon(const QGCFencePolygon &other, QObject *parent)
+    : QGCMapPolygon(other, parent)
+    , _inclusion(other.inclusion())
 {
     _init();
 }
 
-void QGCFencePolygon::_init(void)
+void QGCFencePolygon::_init()
 {
-    connect(this, &QGCFencePolygon::inclusionChanged, this, &QGCFencePolygon::_setDirty);
+    (void) connect(this, &QGCFencePolygon::inclusionChanged, this, &QGCFencePolygon::_setDirty);
 }
 
-const QGCFencePolygon& QGCFencePolygon::operator=(const QGCFencePolygon& other)
+const QGCFencePolygon &QGCFencePolygon::operator=(const QGCFencePolygon &other)
 {
     QGCMapPolygon::operator=(other);
 
-    setInclusion(other._inclusion);
+    setInclusion(other.inclusion());
 
     return *this;
 }
 
-void QGCFencePolygon::_setDirty(void)
+void QGCFencePolygon::_setDirty()
 {
     setDirty(true);
 }
 
-void QGCFencePolygon::saveToJson(QJsonObject& json)
+void QGCFencePolygon::saveToJson(QJsonObject &json)
 {
     json[JsonHelper::jsonVersionKey] = _jsonCurrentVersion;
     json[_jsonInclusionKey] = _inclusion;
     QGCMapPolygon::saveToJson(json);
 }
 
-bool QGCFencePolygon::loadFromJson(const QJsonObject& json, bool required, QString& errorString)
+bool QGCFencePolygon::loadFromJson(const QJsonObject &json, bool required, QString &errorString)
 {
     errorString.clear();
 
-    QList<JsonHelper::KeyValidateInfo> keyInfoList = {
-        { JsonHelper::jsonVersionKey,   QJsonValue::Double, true },
-        { _jsonInclusionKey,            QJsonValue::Bool,   true },
+    static const QList<JsonHelper::KeyValidateInfo> keyInfoList = {
+        { JsonHelper::jsonVersionKey, QJsonValue::Double, true },
+        { _jsonInclusionKey, QJsonValue::Bool, true },
     };
     if (!JsonHelper::validateKeys(json, keyInfoList, errorString)) {
         return false;

@@ -9,27 +9,18 @@
 
 #include "FactValueGrid.h"
 #include "InstrumentValueData.h"
+#include "MultiVehicleManager.h"
 #include "QGCApplication.h"
 #include "QGCCorePlugin.h"
-#include "MultiVehicleManager.h"
 #include "Vehicle.h"
 
-#include <QtCore/QSettings>
 #include <QtCore/QDir>
+#include <QtCore/QSettings>
 
-QStringList FactValueGrid::_iconNames;
-
-// Important: The indices of these strings must match the FactValueGrid::FontSize enum
-const QStringList FactValueGrid::_fontSizeNames = {
-    QT_TRANSLATE_NOOP("FactValueGrid", "Default"),
-    QT_TRANSLATE_NOOP("FactValueGrid", "Small"),
-    QT_TRANSLATE_NOOP("FactValueGrid", "Medium"),
-    QT_TRANSLATE_NOOP("FactValueGrid", "Large"),
-};
-
-FactValueGrid::FactValueGrid(QQuickItem* parent)
+const QStringList FactValueGrid::_fontSizeNames
+FactValueGrid::FactValueGrid(QQuickItem *parent)
     : QQuickItem(parent)
-    , _columns  (new QmlObjectListModel(this))
+    , _columns(new QmlObjectListModel(this))
 {
     if (_iconNames.isEmpty()) {
         QDir iconDir(":/InstrumentValueIcons/");
@@ -39,33 +30,34 @@ FactValueGrid::FactValueGrid(QQuickItem* parent)
     _init();
 }
 
-FactValueGrid::FactValueGrid(const QString& defaultSettingsGroup)
-    : QQuickItem            (nullptr)
-    , _defaultSettingsGroup (defaultSettingsGroup)
-    , _columns              (new QmlObjectListModel(this))
+FactValueGrid::FactValueGrid(const QString &defaultSettingsGroup)
+    : QQuickItem(nullptr)
+    , _defaultSettingsGroup(defaultSettingsGroup)
+    , _columns(new QmlObjectListModel(this))
 {
     _init();
 }
 
-void FactValueGrid::_init(void)
+void FactValueGrid::_init()
 {
-    Vehicle* offlineVehicle  = MultiVehicleManager::instance()->offlineEditingVehicle();
+    Vehicle *offlineVehicle = MultiVehicleManager::instance()->offlineEditingVehicle();
 
-    connect(offlineVehicle, &Vehicle::vehicleTypeChanged,       this, &FactValueGrid::_offlineVehicleTypeChanged);
-    connect(this,           &FactValueGrid::fontSizeChanged,    this, &FactValueGrid::_saveSettings);
+    (void) connect(offlineVehicle, &Vehicle::vehicleTypeChanged, this, &FactValueGrid::_offlineVehicleTypeChanged);
+    (void) connect(this, &FactValueGrid::fontSizeChanged, this, &FactValueGrid::_saveSettings);
 
     _vehicleClass = QGCMAVLink::vehicleClass(offlineVehicle->vehicleType());
     instances().append(this);
 }
 
-FactValueGrid::~FactValueGrid() {
+FactValueGrid::~FactValueGrid()
+{
     instances().removeAll(this);
 }
 
-void FactValueGrid::_offlineVehicleTypeChanged(void)
+void FactValueGrid::_offlineVehicleTypeChanged()
 {
-    Vehicle*                    offlineVehicle  = MultiVehicleManager::instance()->offlineEditingVehicle();
-    QGCMAVLink::VehicleClass_t  newVehicleClass = QGCMAVLink::vehicleClass(offlineVehicle->vehicleType());
+    Vehicle *offlineVehicle = MultiVehicleManager::instance()->offlineEditingVehicle();
+    const QGCMAVLink::VehicleClass_t newVehicleClass = QGCMAVLink::vehicleClass(offlineVehicle->vehicleType());
 
     if (newVehicleClass != _vehicleClass) {
         _vehicleClass = newVehicleClass;
@@ -73,7 +65,7 @@ void FactValueGrid::_offlineVehicleTypeChanged(void)
     }
 }
 
-void FactValueGrid::componentComplete(void)
+void FactValueGrid::componentComplete()
 {
     QQuickItem::componentComplete();
 
@@ -81,16 +73,16 @@ void FactValueGrid::componentComplete(void)
     _loadSettings();
 }
 
-void FactValueGrid::resetToDefaults(void)
+void FactValueGrid::resetToDefaults()
 {
     QSettings settings;
     settings.remove(_userSettingsGroup);
     _loadSettings();
 }
 
-QString FactValueGrid::_pascalCase(const QString& text)
+QString FactValueGrid::_pascalCase(const QString &text)
 {
-    return text[0].toUpper() + text.right(text.length() - 1);
+    return (text[0].toUpper() + text.right(text.length() - 1));
 }
 
 void FactValueGrid::setFontSize(FontSize fontSize)
@@ -101,62 +93,62 @@ void FactValueGrid::setFontSize(FontSize fontSize)
     }
 }
 
-void FactValueGrid::setVehicle(Vehicle * vehicle)
+void FactValueGrid::setVehicle(Vehicle *vehicle)
 {
-    if(vehicle == nullptr){
+    if (!vehicle) {
         qCritical() << "FactValueGrid assumes vehicle is not NULL";
     }
     _vehicle = vehicle;
     emit vehicleChanged();
 }
 
-void FactValueGrid::_saveValueData(QSettings& settings, InstrumentValueData* value)
+void FactValueGrid::_saveValueData(QSettings &settings, InstrumentValueData *value)
 {
-    settings.setValue(_textKey,         value->text());
-    settings.setValue(_showUnitsKey,    value->showUnits());
-    settings.setValue(_iconKey,         value->icon());
-    settings.setValue(_rangeTypeKey,    value->rangeType());
+    settings.setValue(_textKey, value->text());
+    settings.setValue(_showUnitsKey, value->showUnits());
+    settings.setValue(_iconKey, value->icon());
+    settings.setValue(_rangeTypeKey, value->rangeType());
 
     if (value->rangeType() != InstrumentValueData::NoRangeInfo) {
         settings.setValue(_rangeValuesKey, value->rangeValues());
     }
 
     switch (value->rangeType()) {
-    case InstrumentValueData::NoRangeInfo:
-        break;
     case InstrumentValueData::ColorRange:
-        settings.setValue(_rangeColorsKey,      value->rangeColors());
+        settings.setValue(_rangeColorsKey, value->rangeColors());
         break;
     case InstrumentValueData::OpacityRange:
-        settings.setValue(_rangeOpacitiesKey,   value->rangeOpacities());
+        settings.setValue(_rangeOpacitiesKey, value->rangeOpacities());
         break;
     case InstrumentValueData::IconSelectRange:
-        settings.setValue(_rangeIconsKey,       value->rangeIcons());
+        settings.setValue(_rangeIconsKey, value->rangeIcons());
+        break;
+    case InstrumentValueData::NoRangeInfo:
+    default:
         break;
     }
 
-    settings.setValue(_factGroupNameKey,    value->factGroupName());
-    settings.setValue(_factNameKey,         value->factName());
+    settings.setValue(_factGroupNameKey, value->factGroupName());
+    settings.setValue(_factNameKey, value->factName());
 }
 
-void FactValueGrid::_loadValueData(QSettings& settings, InstrumentValueData* value)
+void FactValueGrid::_loadValueData(QSettings &settings, InstrumentValueData *value)
 {
-    QString factName = settings.value(_factNameKey).toString();
+    const QString factName = settings.value(_factNameKey).toString();
     if (!factName.isEmpty()) {
         value->setFact(settings.value(_factGroupNameKey).toString(), factName);
     }
 
-    value->setText      (settings.value(_textKey).toString());
-    value->setShowUnits (settings.value(_showUnitsKey, true).toBool());
-    value->setIcon      (settings.value(_iconKey).toString());
-    value->setRangeType (settings.value(_rangeTypeKey, InstrumentValueData::NoRangeInfo).value<InstrumentValueData::RangeType>());
+    value->setText(settings.value(_textKey).toString());
+    value->setShowUnits(settings.value(_showUnitsKey, true).toBool());
+    value->setIcon(settings.value(_iconKey).toString());
+    value->setRangeType(settings.value(_rangeTypeKey, InstrumentValueData::NoRangeInfo).value<InstrumentValueData::RangeType>());
 
     if (value->rangeType() != InstrumentValueData::NoRangeInfo) {
         value->setRangeValues(settings.value(_rangeValuesKey).value<QVariantList>());
     }
+
     switch (value->rangeType()) {
-    case InstrumentValueData::NoRangeInfo:
-        break;
     case InstrumentValueData::ColorRange:
         value->setRangeColors(settings.value(_rangeColorsKey).value<QVariantList>());
         break;
@@ -166,27 +158,30 @@ void FactValueGrid::_loadValueData(QSettings& settings, InstrumentValueData* val
     case InstrumentValueData::IconSelectRange:
         value->setRangeIcons(settings.value(_rangeIconsKey).value<QVariantList>());
         break;
+    case InstrumentValueData::NoRangeInfo:
+    default:
+        break;
     }
 }
 
-void FactValueGrid::_connectSaveSignals(InstrumentValueData* value)
+void FactValueGrid::_connectSaveSignals(InstrumentValueData *value)
 {
-    connect(value, &InstrumentValueData::factNameChanged,       this, &FactValueGrid::_saveSettings);
-    connect(value, &InstrumentValueData::factGroupNameChanged,  this, &FactValueGrid::_saveSettings);
-    connect(value, &InstrumentValueData::textChanged,           this, &FactValueGrid::_saveSettings);
-    connect(value, &InstrumentValueData::showUnitsChanged,      this, &FactValueGrid::_saveSettings);
-    connect(value, &InstrumentValueData::iconChanged,           this, &FactValueGrid::_saveSettings);
-    connect(value, &InstrumentValueData::rangeTypeChanged,      this, &FactValueGrid::_saveSettings);
-    connect(value, &InstrumentValueData::rangeValuesChanged,    this, &FactValueGrid::_saveSettings);
-    connect(value, &InstrumentValueData::rangeColorsChanged,    this, &FactValueGrid::_saveSettings);
-    connect(value, &InstrumentValueData::rangeOpacitiesChanged, this, &FactValueGrid::_saveSettings);
-    connect(value, &InstrumentValueData::rangeIconsChanged,     this, &FactValueGrid::_saveSettings);
+    (void) connect(value, &InstrumentValueData::factNameChanged, this, &FactValueGrid::_saveSettings);
+    (void) connect(value, &InstrumentValueData::factGroupNameChanged, this, &FactValueGrid::_saveSettings);
+    (void) connect(value, &InstrumentValueData::textChanged, this, &FactValueGrid::_saveSettings);
+    (void) connect(value, &InstrumentValueData::showUnitsChanged, this, &FactValueGrid::_saveSettings);
+    (void) connect(value, &InstrumentValueData::iconChanged, this, &FactValueGrid::_saveSettings);
+    (void) connect(value, &InstrumentValueData::rangeTypeChanged, this, &FactValueGrid::_saveSettings);
+    (void) connect(value, &InstrumentValueData::rangeValuesChanged, this, &FactValueGrid::_saveSettings);
+    (void) connect(value, &InstrumentValueData::rangeColorsChanged, this, &FactValueGrid::_saveSettings);
+    (void) connect(value, &InstrumentValueData::rangeOpacitiesChanged, this, &FactValueGrid::_saveSettings);
+    (void) connect(value, &InstrumentValueData::rangeIconsChanged, this, &FactValueGrid::_saveSettings);
 }
 
-void FactValueGrid::appendRow(void)
+void FactValueGrid::appendRow()
 {
-    for (int colIndex=0; colIndex<_columns->count(); colIndex++) {
-        QmlObjectListModel* list = _columns->value<QmlObjectListModel*>(colIndex);
+    for (int colIndex = 0; colIndex < _columns->count(); colIndex++) {
+        QmlObjectListModel *list = _columns->value<QmlObjectListModel*>(colIndex);
         list->append(_createNewInstrumentValueWorker(list));
 
     }
@@ -195,13 +190,14 @@ void FactValueGrid::appendRow(void)
     _saveSettings();
 }
 
-void FactValueGrid::deleteLastRow(void)
+void FactValueGrid::deleteLastRow()
 {
     if (_rowCount <= 1) {
         return;
     }
-    for (int colIndex=0; colIndex<_columns->count(); colIndex++) {
-        QmlObjectListModel* list = _columns->value<QmlObjectListModel*>(colIndex);
+
+    for (int colIndex = 0; colIndex < _columns->count(); colIndex++) {
+        QmlObjectListModel *list = _columns->value<QmlObjectListModel*>(colIndex);
         list->removeAt(list->count() - 1)->deleteLater();
     }
     _rowCount--;
@@ -209,14 +205,14 @@ void FactValueGrid::deleteLastRow(void)
     _saveSettings();
 }
 
-QmlObjectListModel* FactValueGrid::appendColumn(void)
+QmlObjectListModel *FactValueGrid::appendColumn()
 {
-    QmlObjectListModel* newList = new QmlObjectListModel(_columns);
+    QmlObjectListModel *newList = new QmlObjectListModel(_columns);
     _columns->append(newList);
 
     // If this is the first row then we automatically add the first column as well
-    int cRowsToAdd = qMax(_rowCount, 1);
-    for (int i=0; i<cRowsToAdd; i++) {
+    const int cRowsToAdd = qMax(_rowCount, 1);
+    for (int i = 0; i < cRowsToAdd; i++) {
         newList->append(_createNewInstrumentValueWorker(newList));
     }
 
@@ -230,7 +226,7 @@ QmlObjectListModel* FactValueGrid::appendColumn(void)
     return newList;
 }
 
-void FactValueGrid::deleteLastColumn(void)
+void FactValueGrid::deleteLastColumn()
 {
     if (_columns->count() > 1) {
         _columns->removeAt(_columns->count() - 1)->deleteLater();
@@ -238,9 +234,9 @@ void FactValueGrid::deleteLastColumn(void)
     }
 }
 
-InstrumentValueData* FactValueGrid::_createNewInstrumentValueWorker(QObject* parent)
+InstrumentValueData *FactValueGrid::_createNewInstrumentValueWorker(QObject *parent)
 {
-    InstrumentValueData* value = new InstrumentValueData(this, parent, _vehicle);
+    InstrumentValueData *value = new InstrumentValueData(this, parent, _vehicle);
     value->setFact(InstrumentValueData::vehicleFactGroupName, "AltitudeRelative");
     value->setText(value->fact()->shortDescription());
     _connectSaveSignals(value);
@@ -248,7 +244,7 @@ InstrumentValueData* FactValueGrid::_createNewInstrumentValueWorker(QObject* par
 
 }
 
-void FactValueGrid::_saveSettings(void)
+void FactValueGrid::_saveSettings()
 {
     if (_preventSaveSettings) {
         return;
@@ -256,10 +252,10 @@ void FactValueGrid::_saveSettings(void)
     saveSettingsForced();
 }
 
-void FactValueGrid::saveSettingsForced(void)
+void FactValueGrid::saveSettingsForced()
 {
-    QSettings   settings;
-    QString     groupNameFormat("%1-%2");
+    QSettings settings;
+    const QString groupNameFormat = QStringLiteral("%1-%2");
     if (_userSettingsGroup.isEmpty()) {
         // This means we are setting up default settings
         settings.beginGroup(groupNameFormat.arg(_defaultSettingsGroup).arg(_vehicleClass));
@@ -276,14 +272,14 @@ void FactValueGrid::saveSettingsForced(void)
     settings.setValue(_rowCountKey, _rowCount);
 
     settings.beginWriteArray(_columnsKey);
-    for (int colIndex=0; colIndex<_columns->count(); colIndex++) {
-        QmlObjectListModel* columns = _columns->value<QmlObjectListModel*>(colIndex);
+    for (int colIndex = 0; colIndex < _columns->count(); colIndex++) {
+        QmlObjectListModel *columns = _columns->value<QmlObjectListModel*>(colIndex);
 
         settings.setArrayIndex(colIndex);
         settings.beginWriteArray(_rowsKey);
 
-        for (int colIndex=0; colIndex<columns->count(); colIndex++) {
-            InstrumentValueData* value = columns->value<InstrumentValueData*>(colIndex);
+        for (int colIndex = 0; colIndex < columns->count(); colIndex++) {
+            InstrumentValueData *value = columns->value<InstrumentValueData*>(colIndex);
             settings.setArrayIndex(colIndex);
             _saveValueData(settings, value);
         }
@@ -294,18 +290,19 @@ void FactValueGrid::saveSettingsForced(void)
 
     // If this settings change was set from a Vehicle card, this makes so the changes are
     // immediately applied to the other Vehicle cards.
-    if(!_preventSaveSettings){
-        for (FactValueGrid* obj : instances()) {
-            if(obj != this && _settingsKey() == obj->_settingsKey()) {
+    if (!_preventSaveSettings){
+        for (FactValueGrid *obj : instances()) {
+            if ((obj != this) && (_settingsKey() == obj->_settingsKey())) {
                 obj->_loadSettings();
             }
         }
     }
 }
 
-QString FactValueGrid::_settingsKey(void){
-    QSettings   settings;
-    QString     groupNameFormat("%1-%2");
+QString FactValueGrid::_settingsKey()
+{
+    QSettings settings;
+    const QString groupNameFormat = QStringLiteral("%1-%2");
     const QString spath(QFileInfo(QSettings().fileName()).dir().absolutePath());
     if (settings.childGroups().contains(groupNameFormat.arg(_defaultSettingsGroup).arg(_vehicleClass))) {
         return groupNameFormat.arg(_defaultSettingsGroup).arg(_vehicleClass);
@@ -314,17 +311,17 @@ QString FactValueGrid::_settingsKey(void){
     }
 }
 
-void FactValueGrid::_loadSettings(void)
+void FactValueGrid::_loadSettings()
 {
     _preventSaveSettings = true;
 
     _columns->deleteLater();
 
-    _columns    = new QmlObjectListModel(this);
-    _rowCount   = 0;
+    _columns = new QmlObjectListModel(this);
+    _rowCount = 0;
 
-    QSettings   settings;
-    QString     groupNameFormat("%1-%2");
+    QSettings settings;
+    QString groupNameFormat = QStringLiteral("%1-%2");
 
     if (!settings.childGroups().contains(groupNameFormat.arg(_userSettingsGroup).arg(_vehicleClass))) {
         QGCCorePlugin::instance()->factValueGridCreateDefaultSettings(this);
@@ -332,7 +329,7 @@ void FactValueGrid::_loadSettings(void)
 
     settings.beginGroup(_settingsKey());
 
-    int version = settings.value(_versionKey, 0).toInt();
+    const int version = settings.value(_versionKey, 0).toInt();
     if (version != 1) {
         qgcApp()->showAppMessage(tr("Settings version %1 for %2 is not supported. Setup will be reset to defaults.").arg(version).arg(_userSettingsGroup), tr("Load Settings"));
         settings.remove("");
@@ -341,25 +338,25 @@ void FactValueGrid::_loadSettings(void)
     _fontSize = settings.value(_fontSizeKey, DefaultFontSize).value<FontSize>();
 
     // Initial setup of empty items
-    int cRows       = settings.value(_rowCountKey).toInt();
-    int cModelLists = settings.beginReadArray(_columnsKey);
+    const int cRows = settings.value(_rowCountKey).toInt();
+    const int cModelLists = settings.beginReadArray(_columnsKey);
     if (cModelLists && cRows) {
         appendColumn();
-        for (int rowIndex=1; rowIndex<cRows; rowIndex++) {
+        for (int rowIndex = 1; rowIndex < cRows; rowIndex++) {
             appendRow();
         }
-        for (int colIndex=1; colIndex<cModelLists; colIndex++) {
+        for (int colIndex = 1; colIndex < cModelLists; colIndex++) {
             appendColumn();
         }
     }
 
     // Fill in the items from settings
-    for (int colIndex=0; colIndex<cModelLists; colIndex++) {
+    for (int colIndex = 0; colIndex < cModelLists; colIndex++) {
         settings.setArrayIndex(colIndex);
-        int cItems = settings.beginReadArray(_rowsKey);
-        for (int itemIndex=0; itemIndex<cItems; itemIndex++) {
-            QmlObjectListModel* list = _columns->value<QmlObjectListModel*>(colIndex);
-            InstrumentValueData* value = list->value<InstrumentValueData*>(itemIndex);
+        const int cItems = settings.beginReadArray(_rowsKey);
+        for (int itemIndex = 0; itemIndex < cItems; itemIndex++) {
+            QmlObjectListModel *list = _columns->value<QmlObjectListModel*>(colIndex);
+            InstrumentValueData *value = list->value<InstrumentValueData*>(itemIndex);
             settings.setArrayIndex(itemIndex);
             _loadValueData(settings, value);
         }
