@@ -26,7 +26,7 @@
 
 #include <gst/gst.h>
 
-Q_DECLARE_LOGGING_CATEGORY(VideoReceiverLog)
+Q_DECLARE_LOGGING_CATEGORY(GstVideoReceiverLog)
 
 class Worker : public QThread
 {

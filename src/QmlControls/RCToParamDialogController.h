@@ -28,17 +28,17 @@ class RCToParamDialogController : public QObject
     Q_PROPERTY(Fact *center     READ center                         CONSTANT)
     Q_PROPERTY(Fact *min        READ min                            CONSTANT)
     Q_PROPERTY(Fact *max        READ max                            CONSTANT)
-    Q_PROPERTY(bool  ready      MEMBER _ready                       NOTIFY readyChanged) // true: editing can begin, false: still waiting for param update from vehicle
+    Q_PROPERTY(bool ready       MEMBER _ready                       NOTIFY readyChanged) // true: editing can begin, false: still waiting for param update from vehicle
 
 public:
     explicit RCToParamDialogController(QObject *parent = nullptr);
     ~RCToParamDialogController();
 
-    Fact *tuningFact() { return _tuningFact; }
-    Fact *scale() { return _scaleFact; }
-    Fact *center() { return _centerFact; }
-    Fact *min() { return _minFact; }
-    Fact *max() { return _maxFact; }
+    Fact *tuningFact() const { return _tuningFact; }
+    Fact *scale() const { return _scaleFact; }
+    Fact *center() const { return _centerFact; }
+    Fact *min() const { return _minFact; }
+    Fact *max() const { return _maxFact; }
     void setTuningFact(Fact *tuningFact);
 
 signals:

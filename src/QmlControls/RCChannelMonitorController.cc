@@ -7,10 +7,9 @@
  *
  ****************************************************************************/
 
-
 #include "RCChannelMonitorController.h"
-#include "Vehicle.h"
 #include "QGCLoggingCategory.h"
+#include "Vehicle.h"
 
 QGC_LOGGING_CATEGORY(RCChannelMonitorControllerLog, "qgc.qmlcontrols.rcchannelmonitorcontroller")
 

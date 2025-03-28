@@ -10,7 +10,6 @@
 #pragma once
 
 #include <QtCore/QLoggingCategory>
-#include <QtCore/QObject>
 #include <QtCore/QStringList>
 
 // Add Global logging categories (not class specific) here using Q_DECLARE_LOGGING_CATEGORY
@@ -27,25 +26,23 @@ Q_DECLARE_LOGGING_CATEGORY(VideoAllLog) // turns on all individual QGC video log
     static QGCLoggingCategory qgcCategory ## name (__VA_ARGS__); \
     Q_LOGGING_CATEGORY(name, __VA_ARGS__)
 
-class QGCLoggingCategoryRegister : public QObject
+class QGCLoggingCategoryRegister
 {
-    Q_OBJECT
-
 public:
     QGCLoggingCategoryRegister() = default;
     static QGCLoggingCategoryRegister *instance();
 
     /// Registers the specified logging category to the system.
-    void registerCategory(const char *category) { _registeredCategories << category; }
+    void registerCategory(const QString &category) { _registeredCategories << category; }
 
     /// Returns the list of available logging category names.
-    Q_INVOKABLE QStringList registeredCategories();
+    QStringList registeredCategories();
 
     /// Turns on/off logging for the specified category. State is saved in app settings.
-    Q_INVOKABLE void setCategoryLoggingOn(const QString &category, bool enable) const;
+    static void setCategoryLoggingOn(QStringView category, bool enable);
 
     /// Returns true if logging is turned on for the specified category.
-    Q_INVOKABLE bool categoryLoggingOn(const QString &category) const;
+    static bool categoryLoggingOn(QStringView category);
 
     /// Sets the logging filters rules from saved settings.
     ///     @param commandLineLogggingOptions Logging options which were specified on the command line
@@ -55,11 +52,11 @@ private:
     QStringList _registeredCategories;
     QString _commandLineLoggingOptions;
 
-    static constexpr const char *_filterRulesSettingsGroup = "LoggingFilters";
+    static constexpr const std::string _kFilterRulesSettingsGroup = "LoggingFilters";
 };
 
 class QGCLoggingCategory
 {
 public:
-    QGCLoggingCategory(const char *category) { QGCLoggingCategoryRegister::instance()->registerCategory(category); }
+    QGCLoggingCategory(const QString &category) { QGCLoggingCategoryRegister::instance()->registerCategory(category); }
 };

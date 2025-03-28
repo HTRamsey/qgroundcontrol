@@ -11,15 +11,14 @@
 
 #include <QtQml/QQmlEngine>
 
-QGCQGeoCoordinate::QGCQGeoCoordinate(const QGeoCoordinate& coord, QObject* parent)
-    : QObject       (parent)
-    , _coordinate   (coord)
-    , _dirty        (false)
+QGCQGeoCoordinate::QGCQGeoCoordinate(QGeoCoordinate coord, QObject *parent)
+    : QObject(parent)
+    , _coordinate(coord)
 {
     QQmlEngine::setObjectOwnership(this, QQmlEngine::CppOwnership);
 }
 
-void QGCQGeoCoordinate::setCoordinate(const QGeoCoordinate& coordinate)
+void QGCQGeoCoordinate::setCoordinate(QGeoCoordinate coordinate)
 {
     if (_coordinate != coordinate) {
         _coordinate = coordinate;

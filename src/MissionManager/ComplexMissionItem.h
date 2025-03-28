@@ -16,6 +16,7 @@
 class PlanMasterController;
 class MissionController;
 class KMLPlanDomDocument;
+class FactMetaData;
 
 class ComplexMissionItem : public VisualMissionItem
 {
@@ -37,7 +38,8 @@ public:
     Q_PROPERTY(QmlObjectListModel*  flightPathSegments  READ flightPathSegments     CONSTANT)
     Q_PROPERTY(bool                 terrainCollision    READ terrainCollision       NOTIFY terrainCollisionChanged)
 
-    QmlObjectListModel* flightPathSegments  (void) { return &_flightPathSegments; }
+    QmlObjectListModel *flightPathSegments() { return &_flightPathSegments; }
+    const QmlObjectListModel *flightPathSegments() const { return &_flightPathSegments; }
 
     virtual QString patternName(void) const = 0;
 

@@ -56,6 +56,7 @@
 #include <MAVLinkSigning.h>
 #include "GimbalController.h"
 #include "MavlinkSettings.h"
+#include "QGCLoggingCategory.h"
 
 #ifdef QGC_UTM_ADAPTER
 #include "UTMSPVehicle.h"

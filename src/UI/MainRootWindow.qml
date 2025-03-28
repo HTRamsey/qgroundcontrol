@@ -223,7 +223,7 @@ ApplicationWindow {
         return true
     }
 
-    property string closeDialogTitle: qsTr("Close %1").arg(QGroundControl.appName)
+    property string closeDialogTitle: qsTr("Close %1").arg(Application.name)
 
     function checkForUnsavedMission() {
         if (planView._planMasterController.dirty) {
@@ -378,7 +378,7 @@ ApplicationWindow {
                             id:                 closeButton
                             height:             toolSelectDialog._toolButtonHeight
                             Layout.fillWidth:   true
-                            text:               qsTr("Close %1").arg(QGroundControl.appName)
+                            text:               qsTr("Close %1").arg(Application.name)
                             imageResource:      "/res/cancel.svg"
                             visible:            mainWindow.visibility === Window.FullScreen
                             onClicked: {
@@ -395,7 +395,7 @@ ApplicationWindow {
 
                             QGCLabel {
                                 id:                     versionLabel
-                                text:                   qsTr("%1 Version").arg(QGroundControl.appName)
+                                text:                   qsTr("%1 Version").arg(Application.name)
                                 font.pointSize:         ScreenTools.smallFontPointSize
                                 wrapMode:               QGCLabel.WordWrap
                                 Layout.maximumWidth:    parent.width
@@ -403,7 +403,7 @@ ApplicationWindow {
                             }
 
                             QGCLabel {
-                                text:                   QGroundControl.qgcVersion
+                                text:                   Application.version
                                 font.pointSize:         ScreenTools.smallFontPointSize
                                 wrapMode:               QGCLabel.WrapAnywhere
                                 Layout.maximumWidth:    parent.width
