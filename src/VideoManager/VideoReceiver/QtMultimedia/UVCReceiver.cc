@@ -21,7 +21,7 @@
 #include <QtMultimedia/QMediaCaptureSession>
 #include <QtMultimediaQuick/private/qquickvideooutput_p.h>
 
-QGC_LOGGING_CATEGORY(UVCReceiverLog, "qgc.video.qtmultimedia.uvcreceiver")
+QGC_LOGGING_CATEGORY(UVCReceiverLog, "qgc.videomanager.videoreceiver.qtmultimedia.uvcreceiver")
 
 UVCReceiver::UVCReceiver(QObject *parent)
     : QtMultimediaReceiver(parent)

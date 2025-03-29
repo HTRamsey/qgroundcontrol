@@ -22,7 +22,7 @@
 #include <QtQuick/QQuickItem>
 #include <QtQuick/QQuickItemGrabResult>
 
-QGC_LOGGING_CATEGORY(QtMultimediaReceiverLog, "qgc.video.qtmultimedia.qtmultimediareceiver")
+QGC_LOGGING_CATEGORY(QtMultimediaReceiverLog, "qgc.videomanager.videoreceiver.qtmultimedia.qtmultimediareceiver")
 
 QtMultimediaReceiver::QtMultimediaReceiver(QObject *parent)
     : VideoReceiver(parent)
