@@ -2,9 +2,9 @@ find_package(Qt6 REQUIRED COMPONENTS Core Quick)
 
 target_sources(QGC PRIVATE GLVideoItemStub.h)
 
-target_link_libraries(QGC PUBLIC Qt6::Quick)
+target_link_libraries(QGC PRIVATE Qt6::Quick)
 
-target_include_directories(QGC PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(QGC PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(NOT QGC_ENABLE_GST_VIDEOSTREAMING)
     return()
@@ -39,9 +39,8 @@ endif()
 
 target_link_libraries(QGC
     PRIVATE
-        gstqml6gl
-    PUBLIC
         Qt6::Core
+        gstqml6gl
 )
 
-target_compile_definitions(QGC PUBLIC QGC_GST_STREAMING)
+target_compile_definitions(QGC PRIVATE QGC_GST_STREAMING)

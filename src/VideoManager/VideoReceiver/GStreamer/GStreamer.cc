@@ -8,11 +8,11 @@
  ****************************************************************************/
 
 #include "GStreamer.h"
-#include "GstVideoReceiver.h"
-#include "SettingsManager.h"
 #include "AppSettings.h"
-#include "VideoSettings.h"
+#include "GstVideoReceiver.h"
 #include "QGCLoggingCategory.h"
+#include "SettingsManager.h"
+#include "VideoSettings.h"
 #ifdef Q_OS_IOS
 #include "gst_ios_init.h"
 #endif
@@ -185,7 +185,7 @@ void initialize()
 
     char **argv = new char*[argc];
     for (int i = 0; i < argc; i++) {
-        (void) argList.append(args[i].toUtf8());
+        (void) argList.append(args[i].toUtf8().constData());
         argv[i] = argList[i].data();
     }
 
@@ -211,7 +211,6 @@ void initialize()
 void blacklist(VideoDecoderOptions option)
 {
     GstRegistry *const registry = gst_registry_get();
-
     if (!registry) {
         qCCritical(GStreamerLog) << "Failed to get gstreamer registry.";
         return;
