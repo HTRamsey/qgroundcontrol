@@ -47,22 +47,20 @@ if(QGC_UTM_ADAPTER)
 
     target_link_libraries(QGC
         PRIVATE
-            Threads::Threads
-            Qt6::Network
-        PUBLIC
             # nlohmann_json
             Qt6::Core
+            Qt6::Network
             Qt6::Positioning
+            Threads::Threads
     )
 
     target_include_directories(QGC
-        PRIVATE
-            services
         PUBLIC
             ${CMAKE_CURRENT_SOURCE_DIR}
+            services
     )
 
-    target_compile_definitions(QGC PUBLIC QGC_UTM_ADAPTER)
+    target_compile_definitions(QGC PRIVATE QGC_UTM_ADAPTER)
 
     # qt_add_qml_module(QGC
     #     URI QGroundControl.UTMSP
@@ -108,9 +106,9 @@ else()
     message(STATUS "UTMSP: Dummy is Initialized")
 
     # qt_add_resources(UTMSP_RESOURCES dummy/utmsp_dummy.qrc)
-    # target_sources(UTMSP PRIVATE ${UTMSP_RESOURCES})
+    # target_sources(QGC PRIVATE ${UTMSP_RESOURCES})
 
-    # qt_add_qml_module(UTMSP
+    # qt_add_qml_module(QGC
     #     URI QGroundControl.UTMSP
     #     VERSION 1.0
     #     QML_FILES

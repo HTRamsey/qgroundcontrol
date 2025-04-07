@@ -21,10 +21,7 @@ target_sources(QGC
         sensor_gps.h
 )
 
-target_link_libraries(QGC
-    PUBLIC
-        Qt6::Core
-)
+target_link_libraries(QGC PRIVATE Qt6::Core)
 
 target_include_directories(QGC PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -47,7 +44,7 @@ target_sources(QGC
         ${GPS_DRIVERS_SOURCES}
 )
 
-target_link_libraries(QGC PUBLIC Qt6::Core)
+target_link_libraries(QGC PRIVATE Qt6::Core)
 
 target_compile_definitions(QGC PUBLIC GPS_DEFINITIONS_HEADER=<${CMAKE_CURRENT_SOURCE_DIR}/definitions.h>)
 

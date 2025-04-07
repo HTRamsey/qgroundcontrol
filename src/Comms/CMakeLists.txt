@@ -25,10 +25,9 @@ target_sources(QGC
 
 target_link_libraries(QGC
     PRIVATE
-        Qt6::Qml
-    PUBLIC
         Qt6::Core
         Qt6::Network
+        Qt6::Qml
 )
 
 target_include_directories(QGC PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
@@ -36,7 +35,7 @@ target_include_directories(QGC PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 #===========================================================================#
 
 if(QGC_NO_SERIAL_LINK)
-    target_compile_definitions(QGC PUBLIC QGC_NO_SERIAL_LINK)
+    target_compile_definitions(QGC PRIVATE QGC_NO_SERIAL_LINK)
 else()
     target_sources(QGC
         PRIVATE
@@ -56,10 +55,10 @@ else()
                 ${CMAKE_SOURCE_DIR}/android/src/AndroidSerial.h
         )
         target_include_directories(qtandroidserialport PUBLIC ${CMAKE_SOURCE_DIR}/android/src)
-        target_link_libraries(QGC PUBLIC qtandroidserialport)
+        target_link_libraries(QGC PRIVATE qtandroidserialport)
     else()
         find_package(Qt6 REQUIRED COMPONENTS SerialPort)
-        target_link_libraries(QGC PUBLIC Qt6::SerialPort)
+        target_link_libraries(QGC PRIVATE Qt6::SerialPort)
     endif()
 endif()
 
@@ -67,13 +66,13 @@ endif()
 
 if(QGC_ENABLE_BLUETOOTH)
     find_package(Qt6 REQUIRED COMPONENTS Bluetooth)
-    target_link_libraries(QGC PUBLIC Qt6::Bluetooth)
+    target_link_libraries(QGC PRIVATE Qt6::Bluetooth)
     target_sources(QGC
         PRIVATE
             BluetoothLink.cc
             BluetoothLink.h
     )
-    target_compile_definitions(QGC PUBLIC QGC_ENABLE_BLUETOOTH)
+    target_compile_definitions(QGC PRIVATE QGC_ENABLE_BLUETOOTH)
 endif()
 
 #===========================================================================#
@@ -93,9 +92,9 @@ if(QGC_ZEROCONF_ENABLED)
     )
 
     if(TARGET qmdnsengine)
-        target_link_libraries(QGC PUBLIC qmdnsengine)
-        target_compile_definitions(QGC PUBLIC QGC_ZEROCONF_ENABLED)
+        target_link_libraries(QGC PRIVATE qmdnsengine)
+        target_compile_definitions(QGC PRIVATE QGC_ZEROCONF_ENABLED)
     endif()
 endif()
 
-# target_compile_definitions(QGC PUBLIC QABSTRACTSOCKET_DEBUG)
+# target_compile_definitions(QGC PRIVATE QABSTRACTSOCKET_DEBUG)

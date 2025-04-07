@@ -64,10 +64,9 @@ target_sources(QGC
 target_link_libraries(QGC
     PRIVATE
         Qt6::Concurrent
-        Qt6::Location
-    PUBLIC
         Qt6::Core
         Qt6::Gui
+        Qt6::Location
         Qt6::Positioning
         Qt6::QmlIntegration
         Qt6::Quick

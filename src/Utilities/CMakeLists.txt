@@ -48,12 +48,11 @@ target_include_directories(QGC
 
 target_link_libraries(QGC
     PRIVATE
-        Qt6::Qml
-    PUBLIC
         Qt6::Core
         Qt6::Gui
         Qt6::Network
         Qt6::Positioning
+        Qt6::Qml
         Qt6::Sensors
         Qt6::Xml
 )

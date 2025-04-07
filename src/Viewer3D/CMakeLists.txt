@@ -33,19 +33,18 @@ if(QGC_VIEWER3D)
 
     target_link_libraries(QGC
         PRIVATE
-            Qt6::Network
-            QGCLocation
-        PUBLIC
             Qt6::Core
             Qt6::Gui
+            Qt6::Network
             Qt6::Positioning
             Qt6::Quick3D
             Qt6::Xml
+            QGCLocation
     )
 
     target_include_directories(QGC PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-    target_compile_definitions(QGC PUBLIC QGC_VIEWER3D)
+    target_compile_definitions(QGC PRIVATE QGC_VIEWER3D)
 
     # file(GLOB_RECURSE QML_SOURCES RELATIVE Viewer3DQml Viewer3DQml/*.qml)
     # file(GLOB_RECURSE QML_RESOURCES RELATIVE Viewer3DQml Viewer3DQml/*.mesh)

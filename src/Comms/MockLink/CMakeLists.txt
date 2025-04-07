@@ -18,7 +18,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     )
 
     target_link_libraries(QGC
-        PUBLIC
+        PRIVATE
             Qt6::Core
             Qt6::Positioning
     )

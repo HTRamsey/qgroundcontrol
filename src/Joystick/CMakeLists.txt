@@ -10,9 +10,8 @@ target_sources(QGC
 
 target_link_libraries(QGC
     PRIVATE
-        Qt6::Qml
-    PUBLIC
         Qt6::Core
+        Qt6::Qml
         Qt6::QmlIntegration
 )
 

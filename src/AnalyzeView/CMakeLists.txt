@@ -33,10 +33,9 @@ target_sources(QGC
 target_link_libraries(QGC
     PRIVATE
         Qt6::Charts
+        Qt6::Core
         Qt6::Gui
         Qt6::Qml
-    PUBLIC
-        Qt6::Core
         Qt6::QmlIntegration
 )
 
@@ -170,5 +169,5 @@ if(TARGET Exiv2::exiv2lib)
         target_link_libraries(exiv2-xmp PRIVATE EXPAT::EXPAT)
     endif()
     target_link_libraries(QGC PRIVATE Exiv2::exiv2lib)
-    target_include_directories(QGC PRIVATE ${CMAKE_BINARY_DIR})
+    target_include_directories(QGC PUBLIC ${CMAKE_BINARY_DIR})
 endif()
