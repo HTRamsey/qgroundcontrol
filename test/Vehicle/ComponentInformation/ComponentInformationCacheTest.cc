@@ -7,17 +7,13 @@
  *
  ****************************************************************************/
 
-
 #include "ComponentInformationCacheTest.h"
 #include "ComponentInformationCache.h"
 
-#include <QtCore/QStandardPaths>
 #include <QtTest/QTest>
 
 ComponentInformationCacheTest::ComponentInformationCacheTest()
 {
-    _cacheDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QLatin1String("/QGCCacheTest");
-    _tmpFilesDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QLatin1String("/QGCTestFiles");
     _cleanup();
 }
 

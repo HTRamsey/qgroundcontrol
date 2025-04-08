@@ -7,17 +7,15 @@
  *
  ****************************************************************************/
 
-
 #include "ParameterManagerTest.h"
-#include "MultiVehicleManager.h"
-#include "Vehicle.h"
-#include "ParameterManager.h"
 #include "MockLinkFTP.h"
+#include "MultiVehicleManager.h"
+#include "ParameterManager.h"
+#include "Vehicle.h"
 
-#include <QtTest/QTest>
 #include <QtTest/QSignalSpy>
+#include <QtTest/QTest>
 
-/// Test failure modes which should still lead to param load success
 void ParameterManagerTest::_noFailureWorker(MockConfiguration::FailureMode_t failureMode)
 {
     Q_ASSERT(!_mockLink);

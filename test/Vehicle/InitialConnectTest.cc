@@ -16,7 +16,7 @@
 #include <QtTest/QSignalSpy>
 #include <QtTest/QTest>
 
-void InitialConnectTest::_performTestCases(void)
+void InitialConnectTest::_performTestCases()
 {
     static const struct TestCase_s {
         MockConfiguration::FailureMode_t    failureMode;
@@ -36,7 +36,7 @@ void InitialConnectTest::_performTestCases(void)
     }
 }
 
-void InitialConnectTest::_boardVendorProductId(void)
+void InitialConnectTest::_boardVendorProductId()
 {
     auto *mvm = MultiVehicleManager::instance();
     QSignalSpy activeVehicleSpy{mvm, &MultiVehicleManager::activeVehicleChanged};

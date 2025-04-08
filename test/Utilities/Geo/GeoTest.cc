@@ -7,12 +7,6 @@
  *
  ****************************************************************************/
 
-
-/// @file
-///     @brief Unit test fpr QGCGeo coordinate project math.
-///
-///     @author David Goodman <dagoodma@gmail.com>
-
 #include "GeoTest.h"
 #include "QGCGeo.h"
 

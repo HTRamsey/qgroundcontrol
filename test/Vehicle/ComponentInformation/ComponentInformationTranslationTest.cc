@@ -7,7 +7,6 @@
  *
  ****************************************************************************/
 
-
 #include "ComponentInformationTranslationTest.h"
 #include "ComponentInformationTranslation.h"
 #include "QGCCachedFileDownload.h"
@@ -47,4 +46,3 @@ void ComponentInformationTranslationTest::readJson(const QByteArray& bytes, QJso
     QTEST_ASSERT(parseError.error == QJsonParseError::NoError);
     QVERIFY(!jsonDoc.isEmpty());
 }
-

@@ -15,16 +15,18 @@
 class ParameterManagerTest : public UnitTest
 {
     Q_OBJECT
-    
-private slots:
-    void _noFailure(void);
-    void _requestListNoResponse(void);
-    void _requestListMissingParamSuccess(void);
-    void _requestListMissingParamFail(void);
-    void _FTPnoFailure(void);
-    // void _FTPChangeParam(void);
 
+private slots:
+    void _noFailure();
+    /// Test no response to param_request_list
+    void _requestListNoResponse();
+    void _requestListMissingParamSuccess();
+    /// MockLink will fail to send a param on initial request, it will also fail to send it on subsequent param_read requests.
+    void _requestListMissingParamFail();
+    void _FTPnoFailure();
+    // void _FTPChangeParam();
 
 private:
+    /// Test failure modes which should still lead to param load success
     void _noFailureWorker(MockConfiguration::FailureMode_t failureMode);
 };
