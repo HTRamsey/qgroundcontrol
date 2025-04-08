@@ -15,11 +15,11 @@
 class SendMavCommandWithHandlerTest : public UnitTest
 {
     Q_OBJECT
-    
+
 private slots:
-    void _performTestCases(void);
-    void _compIdAllFailure(void);
-    void _duplicateCommand(void);
+    void _performTestCases();
+    void _compIdAllFailure();
+    void _duplicateCommand();
 
 private:
     typedef struct {

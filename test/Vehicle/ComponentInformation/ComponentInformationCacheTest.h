@@ -7,11 +7,11 @@
  *
  ****************************************************************************/
 
-
 #pragma once
 
 #include "UnitTest.h"
 
+#include <QtCore/QStandardPaths>
 #include <QtCore/QString>
 
 class ComponentInformationCacheTest : public UnitTest
@@ -20,12 +20,12 @@ class ComponentInformationCacheTest : public UnitTest
 
 public:
     ComponentInformationCacheTest();
-    virtual ~ComponentInformationCacheTest() = default;
 
 private slots:
     void _basic_test();
     void _lru_test();
     void _multi_test();
+
 private:
     void _setup();
     void _cleanup();
@@ -39,7 +39,7 @@ private:
 
     QVector<TmpFile> _tmpFiles;
 
-    QString _cacheDir;
-    QString _tmpFilesDir;
+    const QString _cacheDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QLatin1String("/QGCCacheTest");
+    const QString _tmpFilesDir = QStandardPaths::writableLocation(QStandardPaths::TempLocation) + QLatin1String("/QGCTestFiles");
 };
 

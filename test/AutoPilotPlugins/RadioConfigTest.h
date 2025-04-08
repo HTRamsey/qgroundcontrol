@@ -7,7 +7,6 @@
  *
  ****************************************************************************/
 
-
 #pragma once
 
 #include "UnitTest.h"
@@ -19,20 +18,12 @@ class MultiSignalSpy;
 class AutoPilotPlugin;
 class QGCQmlWidgetHolder;
 
-/// @file
-///     @brief Radio Config unit test
-///
-///     @author Don Gagne <don@thegagnes.com>
-
 Q_DECLARE_LOGGING_CATEGORY(RadioConfigTestLog)
 
 class RadioConfigTest : public UnitTest
 {
     Q_OBJECT
-    
-public:
-    RadioConfigTest(void);
-    
+
 private slots:
     void cleanup(void);
     
@@ -70,6 +61,7 @@ private:
     };
 
     void _init(MAV_AUTOPILOT firmwareType);
+    /// Sets rc input to Throttle down home position. Centers all other channels.
     void _channelHomePosition(void);
     void _minRCChannels(void);
     void _beginCalibration(void);

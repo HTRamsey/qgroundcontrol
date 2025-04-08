@@ -18,11 +18,7 @@
 #include <QtTest/QTest>
 #include <QtTest/QSignalSpy>
 
-const FTPManagerTest::TestCase_t FTPManagerTest::_rgTestCases[] = {
-    {  "/general.json" },
-};
-
-void FTPManagerTest::cleanup(void)
+void FTPManagerTest::cleanup()
 {
     _disconnectMockLink();
 }
@@ -72,7 +68,7 @@ void FTPManagerTest::_sizeTestCaseWorker(int fileSize)
     _disconnectMockLink();
 }
 
-void FTPManagerTest::_performSizeBasedTestCases(void)
+void FTPManagerTest::_performSizeBasedTestCases()
 {
     // We test various boundary conditions on file sizes with respect to buffer sizes
     const QList<int> rgSizeTestCases = {
@@ -91,7 +87,7 @@ void FTPManagerTest::_performSizeBasedTestCases(void)
     }
 }
 
-void FTPManagerTest::_performTestCases(void)
+void FTPManagerTest::_performTestCases()
 {
     int index = 0;
     for (const TestCase_t& testCase: _rgTestCases) {
@@ -100,7 +96,7 @@ void FTPManagerTest::_performTestCases(void)
     }
 }
 
-void FTPManagerTest::_testLostPackets(void)
+void FTPManagerTest::_testLostPackets()
 {
     _connectMockLinkNoInitialConnectSequence();
 
@@ -142,7 +138,7 @@ void FTPManagerTest::_verifyFileSizeAndDelete(const QString& filename, int expec
     file.remove();
 }
 
-void FTPManagerTest::_testListDirectory(void)
+void FTPManagerTest::_testListDirectory()
 {
     _connectMockLinkNoInitialConnectSequence();
 
@@ -165,7 +161,7 @@ void FTPManagerTest::_testListDirectory(void)
     _disconnectMockLink();
 }
 
-void FTPManagerTest::_testListDirectoryNoResponse(void)
+void FTPManagerTest::_testListDirectoryNoResponse()
 {
     _connectMockLinkNoInitialConnectSequence();
 
@@ -188,7 +184,7 @@ void FTPManagerTest::_testListDirectoryNoResponse(void)
     _disconnectMockLink();
 }
 
-void FTPManagerTest::_testListDirectoryNakResponse(void)
+void FTPManagerTest::_testListDirectoryNakResponse()
 {
     _connectMockLinkNoInitialConnectSequence();
 
@@ -211,7 +207,7 @@ void FTPManagerTest::_testListDirectoryNakResponse(void)
     _disconnectMockLink();
 }
 
-void FTPManagerTest::_testListDirectoryNoSecondResponse(void)
+void FTPManagerTest::_testListDirectoryNoSecondResponse()
 {
     _connectMockLinkNoInitialConnectSequence();
 
@@ -234,7 +230,7 @@ void FTPManagerTest::_testListDirectoryNoSecondResponse(void)
     _disconnectMockLink();
 }
 
-void FTPManagerTest::_testListDirectoryNoSecondResponseAllowRetry(void)
+void FTPManagerTest::_testListDirectoryNoSecondResponseAllowRetry()
 {
     _connectMockLinkNoInitialConnectSequence();
 
@@ -257,7 +253,7 @@ void FTPManagerTest::_testListDirectoryNoSecondResponseAllowRetry(void)
     _disconnectMockLink();
 }
 
-void FTPManagerTest::_testListDirectoryNakSecondResponse(void)
+void FTPManagerTest::_testListDirectoryNakSecondResponse()
 {
     _connectMockLinkNoInitialConnectSequence();
 
@@ -280,7 +276,7 @@ void FTPManagerTest::_testListDirectoryNakSecondResponse(void)
     _disconnectMockLink();
 }
 
-void FTPManagerTest::_testListDirectoryBadSequence(void)
+void FTPManagerTest::_testListDirectoryBadSequence()
 {
     _connectMockLinkNoInitialConnectSequence();
 

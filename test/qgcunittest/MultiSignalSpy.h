@@ -14,17 +14,13 @@
 
 class QSignalSpy;
 
-/// @file
-///     @brief This class allows you to keep track of signal counts on a set of signals associated with an object.
-///     Mainly used for writing object unit tests.
-
 #define MULTISPY_ENUM_SIGNAL_INDEX(signalName) signalName##index,
 #define MULTISPY_ENUM_SIGNAL_MASK(signalName) signalName##mask = 1 << signalName##index,
 
 class MultiSignalSpy : public QObject
 {
     Q_OBJECT
-    
+
 public:
     MultiSignalSpy(QObject* parent = nullptr);
     ~MultiSignalSpy();
@@ -57,7 +53,7 @@ public:
     void clearAllSignals(void);
 
     bool waitForSignalByIndex(quint32 index, int msec);
-    
+
     QSignalSpy* getSpyByIndex(quint32 index);
 
     // Returns the value type for the first parameter of the signal
@@ -66,9 +62,8 @@ public:
     QGeoCoordinate pullQGeoCoordinateFromSignalIndex(quint32 index);
 
 private:
-    // QObject overrides
     void timerEvent(QTimerEvent * event);
-    
+
     void _printSignalState(quint32 mask);
     bool _checkSignalByMaskWorker(quint32 mask, bool multipleSignalsAllowed);
     bool _checkOnlySignalByMaskWorker(quint32 mask, bool multipleSignalsAllowed);

@@ -8,15 +8,15 @@
  ****************************************************************************/
 
 #include "FollowMeTest.h"
+#include "AppSettings.h"
 #include "FollowMe.h"
 #include "MultiVehicleManager.h"
 #include "PositionManager.h"
-#include "Vehicle.h"
 #include "SettingsManager.h"
-#include "AppSettings.h"
+#include "Vehicle.h"
 
-#include <QtTest/QTest>
 #include <QtTest/QSignalSpy>
+#include <QtTest/QTest>
 
 void FollowMeTest::_testFollowMe()
 {

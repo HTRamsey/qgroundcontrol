@@ -38,7 +38,7 @@ void RequestMessageTest::_testCaseWorker(TestCase_t& testCase)
 
     MultiVehicleManager*    vehicleMgr  = MultiVehicleManager::instance();
     Vehicle*                vehicle     = vehicleMgr->activeVehicle();
-    
+
     // Gimbal controller sends message requests when receiving heartbeats, trying to find a gimbal, and it messes with this test so we disable it
     vehicle->deleteGimbalController();
 
@@ -73,7 +73,7 @@ void RequestMessageTest::_performTestCases(void)
     }
 }
 
-void RequestMessageTest::_duplicateCommand(void)
+void RequestMessageTest::_duplicateCommand()
 {
     _connectMockLinkNoInitialConnectSequence();
 
@@ -119,7 +119,7 @@ void RequestMessageTest::_compIdAllRequestMessageResultHandler(void* resultHandl
     QCOMPARE((int)testCase->expectedFailureCode, (int)failureCode);
 }
 
-void RequestMessageTest::_compIdAllFailure(void)
+void RequestMessageTest::_compIdAllFailure()
 {
     _connectMockLinkNoInitialConnectSequence();
 
