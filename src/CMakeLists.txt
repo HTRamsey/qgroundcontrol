@@ -14,11 +14,13 @@ target_sources(${CMAKE_PROJECT_NAME}
 )
 
 if(NOT ANDROID AND NOT IOS)
-    target_sources(${CMAKE_PROJECT_NAME}
-        PRIVATE
-            RunGuard.cc
-            RunGuard.h
+    set(QAPPLICATION_CLASS QApplication CACHE STRING "Inheritance class for SingleApplication" FORCE)
+    CPMAddPackage(
+        NAME SingleApplication
+        VERSION 3.5.2
+        GITHUB_REPOSITORY itay-grudev/SingleApplication
     )
+    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE SingleApplication::SingleApplication)
 endif()
 
 target_link_libraries(${CMAKE_PROJECT_NAME}
