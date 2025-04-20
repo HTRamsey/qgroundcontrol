@@ -11,6 +11,7 @@
 
 #include <QtCore/QLoggingCategory>
 #include <QtCore/QObject>
+#include <QtCore/QTimer>
 #include <QtPositioning/QGeoCoordinate>
 
 #include "MAVLinkLib.h"
@@ -42,7 +43,7 @@ private:
 
     Vehicle *_vehicle = nullptr;
     TerrainFactGroup *_terrainFactGroup = nullptr;
-    QTimer *_terrainDataSendTimer = nullptr;
+    QTimer _terrainDataSendTimer;
     bool _terrainRequestActive = false;
     mavlink_terrain_request_t _currentTerrainRequest;
 };

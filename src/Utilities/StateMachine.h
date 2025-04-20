@@ -19,8 +19,8 @@ class StateMachine : public QObject
     Q_OBJECT
 
 public:
-    StateMachine(QObject *parent = nullptr);
-    ~StateMachine();
+    explicit StateMachine(QObject *parent = nullptr);
+    virtual ~StateMachine();
 
     typedef void (*StateFn)(StateMachine *stateMachine);
 

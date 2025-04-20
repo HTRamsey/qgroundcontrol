@@ -26,19 +26,10 @@ class StandardModes : public QObject
 Q_OBJECT
 
 public:
-    struct Mode {
-        QString name;
-        uint8_t standardMode;
-        bool advanced;
-        bool cannotBeSet;
-    };
-
-    StandardModes(QObject* parent, Vehicle* vehicle);
+    StandardModes(QObject *parent, Vehicle *vehicle);
 
     void request();
-
     void availableModesMonitorReceived(uint8_t seq);
-
     void gotMessage(MAV_RESULT result, const mavlink_message_t &message);
 
 signals:
@@ -46,16 +37,13 @@ signals:
     void requestCompleted();
 
 private:
-
     void requestMode(int modeIndex);
     void ensureUniqueModeNames();
 
-    Vehicle*const _vehicle;
-
-    bool _requestActive{false};
-    bool _wantReset{false};
-
-    int _lastSeq{-1};
+    Vehicle *_vehicle = nullptr;
+    bool _requestActive = false;
+    bool _wantReset = false;
+    int _lastSeq = -1;
 
     FlightModeList _modeList;
 };

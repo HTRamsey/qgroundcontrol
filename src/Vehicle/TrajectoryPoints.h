@@ -20,30 +20,27 @@ class TrajectoryPoints : public QObject
     Q_OBJECT
 
 public:
-    TrajectoryPoints(Vehicle* vehicle, QObject* parent = nullptr);
+    explicit TrajectoryPoints(Vehicle *vehicle, QObject *parent = nullptr);
 
-    Q_INVOKABLE QVariantList list(void) const { return _points; }
+    Q_INVOKABLE QVariantList list() const { return _points; }
 
-    void start  (void);
-    void stop   (void);
-
-public slots:
-    void clear  (void);
+    void start();
+    void stop();
 
 signals:
-    void pointAdded     (QGeoCoordinate coordinate);
-    void updateLastPoint(QGeoCoordinate coordinate);
-    void pointsCleared  (void);
+    void pointAdded(const QGeoCoordinate &coordinate);
+    void updateLastPoint(const QGeoCoordinate &coordinate);
+    void pointsCleared();
+
+public slots:
+    void clear();
 
 private slots:
-    void _vehicleCoordinateChanged(QGeoCoordinate coordinate);
+    void _vehicleCoordinateChanged(const QGeoCoordinate &coordinate);
 
 private:
-    Vehicle*        _vehicle;
-    QVariantList    _points;
-    QGeoCoordinate  _lastPoint;
-    double          _lastAzimuth;
-
-    static constexpr double _distanceTolerance = 2.0;
-    static constexpr double _azimuthTolerance = 1.5;
+    Vehicle *_vehicle = nullptr;
+    QVariantList _points;
+    QGeoCoordinate _lastPoint;
+    double _lastAzimuth = qQNaN();
 };

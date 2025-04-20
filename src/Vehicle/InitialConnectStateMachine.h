@@ -22,15 +22,14 @@ class InitialConnectStateMachine : public StateMachine
     Q_OBJECT
 
 public:
-    InitialConnectStateMachine(Vehicle *vehicle, QObject *parent = nullptr);
+    explicit InitialConnectStateMachine(Vehicle *vehicle, QObject *parent = nullptr);
     ~InitialConnectStateMachine();
 
     // Overrides from StateMachine
-    int             stateCount      (void) const final;
-    const StateFn*  rgStates        (void) const final;
-    void            statesCompleted (void) const final;
-
-    void advance() override;
+    int stateCount() const final { return _cStates; }
+    const StateFn *rgStates() const final { return &_rgStates[0]; }
+    void statesCompleted() const final {}
+    void advance() final;
 
 signals:
     void progressUpdate(float progress);
@@ -40,25 +39,24 @@ private slots:
     void standardModesRequestCompleted();
 
 private:
-    static void _stateRequestAutopilotVersion           (StateMachine* stateMachine);
-    static void _stateRequestProtocolVersion            (StateMachine* stateMachine);
-    static void _stateRequestCompInfo                   (StateMachine* stateMachine);
-    static void _stateRequestStandardModes              (StateMachine* stateMachine);
-    static void _stateRequestCompInfoComplete           (void* requestAllCompleteFnData);
-    static void _stateRequestParameters                 (StateMachine* stateMachine);
-    static void _stateRequestMission                    (StateMachine* stateMachine);
-    static void _stateRequestGeoFence                   (StateMachine* stateMachine);
-    static void _stateRequestRallyPoints                (StateMachine* stateMachine);
-    static void _stateSignalInitialConnectComplete      (StateMachine* stateMachine);
-
-    static void _autopilotVersionRequestMessageHandler  (void* resultHandlerData, MAV_RESULT commandResult, Vehicle::RequestMessageResultHandlerFailureCode_t failureCode, const mavlink_message_t& message);
-    static void _protocolVersionRequestMessageHandler   (void* resultHandlerData, MAV_RESULT commandResult, Vehicle::RequestMessageResultHandlerFailureCode_t failureCode, const mavlink_message_t& message);
-
     float _progress(float subProgress = 0.f);
 
-    Vehicle* _vehicle;
+    static void _stateRequestAutopilotVersion(StateMachine *stateMachine);
+    static void _stateRequestProtocolVersion(StateMachine *stateMachine);
+    static void _stateRequestCompInfo(StateMachine *stateMachine);
+    static void _stateRequestStandardModes(StateMachine *stateMachine);
+    static void _stateRequestCompInfoComplete(void *requestAllCompleteFnData);
+    static void _stateRequestParameters(StateMachine *stateMachine);
+    static void _stateRequestMission(StateMachine *stateMachine);
+    static void _stateRequestGeoFence(StateMachine *stateMachine);
+    static void _stateRequestRallyPoints(StateMachine *stateMachine);
+    static void _stateSignalInitialConnectComplete(StateMachine *stateMachine);
 
-    int _progressWeightTotal;
+    static void _autopilotVersionRequestMessageHandler(void *resultHandlerData, MAV_RESULT commandResult, Vehicle::RequestMessageResultHandlerFailureCode_t failureCode, const mavlink_message_t &message);
+    static void _protocolVersionRequestMessageHandler(void *resultHandlerData, MAV_RESULT commandResult, Vehicle::RequestMessageResultHandlerFailureCode_t failureCode, const mavlink_message_t &message);
+
+    Vehicle *_vehicle = nullptr;
+    int _progressWeightTotal = 0;
 
     static constexpr const StateMachine::StateFn _rgStates[] = {
         _stateRequestAutopilotVersion,
@@ -84,5 +82,5 @@ private:
         1, //_stateSignalInitialConnectComplete
     };
 
-    static constexpr int _cStates = sizeof(_rgStates) / sizeof(_rgStates[0]);
+    static constexpr int _cStates = std::size(_rgStates);
 };

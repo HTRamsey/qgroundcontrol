@@ -108,7 +108,6 @@ private:
 
 /*===========================================================================*/
 
-
 class MAVLinkLogManager : public QObject
 {
     Q_OBJECT

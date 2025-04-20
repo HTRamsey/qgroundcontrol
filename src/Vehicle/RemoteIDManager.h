@@ -9,11 +9,11 @@
 
 #pragma once
 
-#include <QtCore/QObject>
 #include <QtCore/QDateTime>
+#include <QtCore/QLoggingCategory>
+#include <QtCore/QObject>
 #include <QtCore/QTimer>
 #include <QtPositioning/QGeoPositionInfo>
-#include <QtCore/QLoggingCategory>
 
 #include "MAVLinkLib.h"
 
@@ -26,10 +26,6 @@ class Vehicle;
 class RemoteIDManager : public QObject
 {
     Q_OBJECT
-
-public:
-    RemoteIDManager(Vehicle* vehicle);
-
     Q_PROPERTY(bool    available            READ available          NOTIFY availableChanged)             ///< true: the vehicle supports Mavlink Open Drone ID messages
     Q_PROPERTY(bool    armStatusGood        READ armStatusGood      NOTIFY armStatusGoodChanged)
     Q_PROPERTY(QString armStatusError       READ armStatusError     NOTIFY armStatusErrorChanged)
@@ -39,28 +35,28 @@ public:
     Q_PROPERTY(bool    emergencyDeclared    READ emergencyDeclared  NOTIFY emergencyDeclaredChanged)
     Q_PROPERTY(bool    operatorIDGood       READ operatorIDGood     NOTIFY operatorIDGoodChanged)
 
+public:
+    RemoteIDManager(Vehicle *vehicle);
 
-    Q_INVOKABLE void checkOperatorID(const QString& operatorID);
+    Q_INVOKABLE void checkOperatorID(const QString &operatorID);
     Q_INVOKABLE void setOperatorID();
-
-    // Declare emergency
     Q_INVOKABLE void setEmergency(bool declare);
 
-    bool    available           (void) const { return _available; }
-    bool    armStatusGood       (void) const { return _armStatusGood; }
-    QString armStatusError      (void) const { return _armStatusError; }
-    bool    commsGood           (void) const { return _commsGood; }
-    bool    gcsGPSGood          (void) const { return _gcsGPSGood; }
-    bool    basicIDGood         (void) const { return _basicIDGood; }
-    bool    emergencyDeclared   (void) const { return _emergencyDeclared;}
-    bool    operatorIDGood      (void) const { return _operatorIDGood; }
+    bool available() const { return _available; }
+    bool armStatusGood() const { return _armStatusGood; }
+    QString armStatusError() const { return _armStatusError; }
+    bool commsGood() const { return _commsGood; }
+    bool gcsGPSGood() const { return _gcsGPSGood; }
+    bool basicIDGood() const { return _basicIDGood; }
+    bool emergencyDeclared() const { return _emergencyDeclared;}
+    bool operatorIDGood() const { return _operatorIDGood; }
 
-    void mavlinkMessageReceived (mavlink_message_t& message);
+    void mavlinkMessageReceived(const mavlink_message_t &message);
 
     enum LocationTypes {
-        TAKEOFF,
-        LiveGNSS,
-        FIXED
+        TAKEOFF = 0,
+        LiveGNSS = 1,
+        FIXED = 2
     };
 
     enum Region {
@@ -79,55 +75,56 @@ signals:
     void operatorIDGoodChanged();
 
 private slots:
+    /// This slot will be called if we stop receiving heartbeats for more than RID_TIMEOUT seconds
     void _odidTimeout();
+    /// Function that sends messages periodically
     void _sendMessages();
-    void _updateLastGCSPositionInfo(QGeoPositionInfo update);
+    void _updateLastGCSPositionInfo(const QGeoPositionInfo &update);
     void _checkGCSBasicID();
 
 private:
-    void _handleArmStatus(mavlink_message_t& message);
+    /// Parsing of the ARM_STATUS message comming from the RID device
+    void _handleArmStatus(const mavlink_message_t &message);
 
-    // Self ID
-    void        _sendSelfIDMsg ();
-    const char* _getSelfIDDescription();
+    void _sendSelfIDMsg();
+    /// We need to return the correct description for the self ID type we have selected
+    const char *_getSelfIDDescription();
 
-    // Operator ID
-    void        _sendOperatorID ();
+    void _sendOperatorID();
 
-    // System
-    void        _sendSystem();
-    uint32_t    _timestamp2019();
+    void _sendSystem();
+    // Returns seconds elapsed since 00:00:00 1/1/2019
+    static uint32_t _timestamp2019();
 
-    // Basic ID
-    void        _sendBasicID();
+    void _sendBasicID();
 
-    bool _isEUOperatorIDValid(const QString& operatorID) const;
-    QChar _calculateLuhnMod36(const QString& input) const;
+    static bool _isEUOperatorIDValid(const QString &operatorID);
+    static QChar _calculateLuhnMod36(const QString &input);
 
-    Vehicle*            _vehicle;
-    RemoteIDSettings*   _settings;
+    Vehicle *_vehicle = nullptr;
+    RemoteIDSettings *_settings = nullptr;
 
-    // Flags ODID
-    bool    _available = false;
-    bool    _armStatusGood;
+    bool _available = false;
+    bool _armStatusGood = false;
     QString _armStatusError;
-    bool    _commsGood;
-    bool    _gcsGPSGood;
-    bool    _basicIDGood;
-    bool    _GCSBasicIDValid;
-    bool    _operatorIDGood;
+    bool _commsGood = false;
+    bool _gcsGPSGood = false;
+    bool _basicIDGood = true;
+    bool _GCSBasicIDValid = false;
+    bool _operatorIDGood = false;
 
-    bool        _emergencyDeclared;
-    QDateTime   _lastGeoPositionTimeStamp;
-    int         _targetSystem;
-    int         _targetComponent;
+    bool _emergencyDeclared = false;
+    QDateTime _lastGeoPositionTimeStamp;
+    int _targetSystem = 0;
+    int _targetComponent = 0;
 
     // After emergency cleared, this makes sure the non emergency selfID message makes it to the vehicle
-    bool        _enforceSendingSelfID;
+    bool _enforceSendingSelfID = false;
 
-    static const uint8_t* _id_or_mac_unknown;
-
-    // Timers
     QTimer _odidTimeoutTimer;
     QTimer _sendMessagesTimer;
+
+    QByteArray _descriptionBuffer;
+
+    static const uint8_t *_id_or_mac_unknown;
 };

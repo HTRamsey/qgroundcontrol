@@ -13,21 +13,18 @@
 #include "MAVLinkProtocol.h"
 #include "QGCLoggingCategory.h"
 
-#include <QtCore/QTimer>
-
 QGC_LOGGING_CATEGORY(TerrainProtocolHandlerLog, "qgc.vehicle.terrainprotocolhandler")
 
 TerrainProtocolHandler::TerrainProtocolHandler(Vehicle *vehicle, TerrainFactGroup *terrainFactGroup, QObject *parent)
     : QObject(parent)
     , _vehicle(vehicle)
     , _terrainFactGroup(terrainFactGroup)
-    , _terrainDataSendTimer(new QTimer(this))
 {
     // qCDebug(TerrainProtocolHandlerLog) << Q_FUNC_INFO << this;
 
-    _terrainDataSendTimer->setSingleShot(false);
-    _terrainDataSendTimer->setInterval(1000.0/12.0);
-    (void) connect(_terrainDataSendTimer, &QTimer::timeout, this, &TerrainProtocolHandler::_sendNextTerrainData);
+    _terrainDataSendTimer.setSingleShot(false);
+    _terrainDataSendTimer.setInterval(1000.0/12.0);
+    (void) connect(&_terrainDataSendTimer, &QTimer::timeout, this, &TerrainProtocolHandler::_sendNextTerrainData);
 }
 
 TerrainProtocolHandler::~TerrainProtocolHandler()
@@ -58,18 +55,18 @@ void TerrainProtocolHandler::_handleTerrainRequest(const mavlink_message_t &mess
 
 void TerrainProtocolHandler::_handleTerrainReport(const mavlink_message_t &message)
 {
-    mavlink_terrain_report_t terrainReport;
+    mavlink_terrain_report_t terrainReport{};
     mavlink_msg_terrain_report_decode(&message, &terrainReport);
 
     _terrainFactGroup->blocksPending()->setRawValue(terrainReport.pending);
     _terrainFactGroup->blocksLoaded()->setRawValue(terrainReport.loaded);
 
     if (TerrainProtocolHandlerLog().isDebugEnabled()) {
-        bool error;
         QList<double> altitudes;
         QList<QGeoCoordinate> coordinates;
         QGeoCoordinate coord(static_cast<double>(terrainReport.lat) / 1e7, static_cast<double>(terrainReport.lon) / 1e7);
-        (void) coordinates.append(coord);
+        coordinates.append(coord);
+        bool error = false;
         const bool altAvailable = TerrainAtCoordinateQuery::getAltitudesForCoordinates(coordinates, altitudes, error);
         const QString vehicleAlt = terrainReport.spacing ? QStringLiteral("%1").arg(terrainReport.terrain_height) : QStringLiteral("n/a");
         QString qgcAlt;
@@ -90,7 +87,7 @@ void TerrainProtocolHandler::_sendNextTerrainData()
         return;
     }
 
-    QGeoCoordinate terrainRequestCoordSWCorner(static_cast<double>(_currentTerrainRequest.lat) / 1e7, static_cast<double>(_currentTerrainRequest.lon) / 1e7);
+    const QGeoCoordinate terrainRequestCoordSWCorner(static_cast<double>(_currentTerrainRequest.lat) / 1e7, static_cast<double>(_currentTerrainRequest.lon) / 1e7);
     const int spacingBetweenGrids = _currentTerrainRequest.grid_spacing * 4;
 
     // Each TERRAIN_DATA sent to vehicle contains a 4x4 grid of heights
@@ -119,7 +116,7 @@ void TerrainProtocolHandler::_sendNextTerrainData()
 
     if (bitFound) {
         // Kick timer to send next possible TERRAIN_DATA to vehicle
-        _terrainDataSendTimer->start();
+        _terrainDataSendTimer.start();
     } else {
         _terrainRequestActive = false;
     }
@@ -128,8 +125,8 @@ void TerrainProtocolHandler::_sendNextTerrainData()
 void TerrainProtocolHandler::_sendTerrainData(const QGeoCoordinate &swCorner, uint8_t gridBit)
 {
     QList<QGeoCoordinate> coordinates;
-    for (int rowIndex=0; rowIndex<4; rowIndex++) {
-        for (int colIndex=0; colIndex<4; colIndex++) {
+    for (int rowIndex = 0; rowIndex < 4; rowIndex++) {
+        for (int colIndex = 0; colIndex < 4; colIndex++) {
             // Move east and then north to generate the coordinate for grid point
             QGeoCoordinate coord = swCorner.atDistanceAndAzimuth(_currentTerrainRequest.grid_spacing * colIndex, 90);
             coord = coord.atDistanceAndAzimuth(_currentTerrainRequest.grid_spacing * rowIndex, 0);
@@ -145,7 +142,7 @@ void TerrainProtocolHandler::_sendTerrainData(const QGeoCoordinate &swCorner, ui
     }
 
     if (error) {
-        qCWarning(TerrainProtocolHandlerLog) << Q_FUNC_INFO << "TerrainAtCoordinateQuery::getAltitudesForCoordinates failed";
+        qCWarning(TerrainProtocolHandlerLog) << "failed";
         return;
     }
 
@@ -154,25 +151,27 @@ void TerrainProtocolHandler::_sendTerrainData(const QGeoCoordinate &swCorner, ui
     _currentTerrainRequest.mask &= removeBit;
     int altIndex = 0;
     int16_t terrainData[16];
-    for (const double& altitude : altitudes) {
+    for (const double &altitude : altitudes) {
         terrainData[altIndex++] = static_cast<int16_t>(altitude);
     }
 
     SharedLinkInterfacePtr sharedLink = _vehicle->vehicleLinkManager()->primaryLink().lock();
-    if (sharedLink) {
-        mavlink_message_t msg;
-        (void) mavlink_msg_terrain_data_pack_chan(
-            MAVLinkProtocol::instance()->getSystemId(),
-            MAVLinkProtocol::getComponentId(),
-            sharedLink->mavlinkChannel(),
-            &msg,
-            _currentTerrainRequest.lat,
-            _currentTerrainRequest.lon,
-            _currentTerrainRequest.grid_spacing,
-            gridBit,
-            terrainData
-        );
-
-        _vehicle->sendMessageOnLinkThreadSafe(sharedLink.get(), msg);
+    if (!sharedLink) {
+        return;
     }
+
+    mavlink_message_t msg{};
+    (void) mavlink_msg_terrain_data_pack_chan(
+        MAVLinkProtocol::instance()->getSystemId(),
+        MAVLinkProtocol::getComponentId(),
+        sharedLink->mavlinkChannel(),
+        &msg,
+        _currentTerrainRequest.lat,
+        _currentTerrainRequest.lon,
+        _currentTerrainRequest.grid_spacing,
+        gridBit,
+        terrainData
+    );
+
+    _vehicle->sendMessageOnLinkThreadSafe(sharedLink.get(), msg);
 }
