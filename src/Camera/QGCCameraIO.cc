@@ -7,125 +7,75 @@
  *
  ****************************************************************************/
 
-#include "MavlinkCameraControl.h"
 #include "QGCCameraIO.h"
-#include "QGCLoggingCategory.h"
 #include "LinkInterface.h"
+#include "MavlinkCameraControl.h"
 #include "MAVLinkProtocol.h"
+#include "QGCMAVLink.h"
+#include "QGCLoggingCategory.h"
 #include "Vehicle.h"
 
 #include <QtQml/QQmlEngine>
 
-QGC_LOGGING_CATEGORY(CameraIOLog, "CameraIOLog")
-QGC_LOGGING_CATEGORY(CameraIOLogVerbose, "CameraIOLogVerbose")
+QGC_LOGGING_CATEGORY(CameraIOLog, "qgc.camera.qgccameraio")
+QGC_LOGGING_CATEGORY(CameraIOLogVerbose, "qgc.camera.qgccameraio:verbose")
 
-//-----------------------------------------------------------------------------
-QGCCameraParamIO::QGCCameraParamIO(MavlinkCameraControl *control, Fact* fact, Vehicle *vehicle)
+QGCCameraParamIO::QGCCameraParamIO(MavlinkCameraControl *control, Fact *fact, Vehicle *vehicle)
     : QObject(control)
     , _control(control)
     , _fact(fact)
     , _vehicle(vehicle)
-    , _sentRetries(0)
-    , _requestRetries(0)
-    , _done(false)
-    , _updateOnSet(false)
-    , _forceUIUpdate(false)
 {
-    QQmlEngine::setObjectOwnership(this, QQmlEngine::CppOwnership);
     _paramWriteTimer.setSingleShot(true);
     _paramWriteTimer.setInterval(3000);
     _paramRequestTimer.setSingleShot(true);
     _paramRequestTimer.setInterval(3500);
-    if(_fact->writeOnly()) {
-        //-- Write mode is always "done" as it won't ever read
+
+    if (_fact->writeOnly()) {
+        // Write mode is always "done" as it won't ever read
         _done = true;
     } else {
-        connect(&_paramRequestTimer, &QTimer::timeout, this, &QGCCameraParamIO::_paramRequestTimeout);
+        (void) connect(&_paramRequestTimer, &QTimer::timeout, this, &QGCCameraParamIO::_paramRequestTimeout);
     }
-    connect(&_paramWriteTimer,   &QTimer::timeout, this, &QGCCameraParamIO::_paramWriteTimeout);
-    connect(_fact, &Fact::rawValueChanged, this, &QGCCameraParamIO::_factChanged);
-    connect(_fact, &Fact::containerRawValueChanged, this, &QGCCameraParamIO::_containerRawValueChanged);
-    //-- TODO: Even though we don't use anything larger than 32-bit, this should
-    //   probably be updated.
-    switch (_fact->type()) {
-        case FactMetaData::valueTypeUint8:
-        case FactMetaData::valueTypeBool:
-            _mavParamType = MAV_PARAM_EXT_TYPE_UINT8;
-            break;
-        case FactMetaData::valueTypeInt8:
-            _mavParamType = MAV_PARAM_EXT_TYPE_INT8;
-            break;
-        case FactMetaData::valueTypeUint16:
-            _mavParamType = MAV_PARAM_EXT_TYPE_UINT16;
-            break;
-        case FactMetaData::valueTypeInt16:
-            _mavParamType = MAV_PARAM_EXT_TYPE_INT16;
-            break;
-        case FactMetaData::valueTypeUint32:
-            _mavParamType = MAV_PARAM_EXT_TYPE_UINT32;
-            break;
-        case FactMetaData::valueTypeUint64:
-            _mavParamType = MAV_PARAM_EXT_TYPE_UINT64;
-            break;
-        case FactMetaData::valueTypeInt64:
-            _mavParamType = MAV_PARAM_EXT_TYPE_INT64;
-            break;
-        case FactMetaData::valueTypeFloat:
-            _mavParamType = MAV_PARAM_EXT_TYPE_REAL32;
-            break;
-        case FactMetaData::valueTypeDouble:
-            _mavParamType = MAV_PARAM_EXT_TYPE_REAL64;
-            break;
-            //-- String and custom are the same for now
-        case FactMetaData::valueTypeString:
-        case FactMetaData::valueTypeCustom:
-            _mavParamType = MAV_PARAM_EXT_TYPE_CUSTOM;
-            break;
-        default:
-            qWarning() << "Unsupported fact type" << _fact->type() << "for" << _fact->name();
-        case FactMetaData::valueTypeInt32:
-            _mavParamType = MAV_PARAM_EXT_TYPE_INT32;
-            break;
-    }
+
+    (void) connect(&_paramWriteTimer, &QTimer::timeout, this, &QGCCameraParamIO::_paramWriteTimeout);
+    (void) connect(_fact, &Fact::rawValueChanged, this, &QGCCameraParamIO::_factChanged);
+    (void) connect(_fact, &Fact::containerRawValueChanged, this, &QGCCameraParamIO::_containerRawValueChanged);
+
+    _mavParamType = QGCMAVLink::valueFromParamExt(_fact->type());
 }
 
-//-----------------------------------------------------------------------------
-void
-QGCCameraParamIO::setParamRequest()
+void QGCCameraParamIO::setParamRequest()
 {
-    if(!_fact->writeOnly()) {
+    if (!_fact->writeOnly()) {
         _paramRequestReceived = false;
         _requestRetries = 0;
         _paramRequestTimer.start();
     }
 }
 
-//-----------------------------------------------------------------------------
-void
-QGCCameraParamIO::_factChanged(QVariant value)
+void QGCCameraParamIO::_factChanged(const QVariant &value)
 {
-    if(!_forceUIUpdate) {
-        Q_UNUSED(value);
+    Q_UNUSED(value);
+
+    if (!_forceUIUpdate) {
         qCDebug(CameraIOLog) << "UI Fact" << _fact->name() << "changed to" << value;
         _control->factChanged(_fact);
     }
 }
 
-//-----------------------------------------------------------------------------
-void
-QGCCameraParamIO::_containerRawValueChanged(const QVariant value)
+void QGCCameraParamIO::_containerRawValueChanged(const QVariant &value)
 {
-    if(!_fact->readOnly()) {
-        Q_UNUSED(value);
+    Q_UNUSED(value);
+
+    if (!_fact->readOnly()) {
         qCDebug(CameraIOLog) << "Update Fact from camera" << _fact->name();
         _sentRetries = 0;
         _sendParameter();
     }
 }
 
-//-----------------------------------------------------------------------------
-void
-QGCCameraParamIO::sendParameter(bool updateUI)
+void QGCCameraParamIO::sendParameter(bool updateUI)
 {
     qCDebug(CameraIOLog) << "Send Fact" << _fact->name();
     _sentRetries = 0;
@@ -133,18 +83,16 @@ QGCCameraParamIO::sendParameter(bool updateUI)
     _sendParameter();
 }
 
-//-----------------------------------------------------------------------------
-void
-QGCCameraParamIO::_sendParameter()
+void QGCCameraParamIO::_sendParameter()
 {
     SharedLinkInterfacePtr sharedLink = _vehicle->vehicleLinkManager()->primaryLink().lock();
     if (sharedLink) {
-        mavlink_param_ext_set_t p;
-        memset(&p, 0, sizeof(mavlink_param_ext_set_t));
-        param_ext_union_t   union_value;
-        mavlink_message_t   msg;
-        FactMetaData::ValueType_t factType = _fact->type();
-        p.param_type = _mavParamType;
+        mavlink_param_ext_set_t param{};
+        (void) memset(&param, 0, sizeof(mavlink_param_ext_set_t));
+        param.param_type = _mavParamType;
+
+        param_ext_union_t union_value{};
+        const FactMetaData::ValueType_t factType = _fact->type();
         switch (factType) {
         case FactMetaData::valueTypeUint8:
         case FactMetaData::valueTypeBool:
@@ -174,208 +122,168 @@ QGCCameraParamIO::_sendParameter()
         case FactMetaData::valueTypeDouble:
             union_value.param_double = _fact->rawValue().toDouble();
             break;
-            //-- String and custom are the same for now
         case FactMetaData::valueTypeString:
-        case FactMetaData::valueTypeCustom:
-        {
-            QByteArray custom = _fact->rawValue().toByteArray();
-            memcpy(union_value.bytes, custom.data(), static_cast<size_t>(std::max(custom.size(), static_cast<qsizetype>(MAVLINK_MSG_PARAM_EXT_SET_FIELD_PARAM_VALUE_LEN))));
-        }
+            // String and custom are the same for now
+        case FactMetaData::valueTypeCustom: {
+            const QByteArray custom = _fact->rawValue().toByteArray();
+            (void) memcpy(union_value.bytes, custom.data(), static_cast<size_t>(std::max(custom.size(), static_cast<qsizetype>(MAVLINK_MSG_PARAM_EXT_SET_FIELD_PARAM_VALUE_LEN))));
             break;
+        }
         default:
-            qCritical() << "Unsupported fact type" << factType << "for" << _fact->name();
+            qCCritical(CameraIOLog) << "Unsupported fact type" << factType << "for" << _fact->name();
         case FactMetaData::valueTypeInt32:
             union_value.param_int32 = static_cast<int32_t>(_fact->rawValue().toInt());
             break;
         }
-        memcpy(&p.param_value[0], &union_value.bytes[0], MAVLINK_MSG_PARAM_EXT_SET_FIELD_PARAM_VALUE_LEN);
-        p.target_system     = static_cast<uint8_t>(_vehicle->id());
-        p.target_component  = static_cast<uint8_t>(_control->compID());
-        strncpy(p.param_id, _fact->name().toStdString().c_str(), MAVLINK_MSG_PARAM_EXT_SET_FIELD_PARAM_ID_LEN);
+
+        (void) memcpy(&param.param_value[0], &union_value.bytes[0], MAVLINK_MSG_PARAM_EXT_SET_FIELD_PARAM_VALUE_LEN);
+        param.target_system = static_cast<uint8_t>(_vehicle->id());
+        param.target_component = static_cast<uint8_t>(_control->compID());
+        (void) strncpy(p.param_id, _fact->name().toStdString().c_str(), MAVLINK_MSG_PARAM_EXT_SET_FIELD_PARAM_ID_LEN);
+
+        mavlink_message_t msg{};
         mavlink_msg_param_ext_set_encode_chan(
-                    static_cast<uint8_t>(MAVLinkProtocol::instance()->getSystemId()),
-                    static_cast<uint8_t>(MAVLinkProtocol::getComponentId()),
-                    sharedLink->mavlinkChannel(),
-                    &msg,
-                    &p);
-        _vehicle->sendMessageOnLinkThreadSafe(sharedLink.get(), msg);
+            static_cast<uint8_t>(MAVLinkProtocol::instance()->getSystemId()),
+            static_cast<uint8_t>(MAVLinkProtocol::getComponentId()),
+            sharedLink->mavlinkChannel(),
+            &msg,
+            &p
+        );
+        (void) _vehicle->sendMessageOnLinkThreadSafe(sharedLink.get(), msg);
     }
     _paramWriteTimer.start();
 }
 
-//-----------------------------------------------------------------------------
-void
-QGCCameraParamIO::_paramWriteTimeout()
+void QGCCameraParamIO::_paramWriteTimeout()
 {
-    if(++_sentRetries > 3) {
+    if (++_sentRetries > 3) {
         qCWarning(CameraIOLog) << "No response for param set:" << _fact->name();
         _updateOnSet = false;
     } else {
-        //-- Send it again
+        // Send it again
         qCDebug(CameraIOLog) << "Param set retry:" << _fact->name() << _sentRetries;
         _sendParameter();
         _paramWriteTimer.start();
     }
 }
 
-//-----------------------------------------------------------------------------
-void
-QGCCameraParamIO::handleParamAck(const mavlink_param_ext_ack_t& ack)
+void QGCCameraParamIO::handleParamAck(const mavlink_param_ext_ack_t &ack)
 {
     _paramWriteTimer.stop();
-    if(ack.param_result == PARAM_ACK_ACCEPTED) {
-        QVariant val = _valueFromMessage(ack.param_value, ack.param_type);
-        if(_fact->rawValue() != val) {
+    switch (ack.param_result) {
+    case PARAM_ACK_ACCEPTED: {
+        const QVariant val = QGCMAVLink::valueFromParamExt(ack.param_value, ack.param_type);
+        if (_fact->rawValue() != val) {
             _fact->containerSetRawValue(val);
-            if(_updateOnSet) {
+            if (_updateOnSet) {
                 _updateOnSet = false;
                 _control->factChanged(_fact);
             }
         }
-    } else if(ack.param_result == PARAM_ACK_IN_PROGRESS) {
-        //-- Wait a bit longer for this one
+        break;
+    }
+    case PARAM_ACK_IN_PROGRESS:
+        // Wait a bit longer for this one
         qCDebug(CameraIOLogVerbose) << "Param set in progress:" << _fact->name();
         _paramWriteTimer.start();
-    } else {
-        if(ack.param_result == PARAM_ACK_FAILED) {
-            if(++_sentRetries < 3) {
-                //-- Try again
-                qCWarning(CameraIOLog) << "Param set failed:" << _fact->name() << _sentRetries;
-                _paramWriteTimer.start();
-            }
-            return;
-        } else if(ack.param_result == PARAM_ACK_VALUE_UNSUPPORTED) {
-            qCWarning(CameraIOLog) << "Param set unsuported:" << _fact->name();
+        break;
+    case PARAM_ACK_FAILED:
+        if (++_sentRetries < 3) {
+            // Try again
+            qCWarning(CameraIOLog) << "Param set failed:" << _fact->name() << _sentRetries;
+            _paramWriteTimer.start();
         }
-        //-- If UI changed and value was not set, restore UI
-        QVariant val = _valueFromMessage(ack.param_value, ack.param_type);
-        if(_fact->rawValue() != val) {
-            if(_control->validateParameter(_fact, val)) {
+        return;
+    case PARAM_ACK_VALUE_UNSUPPORTED:
+        qCWarning(CameraIOLog) << "Param set unsuported:" << _fact->name();
+        // If UI changed and value was not set, restore UI
+        const QVariant val = QGCMAVLink::valueFromParamExt(ack.param_value, ack.param_type);
+        if (_fact->rawValue() != val) {
+            if (_control->validateParameter(_fact, val)) {
                 _fact->containerSetRawValue(val);
             }
         }
+        break;
+    default:
+        qCCritical(CameraIOLog) << "Unsupported Param Ack Type" << ack.param_result;
+        break;
     }
 }
 
-//-----------------------------------------------------------------------------
-void
-QGCCameraParamIO::handleParamValue(const mavlink_param_ext_value_t& value)
+void QGCCameraParamIO::handleParamValue(const mavlink_param_ext_value_t &value)
 {
     _paramRequestTimer.stop();
-    QVariant newValue = _valueFromMessage(value.param_value, value.param_type);
-    if(_control->incomingParameter(_fact, newValue)) {
+    const QVariant newValue = QGCMAVLink::valueFromParamExt(value.param_value, value.param_type);
+    if (_control->incomingParameter(_fact, newValue)) {
         _fact->containerSetRawValue(newValue);
         _control->factChanged(_fact);
     }
+
     _paramRequestReceived = true;
-    if(_forceUIUpdate) {
+    if (_forceUIUpdate) {
         emit _fact->rawValueChanged(_fact->rawValue());
         emit _fact->valueChanged(_fact->rawValue());
         _forceUIUpdate = false;
     }
-    if(!_done) {
+
+    if (!_done) {
         _done = true;
         _control->_paramDone();
     }
-    qCDebug(CameraIOLog) << QString("handleParamValue() %1 %2").arg(_fact->name()).arg(_fact->rawValueString());
+
+    qCDebug(CameraIOLog) << _fact->name() << _fact->rawValueString();
 }
 
-//-----------------------------------------------------------------------------
-QVariant
-QGCCameraParamIO::_valueFromMessage(const char* value, uint8_t param_type)
+void QGCCameraParamIO::_paramRequestTimeout()
 {
-    QVariant var;
-    param_ext_union_t u;
-    memcpy(u.bytes, value, MAVLINK_MSG_PARAM_EXT_SET_FIELD_PARAM_VALUE_LEN);
-    switch (param_type) {
-        case MAV_PARAM_EXT_TYPE_REAL32:
-            var = QVariant(u.param_float);
-            break;
-        case MAV_PARAM_EXT_TYPE_UINT8:
-            var = QVariant(u.param_uint8);
-            break;
-        case MAV_PARAM_EXT_TYPE_INT8:
-            var = QVariant(u.param_int8);
-            break;
-        case MAV_PARAM_EXT_TYPE_UINT16:
-            var = QVariant(u.param_uint16);
-            break;
-        case MAV_PARAM_EXT_TYPE_INT16:
-            var = QVariant(u.param_int16);
-            break;
-        case MAV_PARAM_EXT_TYPE_UINT32:
-            var = QVariant(u.param_uint32);
-            break;
-        case MAV_PARAM_EXT_TYPE_INT32:
-            var = QVariant(u.param_int32);
-            break;
-        case MAV_PARAM_EXT_TYPE_UINT64:
-            var = QVariant(static_cast<qulonglong>(u.param_uint64));
-            break;
-        case MAV_PARAM_EXT_TYPE_INT64:
-            var = QVariant(static_cast<qulonglong>(u.param_int64));
-            break;
-        case MAV_PARAM_EXT_TYPE_CUSTOM:
-            var = QVariant(QByteArray(value, MAVLINK_MSG_PARAM_EXT_SET_FIELD_PARAM_VALUE_LEN));
-            break;
-        default:
-            var = QVariant(0);
-            qCritical() << "Invalid param_type used for camera setting:" << param_type;
-    }
-    return var;
-}
-
-//-----------------------------------------------------------------------------
-void
-QGCCameraParamIO::_paramRequestTimeout()
-{
-    if(++_requestRetries > 3) {
+    if (++_requestRetries > 3) {
         qCWarning(CameraIOLog) << "No response for param request:" << _fact->name();
-        if(!_done) {
+        if (!_done) {
             _done = true;
             _control->_paramDone();
         }
     } else {
-        //-- Request it again
+        // Request it again
         qCDebug(CameraIOLog) << "Param request retry:" << _fact->name();
         paramRequest(false);
         _paramRequestTimer.start();
     }
 }
 
-//-----------------------------------------------------------------------------
-void
-QGCCameraParamIO::paramRequest(bool reset)
+void QGCCameraParamIO::paramRequest(bool reset)
 {
-    //-- If it's write only, we don't request it.
-    if(_fact->writeOnly()) {
-        if(!_done) {
+    // If it's write only, we don't request it.
+    if (_fact->writeOnly()) {
+        if (!_done) {
             _done = true;
             _control->_paramDone();
         }
         return;
     }
-    if(reset) {
+
+    if (reset) {
         _requestRetries = 0;
-        _forceUIUpdate  = true;
+        _forceUIUpdate = true;
     }
     qCDebug(CameraIOLog) << "Request parameter:" << _fact->name();
+
     SharedLinkInterfacePtr sharedLink = _vehicle->vehicleLinkManager()->primaryLink().lock();
     if (sharedLink) {
-        char param_id[MAVLINK_MSG_PARAM_EXT_REQUEST_READ_FIELD_PARAM_ID_LEN + 1];
-        memset(param_id, 0, sizeof(param_id));
-        strncpy(param_id, _fact->name().toStdString().c_str(), MAVLINK_MSG_PARAM_EXT_REQUEST_READ_FIELD_PARAM_ID_LEN);
-        mavlink_message_t msg;
-        mavlink_msg_param_ext_request_read_pack_chan(
-                    static_cast<uint8_t>(MAVLinkProtocol::instance()->getSystemId()),
-                    static_cast<uint8_t>(MAVLinkProtocol::getComponentId()),
-                    sharedLink->mavlinkChannel(),
-                    &msg,
-                    static_cast<uint8_t>(_vehicle->id()),
-                    static_cast<uint8_t>(_control->compID()),
-                    param_id,
-                    -1);
-        _vehicle->sendMessageOnLinkThreadSafe(sharedLink.get(), msg);
+        char param_id[MAVLINK_MSG_PARAM_EXT_REQUEST_READ_FIELD_PARAM_ID_LEN + 1]{};
+        (void) memset(param_id, 0, sizeof(param_id));
+        (void) strncpy(param_id, _fact->name().toStdString().c_str(), MAVLINK_MSG_PARAM_EXT_REQUEST_READ_FIELD_PARAM_ID_LEN);
+        mavlink_message_t msg{};
+        (void) mavlink_msg_param_ext_request_read_pack_chan(
+            static_cast<uint8_t>(MAVLinkProtocol::instance()->getSystemId()),
+            static_cast<uint8_t>(MAVLinkProtocol::getComponentId()),
+            sharedLink->mavlinkChannel(),
+            &msg,
+            static_cast<uint8_t>(_vehicle->id()),
+            static_cast<uint8_t>(_control->compID()),
+            param_id,
+            -1
+        );
+        (void) _vehicle->sendMessageOnLinkThreadSafe(sharedLink.get(), msg);
     }
     _paramRequestTimer.start();
 }

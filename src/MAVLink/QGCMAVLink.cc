@@ -361,7 +361,7 @@ QString QGCMAVLink::firmwareVersionTypeToString(FIRMWARE_VERSION_TYPE firmwareVe
         return QStringLiteral("rc");
     case FIRMWARE_VERSION_TYPE_OFFICIAL:
     default:
-        return QStringLiteral("");
+        return QString();
     }
 }
 
@@ -452,4 +452,277 @@ uint32_t QGCMAVLink::highLatencyFailuresToMavSysStatus(mavlink_high_latency2_t& 
     }
 
     return onboardControlSensorsEnabled;
+}
+
+QVariant QGCMAVLink::valueFromParamExt(const char *value, uint8_t param_type)
+{
+    QVariant var;
+    param_ext_union_t u{};
+    (void) memcpy(u.bytes, value, MAVLINK_MSG_PARAM_EXT_SET_FIELD_PARAM_VALUE_LEN);
+    switch (param_type) {
+    case MAV_PARAM_EXT_TYPE_REAL32:
+        var = QVariant(u.param_float);
+        break;
+    case MAV_PARAM_EXT_TYPE_REAL64:
+        var = QVariant(u.param_double);
+        break;
+    case MAV_PARAM_EXT_TYPE_UINT8:
+        var = QVariant(u.param_uint8);
+        break;
+    case MAV_PARAM_EXT_TYPE_INT8:
+        var = QVariant(u.param_int8);
+        break;
+    case MAV_PARAM_EXT_TYPE_UINT16:
+        var = QVariant(u.param_uint16);
+        break;
+    case MAV_PARAM_EXT_TYPE_INT16:
+        var = QVariant(u.param_int16);
+        break;
+    case MAV_PARAM_EXT_TYPE_UINT32:
+        var = QVariant(u.param_uint32);
+        break;
+    case MAV_PARAM_EXT_TYPE_INT32:
+        var = QVariant(u.param_int32);
+        break;
+    case MAV_PARAM_EXT_TYPE_UINT64:
+        var = QVariant(static_cast<qulonglong>(u.param_uint64));
+        break;
+    case MAV_PARAM_EXT_TYPE_INT64:
+        var = QVariant(static_cast<qulonglong>(u.param_int64));
+        break;
+    case MAV_PARAM_EXT_TYPE_CUSTOM:
+        var = QVariant(QByteArray(value, MAVLINK_MSG_PARAM_EXT_SET_FIELD_PARAM_VALUE_LEN));
+        break;
+    default:
+        var = QVariant(0);
+        qCCritical(QGCMAVLinkLog) << "Invalid param_type:" << param_type;
+    }
+    return var;
+}
+
+MAV_PARAM_EXT_TYPE QGCMAVLink::mavParamType(FactMetaData::ValueType_t type)
+{
+    switch (type) {
+    case FactMetaData::valueTypeUint8:
+    case FactMetaData::valueTypeBool:
+        return MAV_PARAM_EXT_TYPE_UINT8;
+    case FactMetaData::valueTypeInt8:
+        return MAV_PARAM_EXT_TYPE_INT8;
+    case FactMetaData::valueTypeUint16:
+        return MAV_PARAM_EXT_TYPE_UINT16;
+    case FactMetaData::valueTypeInt16:
+        return MAV_PARAM_EXT_TYPE_INT16;
+    case FactMetaData::valueTypeUint32:
+        return MAV_PARAM_EXT_TYPE_UINT32;
+    case FactMetaData::valueTypeUint64:
+        return MAV_PARAM_EXT_TYPE_UINT64;
+    case FactMetaData::valueTypeInt64:
+        return MAV_PARAM_EXT_TYPE_INT64;
+    case FactMetaData::valueTypeFloat:
+        return MAV_PARAM_EXT_TYPE_REAL32;
+    case FactMetaData::valueTypeDouble:
+        return MAV_PARAM_EXT_TYPE_REAL64;
+    case FactMetaData::valueTypeString:
+    case FactMetaData::valueTypeCustom:
+        return MAV_PARAM_EXT_TYPE_CUSTOM;
+    default:
+        qCWarning(QGCMAVLinkLog) << "Unsupported fact type" << type;
+    case FactMetaData::valueTypeInt32:
+        return MAV_PARAM_EXT_TYPE_INT32;
+    }
+}
+
+QVariant QGCMAVLink::parseParamValue(const mavlink_message_t &message)
+{
+    mavlink_param_value_t param_value{};
+    mavlink_msg_param_value_decode(&message, &param_value);
+
+    mavlink_param_union_t paramUnion{};
+    paramUnion.param_float = param_value.param_value;
+    paramUnion.type = param_value.param_type;
+
+    QVariant parameterValue;
+
+    switch (paramUnion.type) {
+    case MAV_PARAM_TYPE_REAL32:
+        parameterValue = QVariant(paramUnion.param_float);
+        break;
+    case MAV_PARAM_TYPE_UINT8:
+        parameterValue = QVariant(paramUnion.param_uint8);
+        break;
+    case MAV_PARAM_TYPE_INT8:
+        parameterValue = QVariant(paramUnion.param_int8);
+        break;
+    case MAV_PARAM_TYPE_UINT16:
+        parameterValue = QVariant(paramUnion.param_uint16);
+        break;
+    case MAV_PARAM_TYPE_INT16:
+        parameterValue = QVariant(paramUnion.param_int16);
+        break;
+    case MAV_PARAM_TYPE_UINT32:
+        parameterValue = QVariant(paramUnion.param_uint32);
+        break;
+    case MAV_PARAM_TYPE_INT32:
+        parameterValue = QVariant(paramUnion.param_int32);
+        break;
+    default:
+        qCCritical(QGCMAVLinkLog) << "unsupported MAV_PARAM_TYPE" << paramUnion.type;
+        break;
+    }
+
+    return parameterValue;
+}
+
+mavlink_param_set_t QGCMAVLink::createParamSet(const mavlink_message_t &message)
+{
+    mavlink_param_set_t paramSet{};
+    mavlink_param_union_t paramUnion{};
+
+    mavlink_msg_param_set_decode(&message, &paramSet);
+
+    paramUnion.param_float = paramSet.param_value;
+
+    switch (paramSet.param_type) {
+    case MAV_PARAM_TYPE_UINT8:
+        paramSet.param_value = paramUnion.param_uint8;
+        break;
+    case MAV_PARAM_TYPE_INT8:
+        paramSet.param_value = paramUnion.param_int8;
+        break;
+    case MAV_PARAM_TYPE_UINT16:
+        paramSet.param_value = paramUnion.param_uint16;
+        break;
+    case MAV_PARAM_TYPE_INT16:
+        paramSet.param_value = paramUnion.param_int16;
+        break;
+    case MAV_PARAM_TYPE_UINT32:
+        paramSet.param_value = paramUnion.param_uint32;
+        break;
+    case MAV_PARAM_TYPE_INT32:
+        paramSet.param_value = paramUnion.param_int32;
+        break;
+    case MAV_PARAM_TYPE_REAL32:
+        // Already in param_float
+        break;
+    default:
+        qCCritical(QGCMAVLinkLog) << "Invalid/Unsupported data type used in parameter:" << paramSet.param_type;
+    }
+
+    return paramSet;
+}
+
+#if 0
+mavlink_param_ext_set_t QGCMAVLink::createParamExtSet(FactMetaData::ValueType_t factType)
+{
+    mavlink_param_ext_set_t p{};
+    (void) memset(&p, 0, sizeof(mavlink_param_ext_set_t));
+    p.param_type = _mavParamType;
+    param_ext_union_t union_value{};
+    const FactMetaData::ValueType_t factType = _fact->type();
+    switch (factType) {
+    case FactMetaData::valueTypeUint8:
+    case FactMetaData::valueTypeBool:
+        union_value.param_uint8 = static_cast<uint8_t>(_fact->rawValue().toUInt());
+        break;
+    case FactMetaData::valueTypeInt8:
+        union_value.param_int8 = static_cast<int8_t>(_fact->rawValue().toInt());
+        break;
+    case FactMetaData::valueTypeUint16:
+        union_value.param_uint16 = static_cast<uint16_t>(_fact->rawValue().toUInt());
+        break;
+    case FactMetaData::valueTypeInt16:
+        union_value.param_int16 = static_cast<int16_t>(_fact->rawValue().toInt());
+        break;
+    case FactMetaData::valueTypeUint32:
+        union_value.param_uint32 = static_cast<uint32_t>(_fact->rawValue().toUInt());
+        break;
+    case FactMetaData::valueTypeInt64:
+        union_value.param_int64 = static_cast<int64_t>(_fact->rawValue().toLongLong());
+        break;
+    case FactMetaData::valueTypeUint64:
+        union_value.param_uint64 = static_cast<uint64_t>(_fact->rawValue().toULongLong());
+        break;
+    case FactMetaData::valueTypeFloat:
+        union_value.param_float = _fact->rawValue().toFloat();
+        break;
+    case FactMetaData::valueTypeDouble:
+        union_value.param_double = _fact->rawValue().toDouble();
+        break;
+        //-- String and custom are the same for now
+    case FactMetaData::valueTypeString:
+    case FactMetaData::valueTypeCustom: {
+        const QByteArray custom = _fact->rawValue().toByteArray();
+        (void) memcpy(union_value.bytes, custom.data(), static_cast<size_t>(std::max(custom.size(), static_cast<qsizetype>(MAVLINK_MSG_PARAM_EXT_SET_FIELD_PARAM_VALUE_LEN))));
+        break;
+    }
+    default:
+        qCCritical() << "Unsupported fact type" << factType;
+    case FactMetaData::valueTypeInt32:
+        union_value.param_int32 = static_cast<int32_t>(_fact->rawValue().toInt());
+        break;
+    }
+    (void) memcpy(&p.param_value[0], &union_value.bytes[0], MAVLINK_MSG_PARAM_EXT_SET_FIELD_PARAM_VALUE_LEN);
+}
+#endif
+
+float QGCMAVLink::floatUnionForParam(MAV_PARAM_TYPE paramType, const QVariant &paramVar, MAV_AUTOPILOT firmwareType)
+{
+    mavlink_param_union_t valueUnion{};
+
+    switch (paramType) {
+    case MAV_PARAM_TYPE_REAL32:
+        valueUnion.param_float = paramVar.toFloat();
+        break;
+    case MAV_PARAM_TYPE_UINT32:
+        if (firmwareType == MAV_AUTOPILOT_ARDUPILOTMEGA) {
+            valueUnion.param_float = paramVar.toUInt();
+        } else {
+            valueUnion.param_uint32 = paramVar.toUInt();
+        }
+        break;
+    case MAV_PARAM_TYPE_INT32:
+        if (firmwareType == MAV_AUTOPILOT_ARDUPILOTMEGA) {
+            valueUnion.param_float = paramVar.toInt();
+        } else {
+            valueUnion.param_int32 = paramVar.toInt();
+        }
+        break;
+    case MAV_PARAM_TYPE_UINT16:
+        if (firmwareType == MAV_AUTOPILOT_ARDUPILOTMEGA) {
+            valueUnion.param_float = paramVar.toUInt();
+        } else {
+            valueUnion.param_uint16 = paramVar.toUInt();
+        }
+        break;
+    case MAV_PARAM_TYPE_INT16:
+        if (firmwareType == MAV_AUTOPILOT_ARDUPILOTMEGA) {
+            valueUnion.param_float = paramVar.toInt();
+        } else {
+            valueUnion.param_int16 = paramVar.toInt();
+        }
+        break;
+    case MAV_PARAM_TYPE_UINT8:
+        if (firmwareType == MAV_AUTOPILOT_ARDUPILOTMEGA) {
+            valueUnion.param_float = paramVar.toUInt();
+        } else {
+            valueUnion.param_uint8 = paramVar.toUInt();
+        }
+        break;
+    case MAV_PARAM_TYPE_INT8:
+        if (firmwareType == MAV_AUTOPILOT_ARDUPILOTMEGA) {
+            valueUnion.param_float = (unsigned char)paramVar.toChar().toLatin1();
+        } else {
+            valueUnion.param_int8 = (unsigned char)paramVar.toChar().toLatin1();
+        }
+        break;
+    default:
+        if (firmwareType == MAV_AUTOPILOT_ARDUPILOTMEGA) {
+            valueUnion.param_float = paramVar.toInt();
+        } else {
+            valueUnion.param_int32 = paramVar.toInt();
+        }
+        qCCritical(QGCMAVLinkLog) << "Invalid parameter type" << paramType;
+    }
+
+    return valueUnion.param_float;
 }

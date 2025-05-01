@@ -7,50 +7,41 @@
  *
  ****************************************************************************/
 
-/*!
- * @file
- *   @brief Camera Controller
- *   @author Gus Grubba <gus@auterion.com>
- *
- */
-
 #include "VehicleCameraControl.h"
-#include "QGCCameraIO.h"
-#include "QGCApplication.h"
-#include "SettingsManager.h"
 #include "AppSettings.h"
-#include "VideoManager.h"
-#include "QGCCameraManager.h"
 #include "FTPManager.h"
-#include "QGCLZMA.h"
-#include "QGCCorePlugin.h"
-#include "Vehicle.h"
 #include "LinkInterface.h"
 #include "MAVLinkProtocol.h"
+#include "QGCApplication.h"
+#include "QGCCameraIO.h"
+#include "QGCCameraManager.h"
+#include "QGCCorePlugin.h"
+#include "QGCLZMA.h"
 #include "QGCVideoStreamInfo.h"
+#include "SettingsManager.h"
+#include "Vehicle.h"
+#include "VideoManager.h"
 
-#include <QtNetwork/QNetworkAccessManager>
 #include <QtCore/QDir>
 #include <QtCore/QSettings>
-#include <QtXml/QDomDocument>
-#include <QtXml/QDomNodeList>
-#include <QtQml/QQmlEngine>
+#include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkProxy>
 #include <QtNetwork/QNetworkReply>
+#include <QtQml/QQmlEngine>
+#include <QtXml/QDomDocument>
+#include <QtXml/QDomNodeList>
 
-//-----------------------------------------------------------------------------
-QGCCameraOptionExclusion::QGCCameraOptionExclusion(QObject* parent, QString param_, QString value_, QStringList exclusions_)
-    : QObject(parent)
-    , param(param_)
+/*===========================================================================*/
+QGCCameraOptionExclusion::QGCCameraOptionExclusion(const QString &param_, const QString &value_, const QStringList &exclusions_)
+    : param(param_)
     , value(value_)
     , exclusions(exclusions_)
 {
 }
 
-//-----------------------------------------------------------------------------
-QGCCameraOptionRange::QGCCameraOptionRange(QObject* parent, QString param_, QString value_, QString targetParam_, QString condition_, QStringList optNames_, QStringList optValues_)
-    : QObject(parent)
-    , param(param_)
+/*===========================================================================*/
+QGCCameraOptionRange::QGCCameraOptionRange(QObject* parent, const QString &param_, const QString &value_, const QString &targetParam_, const QString &condition_, const QStringList &optNames_, const QStringList &optValues_)
+    : param(param_)
     , value(value_)
     , targetParam(targetParam_)
     , condition(condition_)
@@ -59,7 +50,7 @@ QGCCameraOptionRange::QGCCameraOptionRange(QObject* parent, QString param_, QStr
 {
 }
 
-//-----------------------------------------------------------------------------
+/*===========================================================================*/
 static bool
 read_attribute(QDomNode& node, const char* tagName, bool& target)
 {
@@ -75,7 +66,7 @@ read_attribute(QDomNode& node, const char* tagName, bool& target)
     return true;
 }
 
-//-----------------------------------------------------------------------------
+/*===========================================================================*/
 static bool
 read_attribute(QDomNode& node, const char* tagName, int& target)
 {
@@ -91,7 +82,7 @@ read_attribute(QDomNode& node, const char* tagName, int& target)
     return true;
 }
 
-//-----------------------------------------------------------------------------
+/*===========================================================================*/
 static bool
 read_attribute(QDomNode& node, const char* tagName, QString& target)
 {
@@ -107,7 +98,7 @@ read_attribute(QDomNode& node, const char* tagName, QString& target)
     return true;
 }
 
-//-----------------------------------------------------------------------------
+/*===========================================================================*/
 static bool
 read_value(QDomNode& element, const char* tagName, QString& target)
 {

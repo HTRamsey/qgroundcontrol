@@ -15,6 +15,7 @@
 #include <QtCore/QString>
 #include <QtQmlIntegration/QtQmlIntegration>
 
+#include "FactMetaData.h"
 #include "MAVLinkLib.h"
 
 Q_DECLARE_LOGGING_CATEGORY(QGCMAVLinkLog)
@@ -31,7 +32,7 @@ class QGCMAVLink : public QObject
 
 public:
     // Creating an instance of QGCMAVLink is only meant to be used for the Qml Singleton
-    QGCMAVLink(QObject *parent = nullptr);
+    explicit QGCMAVLink(QObject *parent = nullptr);
     ~QGCMAVLink();
 
     typedef int FirmwareClass_t;
@@ -158,10 +159,36 @@ public:
     };
     Q_ENUM(CalibrationType)
 
+    MAVPACKED(
+        struct param_ext_union_t {
+            union {
+                float param_float;
+                double param_double;
+                int64_t param_int64;
+                uint64_t param_uint64;
+                int32_t param_int32;
+                uint32_t param_uint32;
+                int16_t param_int16;
+                uint16_t param_uint16;
+                int8_t param_int8;
+                uint8_t param_uint8;
+                uint8_t bytes[MAVLINK_MSG_PARAM_EXT_SET_FIELD_PARAM_VALUE_LEN];
+            };
+            uint8_t type;
+        }
+    );
+
     static bool isValidChannel(uint8_t channel) { return (channel < MAVLINK_COMM_NUM_BUFFERS); }
     static bool isValidChannel(mavlink_channel_t channel) { return isValidChannel(static_cast<uint8_t>(channel)); }
 
-    static mavlink_status_t* getChannelStatus(mavlink_channel_t channel) { return mavlink_get_channel_status(static_cast<uint8_t>(channel)); }
+    static mavlink_status_t *getChannelStatus(mavlink_channel_t channel) { return mavlink_get_channel_status(static_cast<uint8_t>(channel)); }
+
+    static QVariant valueFromParamExt(const char *value, uint8_t param_type);
+    static MAV_PARAM_EXT_TYPE mavParamType(FactMetaData::ValueType_t type);
+    static QVariant parseParamValue(const mavlink_message_t &message);
+    static mavlink_param_set_t createParamSet(const mavlink_message_t &message);
+    // static mavlink_param_ext_set_t createParamExtSet(FactMetaData::ValueType_t factType);
+    static float floatUnionForParam(MAV_PARAM_TYPE paramType, const QVariant &paramVar, MAV_AUTOPILOT firmwareType);
 
     static const QHash<int, QString> mavlinkCompIdHash;
 };
