@@ -18,13 +18,14 @@
 
 Q_DECLARE_LOGGING_CATEGORY(QtMultimediaReceiverLog)
 
-class QMediaPlayer;
-class QVideoSink;
 class QMediaCaptureSession;
+class QMediaPlayer;
 class QMediaRecorder;
-class QRhi;
 class QQuickItem;
 class QQuickVideoOutput;
+class QRhi;
+class QVideoFrameInput;
+class QVideoSink;
 
 class QtMultimediaReceiver : public VideoReceiver
 {
@@ -32,7 +33,7 @@ class QtMultimediaReceiver : public VideoReceiver
 
 public:
     explicit QtMultimediaReceiver(QObject *parent = nullptr);
-    virtual ~QtMultimediaReceiver();
+    ~QtMultimediaReceiver() override;
 
     static bool enabled();
     static void *createVideoSink(QQuickItem *widget, QObject *parent = nullptr);
@@ -54,6 +55,7 @@ protected:
     QVideoSink *_videoSink = nullptr;
     QMediaCaptureSession *_captureSession = nullptr;
     QMediaRecorder *_mediaRecorder = nullptr;
+    QVideoFrameInput *_frameInput = nullptr;
     QMetaObject::Connection _videoSizeUpdater;
     QMetaObject::Connection _videoFrameUpdater;
     QRhi *_rhi = nullptr;
