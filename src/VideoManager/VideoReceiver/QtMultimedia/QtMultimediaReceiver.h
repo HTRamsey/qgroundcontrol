@@ -11,7 +11,6 @@
 
 #include <QtCore/QLoggingCategory>
 #include <QtCore/QMetaObject>
-#include <QtCore/QString>
 #include <QtCore/QTimer>
 
 #include "VideoReceiver.h"
@@ -22,7 +21,8 @@ class QMediaPlayer;
 class QVideoSink;
 class QMediaCaptureSession;
 class QMediaRecorder;
-class QRhi;
+class QVideoFrame;
+class QVideoFrameInput;
 class QQuickItem;
 class QQuickVideoOutput;
 
@@ -31,11 +31,11 @@ class QtMultimediaReceiver : public VideoReceiver
     Q_OBJECT
 
 public:
-    explicit QtMultimediaReceiver(QObject *parent = nullptr);
-    virtual ~QtMultimediaReceiver();
+    explicit QtMultimediaReceiver(QObject *parent = nullptr) override;
+    ~QtMultimediaReceiver() override;
 
     static bool enabled();
-    static void *createVideoSink(QQuickItem *widget, QObject *parent = nullptr);
+    static void *createVideoSink(QObject *parent, QQuickItem *widget);
     static void releaseVideoSink(void *sink);
     static VideoReceiver *createVideoReceiver(QObject *parent);
 
@@ -44,19 +44,26 @@ public slots:
     void stop() override;
     void startDecoding(void *sink) override;
     void stopDecoding() override;
-    void startRecording(const QString &videoFile, VideoReceiver::FILE_FORMAT format) override;
+    void startRecording(const QString &videoFile, FILE_FORMAT format) override;
     void stopRecording() override;
     void takeScreenshot(const QString &imageFile) override;
 
-protected:
-    QTimer _frameTimer;
-    QMediaPlayer *_mediaPlayer = nullptr;
-    QVideoSink *_videoSink = nullptr;
-    QMediaCaptureSession *_captureSession = nullptr;
-    QMediaRecorder *_mediaRecorder = nullptr;
+private:
+    static QUrl _normalizeForQtBackend(const QString &in);
+
+private slots:
+    void _onRecorderStateChanged();
+    void _onRecorderError();
+
+private:
+    QTimer                 _frameTimer;
+    QMediaPlayer          *_mediaPlayer     = nullptr;
+    QVideoSink            *_videoSink       = nullptr;
+    QMediaCaptureSession  *_captureSession  = nullptr;
+    QMediaRecorder        *_mediaRecorder   = nullptr;
+    QVideoFrameInput      *_frameInput      = nullptr;
     QMetaObject::Connection _videoSizeUpdater;
     QMetaObject::Connection _videoFrameUpdater;
-    QRhi *_rhi = nullptr;
-    const QIODevice *_streamDevice;
-    QQuickVideoOutput *_videoOutput = nullptr;
+    QQuickVideoOutput     *_videoOutput     = nullptr;
+    bool                   _recording       = false;
 };
