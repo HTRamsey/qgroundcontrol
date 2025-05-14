@@ -81,7 +81,6 @@ bool SHPFileHelper::_validateSHPFiles(const QString &shpFile, int *utmZone, bool
     return errorString.isEmpty();
 }
 
-
 SHPHandle SHPFileHelper::_loadShape(const QString &shpFile, int *utmZone, bool *utmSouthernHemisphere, QString &errorString)
 {
     SHPHandle shpHandle = nullptr;
@@ -117,6 +116,8 @@ ShapeFileHelper::ShapeType SHPFileHelper::determineShapeType(const QString &shpF
             errorString = QString(_errorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "More than one entity found."));
         } else if (type == SHPT_POLYGON) {
             shapeType = ShapeType::Polygon;
+        } else if (type == SHPT_ARC) {
+            shapeType = ShapeType::Polyline;
         } else {
             errorString = QString(_errorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "No supported types found."));
         }
@@ -182,6 +183,54 @@ bool SHPFileHelper::loadPolygonFromFile(const QString &shpFile, QList<QGeoCoordi
                 i++;
             }
         }
+    }
+
+Error:
+    if (shpObject) {
+        SHPDestroyObject(shpObject);
+    }
+
+    if (shpHandle) {
+        SHPClose(shpHandle);
+    }
+
+    return errorString.isEmpty();
+}
+
+bool SHPFileHelper::loadPolylineFromFile(const QString &shpFile, QList<QGeoCoordinate> &vertices, QString &errorString)
+{
+    int utmZone = 0;
+    bool utmSouthernHemisphere = false;
+    SHPObject *shpObject = nullptr;
+
+    errorString.clear();
+    vertices.clear();
+
+    SHPHandle shpHandle = SHPFileHelper::_loadShape(shpFile, &utmZone, &utmSouthernHemisphere, errorString);
+    if (!errorString.isEmpty()) {
+        goto Error;
+    }
+
+    int cEntities, shapeType;
+    SHPGetInfo(shpHandle, &cEntities, &shapeType, nullptr /* padfMinBound */, nullptr /* padfMaxBound */);
+    if (shapeType != SHPT_ARC) {
+        errorString = QString(_errorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "File does not contain a polyline."));
+        goto Error;
+    }
+
+    shpObject = SHPReadObject(shpHandle, 0);
+    if (shpObject->nParts != 1) {
+        errorString = QString(_errorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "Only single part polylines are supported."));
+        goto Error;
+    }
+
+    for (int i = 0; i < shpObject->nVertices; i++) {
+        QGeoCoordinate coord;
+        if (!utmZone || !QGCGeo::convertUTMToGeo(shpObject->padfX[i], shpObject->padfY[i], utmZone, utmSouthernHemisphere, coord)) {
+            coord.setLatitude(shpObject->padfY[i]);
+            coord.setLongitude(shpObject->padfX[i]);
+        }
+        vertices.append(coord);
     }
 
 Error:
