@@ -11,33 +11,28 @@
 
 #include <QtCore/QLoggingCategory>
 #include <QtCore/QObject>
-#include <QtCore/QVariantList>
-#include <QtPositioning/QGeoCoordinate>
+#include <QtPositioning/QGeoPath>
 
 #include "QmlObjectListModel.h"
 
 Q_DECLARE_LOGGING_CATEGORY(QGCMapPolylineLog)
 
-class QGCMapPolyline : public QObject
+class QGCMapPolyline : public QmlObjectListModel
 {
     Q_OBJECT
-    Q_PROPERTY(bool                 dirty           READ dirty          WRITE setDirty          NOTIFY dirtyChanged)
-    Q_PROPERTY(bool                 empty           READ empty                                  NOTIFY isEmptyChanged)
     Q_PROPERTY(bool                 interactive     READ interactive    WRITE setInteractive    NOTIFY interactiveChanged)
     Q_PROPERTY(bool                 isValid         READ isValid                                NOTIFY isValidChanged)
     Q_PROPERTY(bool                 traceMode       READ traceMode      WRITE setTraceMode      NOTIFY traceModeChanged)
-    Q_PROPERTY(int                  count           READ count                                  NOTIFY countChanged)
     Q_PROPERTY(int                  selectedVertex  READ selectedVertex WRITE selectVertex      NOTIFY selectedVertexChanged)
-    Q_PROPERTY(QmlObjectListModel   *pathModel      READ qmlPathModel                           CONSTANT)
     Q_PROPERTY(QVariantList         path            READ path                                   NOTIFY pathChanged)
 
 public:
     explicit QGCMapPolyline(QObject *parent = nullptr);
     explicit QGCMapPolyline(const QGCMapPolyline &other, QObject *parent = nullptr);
+    ~QGCMapPolyline();
 
     const QGCMapPolyline &operator=(const QGCMapPolyline &other);
 
-    Q_INVOKABLE void clear();
     Q_INVOKABLE void appendVertex(const QGeoCoordinate &coordinate);
     Q_INVOKABLE void removeVertex(int vertexIndex);
     Q_INVOKABLE void appendVertices(const QList<QGeoCoordinate> &coordinates);
@@ -58,15 +53,9 @@ public:
     /// @return true: success
     Q_INVOKABLE bool loadKMLOrSHPFile(const QString &file);
 
-    Q_INVOKABLE void beginReset();
-    Q_INVOKABLE void endReset();
-
     /// Offsets the current polyline edges by the specified distance in meters
     /// @return Offset set of vertices
     QList<QGeoCoordinate> offsetPolyline(double distance);
-
-    /// Returns the path in a list of QGeoCoordinate's format
-    QList<QGeoCoordinate> coordinateList() const;
 
     /// Saves the polyline to the json object.
     ///     @param json Json object to save to
@@ -86,39 +75,26 @@ public:
     double length() const;
 
     // Property methods
-    bool isValid() const { return (_polylineModel.count() >= 2); }
-    bool empty() const { return (_polylineModel.count() == 0); }
-    int count() const { return _polylinePath.count(); }
-    bool dirty() const { return _dirty; }
-    void setDirty(bool dirty);
+    bool isValid() const { return (count() >= 2); }
     bool interactive() const { return _interactive; }
     void setInteractive(bool interactive);
-    QVariantList path() const { return _polylinePath; }
-    void setPath(const QList<QGeoCoordinate> &path);
+    QVariantList path() const { return _polylinePath.variantPath(); }
     void setPath(const QVariantList &path);
+    QList<QGeoCoordinate> coordinateList() const { return _polylinePath.path(); }
+    void setPath(const QList<QGeoCoordinate> &path);
     bool traceMode() const { return _traceMode; }
     void setTraceMode(bool traceMode);
     int selectedVertex() const { return _selectedVertexIndex; }
     void selectVertex(int index);
-    QmlObjectListModel *qmlPathModel() { return &_polylineModel; }
-    QmlObjectListModel &pathModel() { return _polylineModel; }
 
     static constexpr const char *jsonPolylineKey = "polyline";
 
 signals:
-    void countChanged(int count);
     void pathChanged();
-    void dirtyChanged(bool dirty);
-    void cleared();
     void interactiveChanged(bool interactive);
     void isValidChanged();
-    void isEmptyChanged();
     void traceModeChanged(bool traceMode);
     void selectedVertexChanged(int index);
-
-private slots:
-    void _polylineModelCountChanged(int count);
-    void _polylineModelDirtyChanged(bool dirty);
 
 private:
     void _init();
@@ -127,11 +103,8 @@ private:
     void _beginResetIfNotActive();
     void _endResetIfActive();
 
-    QVariantList _polylinePath;
-    QmlObjectListModel _polylineModel;
-    bool _dirty = false;
+    QGeoPath _polylinePath;
     bool _interactive = false;
-    bool _resetActive = false;
     bool _traceMode = false;
     int _selectedVertexIndex = -1;
 };

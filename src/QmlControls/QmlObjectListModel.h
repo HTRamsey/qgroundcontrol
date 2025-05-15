@@ -7,7 +7,6 @@
  *
  ****************************************************************************/
 
-
 #pragma once
 
 #include <QtCore/QAbstractListModel>
@@ -15,6 +14,7 @@
 class QmlObjectListModel : public QAbstractListModel
 {
     Q_OBJECT
+    Q_PROPERTY(bool empty READ empty NOTIFY isEmptyChanged)
     
 public:
     QmlObjectListModel(QObject* parent = nullptr);
@@ -32,6 +32,7 @@ public:
     // Property accessors
     
     int         count               () const;
+    bool        empty               () const { return (count() == 0); }
     bool        dirty               () const { return _dirty; }
 
     void        setDirty            (bool dirty);
@@ -65,7 +66,9 @@ public:
 
 signals:
     void countChanged               (int count);
+    void isEmptyChanged             (bool empty);
     void dirtyChanged               (bool dirtyChanged);
+    void cleared();
     
 private slots:
     void _childDirtyChanged         (bool dirty);

@@ -60,7 +60,7 @@ bool SHPFileHelper::_validateSHPFiles(const QString &shpFile, int *utmZone, bool
         *utmZone = 0;
         *utmSouthernHemisphere = false;
     } else if (line.startsWith(QStringLiteral("PROJCS[\"WGS_1984_UTM_Zone_"))) {
-        static QRegularExpression regEx(QStringLiteral("^PROJCS\\[\"WGS_1984_UTM_Zone_(\\d+){1,2}([NS]{1})"));
+        static const QRegularExpression regEx(QStringLiteral("^PROJCS\\[\"WGS_1984_UTM_Zone_(\\d+){1,2}([NS]{1})"));
         const QRegularExpressionMatch regExMatch = regEx.match(line);
         const QStringList rgCapture = regExMatch.capturedTexts();
         if (rgCapture.count() == 3) {
@@ -88,7 +88,10 @@ SHPHandle SHPFileHelper::_loadShape(const QString &shpFile, int *utmZone, bool *
     errorString.clear();
 
     if (_validateSHPFiles(shpFile, utmZone, utmSouthernHemisphere, errorString)) {
-        shpHandle = SHPOpen(shpFile.toUtf8().constData(), "rb");
+        SAHooks sHooks;
+        SASetupDefaultHooks(&sHooks);
+        sHooks.Error = [](const char *message) { qCDebug(SHPFileHelperLog) << message; };
+        shpHandle = SHPOpenLL(shpFile.toUtf8().constData(), "rb", &sHooks);
         if (!shpHandle) {
             errorString = QString(_errorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "SHPOpen failed."));
         }
@@ -109,6 +112,8 @@ ShapeFileHelper::ShapeType SHPFileHelper::determineShapeType(const QString &shpF
     bool utmSouthernHemisphere;
     SHPHandle shpHandle = SHPFileHelper::_loadShape(shpFile, &utmZone, &utmSouthernHemisphere, errorString);
     if (errorString.isEmpty()) {
+        Q_CHECK_PTR(shpHandle);
+
         int cEntities, type;
         SHPGetInfo(shpHandle, &cEntities /* pnEntities */, &type, nullptr /* padfMinBound */, nullptr /* padfMaxBound */);
         qCDebug(SHPFileHelperLog) << "SHPGetInfo" << shpHandle << cEntities << type;
@@ -123,7 +128,9 @@ ShapeFileHelper::ShapeType SHPFileHelper::determineShapeType(const QString &shpF
         }
     }
 
-    SHPClose(shpHandle);
+    if (shpHandle) {
+        SHPClose(shpHandle);
+    }
 
     return shapeType;
 }
@@ -142,6 +149,7 @@ bool SHPFileHelper::loadPolygonFromFile(const QString &shpFile, QList<QGeoCoordi
     if (!errorString.isEmpty()) {
         goto Error;
     }
+    Q_CHECK_PTR(shpHandle);
 
     int cEntities, shapeType;
     SHPGetInfo(shpHandle, &cEntities, &shapeType, nullptr /* padfMinBound */, nullptr /* padfMaxBound */);
@@ -151,6 +159,11 @@ bool SHPFileHelper::loadPolygonFromFile(const QString &shpFile, QList<QGeoCoordi
     }
 
     shpObject = SHPReadObject(shpHandle, 0);
+    if (!shpObject) {
+        errorString = QString(_errorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "Failed to read polygon object."));
+        goto Error;
+    }
+
     if (shpObject->nParts != 1) {
         errorString = QString(_errorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "Only single part polygons are supported."));
         goto Error;
@@ -176,7 +189,7 @@ bool SHPFileHelper::loadPolygonFromFile(const QString &shpFile, QList<QGeoCoordi
     // Filter vertex distances to be larger than 1 meter apart
     {
         int i = 0;
-        while (i < vertices.count() - 2) {
+        while (i < (vertices.count() - 2)) {
             if (vertices[i].distanceTo(vertices[i+1]) < vertexFilterMeters) {
                 vertices.removeAt(i+1);
             } else {
@@ -210,6 +223,7 @@ bool SHPFileHelper::loadPolylineFromFile(const QString &shpFile, QList<QGeoCoord
     if (!errorString.isEmpty()) {
         goto Error;
     }
+    Q_CHECK_PTR(shpHandle);
 
     int cEntities, shapeType;
     SHPGetInfo(shpHandle, &cEntities, &shapeType, nullptr /* padfMinBound */, nullptr /* padfMaxBound */);
@@ -219,6 +233,11 @@ bool SHPFileHelper::loadPolylineFromFile(const QString &shpFile, QList<QGeoCoord
     }
 
     shpObject = SHPReadObject(shpHandle, 0);
+    if (!shpObject) {
+        errorString = QString(_errorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "Failed to read polyline object."));
+        goto Error;
+    }
+
     if (shpObject->nParts != 1) {
         errorString = QString(_errorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "Only single part polylines are supported."));
         goto Error;

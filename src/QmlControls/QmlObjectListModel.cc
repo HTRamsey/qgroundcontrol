@@ -22,7 +22,7 @@ QmlObjectListModel::QmlObjectListModel(QObject* parent)
     , _skipDirtyFirstItem       (false)
     , _externalBeginResetModel  (false)
 {
-
+    (void) connect(this, &QmlObjectListModel::countChanged, this, &QmlObjectListModel::isEmptyChanged);
 }
 
 QmlObjectListModel::~QmlObjectListModel()
@@ -162,6 +162,7 @@ void QmlObjectListModel::clear()
     _objectList.clear();
     if (!_externalBeginResetModel) {
         endResetModel();
+        emit cleared();
         emit countChanged(count());
     }
 }
