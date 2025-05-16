@@ -8,7 +8,6 @@
  ****************************************************************************/
 
 #include "QGCSerialPortInfo.h"
-
 #include "JsonHelper.h"
 #include "QGCLoggingCategory.h"
 
@@ -28,18 +27,64 @@ QList<QGCSerialPortInfo::BoardRegExpFallback_t> QGCSerialPortInfo::_boardManufac
 QGCSerialPortInfo::QGCSerialPortInfo()
     : QSerialPortInfo()
 {
-    // qCDebug(QGCSerialPortInfoLog) << Q_FUNC_INFO << this;
+    qCDebug(QGCSerialPortInfoLog) << this;
 }
 
 QGCSerialPortInfo::QGCSerialPortInfo(const QSerialPort &port)
     : QSerialPortInfo(port)
 {
-    // qCDebug(QGCSerialPortInfoLog) << Q_FUNC_INFO << this;
+    qCDebug(QGCSerialPortInfoLog) << this;
+}
+
+QGCSerialPortInfo::QGCSerialPortInfo(const QString &portName)
+    : QSerialPortInfo(portName)
+{
+    qCDebug(QGCSerialPortInfoLog) << this;
 }
 
 QGCSerialPortInfo::~QGCSerialPortInfo()
 {
-    // qCDebug(QGCSerialPortInfoLog) << Q_FUNC_INFO << this;
+    qCDebug(QGCSerialPortInfoLog) << this;
+}
+
+QString QGCSerialPortInfo::_boardTypeToString(BoardType boardType)
+{
+    switch (boardType) {
+    case BoardType::BoardTypePixhawk:
+        return QStringLiteral("Pixhawk");
+    case BoardType::BoardTypeSiKRadio:
+        return QStringLiteral("SiK Radio");
+    case BoardType::BoardTypeOpenPilot:
+        return QStringLiteral("OpenPilot");
+    case BoardType::BoardTypeRTKGPS:
+        return QStringLiteral("RTK GPS");
+    case BoardType::BoardTypeUnknown:
+    default:
+        return QStringLiteral("Unknown");
+    }
+}
+
+QGCSerialPortInfo::BoardType QGCSerialPortInfo::_boardClassStringToType(const QString &boardClass)
+{
+    struct BoardClassString2BoardType_t {
+        const QString classString;
+        const BoardType boardType = BoardType::BoardTypeUnknown;
+    };
+
+    static const QList<BoardClassString2BoardType_t> rgBoardClass2BoardType = {
+        { _boardTypeToString(BoardType::BoardTypePixhawk), BoardType::BoardTypePixhawk },
+        { _boardTypeToString(BoardType::BoardTypeRTKGPS), BoardType::BoardTypeRTKGPS },
+        { _boardTypeToString(BoardType::BoardTypeSiKRadio), BoardType::BoardTypeSiKRadio },
+        { _boardTypeToString(BoardType::BoardTypeOpenPilot), BoardType::BoardTypeOpenPilot },
+    };
+
+    for (const BoardClassString2BoardType_t &board : rgBoardClass2BoardType) {
+        if (boardClass == board.classString) {
+            return board.boardType;
+        }
+    }
+
+    return BoardType::BoardTypeUnknown;
 }
 
 bool QGCSerialPortInfo::_loadJsonData()
@@ -93,7 +138,7 @@ bool QGCSerialPortInfo::_loadJsonData()
             _boardClassStringToType(boardObject[_jsonBoardClassKey].toString()),
             boardObject[_jsonNameKey].toString()
         };
-        if (boardInfo.boardType == BoardTypeUnknown) {
+        if (boardInfo.boardType == BoardType::BoardTypeUnknown) {
             qCWarning(QGCSerialPortInfoLog) << "Bad board class" << boardObject[_jsonBoardClassKey].toString();
             return false;
         }
@@ -106,6 +151,7 @@ bool QGCSerialPortInfo::_loadJsonData()
         { _jsonBoardClassKey, QJsonValue::String, true },
         { _jsonAndroidOnlyKey, QJsonValue::Bool, false },
     };
+
     const QJsonArray rgBoardDescriptionFallback = json[_jsonBoardDescriptionFallbackKey].toArray();
     for (const QJsonValue &jsonValue : rgBoardDescriptionFallback) {
         if (!jsonValue.isObject()) {
@@ -124,7 +170,7 @@ bool QGCSerialPortInfo::_loadJsonData()
             _boardClassStringToType(fallbackObject[_jsonBoardClassKey].toString()),
             fallbackObject[_jsonAndroidOnlyKey].toBool(false)
         };
-        if (boardFallback.boardType == BoardTypeUnknown) {
+        if (boardFallback.boardType == BoardType::BoardTypeUnknown) {
             qCWarning(QGCSerialPortInfoLog) << "Bad board class" << fallbackObject[_jsonBoardClassKey].toString();
             return false;
         }
@@ -150,7 +196,7 @@ bool QGCSerialPortInfo::_loadJsonData()
             _boardClassStringToType(fallbackObject[_jsonBoardClassKey].toString()),
             fallbackObject[_jsonAndroidOnlyKey].toBool(false)
         };
-        if (boardFallback.boardType == BoardTypeUnknown) {
+        if (boardFallback.boardType == BoardType::BoardTypeUnknown) {
             qCWarning(QGCSerialPortInfoLog) << "Bad board class" << fallbackObject[_jsonBoardClassKey].toString();
             return false;
         }
@@ -163,33 +209,15 @@ bool QGCSerialPortInfo::_loadJsonData()
     return true;
 }
 
-QGCSerialPortInfo::BoardType_t QGCSerialPortInfo::_boardClassStringToType(const QString &boardClass)
+bool QGCSerialPortInfo::getBoardInfo(QGCSerialPortInfo::BoardType &boardType, QString &name) const
 {
-    static const BoardClassString2BoardType_t rgBoardClass2BoardType[BoardTypeUnknown] = {
-        { _boardTypeToString(BoardTypePixhawk), BoardTypePixhawk },
-        { _boardTypeToString(BoardTypeRTKGPS), BoardTypeRTKGPS },
-        { _boardTypeToString(BoardTypeSiKRadio), BoardTypeSiKRadio },
-        { _boardTypeToString(BoardTypeOpenPilot), BoardTypeOpenPilot },
-    };
+    boardType = BoardType::BoardTypeUnknown;
 
-    for (const BoardClassString2BoardType_t &board : rgBoardClass2BoardType) {
-        if (boardClass == board.classString) {
-            return board.boardType;
-        }
-    }
-
-    return BoardTypeUnknown;
-}
-
-bool QGCSerialPortInfo::getBoardInfo(QGCSerialPortInfo::BoardType_t &boardType, QString &name) const
-{
-    boardType = BoardTypeUnknown;
-
-    if (!_loadJsonData()) {
+    if (isNull()) {
         return false;
     }
 
-    if (isNull()) {
+    if (!_loadJsonData()) {
         return false;
     }
 
@@ -201,7 +229,7 @@ bool QGCSerialPortInfo::getBoardInfo(QGCSerialPortInfo::BoardType_t &boardType, 
         }
     }
 
-    Q_ASSERT(boardType == BoardTypeUnknown);
+    Q_ASSERT(boardType == BoardType::BoardTypeUnknown);
 
     for (const BoardRegExpFallback_t &boardFallback : _boardDescriptionFallbackList) {
         if (description().contains(QRegularExpression(boardFallback.regExp, QRegularExpression::CaseInsensitiveOption))) {
@@ -232,49 +260,31 @@ bool QGCSerialPortInfo::getBoardInfo(QGCSerialPortInfo::BoardType_t &boardType, 
     return false;
 }
 
-QString QGCSerialPortInfo::_boardTypeToString(BoardType_t boardType)
+bool QGCSerialPortInfo::canFlash() const
 {
-    switch (boardType) {
-    case BoardTypePixhawk:
-        return QStringLiteral("Pixhawk");
-    case BoardTypeSiKRadio:
-        return QStringLiteral("SiK Radio");
-    case BoardTypeOpenPilot:
-        return QStringLiteral("OpenPilot");
-    case BoardTypeRTKGPS:
-        return QStringLiteral("RTK GPS");
-    case BoardTypeUnknown:
-    default:
-        return QStringLiteral("Unknown");
-    }
-}
-
-QList<QGCSerialPortInfo> QGCSerialPortInfo::availablePorts()
-{
-    QList<QGCSerialPortInfo> list;
-
-    const QList<QSerialPortInfo> availablePorts = QSerialPortInfo::availablePorts();
-    for (const QSerialPortInfo &portInfo : availablePorts) {
-        if (isSystemPort(portInfo)) {
-            continue;
-        }
-
-        const QGCSerialPortInfo *const qgcPortInfo = reinterpret_cast<const QGCSerialPortInfo*>(&portInfo);
-        list << *qgcPortInfo;
-    }
-
-    return list;
-}
-
-bool QGCSerialPortInfo::isBootloader() const
-{
-    BoardType_t boardType;
+    BoardType boardType;
     QString name;
     if (!getBoardInfo(boardType, name)) {
         return false;
     }
 
-    return ((boardType == BoardTypePixhawk) && description().contains(QStringLiteral("BL")));
+    static const QList<BoardType> flashable ={
+        BoardType::BoardTypePixhawk,
+        BoardType::BoardTypeSiKRadio
+    };
+
+    return flashable.contains(boardType);
+}
+
+bool QGCSerialPortInfo::isBootloader() const
+{
+    BoardType boardType;
+    QString name;
+    if (!getBoardInfo(boardType, name)) {
+        return false;
+    }
+
+    return ((boardType == BoardType::BoardTypePixhawk) && description().contains(QStringLiteral("BL")));
 }
 
 bool QGCSerialPortInfo::isBlackCube() const
@@ -285,7 +295,7 @@ bool QGCSerialPortInfo::isBlackCube() const
 bool QGCSerialPortInfo::isSystemPort(const QSerialPortInfo &port)
 {
 #ifdef Q_OS_MACOS
-    static const QList<QString> systemPortLocations = {
+    static const QStringList systemPortLocations = {
         QStringLiteral("tty.MALS"),
         QStringLiteral("tty.SOC"),
         QStringLiteral("tty.Bluetooth-Incoming-Port"),
@@ -304,18 +314,19 @@ bool QGCSerialPortInfo::isSystemPort(const QSerialPortInfo &port)
     return false;
 }
 
-bool QGCSerialPortInfo::canFlash() const
+QList<QGCSerialPortInfo> QGCSerialPortInfo::availablePorts()
 {
-    BoardType_t boardType;
-    QString name;
-    if (!getBoardInfo(boardType, name)) {
-        return false;
+    QList<QGCSerialPortInfo> list;
+
+    const QList<QSerialPortInfo> availablePorts = QSerialPortInfo::availablePorts();
+    for (const QSerialPortInfo &portInfo : availablePorts) {
+        if (isSystemPort(portInfo)) {
+            continue;
+        }
+
+        const QGCSerialPortInfo *const qgcPortInfo = reinterpret_cast<const QGCSerialPortInfo*>(&portInfo);
+        list << *qgcPortInfo;
     }
 
-    static const QList<BoardType_t> flashable = {
-        BoardTypePixhawk,
-        BoardTypeSiKRadio
-    };
-
-    return flashable.contains(boardType);
+    return list;
 }

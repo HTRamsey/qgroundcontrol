@@ -809,7 +809,7 @@ void LinkManager::_addSerialAutoConnectLink()
 
         currentPorts << portInfo.systemLocation();
 
-        QGCSerialPortInfo::BoardType_t boardType;
+        QGCSerialPortInfo::BoardType boardType;
         QString boardName;
 
         // check to see if nmea gps is configured for current Serial port, if so, set it up to connect
@@ -854,18 +854,19 @@ void LinkManager::_addSerialAutoConnectLink()
             } else if ((++_autoconnectPortWaitList[portInfo.systemLocation()] * _autoconnectUpdateTimerMSecs) > _autoconnectConnectDelayMSecs) {
                 SerialConfiguration* pSerialConfig = nullptr;
                 _autoconnectPortWaitList.remove(portInfo.systemLocation());
+                using BoardType = QGCSerialPortInfo::BoardType;
                 switch (boardType) {
-                case QGCSerialPortInfo::BoardTypePixhawk:
+                case BoardType::BoardTypePixhawk:
                     pSerialConfig = new SerialConfiguration(tr("%1 on %2 (AutoConnect)").arg(boardName, portInfo.portName().trimmed()));
                     pSerialConfig->setUsbDirect(true);
                     break;
-                case QGCSerialPortInfo::BoardTypeSiKRadio:
+                case BoardType::BoardTypeSiKRadio:
                     pSerialConfig = new SerialConfiguration(tr("%1 on %2 (AutoConnect)").arg(boardName, portInfo.portName().trimmed()));
                     break;
-                case QGCSerialPortInfo::BoardTypeOpenPilot:
+                case BoardType::BoardTypeOpenPilot:
                     pSerialConfig = new SerialConfiguration(tr("%1 on %2 (AutoConnect)").arg(boardName, portInfo.portName().trimmed()));
                     break;
-                case QGCSerialPortInfo::BoardTypeRTKGPS:
+                case BoardType::BoardTypeRTKGPS:
                     qCDebug(LinkManagerLog) << "RTK GPS auto-connected" << portInfo.portName().trimmed();
                     _autoConnectRTKPort = portInfo.systemLocation();
                     GPSManager::instance()->gpsRtk()->connectGPS(portInfo.systemLocation(), boardName);
@@ -877,7 +878,7 @@ void LinkManager::_addSerialAutoConnectLink()
 
                 if (pSerialConfig) {
                     qCDebug(LinkManagerLog) << "New auto-connect port added: " << pSerialConfig->name() << portInfo.systemLocation();
-                    pSerialConfig->setBaud((boardType == QGCSerialPortInfo::BoardTypeSiKRadio) ? 57600 : 115200);
+                    pSerialConfig->setBaud((boardType == BoardType::BoardTypeSiKRadio) ? 57600 : 115200);
                     pSerialConfig->setDynamic(true);
                     pSerialConfig->setPortName(portInfo.systemLocation());
                     pSerialConfig->setAutoConnect(true);
@@ -897,25 +898,27 @@ void LinkManager::_addSerialAutoConnectLink()
     }
 }
 
-bool LinkManager::_allowAutoConnectToBoard(QGCSerialPortInfo::BoardType_t boardType) const
+bool LinkManager::_allowAutoConnectToBoard(QGCSerialPortInfo::BoardType boardType) const
 {
+    using BoardType = QGCSerialPortInfo::BoardType;
+
     switch (boardType) {
-    case QGCSerialPortInfo::BoardTypePixhawk:
+    case BoardType::BoardTypePixhawk:
         if (_autoConnectSettings->autoConnectPixhawk()->rawValue().toBool()) {
             return true;
         }
         break;
-    case QGCSerialPortInfo::BoardTypeSiKRadio:
+    case BoardType::BoardTypeSiKRadio:
         if (_autoConnectSettings->autoConnectSiKRadio()->rawValue().toBool()) {
             return true;
         }
         break;
-    case QGCSerialPortInfo::BoardTypeOpenPilot:
+    case BoardType::BoardTypeOpenPilot:
         if (_autoConnectSettings->autoConnectLibrePilot()->rawValue().toBool()) {
             return true;
         }
         break;
-    case QGCSerialPortInfo::BoardTypeRTKGPS:
+    case BoardType::BoardTypeRTKGPS:
         if (_autoConnectSettings->autoConnectRTKGPS()->rawValue().toBool() && !GPSManager::instance()->gpsRtk()->connected()) {
             return true;
         }
@@ -950,7 +953,7 @@ void LinkManager::_updateSerialPorts()
     for (const QGCSerialPortInfo &info: portList) {
         const QString port = info.systemLocation().trimmed();
         _commPortList += port;
-        _commPortDisplayList += SerialConfiguration::cleanPortDisplayName(port);
+        _commPortDisplayList += SerialConfiguration::findPortDisplayName(port);
     }
 }
 

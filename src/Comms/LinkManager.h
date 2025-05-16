@@ -182,7 +182,7 @@ signals:
 private:
     bool _isSerialPortConnected() const;
     void _updateSerialPorts();
-    bool _allowAutoConnectToBoard(QGCSerialPortInfo::BoardType_t boardType) const;
+    bool _allowAutoConnectToBoard(QGCSerialPortInfo::BoardType boardType) const;
     void _addSerialAutoConnectLink();
     bool _portAlreadyConnected(const QString &portName) const;
 

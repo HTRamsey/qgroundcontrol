@@ -68,7 +68,7 @@ void PX4FirmwareUpgradeThreadWorker::_findBoardOnce(void)
     qCDebug(FirmwareUpgradeVerboseLog) << "_findBoardOnce";
     
     QGCSerialPortInfo               portInfo;
-    QGCSerialPortInfo::BoardType_t  boardType;
+    QGCSerialPortInfo::BoardType  boardType;
     QString                         boardName;
     
     if (_findBoardFromPorts(portInfo, boardType, boardName)) {
@@ -78,7 +78,7 @@ void PX4FirmwareUpgradeThreadWorker::_findBoardOnce(void)
             emit foundBoard(_findBoardFirstAttempt, portInfo, boardType, boardName);
             if (!_findBoardFirstAttempt) {
 
-                _bootloader = new Bootloader(boardType == QGCSerialPortInfo::BoardTypeSiKRadio, this);
+                _bootloader = new Bootloader(boardType == QGCSerialPortInfo::BoardType::BoardTypeSiKRadio, this);
                 connect(_bootloader, &Bootloader::updateProgress, this, &PX4FirmwareUpgradeThreadWorker::_updateProgress);
 
                 if (_bootloader->open(portInfo.portName())) {
@@ -110,7 +110,7 @@ void PX4FirmwareUpgradeThreadWorker::_findBoardOnce(void)
     _findBoardTimer->start();
 }
 
-bool PX4FirmwareUpgradeThreadWorker::_findBoardFromPorts(QGCSerialPortInfo& portInfo, QGCSerialPortInfo::BoardType_t& boardType, QString& boardName)
+bool PX4FirmwareUpgradeThreadWorker::_findBoardFromPorts(QGCSerialPortInfo& portInfo, QGCSerialPortInfo::BoardType& boardType, QString& boardName)
 {
     for (const QGCSerialPortInfo& info: QGCSerialPortInfo::availablePorts()) {
         info.getBoardInfo(boardType, boardName);

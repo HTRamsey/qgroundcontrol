@@ -137,7 +137,7 @@ public:
     QString     px4StableVersion    (void) { return _px4StableVersion; }
     QString     px4BetaVersion  (void) { return _px4BetaVersion; }
 
-    bool pixhawkBoard(void) const { return _boardType == QGCSerialPortInfo::BoardTypePixhawk; }
+    bool pixhawkBoard(void) const { return _boardType == QGCSerialPortInfo::BoardType::BoardTypePixhawk; }
 
     /**
      * @brief Return a human friendly string of available boards
@@ -163,7 +163,7 @@ signals:
 private slots:
     void _firmwareDownloadProgress          (qint64 curr, qint64 total);
     void _firmwareDownloadComplete          (QString remoteFile, QString localFile, QString errorMsg);
-    void _foundBoard                        (bool firstAttempt, const QSerialPortInfo& portInfo, int boardType, QString boardName);
+    void _foundBoard                        (bool firstAttempt, const QSerialPortInfo& portInfo, QGCSerialPortInfo::BoardType boardType, QString boardName);
     void _noBoardFound                      (void);
     void _boardGone                         (void);
     void _foundBoardInfo                    (int bootloaderVersion, int boardID, int flashSize);
@@ -234,7 +234,7 @@ private:
     bool _searchingForBoard;    ///< true: searching for board, false: search for bootloader
     
     QSerialPortInfo                 _boardInfo;
-    QGCSerialPortInfo::BoardType_t  _boardType;
+    QGCSerialPortInfo::BoardType  _boardType;
     QString                         _boardTypeName;
 
     FirmwareBuildType_t             _selectedFirmwareBuildType;

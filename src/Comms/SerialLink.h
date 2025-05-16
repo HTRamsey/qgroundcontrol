@@ -20,6 +20,7 @@
 
 #include "LinkConfiguration.h"
 #include "LinkInterface.h"
+#include "QGCSerialPortInfo.h"
 
 class QThread;
 class QTimer;
@@ -71,13 +72,12 @@ public:
     void setPortName(const QString &name);
 
     QString portDisplayName() const { return _portDisplayName; }
-    void setPortDisplayName(const QString &portDisplayName) { if (portDisplayName != _portDisplayName) { _portDisplayName = portDisplayName; emit portDisplayNameChanged(); } }
 
     bool usbDirect() const { return _usbDirect; }
     void setUsbDirect(bool usbDirect) { if (usbDirect != _usbDirect) { _usbDirect = usbDirect; emit usbDirectChanged(); } }
 
     static QStringList supportedBaudRates();
-    static QString cleanPortDisplayName(const QString &name);
+    static QString findPortDisplayName(const QString &name);
 
 signals:
     void baudChanged();
@@ -90,6 +90,8 @@ signals:
     void usbDirectChanged();
 
 private:
+    void _setPortDisplayName(const QString &portDisplayName) { if (portDisplayName != _portDisplayName) { _portDisplayName = portDisplayName; emit portDisplayNameChanged(); } }
+
     qint32 _baud = QSerialPort::Baud57600;
     QSerialPort::DataBits _dataBits = QSerialPort::Data8;
     QSerialPort::FlowControl _flowControl = QSerialPort::NoFlowControl;
@@ -138,6 +140,7 @@ private:
     const SerialConfiguration *_serialConfig = nullptr;
     QSerialPort *_port = nullptr;
     QTimer *_timer = nullptr;
+    QGCSerialPortInfo _portInfo;
     bool _errorEmitted = false;
 };
 

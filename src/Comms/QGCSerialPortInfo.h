@@ -7,18 +7,14 @@
  *
  ****************************************************************************/
 
-
 #pragma once
 
 #include <QtCore/QLoggingCategory>
-#include <QtCore/QtSystemDetection>
 #ifdef Q_OS_ANDROID
     #include "qserialportinfo.h"
 #else
     #include <QtSerialPort/QSerialPortInfo>
 #endif
-
-class QGCSerialPortInfoTest;
 
 Q_DECLARE_LOGGING_CATEGORY(QGCSerialPortInfoLog)
 
@@ -26,21 +22,24 @@ Q_DECLARE_LOGGING_CATEGORY(QGCSerialPortInfoLog)
 /// that QGC cares about.
 class QGCSerialPortInfo : public QSerialPortInfo
 {
+    Q_GADGET
     friend class QGCSerialPortInfoTest;
 public:
     QGCSerialPortInfo();
-    explicit QGCSerialPortInfo(const QSerialPort &port);
+    QGCSerialPortInfo(const QSerialPort &port);
+    QGCSerialPortInfo(const QString &portName);
     ~QGCSerialPortInfo();
 
-    enum BoardType_t {
-        BoardTypePixhawk = 0,
+    enum class BoardType {
+        BoardTypePixhawk,
         BoardTypeSiKRadio,
         BoardTypeOpenPilot,
         BoardTypeRTKGPS,
         BoardTypeUnknown
     };
+    Q_ENUM(BoardType)
 
-    bool getBoardInfo(BoardType_t &boardType, QString &name) const;
+    bool getBoardInfo(BoardType &boardType, QString &name) const;
 
     /// @return true: we can flash this board type
     bool canFlash() const;
@@ -59,30 +58,25 @@ public:
     static QList<QGCSerialPortInfo> availablePorts();
 
 private:
-    struct BoardClassString2BoardType_t {
-        const QString classString;
-        const BoardType_t boardType = BoardTypeUnknown;
-    };
-
     static bool _loadJsonData();
-    static BoardType_t _boardClassStringToType(const QString &boardClass);
-    static QString _boardTypeToString(BoardType_t boardType);
+    static BoardType _boardClassStringToType(const QString &boardClass);
+    static QString _boardTypeToString(BoardType boardType);
 
     static bool _jsonLoaded;
     static bool _jsonDataValid;
 
     struct BoardInfo_t {
-        int vendorId;
-        int productId;
-        BoardType_t boardType;
+        int vendorId = -1;
+        int productId = -1;
+        BoardType boardType = BoardType::BoardTypeUnknown;
         QString name;
     };
     static QList<BoardInfo_t> _boardInfoList;
 
     struct BoardRegExpFallback_t {
         QString regExp;
-        BoardType_t boardType;
-        bool androidOnly;
+        BoardType boardType = BoardType::BoardTypeUnknown;
+        bool androidOnly = false;
     };
     static QList<BoardRegExpFallback_t> _boardDescriptionFallbackList;
     static QList<BoardRegExpFallback_t> _boardManufacturerFallbackList;

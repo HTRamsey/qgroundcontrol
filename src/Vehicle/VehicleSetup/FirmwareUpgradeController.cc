@@ -219,7 +219,7 @@ void FirmwareUpgradeController::cancel(void)
 
 QStringList FirmwareUpgradeController::availableBoardsName(void)
 {
-    QGCSerialPortInfo::BoardType_t boardType;
+    QGCSerialPortInfo::BoardType boardType;
     QString boardName;
     QStringList names;
 
@@ -234,17 +234,17 @@ QStringList FirmwareUpgradeController::availableBoardsName(void)
     return names;
 }
 
-void FirmwareUpgradeController::_foundBoard(bool firstAttempt, const QSerialPortInfo& info, int boardType, QString boardName)
+void FirmwareUpgradeController::_foundBoard(bool firstAttempt, const QSerialPortInfo& info, QGCSerialPortInfo::BoardType boardType, QString boardName)
 {
     _boardInfo      = info;
-    _boardType      = static_cast<QGCSerialPortInfo::BoardType_t>(boardType);
+    _boardType      = boardType;
     _boardTypeName  = boardName;
 
     qDebug() << info.manufacturer() << info.description();
 
     _startFlashWhenBootloaderFound = false;
 
-    if (_boardType == QGCSerialPortInfo::BoardTypeSiKRadio) {
+    if (_boardType == QGCSerialPortInfo::BoardType::BoardTypeSiKRadio) {
         if (!firstAttempt) {
             // Radio always flashes latest firmware, so we can start right away without
             // any further user input.
