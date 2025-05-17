@@ -7,7 +7,6 @@ set(LD_PATH "${CMAKE_BINARY_DIR}/linuxdeploy-x86_64.AppImage")
 # set(LD_APPIMAGEPLUGIN_PATH "${CMAKE_BINARY_DIR}/linuxdeploy-plugin-appimage-x86_64.AppImage")
 # set(LD_QTPLUGIN_PATH "${CMAKE_BINARY_DIR}/linuxdeploy-plugin-qt-x86_64.AppImage")
 # set(LD_GSTPLUGIN_PATH "${CMAKE_BINARY_DIR}/linuxdeploy-plugin-gstreamer.sh")
-# set(LD_GTKPLUGIN_PATH "${CMAKE_BINARY_DIR}/linuxdeploy-plugin-gtk.sh")
 
 if(NOT EXISTS "${APPIMAGETOOL_PATH}")
     file(DOWNLOAD https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage "${APPIMAGETOOL_PATH}")
@@ -26,10 +25,6 @@ endif()
 #     file(DOWNLOAD https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-x86_64.AppImage "${LD_QTPLUGIN_PATH}")
 #     execute_process(COMMAND chmod a+x "${LD_QTPLUGIN_PATH}")
 # endif()
-# if(NOT EXISTS "${LD_GTKPLUGIN_PATH}")
-#     file(DOWNLOAD https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/master/linuxdeploy-plugin-gtk.sh "${LD_GTKPLUGIN_PATH}")
-#     execute_process(COMMAND chmod a+x "${LD_GTKPLUGIN_PATH}")
-# endif()
 # if(NOT EXISTS "${LD_GSTPLUGIN_PATH}")
 #     file(DOWNLOAD https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gstreamer/master/linuxdeploy-plugin-gstreamer.sh "${LD_GSTPLUGIN_PATH}")
 #     execute_process(COMMAND chmod a+x "${LD_GSTPLUGIN_PATH}")
@@ -40,9 +35,19 @@ execute_process(COMMAND ${LD_PATH}
     --executable ${APPDIR_PATH}/usr/bin/QGroundControl
     --desktop-file ${APPDIR_PATH}/usr/share/applications/org.mavlink.qgroundcontrol.desktop
     --custom-apprun ${CMAKE_BINARY_DIR}/AppRun)
-# --exclude-library "libgst*"
-# --plugin qt --plugin gtk --plugin gstreamer
+    # --plugin qt
+    # --plugin gstreamer
 
 set(ENV{ARCH} x86_64)
 # set(ENV{VERSION} 5.0)
 execute_process(COMMAND ${APPIMAGETOOL_PATH} ${APPDIR_PATH})
+
+set(LD_APPIMAGELINT_PATH "${CMAKE_BINARY_DIR}/appimagelint-x86_64.AppImage")
+if(NOT EXISTS "${LD_APPIMAGELINT_PATH}")
+    file(DOWNLOAD https://github.com/TheAssassin/appimagelint/releases/download/continuous/appimagelint-x86_64.AppImage "${LD_APPIMAGELINT_PATH}")
+    execute_process(COMMAND chmod a+x "${LD_APPIMAGELINT_PATH}")
+endif()
+execute_process(COMMAND ${LD_APPIMAGELINT_PATH} "QGroundControl-$ENV{ARCH}.AppImage")
+# > ./appimagelint-x86_64.AppImage some_other.AppImage
+
+# appstreamcli validate --pedantic /path/to/metadata.xml
