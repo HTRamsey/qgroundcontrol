@@ -76,6 +76,7 @@ else()
     set(ENV{CPM_SOURCE_CACHE} "${CMAKE_BINARY_DIR}/cpm_modules")
 endif()
 include(CPM)
+CPMUsePackageLock(cmake/cpm-package-lock.cmake)
 
 include(Toolchain)
 
