@@ -14,6 +14,7 @@
 #include <QtCore/QSet>
 #include <QtCore/QTimer>
 #include <QtCore/QTranslator>
+#include <QtCore/QVersionNumber>
 
 #include <QtWidgets/QApplication>
 
@@ -51,11 +52,13 @@ public:
     QGCApplication(int &argc, char *argv[], bool unitTesting, bool simpleBootTest);
     ~QGCApplication();
 
-    /// Sets the persistent flag to delete all settings the next time QGroundControl is started.
-    void deleteAllSettingsNextBoot();
+    QQuickWindow *mainRootWindow();
 
-    /// Clears the persistent flag to delete all settings the next time QGroundControl is started.
-    void clearDeleteAllSettingsNextBoot();
+    uint64_t msecsSinceBoot() const { return _msecsElapsedTime.elapsed(); }
+
+    void setLanguage();
+    /// Get current language
+    QLocale getCurrentLanguage() const { return _locale; }
 
     bool runningUnitTests() const { return _runningUnitTests; }
     bool simpleBootTest() const { return _simpleBootTest; }
@@ -70,24 +73,25 @@ public:
     /// @return true: Fake ui into showing mobile interface
     bool fakeMobile() const { return _fakeMobile; }
 
-    void setLanguage();
-    QQuickWindow *mainRootWindow();
-    uint64_t msecsSinceBoot() const { return _msecsElapsedTime.elapsed(); }
-    QString numberToString(quint64 number);
-    QString bigSizeToString(quint64 size);
-    QString bigSizeMBToString(quint64 size_MB);
+    QString numberToString(quint64 number) const;
+    QString bigSizeToString(quint64 size) const;
+    QString bigSizeMBToString(quint64 size_MB) const;
 
     /// Registers the signal such that only the last duplicate signal added is left in the queue.
     void addCompressedSignal(const QMetaMethod &method);
-
     void removeCompressedSignal(const QMetaMethod &method);
 
     bool event(QEvent *e) final;
 
+    /// Sets the persistent flag to delete all settings the next time QGroundControl is started.
+    static void deleteAllSettingsNextBoot();
+
+    /// Clears the persistent flag to delete all settings the next time QGroundControl is started.
+    static void clearDeleteAllSettingsNextBoot();
+
     static QString cachedParameterMetaDataFile();
     static QString cachedAirframeMetaDataFile();
 
-public:
     /// Perform initialize which is common to both normal application running and unit tests.
     void init();
     void shutdown();
@@ -96,15 +100,12 @@ public:
     QQmlApplicationEngine *qmlAppEngine() const { return _qmlAppEngine; }
 
 signals:
-    void languageChanged(const QLocale locale);
+    void languageChanged(const QLocale &locale);
 
 public slots:
     void showVehicleConfig();
 
     void qmlAttemptWindowClose();
-
-    /// Get current language
-    QLocale getCurrentLanguage() const { return _locale; }
 
     /// Show non-modal vehicle message to the user
     void showCriticalVehicleMessage(const QString &message);
@@ -122,14 +123,14 @@ private slots:
     /// Called when the delay timer fires to show the missing parameters warning
     void _missingParamsDisplay();
     void _qgcCurrentStableVersionDownloadComplete(const QString &remoteFile, const QString &localFile, const QString &errorMsg);
-    static bool _parseVersionText(const QString &versionString, int &majorVersion, int &minorVersion, int &buildVersion);
+    bool _parseVersionText(const QString &versionString, QVersionNumber &version);
     void _showDelayedAppMessages();
 
 private:
     bool compressEvent(QEvent *event, QObject *receiver, QPostEventList *postedEvents) final;
 
     void _initVideo();
-    
+
     /// Initialize the application for normal application boot. Or in other words we are not going to run unit tests.
     void _initForNormalAppBoot();
 
@@ -137,7 +138,7 @@ private:
     void _checkForNewVersion();
 
     bool _runningUnitTests = false;
-    bool _simpleBootTest = false; 
+    bool _simpleBootTest = false;
     static constexpr int _missingParamsDelayedDisplayTimerTimeout = 1000;   ///< Timeout to wait for next missing fact to come in before display
     QTimer _missingParamsDelayedDisplayTimer;                               ///< Timer use to delay missing fact display
     QList<QPair<int,QString>> _missingParams;                               ///< List of missing parameter component id:name
@@ -146,9 +147,7 @@ private:
     bool _logOutput = false;    ///< true: Log Qt debug output to file
     bool _fakeMobile = false;    ///< true: Fake ui into displaying mobile interface
     bool _settingsUpgraded = false;    ///< true: Settings format has been upgrade to new version
-    int _majorVersion = 0;
-    int _minorVersion = 0;
-    int _buildVersion = 0;
+    QVersionNumber _version;
     QQuickWindow *_mainRootWindow = nullptr;
     QTranslator _qgcTranslatorSourceCode;           ///< translations for source code C++/Qml
     QTranslator _qgcTranslatorQtLibs;               ///< tranlsations for Qt libraries
@@ -180,7 +179,6 @@ private:
     CompressedSignalList _compressedSignals;
 
     const QString _settingsVersionKey = QStringLiteral("SettingsVersion"); ///< Settings key which hold settings version
-    const QString _deleteAllSettingsKey = QStringLiteral("DeleteAllSettingsNextBoot"); ///< If this settings key is set on boot, all settings will be deleted
-
     const QString _qgcImageProviderId = QStringLiteral("QGCImages");
+    static constexpr const char *_deleteAllSettingsKey = "DeleteAllSettingsNextBoot"; ///< If this settings key is set on boot, all settings will be deleted
 };

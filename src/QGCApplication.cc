@@ -7,17 +7,9 @@
  *
  ****************************************************************************/
 
-
-/**
- * @file
- *   @brief Implementation of class QGCApplication
- *
- *   @author Lorenz Meier <mavteam@student.ethz.ch>
- *
- */
-
 #include "QGCApplication.h"
 
+#include <QtCore/private/qthread_p.h>
 #include <QtCore/QEvent>
 #include <QtCore/QFile>
 #include <QtCore/QMetaMethod>
@@ -32,9 +24,7 @@
 #include <QtQuick/QQuickWindow>
 #include <QtQuickControls2/QQuickStyle>
 
-#include <QtCore/private/qthread_p.h>
-
-#include "QGCLogging.h"
+#include "AppSettings.h"
 #include "AudioOutput.h"
 #include "AutoPilotPlugin.h"
 #include "CmdLineOptParser.h"
@@ -59,10 +49,10 @@
 #include "QGCCorePlugin.h"
 #include "QGCFileDownload.h"
 #include "QGCImageProvider.h"
+#include "QGCLogging.h"
 #include "QGCLoggingCategory.h"
 #include "QGroundControlQmlGlobal.h"
 #include "SettingsManager.h"
-#include "AppSettings.h"
 #include "ShapeFileHelper.h"
 #include "SyslinkComponentController.h"
 #include "UDPLink.h"
@@ -175,8 +165,8 @@ QGCApplication::QGCApplication(int &argc, char *argv[], bool unitTesting, bool s
 
         // Clear parameter cache
         QDir paramDir(ParameterManager::parameterCacheDir());
-        paramDir.removeRecursively();
-        paramDir.mkpath(paramDir.absolutePath());
+        (void) paramDir.removeRecursively();
+        (void)paramDir.mkpath(paramDir.absolutePath());
     } else {
         // Determine if upgrade message for settings version bump is required. Check and clear must happen before toolbox is started since
         // that will write some settings.
@@ -191,11 +181,11 @@ QGCApplication::QGCApplication(int &argc, char *argv[], bool unitTesting, bool s
 
     if (fClearCache) {
         QDir dir(ParameterManager::parameterCacheDir());
-        dir.removeRecursively();
+        (void) dir.removeRecursively();
         QFile airframe(cachedAirframeMetaDataFile());
-        airframe.remove();
+        (void) airframe.remove();
         QFile parameter(cachedParameterMetaDataFile());
-        parameter.remove();
+        (void) parameter.remove();
     }
 
     // Set up our logging filters
@@ -214,7 +204,7 @@ void QGCApplication::setLanguage()
     _locale = QLocale::system();
     qCDebug(QGCApplicationLog) << "System reported locale:" << _locale << "; Name" << _locale.name() << "; Preffered (used in maps): " << (QLocale::system().uiLanguages().length() > 0 ? QLocale::system().uiLanguages()[0] : "None");
 
-    QLocale::Language possibleLocale = AppSettings::_qLocaleLanguageEarlyAccess();
+    const QLocale::Language possibleLocale = AppSettings::_qLocaleLanguageEarlyAccess();
     if (possibleLocale != QLocale::AnyLanguage) {
         _locale = QLocale(possibleLocale);
     }
@@ -453,8 +443,9 @@ void QGCApplication::_missingParamsDisplay()
 
 QObject *QGCApplication::_rootQmlObject()
 {
-    if (_qmlAppEngine && _qmlAppEngine->rootObjects().size()) {
-        return _qmlAppEngine->rootObjects()[0];
+    if (_qmlAppEngine && !_qmlAppEngine->rootObjects().isEmpty()) {
+        const QList<QObject*> rootObjects = _qmlAppEngine->rootObjects();
+        return rootObjects.first();
     }
 
     return nullptr;
@@ -470,11 +461,11 @@ void QGCApplication::showCriticalVehicleMessage(const QString &message)
     QObject *const rootQmlObject = _rootQmlObject();
     if (rootQmlObject && _showErrorsInToolbar) {
         QVariant varReturn;
-        QVariant varMessage = QVariant::fromValue(message);
-        QMetaObject::invokeMethod(rootQmlObject, "showCriticalVehicleMessage", Q_RETURN_ARG(QVariant, varReturn), Q_ARG(QVariant, varMessage));
+        const QVariant varMessage = QVariant::fromValue(message);
+        (void) QMetaObject::invokeMethod(rootQmlObject, "showCriticalVehicleMessage", Q_RETURN_ARG(QVariant, varReturn), Q_ARG(QVariant, varMessage));
     } else if (runningUnitTests() || !_showErrorsInToolbar) {
         // Unit tests can run without UI
-        qCDebug(QGCApplicationLog) << "QGCApplication::showCriticalVehicleMessage unittest" << message;
+        qCDebug(QGCApplicationLog) << "unittest" << message;
     } else {
         qCWarning(QGCApplicationLog) << "Internal error";
     }
@@ -487,11 +478,11 @@ void QGCApplication::showAppMessage(const QString &message, const QString &title
     QObject *const rootQmlObject = _rootQmlObject();
     if (rootQmlObject) {
         QVariant varReturn;
-        QVariant varMessage = QVariant::fromValue(message);
-        QMetaObject::invokeMethod(rootQmlObject, "_showMessageDialog", Q_RETURN_ARG(QVariant, varReturn), Q_ARG(QVariant, dialogTitle), Q_ARG(QVariant, varMessage));
+        const QVariant varMessage = QVariant::fromValue(message);
+        (void) QMetaObject::invokeMethod(rootQmlObject, "_showMessageDialog", Q_RETURN_ARG(QVariant, varReturn), Q_ARG(QVariant, dialogTitle), Q_ARG(QVariant, varMessage));
     } else if (runningUnitTests()) {
         // Unit tests can run without UI
-        qCDebug(QGCApplicationLog) << "QGCApplication::showAppMessage unittest title:message" << dialogTitle << message;
+        qCDebug(QGCApplicationLog) << "unittest title:message" << dialogTitle << message;
     } else {
         // UI isn't ready yet
         _delayedAppMessages.append(QPair<QString, QString>(dialogTitle, message));
@@ -518,7 +509,7 @@ void QGCApplication::showRebootAppMessage(const QString &message, const QString 
 void QGCApplication::_showDelayedAppMessages()
 {
     if (_rootQmlObject()) {
-        for (const QPair<QString, QString>& appMsg: _delayedAppMessages) {
+        for (const QPair<QString, QString> &appMsg : std::as_const(_delayedAppMessages)) {
             showAppMessage(appMsg.second, appMsg.first);
         }
         _delayedAppMessages.clear();
@@ -539,14 +530,14 @@ QQuickWindow *QGCApplication::mainRootWindow()
 void QGCApplication::showVehicleConfig()
 {
     if (_rootQmlObject()) {
-      QMetaObject::invokeMethod(_rootQmlObject(), "showVehicleConfig");
+        (void) QMetaObject::invokeMethod(_rootQmlObject(), "showVehicleConfig");
     }
 }
 
 void QGCApplication::qmlAttemptWindowClose()
 {
     if (_rootQmlObject()) {
-        QMetaObject::invokeMethod(_rootQmlObject(), "attemptWindowClose");
+        (void) QMetaObject::invokeMethod(_rootQmlObject(), "attemptWindowClose");
     }
 }
 
@@ -556,54 +547,55 @@ void QGCApplication::_checkForNewVersion()
         return;
     }
 
-    if (!_parseVersionText(applicationVersion(), _majorVersion, _minorVersion, _buildVersion)) {
+    if (!_parseVersionText(applicationVersion(), _version)) {
         return;
     }
 
     const QString versionCheckFile = QGCCorePlugin::instance()->stableVersionCheckFileUrl();
     if (!versionCheckFile.isEmpty()) {
-        QGCFileDownload *const download = new QGCFileDownload(this);
+        QGCFileDownload *download = new QGCFileDownload(this);
         (void) connect(download, &QGCFileDownload::downloadComplete, this, &QGCApplication::_qgcCurrentStableVersionDownloadComplete);
-        download->download(versionCheckFile);
+        (void) download->download(versionCheckFile);
     }
 }
 
 void QGCApplication::_qgcCurrentStableVersionDownloadComplete(const QString &remoteFile, const QString &localFile, const QString &errorMsg)
 {
     Q_UNUSED(remoteFile);
+    sender()->deleteLater();
 
-    if (errorMsg.isEmpty()) {
-        QFile versionFile(localFile);
-        if (versionFile.open(QIODevice::ReadOnly)) {
-            QTextStream textStream(&versionFile);
-            const QString version = textStream.readLine();
-
-            qCDebug(QGCApplicationLog) << version;
-
-            int majorVersion, minorVersion, buildVersion;
-            if (_parseVersionText(version, majorVersion, minorVersion, buildVersion)) {
-                if (_majorVersion < majorVersion ||
-                        ((_majorVersion == majorVersion) && (_minorVersion < minorVersion)) ||
-                        ((_majorVersion == majorVersion) && (_minorVersion == minorVersion) && (_buildVersion < buildVersion))) {
-                    showAppMessage(tr("There is a newer version of %1 available. You can download it from %2.").arg(applicationName()).arg(QGCCorePlugin::instance()->stableDownloadLocation()), tr("New Version Available"));
-                }
-            }
-        }
-    } else {
-        qCDebug(QGCApplicationLog) << "Download QGC stable version failed" << errorMsg;
+    if (!errorMsg.isEmpty()) {
+        qCWarning(QGCApplicationLog) << "Download QGC stable version failed" << errorMsg;
+        return;
     }
 
-    sender()->deleteLater();
+    QFile versionFile(localFile);
+    if (!versionFile.open(QIODevice::ReadOnly)) {
+        qCWarning(QGCApplicationLog) << "Open QGC stable version file failed" << versionFile.error();
+        return;
+    }
+
+    QTextStream textStream(&versionFile);
+    const QString versionString = textStream.readLine();
+    qCDebug(QGCApplicationLog) << versionString;
+
+    QVersionNumber version;
+    if (!_parseVersionText(versionString, version)) {
+        qCWarning(QGCApplicationLog) << "Error Parsing version file for version number";
+        return;
+    }
+
+    if (_version < version) {
+        showAppMessage(tr("There is a newer version of %1 available. You can download it from %2.").arg(applicationName(), QGCCorePlugin::instance()->stableDownloadLocation()), tr("New Version Available"));
+    }
 }
 
-bool QGCApplication::_parseVersionText(const QString &versionString, int &majorVersion, int &minorVersion, int &buildVersion)
+bool QGCApplication::_parseVersionText(const QString &versionString, QVersionNumber &version)
 {
     static const QRegularExpression regExp("v(\\d+)\\.(\\d+)\\.(\\d+)");
     const QRegularExpressionMatch match = regExp.match(versionString);
-    if (match.hasMatch() && match.lastCapturedIndex() == 3) {
-        majorVersion = match.captured(1).toInt();
-        minorVersion = match.captured(2).toInt();
-        buildVersion = match.captured(3).toInt();
+    if (match.hasMatch() && (match.lastCapturedIndex() == 3)) {
+        version = QVersionNumber(match.captured(1).toInt(), match.captured(2).toInt(), match.captured(3).toInt());
         return true;
     }
 
@@ -668,7 +660,7 @@ void QGCApplication::CompressedSignalList::remove(const QMetaMethod &method)
 
 bool QGCApplication::CompressedSignalList::contains(const QMetaObject *metaObject, int signalIndex)
 {
-    return _signalMap.contains(metaObject) && _signalMap[metaObject].contains(signalIndex);
+    return (_signalMap.contains(metaObject) && _signalMap[metaObject].contains(signalIndex));
 }
 
 void QGCApplication::addCompressedSignal(const QMetaMethod &method)
@@ -761,39 +753,39 @@ void QGCApplication::shutdown()
     delete _qmlAppEngine;
 }
 
-QString QGCApplication::numberToString(quint64 number)
+QString QGCApplication::numberToString(quint64 number) const
 {
     return getCurrentLanguage().toString(number);
 }
 
-QString QGCApplication::bigSizeToString(quint64 size)
+QString QGCApplication::bigSizeToString(quint64 size) const
 {
     QString result;
     const QLocale kLocale = getCurrentLanguage();
     if (size < 1024) {
         result = kLocale.toString(size) + "B";
-    } else if (size < pow(1024, 2)) {
+    } else if (size < qPow(1024, 2)) {
         result = kLocale.toString(static_cast<double>(size) / 1024.0, 'f', 1) + "KB";
-    } else if (size < pow(1024, 3)) {
-        result = kLocale.toString(static_cast<double>(size) / pow(1024, 2), 'f', 1) + "MB";
-    } else if (size < pow(1024, 4)) {
-        result = kLocale.toString(static_cast<double>(size) / pow(1024, 3), 'f', 1) + "GB";
+    } else if (size < qPow(1024, 3)) {
+        result = kLocale.toString(static_cast<double>(size) / qPow(1024, 2), 'f', 1) + "MB";
+    } else if (size < qPow(1024, 4)) {
+        result = kLocale.toString(static_cast<double>(size) / qPow(1024, 3), 'f', 1) + "GB";
     } else {
-        result = kLocale.toString(static_cast<double>(size) / pow(1024, 4), 'f', 1) + "TB";
+        result = kLocale.toString(static_cast<double>(size) / qPow(1024, 4), 'f', 1) + "TB";
     }
     return result;
 }
 
-QString QGCApplication::bigSizeMBToString(quint64 size_MB)
+QString QGCApplication::bigSizeMBToString(quint64 size_MB) const
 {
     QString result;
     const QLocale kLocale = getCurrentLanguage();
     if (size_MB < 1024) {
         result = kLocale.toString(static_cast<double>(size_MB) , 'f', 0) + " MB";
-    } else if(size_MB < pow(1024, 2)) {
+    } else if(size_MB < qPow(1024, 2)) {
         result = kLocale.toString(static_cast<double>(size_MB) / 1024.0, 'f', 1) + " GB";
     } else {
-        result = kLocale.toString(static_cast<double>(size_MB) / pow(1024, 2), 'f', 2) + " TB";
+        result = kLocale.toString(static_cast<double>(size_MB) / qPow(1024, 2), 'f', 2) + " TB";
     }
     return result;
 }
