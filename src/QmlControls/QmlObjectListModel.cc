@@ -20,7 +20,18 @@ QmlObjectListModel::QmlObjectListModel(QObject* parent)
     , _dirty                    (false)
     , _skipDirtyFirstItem       (false)
 {
-
+    (void) connect(this, &QmlObjectListModel::countChanged, this, [this](int count) {
+        if (count == 0) {
+            if (_lastCount != 0) {
+                emit isEmptyChanged(true);
+            }
+        } else {
+            if (_lastCount == 0) {
+                emit isEmptyChanged(false);
+            }
+        }
+        _lastCount = count;
+    });
 }
 
 QmlObjectListModel::~QmlObjectListModel()
@@ -159,6 +170,7 @@ void QmlObjectListModel::clear()
     beginResetModel();
     _objectList.clear();
     endResetModel();
+    emit cleared();
 }
 
 QObject* QmlObjectListModel::removeAt(int i)

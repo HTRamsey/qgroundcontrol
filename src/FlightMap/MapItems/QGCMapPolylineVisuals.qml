@@ -289,7 +289,7 @@ Item {
         id: dragHandlesComponent
 
         Repeater {
-            model: mapPolyline.pathModel
+            model: mapPolyline
 
             delegate: Item {
                 property var _visuals: [ ]

@@ -20,7 +20,7 @@ void QGCMapPolylineTest::init()
     UnitTest::init();
 
     _mapPolyline = new QGCMapPolyline(this);
-    _pathModel = _mapPolyline->qmlPathModel();
+    _pathModel = _mapPolyline;
     QVERIFY(_pathModel);
 
     _multiSpyPolyline = new MultiSignalSpyV2(this);

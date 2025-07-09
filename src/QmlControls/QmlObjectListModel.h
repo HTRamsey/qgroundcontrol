@@ -7,7 +7,6 @@
  *
  ****************************************************************************/
 
-
 #pragma once
 
 #include <QtCore/QAbstractListModel>
@@ -24,6 +23,7 @@ public:
     ~QmlObjectListModel() override;
     
     Q_PROPERTY(int count READ count NOTIFY countChanged)
+    Q_PROPERTY(bool isEmpty READ isEmpty NOTIFY isEmptyChanged)
     
     /// Returns true if any of the items in the list are dirty. Requires each object to have
     /// a dirty property and dirtyChanged signal.
@@ -35,6 +35,7 @@ public:
     // Property accessors
     
     int         count               () const;
+    bool        isEmpty             () const { return (count() == 0); }
     bool        dirty               () const { return _dirty; }
 
     void        setDirty            (bool dirty);
@@ -70,7 +71,9 @@ public:
 
 signals:
     void countChanged               (int count);
+    void isEmptyChanged             (bool empty);
     void dirtyChanged               (bool dirtyChanged);
+    void cleared();
     
 private slots:
     void _childDirtyChanged         (bool dirty);
@@ -90,6 +93,7 @@ private:
     bool _dirty;
     bool _skipDirtyFirstItem;
     uint _resetModelNestingCount = 0;
+    int _lastCount = 0;
         
     static constexpr int ObjectRole = Qt::UserRole;
     static constexpr int TextRole = Qt::UserRole + 1;
