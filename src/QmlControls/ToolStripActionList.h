@@ -9,28 +9,32 @@
 
 #pragma once
 
+#include <QtCore/QLoggingCategory>
 #include <QtCore/QObject>
+#include <QtGui/QActionGroup>
 #include <QtQml/QQmlListProperty>
 
-class ToolStripActionList : public QObject
+#include "ToolStripAction.h"
+
+Q_DECLARE_LOGGING_CATEGORY(ToolStripActionListLog)
+
+class ToolStripActionList : public QActionGroup
 {
     Q_OBJECT
-    
-public:
-    ToolStripActionList(QObject* parent = nullptr);
-    
-    Q_PROPERTY(QQmlListProperty<QObject> model READ model NOTIFY modelChanged)
+    Q_PROPERTY(QQmlListProperty<ToolStripAction> model READ model NOTIFY modelChanged)
 
-    QQmlListProperty<QObject> model();
+public:
+    explicit ToolStripActionList(QObject *parent = nullptr);
+    ~ToolStripActionList();
+
+    QQmlListProperty<ToolStripAction> model();
 
 signals:
-    void modelChanged(void);
+    void modelChanged();
 
 private:
-    static void         append  (QQmlListProperty<QObject>* qmlListProperty, QObject* value);
-    static qsizetype    count   (QQmlListProperty<QObject>* qmlListProperty);
-    static QObject*     at      (QQmlListProperty<QObject>*, qsizetype index);
-    static void         clear   (QQmlListProperty<QObject>* qmlListProperty);
-
-    QList<QObject*> _objectList;
+    static qsizetype count(QQmlListProperty<ToolStripAction> *qmlListProperty);
+    static ToolStripAction *at(QQmlListProperty<ToolStripAction> *qmlListProperty, qsizetype index);
+    static void append(QQmlListProperty<ToolStripAction> *qmlListProperty, ToolStripAction *value);
+    static void clear(QQmlListProperty<ToolStripAction> *qmlListProperty);
 };
