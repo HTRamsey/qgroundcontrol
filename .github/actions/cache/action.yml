@@ -10,6 +10,10 @@ inputs:
   build-type:
     description: Build Type
     required: true
+    type: choice
+    options:
+      - Debug
+      - Release
   cpm-modules:
     description: Path to CPM Modules
     required: false
@@ -18,7 +22,7 @@ inputs:
     required: false
     default: 4.11.3
 runs:
-  using: "composite"
+  using: composite
   steps:
     - name: Install ccache (Linux)
       if: inputs.host == 'linux' && inputs.target != 'linux_gcc_arm64'
@@ -53,7 +57,7 @@ runs:
         verbose: 1
         evict-old-files: job
 
-    - name: Ensure cpm-modules directory exists (Linux/macOS)
+    - name: Ensure cpm-modules directory exists
       run: mkdir -p "${{ inputs.cpm-modules }}"
       shell: bash
 
