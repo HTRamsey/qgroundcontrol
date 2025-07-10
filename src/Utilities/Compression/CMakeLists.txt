@@ -6,6 +6,8 @@ target_sources(${CMAKE_PROJECT_NAME}
         QGCZip.h
         QGCZlib.cc
         QGCZlib.h
+        QuaZip.cc
+        QuaZip.h
 )
 
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -34,6 +36,22 @@ CPMAddPackage(
 )
 
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE ZLIB::ZLIBSTATIC)
+
+#===========================================================================#
+
+CPMAddPackage(
+    NAME QuaZip
+    GITHUB_REPOSITORY stachenov/quazip
+    VERSION 1.5
+    OPTIONS
+        "BUILD_SHARED_LIBS OFF"
+        "QUAZIP_INSTALL OFF"
+        "QUAZIP_USE_QT_ZLIB OFF"
+        "QUAZIP_ENABLE_TESTS OFF"
+        "QUAZIP_BZIP2 ON"
+)
+
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE QuaZip::QuaZip)
 
 #===========================================================================#
 
