@@ -45,9 +45,9 @@ public:
     QString settingsTitle() const override { return tr("TCP Link Settings"); }
 
     QString host() const { return _host.toString(); }
-    void setHost(const QString &host) { if (host != _host.toString()) { _host.setAddress(host); emit hostChanged(); } }
+    void setHost(const QString &host);
     quint16 port() const { return _port; }
-    void setPort(quint16 port) { if (port != _port) { _port = port; emit portChanged(); } }
+    void setPort(quint16 port);
 
 signals:
     void hostChanged();

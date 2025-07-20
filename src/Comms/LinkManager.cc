@@ -51,6 +51,8 @@
 
 #include <QtCore/qapplicationstatic.h>
 #include <QtCore/QTimer>
+#include <QtNetwork/QHostAddress>
+#include <QtNetwork/QHostInfo>
 #include <QtQml/qqml.h>
 
 QGC_LOGGING_CATEGORY(LinkManagerLog, "qgc.comms.linkmanager")
@@ -668,6 +670,28 @@ void LinkManager::_removeConfiguration(const LinkConfiguration *config)
 bool LinkManager::isBluetoothAvailable()
 {
     return QGCDeviceInfo::isBluetoothAvailable();
+}
+
+QString LinkManager::getIpAddress(const QString &host)
+{
+    const QHostAddress direct(host);
+    if (!direct.isNull()) {
+        return host;
+    }
+
+    const QHostInfo info = QHostInfo::fromName(host);
+    if (info.error() != QHostInfo::NoError) {
+        return QString();
+    }
+
+    const QList<QHostAddress> addresses = info.addresses();
+    for (const QHostAddress &addr : addresses) {
+        if (addr.protocol() == QAbstractSocket::NetworkLayerProtocol::IPv4Protocol) {
+            return addr.toString();
+        }
+    }
+
+    return QString();
 }
 
 bool LinkManager::containsLink(const LinkInterface *link) const

@@ -19,8 +19,17 @@ import QGroundControl.Palette
 ColumnLayout {
     spacing: _rowSpacing
 
+    property var _linkManager: QGroundControl.linkManager
+    property string selectedEntry: ""
+
     function saveSettings() {
-        // No need
+        if (selectedEntry !== "") {
+            const parts = selectedEntry.split(":")
+            const ip = _linkManager.getIpAddress(parts[0])
+            if (ip !== "") {
+                hostField.text = ip + ":" + parts[1]
+            }
+        }
     }
 
     QGCLabel {
@@ -53,14 +62,30 @@ ColumnLayout {
         delegate: RowLayout {
             spacing: _colSpacing
 
-            QGCLabel {
-                Layout.preferredWidth:  _secondColumnWidth
-                text:                   modelData
+            QGCButton {
+                text: modelData
+                onClicked: {
+                    selectedEntry = modelData
+                    const parts = modelData.split(":")
+                    const hostname = parts[0]
+                    const port = parseInt(parts[1])
+                    const resolved = _linkManager.getIpAddress(hostname)
+                    if (resolved !== "") {
+                        hostField.text = resolved + ":" + port
+                    } else {
+                        hostField.text = hostname + ":" + port
+                    }
+                }
             }
 
             QGCButton {
-                text:       qsTr("Remove")
-                onClicked:  subEditConfig.removeHost(modelData)
+                text: qsTr("Remove")
+                onClicked: {
+                    subEditConfig.removeHost(modelData)
+                    if (selectedEntry === modelData) {
+                        selectedEntry = ""
+                    }
+                }
             }
         }
     }
