@@ -4,7 +4,7 @@ QGC有一套标准的字体和调色板，应该由所有用户界面使用。
 
 ```
 import QGroundControl.Palette       1.0
-import QGroundControl.ScreenTools   1.0
+   1.0
 ```
 
 ## QGCPalette(QGC调色板)

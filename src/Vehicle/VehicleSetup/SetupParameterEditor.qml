@@ -12,7 +12,7 @@ import QtQuick
 import QtQuick.Controls
 
 import QGroundControl.Controls
-import QGroundControl.ScreenTools
+
 
 
 ParameterEditor {

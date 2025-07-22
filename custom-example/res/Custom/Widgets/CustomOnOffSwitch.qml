@@ -12,7 +12,7 @@
 import QtQuick
 
 
-import QGroundControl.ScreenTools
+
 import QGroundControl.Controls
 
 Rectangle {

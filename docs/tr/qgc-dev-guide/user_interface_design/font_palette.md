@@ -4,7 +4,7 @@ QGC has a standard set of fonts and color palette which should be used by all us
 
 ```
 import QGroundControl.Palette 		1.0
-import QGroundControl.ScreenTools 	1.0
+ 	1.0
 ```
 
 ## QGCPalette
