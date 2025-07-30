@@ -3,7 +3,7 @@ import QtQuick.Controls
 
 import QGroundControl
 
-import QGroundControl.ScreenTools
+
 
 /// File Button controls used by QGCFileDialog control
 Rectangle {

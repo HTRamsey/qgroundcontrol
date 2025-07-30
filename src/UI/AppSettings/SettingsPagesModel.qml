@@ -10,7 +10,7 @@
 import QtQml.Models
 
 import QGroundControl
-import QGroundControl.ScreenTools
+
 
 ListModel {
     ListElement {

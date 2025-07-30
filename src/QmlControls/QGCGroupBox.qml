@@ -12,7 +12,7 @@ import QtQuick.Controls
 
 import QGroundControl
 
-import QGroundControl.ScreenTools
+
 
 GroupBox {
     id: control

@@ -13,7 +13,7 @@ import QtQuick.Controls
 import QtCore
 
 import QGroundControl
-import QGroundControl.ScreenTools
+
 
 Item {
     property Window window

@@ -3,7 +3,7 @@ import QtQuick.Controls
 
 import QGroundControl
 
-import QGroundControl.ScreenTools
+
 
 Item {
     property color  color:          qgcPal.text

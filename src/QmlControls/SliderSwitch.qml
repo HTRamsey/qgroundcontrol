@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 
 import QGroundControl
-import QGroundControl.ScreenTools
+
 
 
 /// The SliderSwitch control implements a sliding switch control similar to the power off
