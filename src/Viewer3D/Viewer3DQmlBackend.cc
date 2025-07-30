@@ -13,6 +13,9 @@
 #include "Vehicle.h"
 #include "Viewer3DSettings.h"
 #include "OsmParser.h"
+#include "QGCLoggingCategory.h"
+
+QGC_LOGGING_CATEGORY(Viewer3DQmlBackendLog, "qgc.viewer3d.viewer3dqmlbackend")
 
 Viewer3DQmlBackend::Viewer3DQmlBackend(QObject *parent)
     : QObject{parent}

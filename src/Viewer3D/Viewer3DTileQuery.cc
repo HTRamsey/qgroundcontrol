@@ -9,6 +9,8 @@
 
 #include "Viewer3DTileQuery.h"
 
+#include "QGCLoggingCategory.h"
+
 #define MAX_TILE_COUNTS     200
 #define MAX_ZOOM_LEVEL      23
 #define MAX_LATITUDE       85.05112878
@@ -19,6 +21,8 @@ enum RequestStat{
     FINISHED,
     ERROR,
 };
+
+QGC_LOGGING_CATEGORY(MapTileQueryLog, "qgc.viewer3d.maptilequery")
 
 MapTileQuery::MapTileQuery(QObject *parent)
     : QObject{parent}

@@ -14,7 +14,9 @@
 #include "QGCMapUrlEngine.h"
 #include "FlightMapSettings.h"
 #include "OsmParser.h"
+#include "QGCLoggingCategory.h"
 
+QGC_LOGGING_CATEGORY(Viewer3DTerrainTextureLog, "qgc.viewer3d.viewer3dterraintexture")
 
 Viewer3DTerrainTexture::Viewer3DTerrainTexture()
 {

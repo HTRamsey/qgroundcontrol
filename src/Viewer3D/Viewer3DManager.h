@@ -9,10 +9,11 @@
 
 #pragma once
 
+#include <QtCore/QLoggingCategory>
 #include <QtCore/QObject>
 #include <QtQmlIntegration/QtQmlIntegration>
 
-///     @author Omid Esrafilian <esrafilian.omid@gmail.com>
+Q_DECLARE_LOGGING_CATEGORY(Viewer3DManagerLog)
 
 class SettingsManager;
 class OsmParser;

@@ -7,23 +7,15 @@
  *
  ****************************************************************************/
 
-#include "Viewer3DManager.h"
-#include "OsmParser.h"
-#include "Viewer3DQmlBackend.h"
+#include "GeoCoordinateType.h"
 #include "QGCLoggingCategory.h"
 
-QGC_LOGGING_CATEGORY(Viewer3DManagerLog, "qgc.viewer3d.viewer3dqmlbackend")
+QGC_LOGGING_CATEGORY(GeoCoordinateTypeLog, "qgc.viewer3d.geocoordinatetype")
 
-Viewer3DManager::Viewer3DManager()
+GeoCoordinateType::GeoCoordinateType()
 {
-    _qmlBackend  = new Viewer3DQmlBackend(this);
-    _osmParser = new OsmParser();
-
-    _qmlBackend->init(_osmParser);
 }
 
-Viewer3DManager::~Viewer3DManager()
+GeoCoordinateType::~GeoCoordinateType()
 {
-    delete _osmParser;
-    delete _qmlBackend;
 }

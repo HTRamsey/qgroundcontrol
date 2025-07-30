@@ -1,3 +1,5 @@
+# Author Omid Esrafilian <esrafilian.omid@gmail.com>
+
 if(NOT QGC_VIEWER3D)
     return()
 endif()

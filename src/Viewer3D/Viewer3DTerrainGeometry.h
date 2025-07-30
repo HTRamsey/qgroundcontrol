@@ -9,15 +9,16 @@
 
 #pragma once
 
+#include <QtCore/QLoggingCategory>
 #include <QtQuick3D/QQuick3DGeometry>
 #include <QtPositioning/QGeoCoordinate>
 #include <QtGui/QVector3D>
 #include <QtGui/QVector2D>
 #include <QtQmlIntegration/QtQmlIntegration>
 
-class Viewer3DSettings;
+Q_DECLARE_LOGGING_CATEGORY(Viewer3DTerrainGeometryLog)
 
-///     @author Omid Esrafilian <esrafilian.omid@gmail.com>
+class Viewer3DSettings;
 
 class Viewer3DTerrainGeometry : public QQuick3DGeometry
 {

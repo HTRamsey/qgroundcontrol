@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include <QtCore/QLoggingCategory>
 #include <QtCore/QObject>
 #include <QtGui/QVector3D>
 #include <QtGui/QVector2D>
@@ -16,7 +17,7 @@
 #include <QtCore/QVariant>
 #include <QtQmlIntegration/QtQmlIntegration>
 
-///     @author Omid Esrafilian <esrafilian.omid@gmail.com>
+Q_DECLARE_LOGGING_CATEGORY(OsmParserLog)
 
 class Viewer3DSettings;
 class OsmParserThread;

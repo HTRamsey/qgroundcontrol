@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include <QtCore/QLoggingCategory>
 #include <QtQuick3D/QQuick3DTextureData>
 #include <QtQmlIntegration/QtQmlIntegration>
 
@@ -17,8 +18,7 @@
 class FlightMapSettings;
 class OsmParser;
 
-///     @author Omid Esrafilian <esrafilian.omid@gmail.com>
-
+Q_DECLARE_LOGGING_CATEGORY(Viewer3DTerrainTextureLog)
 
 class Viewer3DTerrainTexture : public QQuick3DTextureData
 {

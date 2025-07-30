@@ -10,6 +10,7 @@
 #pragma once
 
 #include <QtGui/QPixmap>
+#include <QtCore/QLoggingCategory>
 #include <QtCore/QObject>
 #include <QtGui/QImage>
 #include <QtGui/QPainter>
@@ -18,9 +19,7 @@
 
 #include "Viewer3DTileReply.h"
 
-
-///     @author Omid Esrafilian <esrafilian.omid@gmail.com>
-
+Q_DECLARE_LOGGING_CATEGORY(MapTileQueryLog)
 
 class MapTileQuery : public QObject
 {

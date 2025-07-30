@@ -9,8 +9,11 @@
 
 #include "OsmParserThread.h"
 #include "QGCGeo.h"
+#include "QGCLoggingCategory.h"
 
 #include <QtCore/QFile>
+
+QGC_LOGGING_CATEGORY(OsmParserThreadLog, "qgc.viewer3d.osmparserthread")
 
 OsmParserThread::OsmParserThread(QObject *parent)
     : QThread{parent}

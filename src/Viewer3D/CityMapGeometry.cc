@@ -11,6 +11,9 @@
 #include "SettingsManager.h"
 #include "Viewer3DSettings.h"
 #include "OsmParser.h"
+#include "QGCLoggingCategory.h"
+
+QGC_LOGGING_CATEGORY(CityMapGeometryLog, "qgc.viewer3d.citymapgeometry")
 
 CityMapGeometry::CityMapGeometry()
 {

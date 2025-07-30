@@ -11,11 +11,14 @@
 #include "SettingsManager.h"
 #include "Viewer3DSettings.h"
 #include "QGCGeo.h"
+#include "QGCLoggingCategory.h"
 
 #include "math.h"
 
 #define MaxLatitude 85.05112878
 #define EarthRadius 6378137
+
+QGC_LOGGING_CATEGORY(Viewer3DTerrainGeometryLog, "qgc.viewer3d.viewer3dterraingeometry")
 
 Viewer3DTerrainGeometry::Viewer3DTerrainGeometry()
 {

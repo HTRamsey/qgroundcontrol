@@ -9,11 +9,12 @@
 
 #pragma once
 
+#include <QtCore/QLoggingCategory>
 #include <QtCore/QObject>
 #include <QtPositioning/QGeoCoordinate>
 #include <QtQmlIntegration/QtQmlIntegration>
 
-///     @author Omid Esrafilian <esrafilian.omid@gmail.com>
+Q_DECLARE_LOGGING_CATEGORY(Viewer3DQmlBackendLog)
 
 class Viewer3DSettings;
 class Vehicle;

@@ -9,13 +9,14 @@
 
 #pragma once
 
+#include <QtCore/QLoggingCategory>
 #include <QtCore/QObject>
 #include <QtPositioning/QGeoCoordinate>
 #include <QtQmlIntegration/QtQmlIntegration>
 
 #include "QGCGeo.h"
 
-///     @author Omid Esrafilian <esrafilian.omid@gmail.com>
+Q_DECLARE_LOGGING_CATEGORY(GeoCoordinateTypeLog)
 
 class GeoCoordinateType: public QObject
 {

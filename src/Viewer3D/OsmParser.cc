@@ -11,7 +11,10 @@
 #include "SettingsManager.h"
 #include "Viewer3DSettings.h"
 #include "OsmParserThread.h"
+#include "QGCLoggingCategory.h"
 #include "earcut.hpp"
+
+QGC_LOGGING_CATEGORY(OsmParserThreadLog, "qgc.viewer3d.osmparser")
 
 typedef union {
     uint array[3];

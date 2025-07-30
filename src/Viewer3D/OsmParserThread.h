@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include <QtCore/QLoggingCategory>
 #include <QtCore/QObject>
 #include <QtCore/QThread>
 #include <QtXml/QDomDocument>
@@ -17,8 +18,7 @@
 #include <QtGui/QVector2D>
 #include <QtPositioning/QGeoCoordinate>
 
-///     @author Omid Esrafilian <esrafilian.omid@gmail.com>
-
+Q_DECLARE_LOGGING_CATEGORY(OsmParserThreadLog)
 
 class OsmParserThread : public QThread
 {
