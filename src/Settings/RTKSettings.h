@@ -18,9 +18,12 @@ class RTKSettings : public SettingsGroup
     Q_OBJECT
     QML_ELEMENT
     QML_UNCREATABLE("")
+
 public:
-    RTKSettings(QObject* parent = nullptr);
+    explicit RTKSettings(QObject *parent = nullptr);
+
     DEFINE_SETTING_NAME_GROUP()
+
     DEFINE_SETTINGFACT(surveyInAccuracyLimit)
     DEFINE_SETTINGFACT(surveyInMinObservationDuration)
     DEFINE_SETTINGFACT(useFixedBasePosition)

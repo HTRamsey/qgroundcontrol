@@ -17,8 +17,9 @@ class FirmwareUpgradeSettings : public SettingsGroup
     Q_OBJECT
     QML_ELEMENT
     QML_UNCREATABLE("")
+
 public:
-    FirmwareUpgradeSettings(QObject* parent = nullptr);
+    explicit FirmwareUpgradeSettings(QObject *parent = nullptr);
 
     DEFINE_SETTING_NAME_GROUP()
 

@@ -11,6 +11,7 @@
 
 DECLARE_SETTINGGROUP(RTK, "RTK")
 {
+
 }
 
 DECLARE_SETTINGSFACT(RTKSettings, surveyInAccuracyLimit)

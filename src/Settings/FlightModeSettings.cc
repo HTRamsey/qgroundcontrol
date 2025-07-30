@@ -11,6 +11,7 @@
 
 DECLARE_SETTINGGROUP(FlightMode, "FlightMode")
 {
+
 }
 
 DECLARE_SETTINGSFACT(FlightModeSettings, px4HiddenFlightModesMultiRotor)

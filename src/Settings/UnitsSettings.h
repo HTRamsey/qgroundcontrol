@@ -18,18 +18,23 @@ class UnitsSettings : public SettingsGroup
     Q_OBJECT
     QML_ELEMENT
     QML_UNCREATABLE("")
+
 public:
-    UnitsSettings(QObject* parent = nullptr);
+    explicit UnitsSettings(QObject* parent = nullptr);
+
+    DEFINE_SETTING_NAME_GROUP()
 
     enum HorizontalDistanceUnits {
         HorizontalDistanceUnitsFeet = 0,
         HorizontalDistanceUnitsMeters
     };
+    Q_ENUM(HorizontalDistanceUnits)
 
     enum VerticalDistanceUnits {
         VerticalDistanceUnitsFeet = 0,
         VerticalDistanceUnitsMeters
     };
+    Q_ENUM(VerticalDistanceUnits)
 
     enum AreaUnits {
         AreaUnitsSquareFeet = 0,
@@ -39,6 +44,7 @@ public:
         AreaUnitsAcres,
         AreaUnitsSquareMiles,
     };
+    Q_ENUM(AreaUnits)
 
     enum SpeedUnits {
         SpeedUnitsFeetPerSecond = 0,
@@ -47,11 +53,13 @@ public:
         SpeedUnitsKilometersPerHour,
         SpeedUnitsKnots,
     };
+    Q_ENUM(SpeedUnits)
 
     enum TemperatureUnits {
         TemperatureUnitsCelsius = 0,
         TemperatureUnitsFarenheit,
     };
+    Q_ENUM(TemperatureUnits)
 
     enum WeightUnits {
         WeightUnitsGrams = 0,
@@ -59,15 +67,8 @@ public:
         WeightUnitsOz,
         WeightUnitsLbs
     };
-
-    Q_ENUM(HorizontalDistanceUnits)
-    Q_ENUM(VerticalDistanceUnits)
-    Q_ENUM(AreaUnits)
-    Q_ENUM(SpeedUnits)
-    Q_ENUM(TemperatureUnits)
     Q_ENUM(WeightUnits)
 
-    DEFINE_SETTING_NAME_GROUP()
 
     DEFINE_SETTINGFACT(horizontalDistanceUnits)
     DEFINE_SETTINGFACT(verticalDistanceUnits)

@@ -18,13 +18,13 @@ class OfflineMapsSettings : public SettingsGroup
     Q_OBJECT
     QML_ELEMENT
     QML_UNCREATABLE("")
+
 public:
-    OfflineMapsSettings(QObject* parent = nullptr);
+    explicit OfflineMapsSettings(QObject *parent = nullptr);
 
     DEFINE_SETTING_NAME_GROUP()
+
     DEFINE_SETTINGFACT(minZoomLevelDownload)
     DEFINE_SETTINGFACT(maxZoomLevelDownload)
     DEFINE_SETTINGFACT(maxTilesForDownload)
-
-private:
 };

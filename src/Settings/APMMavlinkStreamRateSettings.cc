@@ -13,13 +13,13 @@
 
 DECLARE_SETTINGGROUP(APMMavlinkStreamRate, "APMMavlinkStreamRate")
 {
-    connect(streamRateRawSensors(),     &Fact::rawValueChanged, this, &APMMavlinkStreamRateSettings::_updateStreamRateRawSensors);
-    connect(streamRateExtendedStatus(), &Fact::rawValueChanged, this, &APMMavlinkStreamRateSettings::_updateStreamRateExtendedStatus);
-    connect(streamRateRCChannels(),     &Fact::rawValueChanged, this, &APMMavlinkStreamRateSettings::_updateStreamRateRCChannels);
-    connect(streamRatePosition(),       &Fact::rawValueChanged, this, &APMMavlinkStreamRateSettings::_updateStreamRatePosition);
-    connect(streamRateExtra1(),         &Fact::rawValueChanged, this, &APMMavlinkStreamRateSettings::_updateStreamRateExtra1);
-    connect(streamRateExtra2(),         &Fact::rawValueChanged, this, &APMMavlinkStreamRateSettings::_updateStreamRateExtra2);
-    connect(streamRateExtra3(),         &Fact::rawValueChanged, this, &APMMavlinkStreamRateSettings::_updateStreamRateExtra3);
+    (void) connect(streamRateRawSensors(), &Fact::rawValueChanged, this, &APMMavlinkStreamRateSettings::_updateStreamRateRawSensors);
+    (void) connect(streamRateExtendedStatus(), &Fact::rawValueChanged, this, &APMMavlinkStreamRateSettings::_updateStreamRateExtendedStatus);
+    (void) connect(streamRateRCChannels(), &Fact::rawValueChanged, this, &APMMavlinkStreamRateSettings::_updateStreamRateRCChannels);
+    (void) connect(streamRatePosition(), &Fact::rawValueChanged, this, &APMMavlinkStreamRateSettings::_updateStreamRatePosition);
+    (void) connect(streamRateExtra1(), &Fact::rawValueChanged, this, &APMMavlinkStreamRateSettings::_updateStreamRateExtra1);
+    (void) connect(streamRateExtra2(), &Fact::rawValueChanged, this, &APMMavlinkStreamRateSettings::_updateStreamRateExtra2);
+    (void) connect(streamRateExtra3(), &Fact::rawValueChanged, this, &APMMavlinkStreamRateSettings::_updateStreamRateExtra3);
 }
 
 DECLARE_SETTINGSFACT(APMMavlinkStreamRateSettings, streamRateRawSensors)
@@ -30,49 +30,15 @@ DECLARE_SETTINGSFACT(APMMavlinkStreamRateSettings, streamRateExtra1)
 DECLARE_SETTINGSFACT(APMMavlinkStreamRateSettings, streamRateExtra2)
 DECLARE_SETTINGSFACT(APMMavlinkStreamRateSettings, streamRateExtra3)
 
-void APMMavlinkStreamRateSettings::_updateStreamRateWorker(MAV_DATA_STREAM mavStream, QVariant rateVar)
+void APMMavlinkStreamRateSettings::_updateStreamRateWorker(MAV_DATA_STREAM mavStream, const QVariant &rateVar)
 {
-    Vehicle* activeVehicle = MultiVehicleManager::instance()->activeVehicle();
+    Vehicle *activeVehicle = MultiVehicleManager::instance()->activeVehicle();
 
     if (activeVehicle) {
-        int streamRate = rateVar.toInt();
-        if (streamRate >= 0) {
+        bool valid;
+        const int streamRate = rateVar.toInt(&valid);
+        if (valid && (streamRate >= 0)) {
             activeVehicle->requestDataStream(mavStream, static_cast<uint16_t>(streamRate));
         }
     }
-}
-
-void APMMavlinkStreamRateSettings::_updateStreamRateRawSensors(QVariant value)
-{
-    _updateStreamRateWorker(MAV_DATA_STREAM_RAW_SENSORS, value);
-}
-
-void APMMavlinkStreamRateSettings::_updateStreamRateExtendedStatus(QVariant value)
-{
-    _updateStreamRateWorker(MAV_DATA_STREAM_EXTENDED_STATUS, value);
-}
-
-void APMMavlinkStreamRateSettings::_updateStreamRateRCChannels(QVariant value)
-{
-    _updateStreamRateWorker(MAV_DATA_STREAM_RC_CHANNELS, value);
-}
-
-void APMMavlinkStreamRateSettings::_updateStreamRatePosition(QVariant value)
-{
-    _updateStreamRateWorker(MAV_DATA_STREAM_POSITION, value);
-}
-
-void APMMavlinkStreamRateSettings::_updateStreamRateExtra1(QVariant value)
-{
-    _updateStreamRateWorker(MAV_DATA_STREAM_EXTRA1, value);
-}
-
-void APMMavlinkStreamRateSettings::_updateStreamRateExtra2(QVariant value)
-{
-    _updateStreamRateWorker(MAV_DATA_STREAM_EXTRA2, value);
-}
-
-void APMMavlinkStreamRateSettings::_updateStreamRateExtra3(QVariant value)
-{
-    _updateStreamRateWorker(MAV_DATA_STREAM_EXTRA3, value);
 }

@@ -11,6 +11,7 @@
 
 DECLARE_SETTINGGROUP(GimbalController, "GimbalController")
 {
+
 }
 
 DECLARE_SETTINGSFACT(GimbalControllerSettings, EnableOnScreenControl)

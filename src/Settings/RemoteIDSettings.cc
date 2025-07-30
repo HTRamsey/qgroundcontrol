@@ -11,6 +11,7 @@
 
 DECLARE_SETTINGGROUP(RemoteID, "RemoteID")
 {
+
 }
 
 DECLARE_SETTINGSFACT(RemoteIDSettings,  operatorID)

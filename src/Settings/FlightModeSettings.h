@@ -18,10 +18,12 @@ class FlightModeSettings : public SettingsGroup
     Q_OBJECT
     QML_ELEMENT
     QML_UNCREATABLE("")
+
 public:
-    FlightModeSettings(QObject* parent = nullptr);
+    explicit FlightModeSettings(QObject *parent = nullptr);
 
     DEFINE_SETTING_NAME_GROUP()
+
     DEFINE_SETTINGFACT(px4HiddenFlightModesMultiRotor)
     DEFINE_SETTINGFACT(px4HiddenFlightModesFixedWing)
     DEFINE_SETTINGFACT(px4HiddenFlightModesVTOL)

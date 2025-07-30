@@ -11,6 +11,7 @@
 
 DECLARE_SETTINGGROUP(FlightMap, "FlightMap")
 {
+
 }
 
 DECLARE_SETTINGSFACT(FlightMapSettings, mapProvider)

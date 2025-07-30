@@ -24,7 +24,7 @@
 // Release languages are 90%+ complete
 QList<QLocale::Language> AppSettings::_rgReleaseLanguages = {
     QLocale::English,
-    QLocale::Azerbaijani,    
+    QLocale::Azerbaijani,
     QLocale::Chinese,
     QLocale::Japanese,
     QLocale::Korean,
@@ -226,7 +226,7 @@ void AppSettings::_qLocaleLanguageChanged()
     qgcApp()->setLanguage();
 }
 
-void AppSettings::_checkSavePathDirectories(void)
+void AppSettings::_checkSavePathDirectories()
 {
     QDir savePathDir(savePath()->rawValue().toString());
     if (!savePathDir.exists()) {
@@ -244,12 +244,12 @@ void AppSettings::_checkSavePathDirectories(void)
     }
 }
 
-void AppSettings::_indoorPaletteChanged(void)
+void AppSettings::_indoorPaletteChanged()
 {
     QGCPalette::setGlobalTheme(indoorPalette()->rawValue().toBool() ? QGCPalette::Dark : QGCPalette::Light);
 }
 
-QString AppSettings::missionSavePath(void)
+QString AppSettings::missionSavePath()
 {
     QString path = savePath()->rawValue().toString();
     if (!path.isEmpty() && QDir(path).exists()) {
@@ -259,7 +259,7 @@ QString AppSettings::missionSavePath(void)
     return QString();
 }
 
-QString AppSettings::parameterSavePath(void)
+QString AppSettings::parameterSavePath()
 {
     QString path = savePath()->rawValue().toString();
     if (!path.isEmpty() && QDir(path).exists()) {
@@ -269,7 +269,7 @@ QString AppSettings::parameterSavePath(void)
     return QString();
 }
 
-QString AppSettings::telemetrySavePath(void)
+QString AppSettings::telemetrySavePath()
 {
     QString path = savePath()->rawValue().toString();
     if (!path.isEmpty() && QDir(path).exists()) {
@@ -279,7 +279,7 @@ QString AppSettings::telemetrySavePath(void)
     return QString();
 }
 
-QString AppSettings::logSavePath(void)
+QString AppSettings::logSavePath()
 {
     QString path = savePath()->rawValue().toString();
     if (!path.isEmpty() && QDir(path).exists()) {
@@ -289,7 +289,7 @@ QString AppSettings::logSavePath(void)
     return QString();
 }
 
-QString AppSettings::videoSavePath(void)
+QString AppSettings::videoSavePath()
 {
     QString path = savePath()->rawValue().toString();
     if (!path.isEmpty() && QDir(path).exists()) {
@@ -299,7 +299,7 @@ QString AppSettings::videoSavePath(void)
     return QString();
 }
 
-QString AppSettings::photoSavePath(void)
+QString AppSettings::photoSavePath()
 {
     QString path = savePath()->rawValue().toString();
     if (!path.isEmpty() && QDir(path).exists()) {
@@ -309,7 +309,7 @@ QString AppSettings::photoSavePath(void)
     return QString();
 }
 
-QString AppSettings::crashSavePath(void)
+QString AppSettings::crashSavePath()
 {
     QString path = savePath()->rawValue().toString();
     if (!path.isEmpty() && QDir(path).exists()) {
@@ -319,7 +319,7 @@ QString AppSettings::crashSavePath(void)
     return QString();
 }
 
-QString AppSettings::mavlinkActionsSavePath(void)
+QString AppSettings::mavlinkActionsSavePath()
 {
     QString path = savePath()->rawValue().toString();
     if (!path.isEmpty() && QDir(path).exists()) {
@@ -329,7 +329,7 @@ QString AppSettings::mavlinkActionsSavePath(void)
     return QString();
 }
 
-QList<int> AppSettings::firstRunPromptsIdsVariantToList(const QVariant& firstRunPromptIds)
+QList<int> AppSettings::firstRunPromptsIdsVariantToList(const QVariant &firstRunPromptIds)
 {
     QList<int> rgIds;
 
@@ -341,7 +341,7 @@ QList<int> AppSettings::firstRunPromptsIdsVariantToList(const QVariant& firstRun
     return rgIds;
 }
 
-QVariant AppSettings::firstRunPromptsIdsListToVariant(const QList<int>& rgIds)
+QVariant AppSettings::firstRunPromptsIdsListToVariant(const QList<int> &rgIds)
 {
     QStringList strList;
     for (int id: rgIds) {
@@ -359,12 +359,8 @@ void AppSettings::firstRunPromptIdsMarkIdAsShown(int id)
     }
 }
 
-/// Returns the current qLocaleLanguage setting bypassing the standard SettingsGroup path. It also validates
-/// that the value is a supported language. This should only be used by QGCApplication::setLanguage to query 
-/// the language setting as early in the boot process as possible. Specfically prior to any JSON files being 
-/// loaded such that JSON file can be translated. Also since this is a one-off mechanism custom build overrides 
-/// for language are not currently supported.
-QLocale::Language AppSettings::_qLocaleLanguageEarlyAccess(void)
+
+QLocale::Language AppSettings::_qLocaleLanguageEarlyAccess()
 {
     QSettings settings;
 

@@ -7,24 +7,21 @@
  *
  ****************************************************************************/
 
-/// @file
-/// @brief Auto connect settings
-
 #pragma once
 
 #include <QtQmlIntegration/QtQmlIntegration>
 
 #include "SettingsGroup.h"
 
-/// Auto connect settings
 /// Defines which links should be automatically created and started at runtime
 class AutoConnectSettings : public SettingsGroup
 {
     Q_OBJECT
     QML_ELEMENT
     QML_UNCREATABLE("")
+
 public:
-    AutoConnectSettings(QObject* parent = nullptr);
+    explicit AutoConnectSettings(QObject *parent = nullptr);
 
     DEFINE_SETTING_NAME_GROUP()
 

@@ -18,21 +18,25 @@ class BatteryIndicatorSettings : public SettingsGroup
     Q_OBJECT
     QML_ELEMENT
     QML_UNCREATABLE("")
+
 public:
-    BatteryIndicatorSettings(QObject* parent = nullptr);
+    explicit BatteryIndicatorSettings(QObject *parent = nullptr);
 
     DEFINE_SETTING_NAME_GROUP()
 
-    DEFINE_SETTINGFACT(valueDisplay)            // Battery value display mode
-    DEFINE_SETTINGFACT(threshold1)              // First threshold for battery level
-    DEFINE_SETTINGFACT(threshold2)              // Second threshold for battery level
+    DEFINE_SETTINGFACT(valueDisplay)    ///< Battery value display mode
+    DEFINE_SETTINGFACT(threshold1)      ///< First threshold for battery level
+    DEFINE_SETTINGFACT(threshold2)      ///< Second threshold for battery level
 
-    Q_INVOKABLE void setThreshold1(int value);  // Set threshold1 with validation
-    Q_INVOKABLE void setThreshold2(int value);  // Set threshold2 with validation
+    /// Set threshold1 with validation
+    Q_INVOKABLE void setThreshold1(int value);
+
+    /// Set threshold2 with validation
+    Q_INVOKABLE void setThreshold2(int value);
 
 private:
-    void validateThreshold1();
-    void validateThreshold2(); 
+    void _validateThreshold1();
+    void _validateThreshold2();
     void _threshold1Changed();
     void _threshold2Changed();
 };

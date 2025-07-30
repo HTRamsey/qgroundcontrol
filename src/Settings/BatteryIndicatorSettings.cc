@@ -13,6 +13,7 @@
 
 DECLARE_SETTINGGROUP(BatteryIndicator, "BatteryIndicator")
 {
+
 }
 
 DECLARE_SETTINGSFACT(BatteryIndicatorSettings, valueDisplay)

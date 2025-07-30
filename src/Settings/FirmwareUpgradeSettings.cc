@@ -11,6 +11,7 @@
 
 DECLARE_SETTINGGROUP(FirmwareUpgrade, "FirmwareUpgrade")
 {
+
 }
 
 DECLARE_SETTINGSFACT(FirmwareUpgradeSettings, defaultFirmwareType)

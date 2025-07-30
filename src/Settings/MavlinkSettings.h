@@ -13,14 +13,14 @@
 
 #include "SettingsGroup.h"
 
-/// Application Settings
 class MavlinkSettings : public SettingsGroup
 {
     Q_OBJECT
     QML_ELEMENT
     QML_UNCREATABLE("")
+
 public:
-    MavlinkSettings(QObject* parent = nullptr);
+    explicit MavlinkSettings(QObject *parent = nullptr);
 
     DEFINE_SETTING_NAME_GROUP()
 
@@ -35,7 +35,7 @@ public:
     DEFINE_SETTINGFACT(gcsMavlinkSystemID)
     DEFINE_SETTINGFACT(requireMatchingMavlinkVersions)
 
-    // Although this is a global setting it only affects ArduPilot vehicle since PX4 automatically starts the stream from the vehicle side
+    /// Although this is a global setting it only affects ArduPilot vehicle since PX4 automatically starts the stream from the vehicle side
     DEFINE_SETTINGFACT(apmStartMavlinkStreams)
 
 private slots:

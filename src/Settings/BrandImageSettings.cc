@@ -11,6 +11,7 @@
 
 DECLARE_SETTINGGROUP(BrandImage, "Branding")
 {
+
 }
 
 DECLARE_SETTINGSFACT(BrandImageSettings, userBrandImageIndoor)

@@ -26,13 +26,13 @@ DECLARE_SETTINGGROUP(Maps, "Maps")
         uint32_t maxDiskCache = deprecatedSettings.value(kMaxDiskCacheKey, 1024).toUInt();
         deprecatedSettings.remove(kMaxDiskCacheKey);
         newSettings.setValue("maxCacheDiskSize", maxDiskCache);
-   }
+    }
+
     if (deprecatedSettings.contains(kMaxMemCacheKey)) {
         uint32_t maxMemCache = deprecatedSettings.value(kMaxMemCacheKey, 1024).toUInt();
         deprecatedSettings.remove(kMaxMemCacheKey);
         newSettings.setValue("maxCacheMemorySize", maxMemCache);
     }
- 
 }
 
 DECLARE_SETTINGSFACT(MapsSettings, maxCacheDiskSize)

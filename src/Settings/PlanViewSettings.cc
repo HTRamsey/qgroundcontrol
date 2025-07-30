@@ -11,6 +11,7 @@
 
 DECLARE_SETTINGGROUP(PlanView, "PlanView")
 {
+
 }
 
 DECLARE_SETTINGSFACT(PlanViewSettings, displayPresetsTabFirst)

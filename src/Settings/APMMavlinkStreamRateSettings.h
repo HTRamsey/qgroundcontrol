@@ -18,8 +18,9 @@ class APMMavlinkStreamRateSettings : public SettingsGroup
     Q_OBJECT
     QML_ELEMENT
     QML_UNCREATABLE("")
+
 public:
-    APMMavlinkStreamRateSettings(QObject* parent = nullptr);
+    explicit APMMavlinkStreamRateSettings(QObject *parent = nullptr);
 
     DEFINE_SETTING_NAME_GROUP()
 
@@ -32,14 +33,14 @@ public:
     DEFINE_SETTINGFACT(streamRateExtra3)
 
 private slots:
-    void _updateStreamRateRawSensors    (QVariant value);
-    void _updateStreamRateExtendedStatus(QVariant value);
-    void _updateStreamRateRCChannels    (QVariant value);
-    void _updateStreamRatePosition      (QVariant value);
-    void _updateStreamRateExtra1        (QVariant value);
-    void _updateStreamRateExtra2        (QVariant value);
-    void _updateStreamRateExtra3        (QVariant value);
+    void _updateStreamRateRawSensors(const QVariant &value) { _updateStreamRateWorker(MAV_DATA_STREAM_RAW_SENSORS, value); }
+    void _updateStreamRateExtendedStatus(const QVariant &value) { _updateStreamRateWorker(MAV_DATA_STREAM_EXTENDED_STATUS, value); }
+    void _updateStreamRateRCChannels(const QVariant &value) { _updateStreamRateWorker(MAV_DATA_STREAM_RC_CHANNELS, value); }
+    void _updateStreamRatePosition(const QVariant &value) { _updateStreamRateWorker(MAV_DATA_STREAM_POSITION, value); }
+    void _updateStreamRateExtra1(const QVariant &value) { _updateStreamRateWorker(MAV_DATA_STREAM_EXTRA1, value); }
+    void _updateStreamRateExtra2(const QVariant &value) { _updateStreamRateWorker(MAV_DATA_STREAM_EXTRA2, value); }
+    void _updateStreamRateExtra3(const QVariant &value) { _updateStreamRateWorker(MAV_DATA_STREAM_EXTRA3, value); }
 
 private:
-    void _updateStreamRateWorker(MAV_DATA_STREAM mavStream, QVariant rateVar);
+    void _updateStreamRateWorker(MAV_DATA_STREAM mavStream, const QVariant &rateVar);
 };

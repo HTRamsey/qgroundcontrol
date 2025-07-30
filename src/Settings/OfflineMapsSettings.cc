@@ -11,6 +11,7 @@
 
 DECLARE_SETTINGGROUP(OfflineMaps, "OfflineMaps")
 {
+
 }
 
 DECLARE_SETTINGSFACT(OfflineMapsSettings, minZoomLevelDownload)

@@ -11,6 +11,7 @@
 
 DECLARE_SETTINGGROUP(FlyView, "FlyView")
 {
+
 }
 
 DECLARE_SETTINGSFACT(FlyViewSettings, guidedMinimumAltitude)
