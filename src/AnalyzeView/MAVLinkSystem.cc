@@ -10,6 +10,7 @@
 #include "MAVLinkSystem.h"
 #include "MAVLinkMessage.h"
 #include "QGCLoggingCategory.h"
+#include "QmlObjectListModel.h"
 
 QGC_LOGGING_CATEGORY(MAVLinkSystemLog, "qgc.analyzeview.mavlinksystem")
 
@@ -18,18 +19,20 @@ QGCMAVLinkSystem::QGCMAVLinkSystem(quint8 id, QObject *parent)
     , _id(id)
     , _messages(new QmlObjectListModel(this))
 {
-    qCDebug(MAVLinkSystemLog) << "New Vehicle:" << id;
+    qCDebug(MAVLinkSystemLog) << this << "New Vehicle:" << id;
 }
 
 QGCMAVLinkSystem::~QGCMAVLinkSystem()
 {
     _messages->clearAndDeleteContents();
+
+    qCDebug(MAVLinkSystemLog) << this << "Removed Vehicle:" << id;
 }
 
 QGCMAVLinkMessage *QGCMAVLinkSystem::findMessage(uint32_t id, uint8_t compId)
 {
     for (int i = 0; i < _messages->count(); i++) {
-        QGCMAVLinkMessage *const msg = qobject_cast<QGCMAVLinkMessage*>(_messages->get(i));
+        QGCMAVLinkMessage *msg = qobject_cast<QGCMAVLinkMessage*>(_messages->get(i));
         if(msg) {
             if((msg->id() == id) && (msg->compId() == compId)) {
                 return msg;

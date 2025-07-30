@@ -127,6 +127,7 @@ find_package(Qt6
         Concurrent
         Core
         Core5Compat
+        Graphs
         Gui
         LinguistTools
         Location

@@ -96,7 +96,6 @@ qt_add_qml_module(QGroundControlControlsModule
         LabelledLabel.qml
         LogReplayStatusBar.qml
         MainWindowSavedState.qml
-        MAVLinkChart.qml
         MAVLinkMessageButton.qml
         MissionCommandDialog.qml
         MissionItemIndexLabel.qml

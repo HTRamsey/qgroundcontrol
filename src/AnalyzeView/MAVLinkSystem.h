@@ -14,49 +14,50 @@
 #include <QtCore/QStringList>
 #include <QtQmlIntegration/QtQmlIntegration>
 
-#include "QmlObjectListModel.h"
-
 Q_DECLARE_LOGGING_CATEGORY(MAVLinkSystemLog)
 
 class QGCMAVLinkMessage;
+class QmlObjectListModel;
 
 class QGCMAVLinkSystem : public QObject
 {
     Q_OBJECT
-    // QML_ELEMENT
-    Q_PROPERTY(quint8               id          READ id                             CONSTANT)
-    Q_PROPERTY(QmlObjectListModel   *messages   READ messages                       CONSTANT)
-    Q_PROPERTY(QList<int>           compIDs     READ compIDs                        NOTIFY compIDsChanged)
-    Q_PROPERTY(QStringList          compIDsStr  READ compIDsStr                     NOTIFY compIDsChanged)
-    Q_PROPERTY(int                  selected    READ selected   WRITE setSelected   NOTIFY selectedChanged)
+    QML_ELEMENT
+    QML_UNCREATABLE("")
+    Q_MOC_INCLUDE("QmlObjectListModel.h")
+    Q_PROPERTY(quint8               sysId       READ sysId                          CONSTANT)
+    Q_PROPERTY(QmlObjectListModel*  messages    READ messages                       CONSTANT)
+    Q_PROPERTY(QList<quint8>        compIds     READ compIds                        NOTIFY compIdsChanged)
+    Q_PROPERTY(QStringList          compIdsStr  READ compIdsStr                     NOTIFY compIdsChanged)
+    Q_PROPERTY(quint32              selected    READ selected   WRITE setSelected   NOTIFY selectedChanged)
+
 public:
-    QGCMAVLinkSystem(quint8 id, QObject *parent = nullptr);
+    explicit QGCMAVLinkSystem(quint8 sysId, QObject *parent = nullptr);
     ~QGCMAVLinkSystem();
 
-    quint8 id() const { return _id; }
+    quint8 sysId() const { return _sysId; }
     QmlObjectListModel *messages() const { return _messages; }
-    QList<int> compIDs() const { return _compIDs; }
-    QStringList compIDsStr() const { return _compIDsStr; }
-    int selected() const { return _selected; }
+    QList<quint8> compIds() const { return _compIds; }
+    QStringList compIdsStr() const { return _compIdsStr; }
+    quint32 selected() const { return _selected; }
 
-    void setSelected(int sel);
-    QGCMAVLinkMessage *findMessage(uint32_t id, uint8_t compId);
-    int findMessage(const QGCMAVLinkMessage *message);
+    void setSelected(quint32 msgId);
+    QGCMAVLinkMessage *findMessage(uint8_t sysId, uint8_t compId);
+    quint32 findMessage(const QGCMAVLinkMessage *message);
     void append(QGCMAVLinkMessage *message);
     QGCMAVLinkMessage *selectedMsg();
 
 signals:
-    void compIDsChanged();
+    void compIdsChanged();
     void selectedChanged();
 
 private:
     void _checkCompID(const QGCMAVLinkMessage *message);
     void _resetSelection();
 
-private:
-    quint8 _id = 0;
+    quint8 _sysId = 0;
     QmlObjectListModel *_messages = nullptr; ///< List of QGCMAVLinkMessage
-    QList<int> _compIDs;
-    QStringList _compIDsStr;
-    int _selected = 0;
+    QList<quint8> _compIds;
+    QStringList _compIdsStr;
+    quint32 _selected = 0;
 };

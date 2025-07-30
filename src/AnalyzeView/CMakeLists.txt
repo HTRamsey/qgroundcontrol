@@ -40,6 +40,7 @@ qt_add_qml_module(AnalyzeViewModule
         AnalyzeView.qml
         GeoTagPage.qml
         LogDownloadPage.qml
+        MAVLinkChart.qml
         MAVLinkConsolePage.qml
         MAVLinkInspectorPage.qml
         VibrationPage.qml
