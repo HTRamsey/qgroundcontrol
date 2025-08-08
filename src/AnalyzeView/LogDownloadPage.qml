@@ -1,6 +1,6 @@
 /****************************************************************************
  *
- * (c) 2009-2020 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
+ * (c) 2009-2025 QGROUNDCONTROL PROJECT <http://www.qgroundcontrol.org>
  *
  * QGroundControl is licensed according to the terms in the file
  * COPYING.md in the root of the source code directory.
@@ -14,13 +14,19 @@ import Qt.labs.qmlmodels
 
 import QGroundControl
 import QGroundControl.Controls
-
 import QGroundControl.ScreenTools
 
 AnalyzePage {
     id: logDownloadPage
+
+    // Page metadata
     pageComponent: pageComponent
     pageDescription: qsTr("Log Download allows you to download binary log files from your vehicle. Click Refresh to get list of available logs.")
+
+    // Convenience accessors / derived state
+    readonly property var  ctl: LogDownloadController
+    readonly property bool isBusy: ctl.requestingList || ctl.downloadingLogs
+    readonly property int  rowCount: ctl.model.count + 1
 
     Component {
         id: pageComponent
@@ -29,124 +35,120 @@ AnalyzePage {
             width: availableWidth
             height: availableHeight
 
+            // List/grid
             QGCFlickable {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                contentWidth: gridLayout.width
-                contentHeight: gridLayout.height
+                contentWidth: gridLayout.implicitWidth
+                contentHeight: gridLayout.implicitHeight
 
                 GridLayout {
                     id: gridLayout
-                    rows: LogDownloadController.model.count + 1
+
+                    rows: rowCount
                     columns: 5
                     flow: GridLayout.TopToBottom
                     columnSpacing: ScreenTools.defaultFontPixelWidth
                     rowSpacing: 0
 
+                    // --- Column: Select ---
                     QGCCheckBox {
                         id: headerCheckBox
                         enabled: false
                     }
-
                     Repeater {
-                        model: LogDownloadController.model
-
+                        model: ctl.model
                         QGCCheckBox {
-                            Binding on checkState {
-                                value: object.selected ? Qt.Checked : Qt.Unchecked
-                            }
-
-                            onClicked: object.selected = checked
+                            checked: object.selected
+                            onToggled: object.selected = checked
                         }
                     }
 
+                    // --- Column: Id ---
                     QGCLabel { text: qsTr("Id") }
-
                     Repeater {
-                        model: LogDownloadController.model
-
+                        model: ctl.model
                         QGCLabel { text: object.id }
                     }
 
+                    // --- Column: Date ---
                     QGCLabel { text: qsTr("Date") }
-
                     Repeater {
-                        model: LogDownloadController.model
-
+                        model: ctl.model
                         QGCLabel {
                             text: {
-                                if (!object.received) {
-                                    return ""
-                                }
-
-                                if (object.time.getUTCFullYear() < 2010) {
-                                    return qsTr("Date Unknown")
-                                }
-
-                                return object.time.toLocaleString(undefined)
+                                if (!object.received) return ""
+                                if (object.time.getUTCFullYear() < 2010) return qsTr("Date Unknown")
+                                // Default-locale short format
+                                return Qt.formatDateTime(object.time, Qt.DefaultLocaleShortDate)
                             }
                         }
                     }
 
+                    // --- Column: Size ---
                     QGCLabel { text: qsTr("Size") }
-
                     Repeater {
-                        model: LogDownloadController.model
-
+                        model: ctl.model
                         QGCLabel { text: object.sizeStr }
                     }
 
+                    // --- Column: Status ---
                     QGCLabel { text: qsTr("Status") }
-
                     Repeater {
-                        model: LogDownloadController.model
-
+                        model: ctl.model
                         QGCLabel { text: object.status }
                     }
                 }
             }
 
+            // Actions
             ColumnLayout {
                 spacing: ScreenTools.defaultFontPixelWidth
                 Layout.alignment: Qt.AlignTop
                 Layout.fillWidth: false
 
+                // Refresh
                 QGCButton {
                     Layout.fillWidth: true
-                    enabled: !LogDownloadController.requestingList && !LogDownloadController.downloadingLogs
                     text: qsTr("Refresh")
+                    enabled: !isBusy
 
                     onClicked: {
-                        if (!QGroundControl.multiVehicleManager.activeVehicle || QGroundControl.multiVehicleManager.activeVehicle.isOfflineEditingVehicle) {
-                            mainWindow.showMessageDialog(qsTr("Log Refresh"), qsTr("You must be connected to a vehicle in order to download logs."))
+                        const v = QGroundControl.multiVehicleManager.activeVehicle
+                        if (!v || v.isOfflineEditingVehicle) {
+                            mainWindow.showMessageDialog(
+                                qsTr("Log Refresh"),
+                                qsTr("You must be connected to a vehicle in order to download logs.")
+                            )
                             return
                         }
-
-                        LogDownloadController.refresh()
+                        ctl.refresh()
                     }
                 }
 
+                // Download
                 QGCButton {
                     Layout.fillWidth: true
-                    enabled: !LogDownloadController.requestingList && !LogDownloadController.downloadingLogs
                     text: qsTr("Download")
+                    enabled: !isBusy
 
                     onClicked: {
-                        var logsSelected = false
-                        for (var i = 0; i < LogDownloadController.model.count; i++) {
-                            if (LogDownloadController.model.get(i).selected) {
-                                logsSelected = true
-                                break
-                            }
+                        // any selection?
+                        let hasSelection = false
+                        for (let i = 0; i < ctl.model.count; i++) {
+                            if (ctl.model.get(i).selected) { hasSelection = true; break }
                         }
 
-                        if (!logsSelected) {
-                            mainWindow.showMessageDialog(qsTr("Log Download"), qsTr("You must select at least one log file to download."))
+                        if (!hasSelection) {
+                            mainWindow.showMessageDialog(
+                                qsTr("Log Download"),
+                                qsTr("You must select at least one log file to download.")
+                            )
                             return
                         }
 
                         if (ScreenTools.isMobile) {
-                            LogDownloadController.download()
+                            ctl.download()
                             return
                         }
 
@@ -158,30 +160,32 @@ AnalyzePage {
 
                     QGCFileDialog {
                         id: fileDialog
-                        onAcceptedForLoad: (file) => {
-                            LogDownloadController.download(file)
+                        onAcceptedForLoad: (dir) => {
+                            ctl.download(dir)
                             close()
                         }
                     }
                 }
 
+                // Erase All
                 QGCButton {
                     Layout.fillWidth: true
-                    enabled: !LogDownloadController.requestingList && !LogDownloadController.downloadingLogs && (LogDownloadController.model.count > 0)
                     text: qsTr("Erase All")
+                    enabled: !isBusy && (ctl.model.count > 0)
                     onClicked: mainWindow.showMessageDialog(
                         qsTr("Delete All Log Files"),
                         qsTr("All log files will be erased permanently. Is this really what you want?"),
                         Dialog.Yes | Dialog.No,
-                        function() { LogDownloadController.eraseAll() }
+                        function() { ctl.eraseAll() }
                     )
                 }
 
+                // Cancel
                 QGCButton {
                     Layout.fillWidth: true
                     text: qsTr("Cancel")
-                    enabled: LogDownloadController.requestingList || LogDownloadController.downloadingLogs
-                    onClicked: LogDownloadController.cancel()
+                    enabled: isBusy
+                    onClicked: ctl.cancel()
                 }
             }
         }
