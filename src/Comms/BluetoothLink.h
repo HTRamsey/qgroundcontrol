@@ -12,12 +12,7 @@
 #include <QtBluetooth/QBluetoothAddress>
 #include <QtBluetooth/QBluetoothDeviceDiscoveryAgent>
 #include <QtBluetooth/QBluetoothDeviceInfo>
-#ifdef Q_OS_IOS
-#include <QtBluetooth/QBluetoothServiceDiscoveryAgent>
-#endif
-#include <QtBluetooth/QBluetoothServiceInfo>
 #include <QtBluetooth/QBluetoothSocket>
-#include <QtBluetooth/QBluetoothUuid>
 #include <QtCore/QList>
 #include <QtCore/QLoggingCategory>
 #include <QtCore/QString>
@@ -34,13 +29,8 @@ Q_DECLARE_LOGGING_CATEGORY(BluetoothLinkLog)
 struct BluetoothData
 {
     BluetoothData() = default;
-#ifdef Q_OS_IOS
-    BluetoothData(const QString &name_, QBluetoothUuid uuid_)
-        : uuid(uuid_)
-#else
     BluetoothData(const QString &name_, QBluetoothAddress address_)
         : address(address_)
-#endif
         , name(name_)
     {}
 
@@ -51,30 +41,18 @@ struct BluetoothData
 
     bool operator==(const BluetoothData &other) const
     {
-#ifdef Q_OS_IOS
-        return ((name == other.name) && (uuid == other.uuid));
-#else
         return ((name == other.name) && (address == other.address));
-#endif
     }
 
     BluetoothData &operator=(const BluetoothData &other)
     {
         name = other.name;
-#ifdef Q_OS_IOS
-        uuid = other.uuid;
-#else
         address = other.address;
-#endif
         return *this;
     }
 
     QString name;
-#ifdef Q_OS_IOS
-    QBluetoothUuid uuid;
-#else
     QBluetoothAddress address;
-#endif
 };
 
 /*===========================================================================*/
@@ -106,11 +84,7 @@ public:
 
     BluetoothData device() const { return _device; }
     QString deviceName() const { return _device.name; }
-#ifdef Q_OS_IOS
-    QString address() const { return QString(); };
-#else
     QString address() const { return _device.address.toString(); };
-#endif
     QStringList nameList() const { return _nameList; }
     bool scanning() const;
 
@@ -164,18 +138,10 @@ private slots:
     void _onSocketReadyRead();
     void _onSocketBytesWritten(qint64 bytes);
     void _onSocketErrorOccurred(QBluetoothSocket::SocketError socketError);
-#ifdef Q_OS_IOS
-    void _onServiceErrorOccurred(QBluetoothServiceDiscoveryAgent::Error error);
-    void _serviceDiscovered(const QBluetoothServiceInfo &info);
-    void _discoveryFinished();
-#endif
 
 private:
     const BluetoothConfiguration *_config = nullptr;
     QBluetoothSocket *_socket = nullptr;
-#ifdef Q_OS_IOS
-    QBluetoothServiceDiscoveryAgent *_serviceDiscoveryAgent = nullptr;
-#endif
 };
 
 /*===========================================================================*/
