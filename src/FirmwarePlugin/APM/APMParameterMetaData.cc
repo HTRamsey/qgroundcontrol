@@ -14,8 +14,9 @@
 #include <QtCore/QRegularExpression>
 #include <QtCore/QRegularExpressionMatch>
 #include <QtCore/QStack>
+#include <QtCore/QXmlStreamReader>
 
-QGC_LOGGING_CATEGORY(APMParameterMetaDataLog, "qgc.firmwareplugin.apm.apmparametermetadata")
+QGC_LOGGING_CATEGORY(APMParameterMetaDataLog, "test.firmwareplugin.apm.apmparametermetadata")
 QGC_LOGGING_CATEGORY(APMParameterMetaDataVerboseLog, "qgc.firmwareplugin.apm.apmparametermetadata:verbose")
 
 APMParameterMetaData::APMParameterMetaData(QObject *parent)
@@ -160,7 +161,7 @@ void APMParameterMetaData::loadParameterFactMetaDataFile(const QString &metaData
     QStack<int> xmlState;
     xmlState.push(XmlStateNone);
 
-    QMap<QString,QStringList> groupMembers; //used to remove groups with single item
+    QMap<QString,QStringList> groupMembers; // used to remove groups with single item
 
     while (!xml.atEnd()) {
         if (xml.isStartElement()) {
@@ -201,7 +202,7 @@ void APMParameterMetaData::loadParameterFactMetaDataFile(const QString &metaData
                     if (nameValue.contains(parameterCategories)) {
                         xmlState.push(XmlStateFoundParameters);
                         currentCategory = nameValue;
-                    } else if(xmlState.top() == XmlStateFoundLibraries) {
+                    } else if (xmlState.top() == XmlStateFoundLibraries) {
                         // we handle all libraries section under the same category libraries
                         // so not setting currentCategory
                         xmlState.push(XmlStateFoundParameters);
@@ -325,7 +326,15 @@ bool APMParameterMetaData::_parseParameterAttributes(QXmlStreamReader &xml, APMF
 {
     QString elementName = xml.name().toString();
     QList<QPair<QString,QString>> values;
-    // as long as param doens't end
+
+    // Accept "a b", "a-b", or "a to b" with optional signs/decimals.
+    // The trailing \b.* allows inline comments like "10 20 # note" (we capture only the numbers).
+    static const QRegularExpression rangeRegex(
+        QLatin1String(R"(^\s*([+-]?\d+(?:\.\d+)?)\s*(?:to|-|\s+)\s*([+-]?\d+(?:\.\d+)?)\b.*$)"),
+        QRegularExpression::CaseInsensitiveOption
+    );
+
+    // as long as param doesn't end
     while (!((elementName == "param") && xml.isEndElement())) {
         if (elementName.isEmpty()) {
             // skip empty elements. Somehow I am getting lot of these. Don't know what to do with them.
@@ -334,62 +343,73 @@ bool APMParameterMetaData::_parseParameterAttributes(QXmlStreamReader &xml, APMF
 
             if (attributeName == "Range") {
                 const QString range = xml.readElementText().trimmed();
-                QStringList rangeList = range.split(' ');
-                if (rangeList.count() != 2) {
-                    qCDebug(APMParameterMetaDataVerboseLog) << "space seperator didn't work',trying 'to' separator";
-                    rangeList = range.split("to");
-                    if (rangeList.count() != 2) {
-                        qCDebug(APMParameterMetaDataVerboseLog) << "'to' seperaator didn't work', trying '-' as seperator";
-                        rangeList = range.split('-');
-                        if (rangeList.count() != 2) {
-                            qCDebug(APMParameterMetaDataLog) << "something wrong with range, all three separators have failed" << range;
-                        }
-                    }
-                }
 
-                // everything should be good. lets collect min and max
-                if (rangeList.count() == 2) {
-                    rawMetaData->min = rangeList.first().trimmed();
-                    rawMetaData->max = rangeList.last().trimmed();
-
-                    // sanitize min and max off any comments that they may have
-                    if (rawMetaData->min.contains(' ')) {
-                        rawMetaData->min = rawMetaData->min.split(' ').first();
-                    }
-                    if(rawMetaData->max.contains(' ')) {
-                        rawMetaData->max = rawMetaData->max.split(' ').first();
-                    }
+                const QRegularExpressionMatch m = rangeRegex.match(range);
+                if (m.hasMatch()) {
+                    rawMetaData->min = m.captured(1).trimmed();
+                    rawMetaData->max = m.captured(2).trimmed();
                     qCDebug(APMParameterMetaDataVerboseLog) << "read field parameter"
                                                             << "min:" << rawMetaData->min
                                                             << "max:" << rawMetaData->max;
+                } else {
+                    // Fallback path (kept from original behaviour) tries simple splits for odd inputs.
+                    QStringList rangeList = range.split(' ', Qt::SkipEmptyParts);
+                    if (rangeList.count() != 2) {
+                        rangeList = range.split("to", Qt::SkipEmptyParts);
+                        if (rangeList.count() != 2) {
+                            rangeList = range.split('-', Qt::SkipEmptyParts);
+                        }
+                    }
+                    if (rangeList.count() == 2) {
+                        rawMetaData->min = rangeList.first().trimmed();
+                        rawMetaData->max = rangeList.last().trimmed();
+
+                        // sanitize min and max off any comments that they may have
+                        if (rawMetaData->min.contains(' ')) {
+                            rawMetaData->min = rawMetaData->min.split(' ').first();
+                        }
+                        if (rawMetaData->max.contains(' ')) {
+                            rawMetaData->max = rawMetaData->max.split(' ').first();
+                        }
+                        qCDebug(APMParameterMetaDataVerboseLog) << "read field parameter (fallback)"
+                                                                << "min:" << rawMetaData->min
+                                                                << "max:" << rawMetaData->max;
+                    } else {
+                        qCDebug(APMParameterMetaDataLog) << "Failed to parse range:" << range;
+                    }
                 }
+
             } else if (attributeName == "Increment") {
-                const QString increment = xml.readElementText();
+                const QString increment = xml.readElementText().trimmed();
                 qCDebug(APMParameterMetaDataVerboseLog) << "read Increment:" << increment;
                 rawMetaData->incrementSize = increment;
+
             } else if (attributeName == "Units") {
-                const QString units = xml.readElementText();
+                const QString units = xml.readElementText().trimmed();
                 qCDebug(APMParameterMetaDataVerboseLog) << "read Units:" << units;
                 rawMetaData->units = units;
+
             } else if (attributeName == "ReadOnly") {
                 const QString strValue = xml.readElementText().trimmed();
-                if (strValue.compare("true", Qt::CaseInsensitive) == 0) {
-                    rawMetaData->readOnly = true;
-                }
+                rawMetaData->readOnly = (strValue.compare("true", Qt::CaseInsensitive) == 0);
                 qCDebug(APMParameterMetaDataVerboseLog) << "read ReadOnly:" << rawMetaData->readOnly;
+
             } else if (attributeName == "Bitmask") {
                 bool parseError = false;
 
-                const QString bitmaskString = xml.readElementText();
+                const QString bitmaskString = xml.readElementText().trimmed();
                 qCDebug(APMParameterMetaDataVerboseLog) << "read Bitmask:" << bitmaskString;
-                const QStringList bitmaskList = bitmaskString.split(",");
+                const QStringList bitmaskList = bitmaskString.split(",", Qt::SkipEmptyParts);
                 if (!bitmaskList.isEmpty()) {
                     for (const QString &bitmask : bitmaskList) {
-                        const QStringList pair = bitmask.split(":");
-                        if (pair.count() == 2) {
-                            rawMetaData->bitmask << QPair<QString, QString>(pair[0], pair[1]);
+                        const QString trimmed = bitmask.trimmed();
+                        const int sep = trimmed.indexOf(':');
+                        if (sep > 0) {
+                            const QString idx  = trimmed.left(sep).trimmed();
+                            const QString desc = trimmed.mid(sep + 1).trimmed();
+                            rawMetaData->bitmask << QPair<QString, QString>(idx, desc);
                         } else {
-                            qCDebug(APMParameterMetaDataLog) << "parse error: bitmask:" << bitmaskString << "pair count:" << pair.count();
+                            qCDebug(APMParameterMetaDataLog) << "parse error: bitmask entry" << trimmed;
                             parseError = true;
                             break;
                         }
@@ -399,17 +419,16 @@ bool APMParameterMetaData::_parseParameterAttributes(QXmlStreamReader &xml, APMF
                 if (parseError) {
                     rawMetaData->bitmask.clear();
                 }
+
             } else if (attributeName == "RebootRequired") {
                 const QString strValue = xml.readElementText().trimmed();
-                if (strValue.compare("true", Qt::CaseInsensitive) == 0) {
-                    rawMetaData->rebootRequired = true;
-                }
+                rawMetaData->rebootRequired = (strValue.compare("true", Qt::CaseInsensitive) == 0);
             }
         } else if (elementName == "values") {
             // doing nothing individual value will follow anyway. May be used for sanity checking.
         } else if (elementName == "value") {
             const QString valueValue = xml.attributes().value("code").toString();
-            const QString valueName = xml.readElementText();
+            const QString valueName  = xml.readElementText().trimmed();
             qCDebug(APMParameterMetaDataVerboseLog) << "read value parameter" << "value desc:"
                                                     << valueName << "code:" << valueValue;
             values << QPair<QString,QString>(valueValue, valueName);
@@ -537,27 +556,35 @@ FactMetaData *APMParameterMetaData::getMetaDataForFact(const QString &name, MAV_
             const QPair<QString, QString> bitmaskPair = rawMetaData->bitmask[i];
 
             bool ok = false;
-            unsigned int bitSet = bitmaskPair.first.toUInt(&ok);
-            bitSet = 1 << bitSet;
+            const unsigned int bitIndex = bitmaskPair.first.toUInt(&ok);
+            const quint64 bitSetU64 = ok ? (1ull << bitIndex) : 0ull;
 
             QVariant typedBitSet;
 
             switch (type) {
             case FactMetaData::valueTypeInt8:
-                typedBitSet = QVariant(static_cast<signed char>(bitSet));
+                typedBitSet = QVariant(static_cast<qint8>(bitSetU64));
                 break;
             case FactMetaData::valueTypeInt16:
-                typedBitSet = QVariant(static_cast<short int>(bitSet));
+                typedBitSet = QVariant(static_cast<qint16>(bitSetU64));
                 break;
             case FactMetaData::valueTypeInt32:
+                typedBitSet = QVariant(static_cast<qint32>(bitSetU64));
+                break;
             case FactMetaData::valueTypeInt64:
-                typedBitSet = QVariant(static_cast<int>(bitSet));
+                typedBitSet = QVariant(static_cast<qint64>(bitSetU64));
                 break;
             case FactMetaData::valueTypeUint8:
+                typedBitSet = QVariant(static_cast<quint8>(bitSetU64));
+                break;
             case FactMetaData::valueTypeUint16:
+                typedBitSet = QVariant(static_cast<quint16>(bitSetU64));
+                break;
             case FactMetaData::valueTypeUint32:
+                typedBitSet = QVariant(static_cast<quint32>(bitSetU64));
+                break;
             case FactMetaData::valueTypeUint64:
-                typedBitSet = QVariant(bitSet);
+                typedBitSet = QVariant(static_cast<quint64>(bitSetU64));
                 break;
             default:
                 break;
@@ -571,7 +598,7 @@ FactMetaData *APMParameterMetaData::getMetaDataForFact(const QString &name, MAV_
             if (!ok) {
                 qCDebug(APMParameterMetaDataLog) << "Invalid bitmask value, name:" << metaData->name()
                                                  << "type:" << metaData->type()
-                                                 << "value:" << bitSet
+                                                 << "value:" << bitmaskPair.first
                                                  << "error: toUInt failed";
                 bitmaskStrings.clear();
                 bitmaskValues.clear();
