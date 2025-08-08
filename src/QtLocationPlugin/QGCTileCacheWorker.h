@@ -7,15 +7,6 @@
  *
  ****************************************************************************/
 
-
-/**
- * @file
- *   @brief Map Tile Cache Worker Thread
- *
- *   @author Gus Grubba <gus@auterion.com>
- *
- */
-
 #pragma once
 
 #include <QtCore/QLoggingCategory>
@@ -80,6 +71,8 @@ private:
     void _updateSetTotals(QGCCachedTileSet *set);
     void _updateTotals();
 
+    static bool _initDataFromResources(QByteArray &bingNoTileImage);
+
     std::shared_ptr<QSqlDatabase> _db = nullptr;
     QMutex _taskQueueMutex;
     QQueue<QGCMapTask*> _taskQueue;
@@ -94,9 +87,10 @@ private:
     int _updateTimeout = kShortTimeout;
     std::atomic_bool _failed = false;
     std::atomic_bool _valid = false;
+    QByteArray _bingNoTileImage;
 
     static constexpr const char *kSession = "QGeoTileWorkerSession";
     static constexpr const char *kExportSession = "QGeoTileExportSession";
-    static constexpr int kShortTimeout = 2;
-    static constexpr int kLongTimeout = 5;
+    static constexpr int kShortTimeout = 2 * 1000;
+    static constexpr int kLongTimeout = 5 * 1000;
 };
