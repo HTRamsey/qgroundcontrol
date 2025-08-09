@@ -12,7 +12,6 @@
 #include "MultiVehicleManager.h"
 #include "QGCApplication.h"
 #include "QGCLoggingCategory.h"
-#include "QGCTemporaryFile.h"
 #include "SettingsManager.h"
 #include "MavlinkSettings.h"
 #include "AppSettings.h"
@@ -31,16 +30,15 @@ Q_APPLICATION_STATIC(MAVLinkProtocol, _mavlinkProtocolInstance);
 
 MAVLinkProtocol::MAVLinkProtocol(QObject *parent)
     : QObject(parent)
-    , _tempLogFile(new QGCTemporaryFile(QStringLiteral("%2.%3").arg(_tempLogFileTemplate, _logFileExtension), this))
 {
-    // qCDebug(MAVLinkProtocolLog) << Q_FUNC_INFO << this;
+    qCDebug(MAVLinkProtocolLog) << this;
 }
 
 MAVLinkProtocol::~MAVLinkProtocol()
 {
     _closeLogFile();
 
-    // qCDebug(MAVLinkProtocolLog) << Q_FUNC_INFO << this;
+    qCDebug(MAVLinkProtocolLog) << this;
 }
 
 MAVLinkProtocol *MAVLinkProtocol::instance()
@@ -291,12 +289,15 @@ bool MAVLinkProtocol::_updateStatus(LinkInterface *link, const SharedLinkInterfa
 
 bool MAVLinkProtocol::_closeLogFile()
 {
-    if (!_tempLogFile->isOpen()) {
+    if (!_tempLogFile || !_tempLogFile->isOpen()) {
         return false;
     }
 
     if (_tempLogFile->size() == 0) {
-        (void) _tempLogFile->remove();
+        const QString path = _tempLogFile->fileName();
+        _tempLogFile->close();
+        QFile::remove(path);
+        _tempLogFile.reset();
         return false;
     }
 
@@ -311,7 +312,7 @@ void MAVLinkProtocol::_startLogging()
         return;
     }
 
-    AppSettings *const appSettings = SettingsManager::instance()->appSettings();
+    AppSettings *appSettings = SettingsManager::instance()->appSettings();
     if (appSettings->disableAllPersistence()->rawValue().toBool()) {
         return;
     }
@@ -322,13 +323,20 @@ void MAVLinkProtocol::_startLogging()
     }
 #endif
 
-    if (_tempLogFile->isOpen()) {
-        return;
-    }
-
     if (_logSuspendReplay) {
         return;
     }
+
+    if (_tempLogFile && _tempLogFile->isOpen()) {
+        return;
+    }
+
+    const QString tmpl =
+        QStandardPaths::writableLocation(QStandardPaths::TempLocation)
+        + "/FlightDataXXXXXX.mavlink";
+
+    _tempLogFile = std::make_unique<QTemporaryFile>(tmpl);
+    _tempLogFile->setAutoRemove(false);
 
     if (!_tempLogFile->open()) {
         const QString message = QStringLiteral("Opening Flight Data file for writing failed. Unable to write to %1. Please choose a different file location.").arg(_tempLogFile->fileName());
@@ -338,7 +346,9 @@ void MAVLinkProtocol::_startLogging()
         return;
     }
 
-    qCDebug(MAVLinkProtocolLog) << "Temp log" << _tempLogFile->fileName();
+    const QString fileName = _tempLogFile->fileName();
+    qCDebug(MAVLinkProtocolLog) << "Temp log" << fileName;
+
     (void) _checkTelemetrySavePath();
 
     _logSuspendError = false;
@@ -346,19 +356,21 @@ void MAVLinkProtocol::_startLogging()
 
 void MAVLinkProtocol::_stopLogging()
 {
-    if (_tempLogFile->isOpen() && _closeLogFile()) {
+    if (_tempLogFile && _tempLogFile->isOpen() && _closeLogFile()) {
         auto appSettings = SettingsManager::instance()->appSettings();
         auto mavlinkSettings = SettingsManager::instance()->mavlinkSettings();
-        if ((_vehicleWasArmed || mavlinkSettings->telemetrySaveNotArmed()->rawValue().toBool()) && 
-                mavlinkSettings->telemetrySave()->rawValue().toBool() && 
+        const QString path = _tempLogFile->fileName();
+        if ((_vehicleWasArmed || mavlinkSettings->telemetrySaveNotArmed()->rawValue().toBool()) &&
+                mavlinkSettings->telemetrySave()->rawValue().toBool() &&
                 !appSettings->disableAllPersistence()->rawValue().toBool()) {
-            _saveTelemetryLog(_tempLogFile->fileName());
+            _saveTelemetryLog(path);
         } else {
-            (void) QFile::remove(_tempLogFile->fileName());
+            (void) QFile::remove(path);
         }
     }
 
     _vehicleWasArmed = false;
+    _tempLogFile.reset();
 }
 
 void MAVLinkProtocol::checkForLostLogFiles()

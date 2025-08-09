@@ -16,7 +16,6 @@
 #include "TerrainTileCopernicus.h"
 
 #include <QtCore/QDir>
-#include <QtCore/QTemporaryFile>
 
 int CopernicusElevationProvider::long2tileX(double lon, int z) const
 {
