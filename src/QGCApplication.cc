@@ -54,7 +54,7 @@
 QGC_LOGGING_CATEGORY(QGCApplicationLog, "qgc.qgcapplication")
 
 QGCApplication::QGCApplication(int &argc, char *argv[], bool unitTesting, bool simpleBootTest)
-    : QApplication(argc, argv)
+    : QGCAPPLICATION_CLASS(argc, argv)
     , _runningUnitTests(unitTesting)
     , _simpleBootTest(simpleBootTest)
 {

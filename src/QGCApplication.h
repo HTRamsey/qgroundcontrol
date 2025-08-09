@@ -17,6 +17,12 @@
 
 #include <QtWidgets/QApplication>
 
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
+    #include <SingleApplication>
+#endif
+
+// #include QT_STRINGIFY(QGCAPPLICATION_CLASS)
+
 class QQmlApplicationEngine;
 class QQuickWindow;
 class QGCImageProvider;
@@ -41,7 +47,7 @@ class QMetaObject;
 /// The main application and management class.
 /// Needs QApplication base to support QtCharts module.
 /// TODO: Use QtGraphs to convert to QGuiApplication
-class QGCApplication : public QApplication
+class QGCApplication : public QGCAPPLICATION_CLASS
 {
     Q_OBJECT
 

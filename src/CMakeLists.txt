@@ -53,14 +53,6 @@ target_sources(${CMAKE_PROJECT_NAME}
         QGCApplication.h
 )
 
-if(NOT ANDROID AND NOT IOS)
-    target_sources(${CMAKE_PROJECT_NAME}
-        PRIVATE
-            RunGuard.cc
-            RunGuard.h
-    )
-endif()
-
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(${CMAKE_PROJECT_NAME}
@@ -112,6 +104,21 @@ if(QGC_VIEWER3D)
 endif()
 if(NOT QGC_AIRLINK_DISABLED)
     target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE AirLinkModule)
+endif()
+
+if(NOT ANDROID AND NOT IOS)
+    set(QT_DEFAULT_MAJOR_VERSION 6 CACHE STRING "Qt version to use, defaults to 6")
+    set(QAPPLICATION_CLASS QApplication CACHE STRING "Inheritance class for SingleApplication")
+    CPMAddPackage(
+        NAME SingleApplication
+        VERSION 3.5.3
+        GITHUB_REPOSITORY itay-grudev/SingleApplication
+    )
+    target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE SingleApplication::SingleApplication)
+    target_link_libraries(QGCLocation PRIVATE SingleApplication::SingleApplication)
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE QGCAPPLICATION_CLASS=SingleApplication)
+else()
+    target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE QGCAPPLICATION_CLASS=QApplication)
 endif()
 
 target_compile_definitions(${CMAKE_PROJECT_NAME}

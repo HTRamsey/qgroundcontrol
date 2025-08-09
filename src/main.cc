@@ -19,7 +19,6 @@
 
 #if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
     #include <QtWidgets/QMessageBox>
-    #include "RunGuard.h"
 #endif
 
 #ifdef Q_OS_LINUX
@@ -70,23 +69,6 @@ int main(int argc, char *argv[])
     };
 
     ParseCmdLineOptions(argc, argv, rgCmdLineOptions, std::size(rgCmdLineOptions), false);
-
-#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
-    // We make the runguard key different for custom and non custom
-    // builds, so they can be executed together in the same device.
-    // Stable and Daily have same QGC_APP_NAME so they would
-    // not be able to run at the same time
-    const QString runguardString = QStringLiteral("%1 RunGuardKey").arg(QGC_APP_NAME);
-
-    RunGuard guard(runguardString);
-    if (!bypassRunGuard && !guard.tryToRun()) {
-        const QApplication errorApp(argc, argv);
-        (void) QMessageBox::critical(nullptr, QObject::tr("Error"),
-            QObject::tr("A second instance of %1 is already running. Please close the other instance and try again.").arg(QGC_APP_NAME)
-        );
-        return -1;
-    }
-#endif
 
 #if defined(Q_OS_LINUX) && !defined(Q_OS_ANDROID)
     if (::getuid() == 0) {
