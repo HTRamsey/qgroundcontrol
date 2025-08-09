@@ -7,7 +7,6 @@
  *
  ****************************************************************************/
 
-
 #include "ParameterManagerTest.h"
 #include "MultiVehicleManager.h"
 #include "Vehicle.h"
@@ -58,18 +57,18 @@ void ParameterManagerTest::_noFailureWorker(MockConfiguration::FailureMode_t fai
 }
 
 
-void ParameterManagerTest::_noFailure(void)
+void ParameterManagerTest::_noFailure()
 {
     _noFailureWorker(MockConfiguration::FailNone);
 }
 
-void ParameterManagerTest::_requestListMissingParamSuccess(void)
+void ParameterManagerTest::_requestListMissingParamSuccess()
 {
     _noFailureWorker(MockConfiguration::FailMissingParamOnInitialReqest);
 }
 
 // Test no response to param_request_list
-void ParameterManagerTest::_requestListNoResponse(void)
+void ParameterManagerTest::_requestListNoResponse()
 {
     Q_ASSERT(!_mockLink);
     _mockLink = MockLink::startPX4MockLink(false, MockConfiguration::FailParamNoReponseToRequestList);
@@ -98,7 +97,7 @@ void ParameterManagerTest::_requestListNoResponse(void)
 
 // MockLink will fail to send a param on initial request, it will also fail to send it on subsequent
 // param_read requests.
-void ParameterManagerTest::_requestListMissingParamFail(void)
+void ParameterManagerTest::_requestListMissingParamFail()
 {
     Q_ASSERT(!_mockLink);
     _mockLink = MockLink::startPX4MockLink(false, MockConfiguration::FailMissingParamOnAllRequests);

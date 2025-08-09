@@ -10,7 +10,7 @@
 
 void ADSBTest::_adsbVehicleTest()
 {
-    ADSB::VehicleInfo_t vehicleInfo;
+    ADSB::VehicleInfo_t vehicleInfo{};
     vehicleInfo.icaoAddress = 1;
     vehicleInfo.callsign = QStringLiteral("1");
     vehicleInfo.location = QGeoCoordinate(1., 1., 1.);
@@ -18,7 +18,7 @@ void ADSBTest::_adsbVehicleTest()
     vehicleInfo.alert = false;
     vehicleInfo.availableFlags = ADSB::CallsignAvailable;
 
-    ADSBVehicle* const adsbVehicle = new ADSBVehicle(vehicleInfo, this);
+    ADSBVehicle *adsbVehicle = new ADSBVehicle(vehicleInfo, this);
     QVERIFY(adsbVehicle != nullptr);
     QVERIFY(!adsbVehicle->expired());
 
@@ -44,11 +44,11 @@ void ADSBTest::_adsbVehicleTest()
 
 void ADSBTest::_adsbTcpLinkTest()
 {
-    QTcpServer* const server = new QTcpServer(this);
+    QTcpServer *server = new QTcpServer(this);
     QVERIFY(server);
     QVERIFY(server->listen(QHostAddress::SpecialAddress::AnyIPv4, 30003));
 
-    ADSBTCPLink* const adsbLink = new ADSBTCPLink(QHostAddress::LocalHost, 30003, this);
+    ADSBTCPLink *adsbLink = new ADSBTCPLink(QHostAddress::LocalHost, 30003, this);
     QVERIFY(adsbLink);
     QVERIFY(adsbLink->init());
     // QSignalSpy spy(adsbLink, &ADSBTCPLink::adsbVehicleUpdate);
@@ -56,7 +56,7 @@ void ADSBTest::_adsbTcpLinkTest()
     bool timeout = false;
     QVERIFY(server->waitForNewConnection(1000, &timeout));
     QVERIFY(!timeout);
-    QTcpSocket* const clientSocket = server->nextPendingConnection();
+    QTcpSocket *clientSocket = server->nextPendingConnection();
     QVERIFY(clientSocket != nullptr);
 
     const QByteArray message("MSG,8D4840D6202CC371C32CE0576098");
@@ -71,12 +71,12 @@ void ADSBTest::_adsbTcpLinkTest()
 
 void ADSBTest::_adsbVehicleManagerTest()
 {
-    ADSBVehicleManager* const manager = ADSBVehicleManager::instance();
+    ADSBVehicleManager *manager = ADSBVehicleManager::instance();
     QVERIFY(manager);
     QVERIFY(manager->adsbVehicles());
     QCOMPARE(manager->adsbVehicles()->count(), 0);
 
-    ADSB::VehicleInfo_t vehicleInfo;
+    ADSB::VehicleInfo_t vehicleInfo{};
     vehicleInfo.icaoAddress = 1;
     vehicleInfo.callsign = QStringLiteral("1");
     vehicleInfo.location = QGeoCoordinate(1., 1., 1.);

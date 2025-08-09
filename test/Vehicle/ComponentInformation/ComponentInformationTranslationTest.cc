@@ -7,7 +7,6 @@
  *
  ****************************************************************************/
 
-
 #include "ComponentInformationTranslationTest.h"
 #include "ComponentInformationTranslation.h"
 #include "QGCCachedFileDownload.h"

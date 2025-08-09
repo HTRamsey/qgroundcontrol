@@ -15,7 +15,7 @@
 
 void StatusTextHandlerTest::_testGetMessageText()
 {
-    mavlink_message_t message;
+    mavlink_message_t message{};
     (void) mavlink_msg_statustext_pack(255, MAV_COMP_ID_USER1, &message, MAV_SEVERITY_INFO,"StatusTextHandlerTest", 0, 0);
 
     const QString messageText = StatusTextHandler::getMessageText(message);

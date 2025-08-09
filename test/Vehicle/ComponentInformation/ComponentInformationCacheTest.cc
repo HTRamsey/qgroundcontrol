@@ -7,7 +7,6 @@
  *
  ****************************************************************************/
 
-
 #include "ComponentInformationCacheTest.h"
 #include "ComponentInformationCache.h"
 
@@ -74,7 +73,6 @@ void ComponentInformationCacheTest::_basic_test()
 
     _cleanup();
 }
-
 
 void ComponentInformationCacheTest::_lru_test()
 {
