@@ -7,29 +7,23 @@
  *
  ****************************************************************************/
 
-
-/**
- * @file
- *   @brief Map Tile Cache Worker Thread
- *
- *   @author Gus Grubba <gus@auterion.com>
- *
- */
-
 #pragma once
 
+#include <QtCore/QElapsedTimer>
 #include <QtCore/QLoggingCategory>
 #include <QtCore/QMutex>
 #include <QtCore/QQueue>
 #include <QtCore/QString>
 #include <QtCore/QThread>
 #include <QtCore/QWaitCondition>
+#include <atomic>
+#include <memory>
 
 Q_DECLARE_LOGGING_CATEGORY(QGCTileCacheWorkerLog)
 
 class QGCMapTask;
 class QGCCachedTileSet;
-class QSqlDatabase;
+class QGCTileCacheDatabase;
 
 class QGCCacheWorker : public QThread
 {
@@ -40,6 +34,8 @@ public:
     ~QGCCacheWorker();
 
     void setDatabaseFile(const QString &path) { _databasePath = path; }
+    bool isValid() const { return _valid; }
+    bool hasFailed() const { return _failed; }
 
 public slots:
     bool enqueueTask(QGCMapTask *task);
@@ -52,8 +48,8 @@ protected:
     void run() final;
 
 private:
+    // Task execution
     void _runTask(QGCMapTask *task);
-
     void _saveTile(QGCMapTask *task);
     void _getTile(QGCMapTask *task);
     void _getTileSets(QGCMapTask *task);
@@ -66,37 +62,36 @@ private:
     void _resetCacheDatabase(QGCMapTask *task);
     void _importSets(QGCMapTask *task);
     void _exportSets(QGCMapTask *task);
-    bool _testTask(QGCMapTask *task);
 
-    bool _connectDB();
-    void _disconnectDB();
-    bool _createDB(QSqlDatabase &db, bool createDefault = true);
-    bool _findTileSetID(const QString &name, quint64 &setID);
+    // Helper methods
+    bool _testTask(QGCMapTask *task);
     bool _init();
-    quint64 _findTile(const QString &hash);
-    quint64 _getDefaultTileSet();
-    void _deleteBingNoTileTiles();
-    void _deleteTileSet(quint64 id);
     void _updateSetTotals(QGCCachedTileSet *set);
     void _updateTotals();
+    void _deleteBingNoTileTiles();
 
-    std::shared_ptr<QSqlDatabase> _db = nullptr;
+    // Member variables
+    std::unique_ptr<QGCTileCacheDatabase> _database;
     QMutex _taskQueueMutex;
     QQueue<QGCMapTask*> _taskQueue;
     QWaitCondition _waitc;
     QString _databasePath;
+
+    // Statistics cache
     quint32 _defaultCount = 0;
     quint32 _totalCount = 0;
     quint64 _defaultSet = UINT64_MAX;
     quint64 _defaultSize = 0;
     quint64 _totalSize = 0;
+
+    // Update timing
     QElapsedTimer _updateTimer;
     int _updateTimeout = kShortTimeout;
-    std::atomic_bool _failed = false;
-    std::atomic_bool _valid = false;
 
-    static constexpr const char *kSession = "QGeoTileWorkerSession";
-    static constexpr const char *kExportSession = "QGeoTileExportSession";
-    static constexpr int kShortTimeout = 2;
-    static constexpr int kLongTimeout = 5;
+    // State flags
+    std::atomic_bool _failed{false};
+    std::atomic_bool _valid{false};
+
+    static constexpr int kShortTimeout = 2 * 1000;
+    static constexpr int kLongTimeout = 5 * 1000;
 };
