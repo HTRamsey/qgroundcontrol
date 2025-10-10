@@ -1,0 +1,55 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 25,
+    "patch": 0
+  },
+  "comment": "Copy this file to CMakeUserPresets.json and customize for your local environment",
+  "configurePresets": [
+    {
+      "name": "user-debug",
+      "displayName": "User Debug Configuration",
+      "description": "Custom debug configuration - modify as needed",
+      "inherits": "debug",
+      "cacheVariables": {
+        "QT_QMAKE_EXECUTABLE": "/path/to/your/qt/bin/qmake",
+        "CMAKE_PREFIX_PATH": "/path/to/your/qt",
+        "QGC_BUILD_TESTING": "ON"
+      },
+      "environment": {
+        "PATH": "/path/to/your/qt/bin:$env{PATH}"
+      }
+    },
+    {
+      "name": "user-release",
+      "displayName": "User Release Configuration",
+      "description": "Custom release configuration - modify as needed",
+      "inherits": "release",
+      "cacheVariables": {
+        "QT_QMAKE_EXECUTABLE": "/path/to/your/qt/bin/qmake",
+        "CMAKE_PREFIX_PATH": "/path/to/your/qt"
+      }
+    },
+    {
+      "name": "user-custom",
+      "displayName": "Custom Development Configuration",
+      "description": "Fully custom configuration template",
+      "inherits": "default",
+      "generator": "Ninja",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_PREFIX_PATH": "/path/to/your/qt",
+        "QGC_USE_CACHE": "ON",
+        "QGC_BUILD_TESTING": "ON",
+        "QGC_DEBUG_QML": "ON",
+        "QGC_ENABLE_BLUETOOTH": "ON",
+        "QGC_ENABLE_GST_VIDEOSTREAMING": "ON"
+      },
+      "environment": {
+        "CCACHE_DIR": "${sourceDir}/.ccache",
+        "QT_LOGGING_RULES": "*.debug=true"
+      }
+    }
+  ]
+}

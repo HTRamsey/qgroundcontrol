@@ -1,0 +1,296 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 25,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "QGC_USE_CACHE": "ON"
+      }
+    },
+    {
+      "name": "debug",
+      "displayName": "Debug Build",
+      "description": "Debug build with full symbols and assertions",
+      "inherits": "default",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "QGC_DEBUG_QML": "ON",
+        "QGC_BUILD_TESTING": "ON"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release Build",
+      "description": "Optimized release build",
+      "inherits": "default",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "QGC_BUILD_TESTING": "OFF"
+      }
+    },
+    {
+      "name": "relwithdebinfo",
+      "displayName": "Release with Debug Info",
+      "description": "Optimized build with debug symbols",
+      "inherits": "default",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "QGC_BUILD_TESTING": "OFF"
+      }
+    },
+    {
+      "name": "linux-debug",
+      "displayName": "Linux Debug",
+      "description": "Debug build for Linux",
+      "inherits": "debug",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "linux-release",
+      "displayName": "Linux Release",
+      "description": "Release build for Linux with AppImage",
+      "inherits": "release",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "cacheVariables": {
+        "QGC_CREATE_APPIMAGE": "ON"
+      }
+    },
+    {
+      "name": "macos-debug",
+      "displayName": "macOS Debug",
+      "description": "Debug build for macOS",
+      "inherits": "debug",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "cacheVariables": {
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "12.0"
+      }
+    },
+    {
+      "name": "macos-release",
+      "displayName": "macOS Release",
+      "description": "Release build for macOS",
+      "inherits": "release",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      },
+      "cacheVariables": {
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "12.0",
+        "QGC_MACOS_UNIVERSAL_BUILD": "ON"
+      }
+    },
+    {
+      "name": "windows-debug",
+      "displayName": "Windows Debug",
+      "description": "Debug build for Windows",
+      "inherits": "debug",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "windows-release",
+      "displayName": "Windows Release",
+      "description": "Release build for Windows",
+      "inherits": "release",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "ci-debug",
+      "displayName": "CI Debug Build",
+      "description": "Debug build optimized for CI/CD pipelines",
+      "inherits": "debug",
+      "cacheVariables": {
+        "QGC_USE_CACHE": "OFF",
+        "QGC_BUILD_TESTING": "ON"
+      }
+    },
+    {
+      "name": "ci-release",
+      "displayName": "CI Release Build",
+      "description": "Release build optimized for CI/CD pipelines",
+      "inherits": "release",
+      "cacheVariables": {
+        "QGC_USE_CACHE": "OFF",
+        "QGC_STABLE_BUILD": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "displayName": "Debug",
+      "configurePreset": "debug",
+      "configuration": "Debug",
+      "jobs": 0
+    },
+    {
+      "name": "release",
+      "displayName": "Release",
+      "configurePreset": "release",
+      "configuration": "Release",
+      "jobs": 0
+    },
+    {
+      "name": "linux-debug",
+      "displayName": "Linux Debug",
+      "configurePreset": "linux-debug",
+      "configuration": "Debug",
+      "jobs": 0
+    },
+    {
+      "name": "linux-release",
+      "displayName": "Linux Release",
+      "configurePreset": "linux-release",
+      "configuration": "Release",
+      "jobs": 0
+    },
+    {
+      "name": "macos-debug",
+      "displayName": "macOS Debug",
+      "configurePreset": "macos-debug",
+      "configuration": "Debug",
+      "jobs": 0
+    },
+    {
+      "name": "macos-release",
+      "displayName": "macOS Release",
+      "configurePreset": "macos-release",
+      "configuration": "Release",
+      "jobs": 0
+    },
+    {
+      "name": "windows-debug",
+      "displayName": "Windows Debug",
+      "configurePreset": "windows-debug",
+      "configuration": "Debug",
+      "jobs": 0
+    },
+    {
+      "name": "windows-release",
+      "displayName": "Windows Release",
+      "configurePreset": "windows-release",
+      "configuration": "Release",
+      "jobs": 0
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "debug",
+      "displayName": "Debug Tests",
+      "configurePreset": "debug",
+      "output": {
+        "outputOnFailure": true
+      },
+      "execution": {
+        "noTestsAction": "error",
+        "stopOnFailure": false
+      }
+    },
+    {
+      "name": "linux-debug",
+      "displayName": "Linux Debug Tests",
+      "configurePreset": "linux-debug",
+      "inherits": "debug"
+    },
+    {
+      "name": "macos-debug",
+      "displayName": "macOS Debug Tests",
+      "configurePreset": "macos-debug",
+      "inherits": "debug"
+    },
+    {
+      "name": "windows-debug",
+      "displayName": "Windows Debug Tests",
+      "configurePreset": "windows-debug",
+      "inherits": "debug"
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "linux-full",
+      "displayName": "Linux Full Workflow",
+      "description": "Configure, build, and test on Linux",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "linux-debug"
+        },
+        {
+          "type": "build",
+          "name": "linux-debug"
+        },
+        {
+          "type": "test",
+          "name": "linux-debug"
+        }
+      ]
+    },
+    {
+      "name": "macos-full",
+      "displayName": "macOS Full Workflow",
+      "description": "Configure, build, and test on macOS",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "macos-debug"
+        },
+        {
+          "type": "build",
+          "name": "macos-debug"
+        },
+        {
+          "type": "test",
+          "name": "macos-debug"
+        }
+      ]
+    },
+    {
+      "name": "windows-full",
+      "displayName": "Windows Full Workflow",
+      "description": "Configure, build, and test on Windows",
+      "steps": [
+        {
+          "type": "configure",
+          "name": "windows-debug"
+        },
+        {
+          "type": "build",
+          "name": "windows-debug"
+        },
+        {
+          "type": "test",
+          "name": "windows-debug"
+        }
+      ]
+    }
+  ]
+}

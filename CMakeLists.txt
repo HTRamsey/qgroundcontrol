@@ -1,4 +1,17 @@
-cmake_minimum_required(VERSION 3.25)
+# ==============================================================================
+# QGroundControl CMake Configuration
+# ==============================================================================
+# Minimum CMake 3.25 required for:
+# - CMake 3.25: SYSTEM keyword in find_package, block() scoping improvements
+# - CMake 3.24: CMAKE_COMPILE_WARNING_AS_ERROR, workflow presets
+# - CMake 3.21: Different link library groups
+# ==============================================================================
+
+cmake_minimum_required(VERSION 3.25...3.32 FATAL_ERROR)
+
+# ==============================================================================
+# CMake Module Path Configuration
+# ==============================================================================
 
 list(APPEND CMAKE_MODULE_PATH
     ${CMAKE_SOURCE_DIR}/cmake
@@ -12,9 +25,14 @@ list(APPEND CMAKE_MODULE_PATH
 
 include(Helpers)
 
+# ==============================================================================
+# Build Type Configuration
+# ==============================================================================
+
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
-    set(CMAKE_CONFIGURATION_TYPES "Debug;Release" CACHE STRING "Configuration types" FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "RelWithDebInfo" "MinSizeRel")
+    set(CMAKE_CONFIGURATION_TYPES "Debug;Release;RelWithDebInfo;MinSizeRel" CACHE STRING "Configuration types" FORCE)
 endif()
 
 set(CMAKE_REQUIRED_QUIET ON)
@@ -81,27 +99,52 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>/lib")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/$<CONFIG>")
 
-# https://cmake.org/cmake/help/latest/policy/CMP0168.html#policy:CMP0168
+# ==============================================================================
+# CMake Policy Configuration
+# ==============================================================================
+# Set modern policies for better behavior and compatibility
+
+# CMP0168: Allow FetchContent to use DOWNLOAD_EXTRACT_TIMESTAMP
 if(POLICY CMP0168)
     cmake_policy(SET CMP0168 NEW)
     set(CMAKE_POLICY_DEFAULT_CMP0168 NEW)
 endif()
 
-# https://cmake.org/cmake/help/latest/policy/CMP0141.html#policy:CMP0141
+# CMP0141: MSVC debug information format flags are selected by an abstraction
 if(POLICY CMP0141)
     cmake_policy(SET CMP0141 NEW)
     set(CMAKE_POLICY_DEFAULT_CMP0141 NEW)
 endif()
 
-# https://cmake.org/cmake/help/latest/policy/CMP0075.html#policy:CMP0075
+# CMP0075: Include file check macros honor CMAKE_REQUIRED_LIBRARIES
 if(POLICY CMP0075)
     cmake_policy(SET CMP0075 NEW)
     set(CMAKE_POLICY_DEFAULT_CMP0075 NEW)
 endif()
 
-#######################################################
-#               Qt6 Configuration
-#######################################################
+# CMP0091: MSVC runtime library flags are selected by an abstraction
+if(POLICY CMP0091)
+    cmake_policy(SET CMP0091 NEW)
+    set(CMAKE_POLICY_DEFAULT_CMP0091 NEW)
+endif()
+
+# CMP0092: Don't add -W3 warning flag by default with MSVC
+if(POLICY CMP0092)
+    cmake_policy(SET CMP0092 NEW)
+    set(CMAKE_POLICY_DEFAULT_CMP0092 NEW)
+endif()
+
+# CMP0117: AUTOMOC, AUTOUIC, AUTORCC generate the .moc files in the build directory
+if(POLICY CMP0117)
+    cmake_policy(SET CMP0117 NEW)
+    set(CMAKE_POLICY_DEFAULT_CMP0117 NEW)
+endif()
+
+# ==============================================================================
+# Qt6 Configuration
+# ==============================================================================
+# Qt6 6.8.3+ is required for QGroundControl
+# Using SYSTEM to reduce warnings from Qt headers
 
 find_package(Qt6
     ${QGC_QT_MINIMUM_VERSION}...${QGC_QT_MAXIMUM_VERSION}
@@ -135,18 +178,36 @@ find_package(Qt6
         Quick3D
         SerialPort
         Test
+    GLOBAL # Make Qt targets available globally
 )
 
+# Platform-specific Qt components
 if(LINUX)
-    find_package(Qt6 COMPONENTS WaylandClient)
+    find_package(Qt6 COMPONENTS WaylandClient QUIET)
+    if(Qt6WaylandClient_FOUND)
+        message(STATUS "QGC: Wayland support enabled")
+    endif()
 endif()
 
+# Validate Qt version
+if(Qt6_VERSION VERSION_LESS ${QGC_QT_MINIMUM_VERSION})
+    message(FATAL_ERROR "Qt ${Qt6_VERSION} found but ${QGC_QT_MINIMUM_VERSION} is required")
+endif()
+
+# Qt standard project setup with modern features
 qt_standard_project_setup(
     REQUIRES ${QGC_QT_MINIMUM_VERSION}
     SUPPORTS_UP_TO ${QGC_QT_MAXIMUM_VERSION}
     I18N_SOURCE_LANGUAGE en
+    I18N_TRANSLATED_LANGUAGES zh_CN zh_TW de es fr it ja ko pt ru tr
 )
 
+# Qt policies for modern behavior
+# QTP0001: Ensure Qt resource files are processed correctly
+# QTP0002: Disable deprecated APIs warnings
+# QTP0003: Ensure consistent behavior with QML module imports
+# QTP0004: Use modern CMake integration for Qt
+# QTP0005: Enable strict mode for Qt deployments
 qt_policy(
     SET QTP0001 NEW
     SET QTP0002 NEW
@@ -154,6 +215,24 @@ qt_policy(
     SET QTP0004 NEW
     SET QTP0005 NEW
 )
+
+# Feature detection for optional Qt components
+set(QGC_QT_FEATURES "")
+if(TARGET Qt6::Bluetooth)
+    list(APPEND QGC_QT_FEATURES "Bluetooth")
+endif()
+if(TARGET Qt6::SerialPort)
+    list(APPEND QGC_QT_FEATURES "SerialPort")
+endif()
+if(TARGET Qt6::Quick3D)
+    list(APPEND QGC_QT_FEATURES "Quick3D")
+endif()
+if(TARGET Qt6::Test)
+    list(APPEND QGC_QT_FEATURES "Test")
+endif()
+if(QGC_QT_FEATURES)
+    message(STATUS "QGC: Optional Qt components found: ${QGC_QT_FEATURES}")
+endif()
 
 #######################################################
 #                Custom Build Configuration

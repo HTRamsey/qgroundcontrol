@@ -1,5 +1,26 @@
+#[[============================================================================
+Function: qgc_set_qt_resource_alias
+
+Description:
+    Sets Qt resource aliases for files, using their base filename as the alias.
+    This simplifies resource access in QML/C++ code.
+
+Parameters:
+    ARGN - List of resource files to set aliases for
+
+Example:
+    qgc_set_qt_resource_alias(
+        ${CMAKE_SOURCE_DIR}/resources/icon.png
+        ${CMAKE_SOURCE_DIR}/resources/logo.svg
+    )
+============================================================================]]
 function(qgc_set_qt_resource_alias)
     foreach(resource_file IN LISTS ARGN)
+        if(NOT EXISTS "${resource_file}")
+            message(WARNING "QGC: Resource file does not exist: ${resource_file}")
+            continue()
+        endif()
+
         get_filename_component(alias "${resource_file}" NAME)
         set_source_files_properties("${resource_file}"
             PROPERTIES
@@ -8,7 +29,28 @@ function(qgc_set_qt_resource_alias)
     endforeach()
 endfunction()
 
+#[[============================================================================
+Function: qgc_config_caching
+
+Description:
+    Configures compiler caching using ccache or sccache to speed up rebuilds.
+    Automatically detects available cache tools and configures them optimally.
+
+Parameters:
+    None
+
+Notes:
+    - Prefers ccache if available, falls back to sccache
+    - Sets appropriate environment variables for optimal performance
+    - Configures compiler launchers for C and C++
+
+Example:
+    if(QGC_USE_CACHE)
+        qgc_config_caching()
+    endif()
+============================================================================]]
 function(qgc_config_caching)
+    # Internal validator function for cache tools
     function(_qgc_verify_cache_tool _ok _path)
         execute_process(
             COMMAND "${_path}" --version
@@ -17,12 +59,16 @@ function(qgc_config_caching)
         )
         if(NOT _res EQUAL 0)
             set(${_ok} FALSE PARENT_SCOPE)
+        else()
+            set(${_ok} TRUE PARENT_SCOPE)
         endif()
     endfunction()
 
     find_program(QGC_CACHE_PROGRAM
                  NAMES ccache sccache
-                 VALIDATOR _qgc_verify_cache_tool)
+                 VALIDATOR _qgc_verify_cache_tool
+                 DOC "Compiler cache program")
+
     if(QGC_CACHE_PROGRAM)
         get_filename_component(_cache_tool "${QGC_CACHE_PROGRAM}" NAME_WE)
         message(STATUS "QGC: using ${_cache_tool} (${QGC_CACHE_PROGRAM})")
@@ -68,46 +114,109 @@ function(qgc_config_caching)
     endif()
 endfunction()
 
+#[[============================================================================
+Function: qgc_set_linker
+
+Description:
+    Automatically selects the fastest available linker for the build.
+    Tries modern linkers in order of preference: mold > lld > gold
+    Falls back to the system default linker if none are available.
+
+Parameters:
+    None
+
+Notes:
+    - mold: Fastest modern linker for Linux
+    - lld: LLVM linker, fast and cross-platform
+    - gold: GNU gold linker, faster than traditional ld
+    - Only applies to non-Apple platforms (macOS uses ld64)
+
+Example:
+    if(NOT APPLE)
+        qgc_set_linker()
+    endif()
+============================================================================]]
 function(qgc_set_linker)
     include(CheckLinkerFlag)
 
+    # Try linkers in order of preference (fastest first)
     foreach(_ld mold lld gold)
         set(_flag "LINKER:-fuse-ld=${_ld}")
         check_linker_flag(CXX "${_flag}" HAVE_LD_${_ld})
 
         if(HAVE_LD_${_ld})
             add_link_options("${_flag}")
-            set(QGC_LINKER "${_ld}")
+            set(QGC_LINKER "${_ld}" PARENT_SCOPE)
             message(STATUS "QGC: using ${_ld} linker (flag ${_flag})")
-            break()
+            return()
         endif()
     endforeach()
 
-    if(NOT DEFINED QGC_LINKER)
-        message(WARNING "QGC: no mold / lld / gold found – falling back to default linker")
-    endif()
+    message(STATUS "QGC: no mold / lld / gold found – using default linker")
 endfunction()
 
+#[[============================================================================
+Function: qgc_enable_pie
+
+Description:
+    Enables Position Independent Executable (PIE) if supported by the toolchain.
+    PIE is a security feature that enables ASLR (Address Space Layout Randomization).
+
+Parameters:
+    None
+
+Notes:
+    - PIE is recommended for security hardening
+    - Required on some modern Linux distributions
+    - May have small performance overhead on 32-bit systems
+
+Example:
+    qgc_enable_pie()
+============================================================================]]
 function(qgc_enable_pie)
     include(CheckPIESupported)
     check_pie_supported(OUTPUT_VARIABLE _output)
+
     if(CMAKE_C_LINK_PIE_SUPPORTED)
-        set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-        message(STATUS "QGC: PIE is enabled")
+        set(CMAKE_POSITION_INDEPENDENT_CODE ON PARENT_SCOPE)
+        message(STATUS "QGC: PIE (Position Independent Executable) enabled")
     else()
-        message(WARNING "QGC: PIE is not supported at link time: ${_output}")
+        message(WARNING "QGC: PIE not supported by toolchain: ${_output}")
     endif()
 endfunction()
 
+#[[============================================================================
+Function: qgc_enable_ipo
+
+Description:
+    Enables Inter-Procedural Optimization (IPO/LTO) for Release builds.
+    IPO can significantly improve runtime performance at the cost of longer
+    link times.
+
+Parameters:
+    None
+
+Notes:
+    - Only enabled for Release builds to avoid slow Debug builds
+    - Also known as Link-Time Optimization (LTO)
+    - Can reduce binary size and improve performance by 5-15%
+    - Requires significant memory during linking
+
+Example:
+    qgc_enable_ipo()
+============================================================================]]
 function(qgc_enable_ipo)
-    if(CMAKE_BUILD_TYPE STREQUAL "Release")
+    if(CMAKE_BUILD_TYPE MATCHES "^(Release|RelWithDebInfo|MinSizeRel)$")
         include(CheckIPOSupported)
         check_ipo_supported(RESULT _result OUTPUT _output)
+
         if(_result)
-            set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
-            message(STATUS "QGC: LTO is enabled")
+            set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE PARENT_SCOPE)
+            message(STATUS "QGC: IPO/LTO (Link-Time Optimization) enabled for ${CMAKE_BUILD_TYPE}")
         else()
-            message(WARNING "QGC: IPO is not supported: ${_output}")
+            message(STATUS "QGC: IPO/LTO not supported by toolchain: ${_output}")
         endif()
+    else()
+        message(STATUS "QGC: IPO/LTO disabled for ${CMAKE_BUILD_TYPE} build")
     endif()
 endfunction()
