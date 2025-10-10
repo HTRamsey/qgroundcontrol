@@ -1,3 +1,5 @@
+add_subdirectory(QGCStyle)
+
 target_sources(${CMAKE_PROJECT_NAME}
     PRIVATE
         EditPositionDialogController.cc
@@ -114,39 +116,18 @@ qt_add_qml_module(QGroundControlControlsModule
         PreFlightCheckButton.qml
         PreFlightCheckGroup.qml
         PreFlightCheckModel.qml
-        QGCButton.qml
-        QGCCheckBox.qml
         QGCCheckBoxSlider.qml
         QGCColoredImage.qml
         QGCColumnButton.qml
-        QGCComboBox.qml
-        QGCDelayButton.qml
         QGCDynamicObjectManager.qml
         QGCFileDialog.qml
-        QGCFlickable.qml
         QGCFlickableScrollIndicator.qml
-        QGCGroupBox.qml
-        QGCLabel.qml
-        QGCListView.qml
         QGCMapLabel.qml
         QGCMarqueeLabel.qml
-        QGCMenu.qml
-        QGCMenuItem.qml
-        QGCMenuSeparator.qml
-        QGCMouseArea.qml
         QGCMovableItem.qml
         QGCOptionsComboBox.qml
-        QGCPageIndicator.qml
-        QGCPopupDialog.qml
-        QGCRadioButton.qml
         QGCRoundButton.qml
         QGCSimpleMessageDialog.qml
-        QGCSlider.qml
-        QGCSwipeView.qml
-        QGCSwitch.qml
-        QGCTabBar.qml
-        QGCTabButton.qml
-        QGCTextField.qml
         QGCToolBarButton.qml
         QGCToolInsets.qml
         RCChannelMonitor.qml
@@ -234,6 +215,8 @@ qt_add_qml_module(QGroundControlControlsModule
         OfflineMapEditor.qml
 
         ScreenTools.qml
+    IMPORTS
+        QGCStyle
     NO_PLUGIN
 )
 

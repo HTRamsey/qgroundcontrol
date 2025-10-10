@@ -92,6 +92,7 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
         FirstRunPromptDialogsModule
         FlightDisplayModule
         FlightMapModule
+        QGCStyleModule
         QGroundControlControlsModule
         QGroundControlModule
         ToolbarModule
