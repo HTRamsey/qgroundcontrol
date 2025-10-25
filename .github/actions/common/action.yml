@@ -11,9 +11,15 @@ runs:
 
     - name: Create build directory
       shell: bash
-      run: mkdir -p "$RUNNER_TEMP/build"
+      run: |
+        set -e
+        mkdir -p "$RUNNER_TEMP/build"
+        echo "Build directory created at $RUNNER_TEMP/build"
 
     - name: Fetch all tags (for version-string logic)
       shell: bash
       working-directory: ${{ github.workspace }}
-      run: git fetch --all --tags --force --depth 1
+      run: |
+        set -e
+        git fetch --all --tags --force --depth 1
+        echo "Latest tag: $(git describe --tags --abbrev=0 2>/dev/null || echo 'none')"

@@ -50,14 +50,21 @@ runs:
     - name: Update Android SDK / NDK / Tools
       shell: bash
       run: |
+        set -e
+        echo "Setting Android environment variables..."
         echo "ANDROID_NDK_ROOT=${{ steps.setup-ndk.outputs.ndk-path }}" >> "$GITHUB_ENV"
         echo "ANDROID_NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}" >> "$GITHUB_ENV"
         echo "ANDROID_NDK=${{ steps.setup-ndk.outputs.ndk-path }}" >> "$GITHUB_ENV"
+        echo "NDK path: ${{ steps.setup-ndk.outputs.ndk-path }}"
+
+        echo "Updating Android SDK..."
         if [[ "$RUNNER_OS" == "Windows" ]]; then
           "${ANDROID_SDK_ROOT}"/cmdline-tools/latest/bin/sdkmanager.bat --update
+          echo "Gradle version:"
           "${GITHUB_WORKSPACE}"/android/gradlew.bat --version
         else
           sdkmanager --update
+          echo "Gradle version:"
           "${GITHUB_WORKSPACE}"/android/gradlew --version
         fi
 

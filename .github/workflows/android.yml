@@ -1,0 +1,170 @@
+name: Android
+
+# Build QGroundControl for Android on Linux, macOS, and Windows runners
+
+on:
+  push:
+    branches:
+      - master
+      - 'Stable*'
+    tags:
+      - 'v*'
+    paths-ignore:
+      - 'docs/**'
+  pull_request:
+    paths:
+      - '.github/workflows/android.yml'
+      - '.github/actions/**'
+      - 'deploy/android/**'
+      - 'src/**'
+      - 'android/**'
+      - 'CMakeLists.txt'
+      - 'cmake/**'
+      - 'translations/*'
+  workflow_dispatch:
+  merge_group:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' && github.ref_type != 'tag' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Android ${{ matrix.os_name }} ${{ matrix.build_type }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            os_name: Linux
+            host: linux
+            arch: linux_gcc_64
+            qt_host_path: gcc_64
+            abis: 'arm64-v8a;armeabi-v7a'
+            build_type: Release
+            shell: bash
+            upload_aws: true
+            free_disk_space: true
+            path_separator: '/'
+
+          - os: macos-latest
+            os_name: macOS
+            host: mac
+            arch: clang_64
+            qt_host_path: macos
+            abis: 'arm64-v8a'
+            build_type: Release
+            shell: bash
+            upload_aws: false
+            free_disk_space: false
+            path_separator: '/'
+
+          - os: windows-latest
+            os_name: Windows
+            host: windows
+            arch: win64_msvc2022_64
+            qt_host_path: msvc2022_64
+            abis: 'arm64-v8a'
+            build_type: Release
+            shell: cmd
+            upload_aws: false
+            free_disk_space: false
+            path_separator: '\'
+
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
+
+    env:
+      PACKAGE: QGroundControl
+      QT_VERSION: 6.10.0
+      QT_ANDROID_KEYSTORE_PATH: ${{ matrix.os == 'windows-latest' && format('{0}\deploy\android\android_release.keystore', github.workspace) || format('{0}/deploy/android/android_release.keystore', github.workspace) }}
+      QT_ANDROID_KEYSTORE_ALIAS: QGCAndroidKeyStore
+      QT_ANDROID_KEYSTORE_STORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      QT_ANDROID_KEYSTORE_KEY_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      QT_ANDROID_ABIS: ${{ matrix.abis }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+          fetch-depth: ${{ github.ref_type == 'tag' && 0 || 1 }}
+          fetch-tags: true
+
+      - name: Initial Setup
+        uses: ./.github/actions/common
+
+      - name: Free Disk Space
+        if: matrix.free_disk_space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: false
+          large-packages: false
+
+      - name: Install Qt for Android
+        uses: ./.github/actions/qt-android
+        with:
+          host: ${{ matrix.host }}
+          arch: ${{ matrix.arch }}
+          version: ${{ env.QT_VERSION }}
+          abis: ${{ env.QT_ANDROID_ABIS }}
+          cpm-modules: ${{ runner.temp }}${{ matrix.path_separator }}build${{ matrix.path_separator }}cpm_modules
+
+      - name: Configure
+        working-directory: ${{ runner.temp }}/build
+        run: ${{ env.QT_ROOT_DIR }}/bin/qt-cmake -S ${{ github.workspace }} -B . -G Ninja
+              -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+              -DCMAKE_WARN_DEPRECATED=FALSE
+              -DQT_ANDROID_ABIS="${{ env.QT_ANDROID_ABIS }}"
+              -DQT_ANDROID_BUILD_ALL_ABIS=OFF
+              -DQT_HOST_PATH="${{ env.QT_ROOT_DIR }}/../${{ matrix.qt_host_path }}"
+              -DQT_ANDROID_SIGN_APK=${{ matrix.os == 'windows-latest' && 'OFF' || (env.QT_ANDROID_KEYSTORE_STORE_PASS != '' && 'ON' || 'OFF') }}
+              -DQGC_STABLE_BUILD=${{ github.ref_type == 'tag' || contains(github.ref, 'Stable') && 'ON' || 'OFF' }}
+
+      - name: Build
+        working-directory: ${{ runner.temp }}/build
+        run: |
+          echo "BUILD_START_TIME=$(date +%s)" >> $GITHUB_ENV
+          cmake --build . --target all --config ${{ matrix.build_type }} --parallel
+        shell: bash
+
+      - name: Record Build Time
+        shell: bash
+        run: |
+          BUILD_END_TIME=$(date +%s)
+          BUILD_DURATION=$((BUILD_END_TIME - BUILD_START_TIME))
+          echo "Build completed in ${BUILD_DURATION} seconds"
+          echo "BUILD_DURATION=${BUILD_DURATION}" >> $GITHUB_ENV
+
+      - name: Copy APK (Unix)
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: cp ${{ runner.temp }}/build/android-build/*.apk ${{ runner.temp }}/build/${{ env.PACKAGE }}.apk
+
+      - name: Copy APK (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: cmd
+        run: copy ${{ runner.temp }}\build\android-build\*.apk ${{ runner.temp }}\build\${{ env.PACKAGE }}.apk
+
+      - name: Upload Build File
+        if: matrix.build_type == 'Release'
+        uses: ./.github/actions/upload
+        permissions:
+          contents: write
+        with:
+          artifact_name: ${{ env.PACKAGE }}-${{ matrix.os_name }}.apk
+          package_name: ${{ env.PACKAGE }}
+          aws_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws_distribution_id: ${{ secrets.AWS_DISTRIBUTION_ID }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          upload_aws: ${{ matrix.upload_aws }}
+          retention-days: ${{ github.ref_type == 'tag' && 90 || 7 }}

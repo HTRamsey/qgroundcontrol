@@ -1,5 +1,7 @@
 name: Windows
 
+# Build QGroundControl for Windows (x64, ARM64, and cross-compiled)
+
 on:
   push:
     branches:
@@ -12,20 +14,27 @@ on:
   pull_request:
     paths:
       - .github/workflows/windows.yml
+      - .github/actions/**
       - deploy/windows/**
       - src/**
       - CMakeLists.txt
       - cmake/**
       - tools/setup/*windows*
+  workflow_dispatch:
+  merge_group:
 
-# concurrency:
-#   group: ${{ github.workflow }}-${{ github.ref }}
-#   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' && github.ref_type != 'tag' }}
+
+permissions:
+  contents: read
 
 jobs:
   build:
     name: Build ${{ matrix.arch }} ${{ matrix.build_type }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
 
     strategy:
       fail-fast: false
@@ -61,15 +70,11 @@ jobs:
         uses: actions/checkout@v5
         with:
           submodules: recursive
-          fetch-depth: 1
+          fetch-depth: ${{ github.ref_type == 'tag' && 0 || 1 }}
           fetch-tags: true
 
       - name: Common setup
         uses: ./.github/actions/common
-
-      # - name: Install dependencies
-      #   shell: pwsh
-      #   run: ./tools/setup/install-dependencies-windows.ps1 -Force
 
       - name: Install GStreamer
         if: matrix.arch == 'win64_msvc2022_64'
@@ -86,16 +91,13 @@ jobs:
           cpm-modules: ${{ runner.temp }}\build\cpm_modules
 
       - name: Install Qt ${{ env.QT_VERSION }}
-        uses: jurplel/install-qt-action@v4
+        uses: ./.github/actions/qt-install
         with:
           version: ${{ env.QT_VERSION }}
           host: ${{ matrix.host }}
           target: desktop
           arch: ${{ matrix.arch }}
           dir: ${{ runner.temp }}
-          modules: qtcharts qtlocation qtpositioning qtspeech qt5compat qtmultimedia qtserialport qtimageformats qtshadertools qtconnectivity qtquick3d qtsensors
-          setup-python: false
-          cache: true
 
       - name: Set up MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
@@ -112,8 +114,15 @@ jobs:
             -DQT_HOST_PATH=${{ (matrix.arch == 'win64_msvc2022_arm64_cross_compiled') && format('{0}\\..\\msvc2022_64', env.QT_ROOT_DIR) || '' }}
 
       - name: Build
+        shell: bash
         working-directory: ${{ runner.temp }}\build
-        run: cmake --build . --target all --config ${{ matrix.build_type }} --parallel
+        run: |
+          BUILD_START_TIME=$(date +%s)
+          cmake --build . --target all --config ${{ matrix.build_type }} --parallel
+          BUILD_END_TIME=$(date +%s)
+          BUILD_DURATION=$((BUILD_END_TIME - BUILD_START_TIME))
+          echo "Build completed in ${BUILD_DURATION} seconds"
+          echo "BUILD_DURATION=${BUILD_DURATION}" >> $GITHUB_ENV
 
       - name: Verify Executable
         if: matrix.build_type == 'Release' && matrix.arch != 'win64_msvc2022_arm64_cross_compiled'
@@ -127,6 +136,8 @@ jobs:
       - name: Upload artifact (installer)
         if: matrix.build_type == 'Release'
         uses: ./.github/actions/upload
+        permissions:
+          contents: write
         with:
           artifact_name: ${{ matrix.package }}.exe
           package_name: ${{ matrix.package }}
@@ -135,3 +146,4 @@ jobs:
           aws_distribution_id: ${{ secrets.AWS_DISTRIBUTION_ID }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
           upload_aws: ${{ matrix.arch == 'win64_msvc2022_arm64_cross_compiled' && 'false' || 'true' }}
+          retention-days: ${{ github.ref_type == 'tag' && 90 || 7 }}

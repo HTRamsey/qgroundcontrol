@@ -1,5 +1,6 @@
 name: Crowdin - Upload Guide sources (en)
 
+# Upload English documentation to Crowdin for translation
 # https://github.com/crowdin/github-action/tree/master
 
 on:
@@ -17,10 +18,14 @@ on:
       - 'docs/en/**'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   upload-to-crowdin:
     if: github.event.pull_request.merged == true || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout

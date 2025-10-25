@@ -1,5 +1,12 @@
 name: flatpak
+
+# Build QGroundControl Flatpak package
+
 on: [workflow_dispatch]
+
+permissions:
+  contents: read
+
 jobs:
   flatpak-builder:
     name: Flatpak

@@ -24,8 +24,12 @@ runs:
         cache-dependency-path: build-action/package-lock.json
 
     - name: Build ${{ inputs.repo }}
-      run: |
-        cd build-action
-        npm ci || npm install
-        npm run build
       shell: bash
+      run: |
+        set -e
+        cd build-action
+        echo "Installing dependencies for ${{ inputs.repo }}..."
+        npm ci || npm install
+        echo "Building action..."
+        npm run build
+        echo "Build complete"

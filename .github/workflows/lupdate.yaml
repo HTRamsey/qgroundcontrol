@@ -1,5 +1,7 @@
 name: Update Translations
 
+# Update Qt translation files using lupdate
+
 on:
   workflow_dispatch:
 #   schedule:
@@ -11,13 +13,12 @@ concurrency:
 
 permissions:
   contents: write
+  pull-requests: write
 
 jobs:
   update-translations:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repo

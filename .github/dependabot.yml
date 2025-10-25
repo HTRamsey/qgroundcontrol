@@ -4,5 +4,12 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+      day: monday
+      time: "09:00"
+    labels:
+      - dependencies
+      - github-actions
     commit-message:
       prefix: "[ci] "
+      include: scope
+    open-pull-requests-limit: 10

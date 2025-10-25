@@ -1,5 +1,7 @@
 name: Custom build
 
+# Build custom QGroundControl variant
+
 on:
   push:
     branches:
@@ -11,21 +13,28 @@ on:
       - docs/**
   pull_request:
     paths:
-      - .github/workflows/windows.yml
+      - .github/workflows/custom.yml
+      - .github/actions/**
       - deploy/windows/**
       - src/**
       - custom-example/**
       - CMakeLists.txt
       - cmake/**
       - tools/setup/*windows*
+  workflow_dispatch:
+  merge_group:
 
-# concurrency:
-#   group: ${{ github.workflow }}-${{ github.ref }}
-#   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' && github.ref_type != 'tag' }}
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: windows-latest
+    timeout-minutes: 120
 
     defaults:
       run:
@@ -40,7 +49,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           submodules: recursive
-          fetch-depth: 1
+          fetch-depth: ${{ github.ref_type == 'tag' && 0 || 1 }}
           fetch-tags: true
 
       - name: Initial Setup
@@ -67,16 +76,13 @@ jobs:
           cpm-modules: ${{ runner.temp }}\build\cpm_modules
 
       - name: Install Qt
-        uses: jurplel/install-qt-action@v4
+        uses: ./.github/actions/qt-install
         with:
           version: ${{ env.QT_VERSION }}
           host: windows
           target: desktop
           arch: win64_msvc2022_64
           dir: ${{ runner.temp }}
-          modules: qtcharts qtlocation qtpositioning qtspeech qt5compat qtmultimedia qtserialport qtimageformats qtshadertools qtconnectivity qtquick3d qtsensors
-          setup-python: false
-          cache: true
 
       - name: Set up MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
@@ -89,8 +95,15 @@ jobs:
             -DQGC_STABLE_BUILD=${{ github.ref_type == 'tag' || contains(github.ref, 'Stable') && 'ON' || 'OFF' }}
 
       - name: Build
+        shell: bash
         working-directory: ${{ runner.temp }}\build
-        run: cmake --build . --target all --config Release --parallel
+        run: |
+          BUILD_START_TIME=$(date +%s)
+          cmake --build . --target all --config Release --parallel
+          BUILD_END_TIME=$(date +%s)
+          BUILD_DURATION=$((BUILD_END_TIME - BUILD_START_TIME))
+          echo "Build completed in ${BUILD_DURATION} seconds"
+          echo "BUILD_DURATION=${BUILD_DURATION}" >> $GITHUB_ENV
 
       - name: Verify executable
         working-directory: ${{ runner.temp }}\build\Release

@@ -1,5 +1,7 @@
 name: Docker-Linux
 
+# Build QGroundControl using Docker container
+
 on:
   push:
     branches:
@@ -12,19 +14,26 @@ on:
   pull_request:
     paths:
       - '.github/workflows/docker-linux.yml'
+      - '.github/actions/**'
       - 'deploy/docker/**'
       - 'deploy/linux/**'
       - 'src/**'
       - 'CMakeLists.txt'
       - 'cmake/**'
+  workflow_dispatch:
+  merge_group:
 
-# concurrency:
-#   group: ${{ github.workflow }}-${{ github.ref }}
-#   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' && github.ref_type != 'tag' }}
+
+permissions:
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
 
     defaults:
       run:
@@ -35,7 +44,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           submodules: recursive
-          fetch-depth: 1
+          fetch-depth: ${{ github.ref_type == 'tag' && 0 || 1 }}
           fetch-tags: true
 
       - name: Get all tags for correct version determination
