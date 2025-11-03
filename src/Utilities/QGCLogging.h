@@ -14,6 +14,8 @@
 #include <QtCore/QStringListModel>
 #include <QtCore/QTimer>
 
+#include <atomic>
+
 Q_DECLARE_LOGGING_CATEGORY(QGCLoggingLog)
 
 class QGCLogging : public QStringListModel
@@ -59,9 +61,11 @@ private:
     QFile _logFile;
     QTimer _flushTimer;
     QStringList _pendingDiskWrites;
-    bool _ioError = false;
+    std::atomic<bool> _ioError{false};
 
     static constexpr int kMaxLogFileSize = 10LL * 1024 * 1024;
     static constexpr int kMaxBackupFiles = 5;
     static constexpr int kFlushIntervalMSecs = 1000;
+    // Assumes average log line is ~100 bytes
+    static constexpr int kMaxLogRows = kMaxLogFileSize / 100;
 };

@@ -11,15 +11,15 @@
 
 #include "QmlObjectListModel.h"
 
+#include <QtCore/QHash>
 #include <QtCore/QLoggingCategory>
 #include <QtCore/QObject>
 #include <QtCore/QStringList>
-#include <QtCore/QMap>
 
 class QGCLoggingCategoryItem;
 
 /// This is a QGC specific replacement for Q_LOGGING_CATEGORY. It will register the category name into a
-/// global list. It's usage is the same as Q_LOGGING_CATEOGRY.
+/// global list. Its usage is the same as Q_LOGGING_CATEGORY.
 #define QGC_LOGGING_CATEGORY(name, categoryStr) \
     static QGCLoggingCategory qgcCategory ## name (categoryStr); \
     Q_LOGGING_CATEGORY(name, categoryStr, QtWarningMsg)
@@ -45,7 +45,7 @@ public:
     QmlObjectListModel *flatCategoryModel() { return &_flatCategoryModel; }
 
     /// Returns true if logging is turned on for the specified category.
-    static bool categoryLoggingOn(const QString &fullCategroryName);
+    static bool categoryLoggingOn(const QString &fullCategoryName);
 
     /// Sets the logging filters rules from saved settings.
     ///     @param commandLineLogggingOptions Logging options which were specified on the command line
@@ -64,6 +64,7 @@ private:
 
     QmlObjectListModel _treeCategoryModel;
     QmlObjectListModel _flatCategoryModel;
+    QHash<QString, QGCLoggingCategoryItem*> _categoryLookup;  // O(1) lookup by full category name
 
     static constexpr const char *kFilterRulesSettingsGroup = "LoggingFilters";
 };

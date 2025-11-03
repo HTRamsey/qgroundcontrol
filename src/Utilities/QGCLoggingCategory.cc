@@ -33,45 +33,42 @@ void QGCLoggingCategoryManager::_insertSorted(QmlObjectListModel* model, QGCLogg
     model->append(item);
 }
 
-void QGCLoggingCategoryManager::registerCategory(const QString &fullCategory) 
-{ 
-    //qDebug() << "Registering logging full category" << fullCategory;
+void QGCLoggingCategoryManager::registerCategory(const QString &fullCategory)
+{
+    // Avoid duplicate registration
+    if (_categoryLookup.contains(fullCategory)) {
+        return;
+    }
 
     QString parentCategory;
     QString childCategory(fullCategory);
     auto currentParentModel = &_treeCategoryModel;
 
-    auto hierarchyIndex = fullCategory.indexOf(".");
+    const int hierarchyIndex = fullCategory.indexOf(".");
     if (hierarchyIndex != -1) {
         parentCategory = fullCategory.left(hierarchyIndex);
         childCategory = fullCategory.mid(hierarchyIndex + 1);
-        QString fullParentCategory = parentCategory + ".";
-        //qDebug() << "  Parent category" << parentCategory << "child category" << childCategory << "full parent category" << fullParentCategory;
-        
-        bool found = false;
-        for (int j=0; j<currentParentModel->count(); j++) {
-            auto item = qobject_cast<QGCLoggingCategoryItem*>(currentParentModel->get(j));
-            if (item->fullCategory == fullParentCategory && item->children) {
-                //qDebug() << "  Found existing parent full category" << item->fullCategory;
-                currentParentModel = item->children;
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
+        const QString fullParentCategory = parentCategory + ".";
+
+        // Check if parent already exists in lookup
+        QGCLoggingCategoryItem* parentItem = _categoryLookup.value(fullParentCategory, nullptr);
+        if (parentItem && parentItem->children) {
+            currentParentModel = parentItem->children;
+        } else {
+            // Create new parent
             auto newParentItem = new QGCLoggingCategoryItem(parentCategory, fullParentCategory, false /* enabled */, currentParentModel);
             newParentItem->children = new QmlObjectListModel(newParentItem);
             _insertSorted(&_flatCategoryModel, newParentItem);
             _insertSorted(currentParentModel, newParentItem);
+            _categoryLookup.insert(fullParentCategory, newParentItem);
             currentParentModel = newParentItem->children;
-            //qDebug() << "  New parent full category" << newParentItem->fullCategory;
         }
     }
 
     auto categoryItem = new QGCLoggingCategoryItem(childCategory, fullCategory, false /* enabled */, currentParentModel);
     _insertSorted(&_flatCategoryModel, categoryItem);
     _insertSorted(currentParentModel, categoryItem);
-    //qDebug() << "  New category full category" << categoryItem->fullCategory << "childCategory" << childCategory;
+    _categoryLookup.insert(fullCategory, categoryItem);
 }
 
 void QGCLoggingCategoryManager::setCategoryLoggingOn(const QString &fullCategoryName, bool enable)
@@ -174,14 +171,7 @@ void QGCLoggingCategoryManager::disableAllCategories()
 
 QGCLoggingCategoryItem *QGCLoggingCategoryManager::_findLoggingCategory(const QString &fullCategoryName)
 {
-    for (int i=0; i<_flatCategoryModel.count(); i++) {
-        auto item = qobject_cast<QGCLoggingCategoryItem*>(_flatCategoryModel.get(i));
-        if (item->fullCategory == fullCategoryName) {
-            return item;
-        }
-    }
-
-    return nullptr;
+    return _categoryLookup.value(fullCategoryName, nullptr);
 }
 
 QGCLoggingCategoryItem::QGCLoggingCategoryItem(const QString& _shortCategory, const QString& _fullCategory, bool _enabled, QObject* parent)

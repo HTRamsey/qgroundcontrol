@@ -14,7 +14,10 @@
 #include "SettingsManager.h"
 
 #include <QtConcurrent/QtConcurrentRun>
+#include <QtCore/QFutureWatcher>
 #include <QtCore/QGlobalStatic>
+#include <QtCore/QPointer>
+#include <QtCore/QSaveFile>
 #include <QtCore/QStringListModel>
 #include <QtCore/QTextStream>
 
@@ -29,9 +32,12 @@ static void msgHandler(QtMsgType type, const QMessageLogContext &context, const 
     // Format the message using Qt's pattern
     const QString message = qFormatLogMessage(type, context, msg);
 
-    // Filter out Qt Quick internals
-    if (QGCLogging::instance() && !QString(context.category).startsWith("qt.quick")) {
-        QGCLogging::instance()->log(message);
+    // Filter out Qt Quick internals - use QLatin1String to avoid QString construction
+    if (QGCLogging::instance()) {
+        const QLatin1String category(context.category);
+        if (!category.startsWith(QLatin1String("qt.quick"))) {
+            QGCLogging::instance()->log(message);
+        }
     }
 
     // Call the previous handler if it exists
@@ -48,7 +54,7 @@ QGCLogging *QGCLogging::instance()
 QGCLogging::QGCLogging(QObject *parent)
     : QStringListModel(parent)
 {
-    qCDebug(QGCLoggingLog) << this;
+    qCDebug(QGCLoggingLog) << "QGCLogging initialized";
 
     _flushTimer.setInterval(kFlushIntervalMSecs);
     _flushTimer.setSingleShot(false);
@@ -66,7 +72,18 @@ QGCLogging::QGCLogging(QObject *parent)
 
 QGCLogging::~QGCLogging()
 {
-    qCDebug(QGCLoggingLog) << this;
+    qCDebug(QGCLoggingLog) << "QGCLogging shutting down - flushing pending logs";
+
+    // Stop timer to prevent any new flushes during shutdown
+    _flushTimer.stop();
+
+    // Perform final flush of any pending logs
+    _flushToDisk();
+
+    // Close log file
+    if (_logFile.isOpen()) {
+        _logFile.close();
+    }
 }
 
 void QGCLogging::installHandler()
@@ -94,7 +111,6 @@ void QGCLogging::_threadsafeLog(const QString &message)
     (void) setData(index(line, 0), message, Qt::DisplayRole);
 
     // Trim old entries to cap memory usage
-    static constexpr const int kMaxLogRows = kMaxLogFileSize / 100;
     if (rowCount() > kMaxLogRows) {
         const int removeCount = rowCount() - kMaxLogRows;
         beginRemoveRows(QModelIndex(), 0, removeCount - 1);
@@ -122,20 +138,23 @@ void QGCLogging::_rotateLogs()
     for (int i = kMaxBackupFiles - 1; i >= 1; --i) {
         const QString from = QStringLiteral("%1/%2.%3.%4").arg(dir, name).arg(i).arg(ext);
         const QString to = QStringLiteral("%1/%2.%3.%4").arg(dir, name).arg(i+1).arg(ext);
-        if (QFile::exists(to)) {
-            (void) QFile::remove(to);
+        if (QFile::exists(to) && !QFile::remove(to)) {
+            qCWarning(QGCLoggingLog) << "Failed to remove old log backup:" << to;
+            // Continue anyway - better partial rotation than nothing
         }
-        if (QFile::exists(from)) {
-            (void) QFile::rename(from, to);
+        if (QFile::exists(from) && !QFile::rename(from, to)) {
+            qCWarning(QGCLoggingLog) << "Failed to rotate log from" << from << "to" << to;
         }
     }
 
-    // Move the just‐closed log to “.1”
+    // Move the just‐closed log to ".1"
     const QString firstBackup = QStringLiteral("%1/%2.1.%3").arg(dir, name, ext);
-    if (QFile::exists(firstBackup)) {
-        (void) QFile::remove(firstBackup);
+    if (QFile::exists(firstBackup) && !QFile::remove(firstBackup)) {
+        qCWarning(QGCLoggingLog) << "Failed to remove first backup:" << firstBackup;
     }
-    (void) QFile::rename(basePath, firstBackup);
+    if (!QFile::rename(basePath, firstBackup)) {
+        qCWarning(QGCLoggingLog) << "Failed to rename current log to backup:" << basePath << "->" << firstBackup;
+    }
 
     // Re‑open a fresh log file
     _logFile.setFileName(basePath);
@@ -170,23 +189,31 @@ void QGCLogging::_flushToDisk()
         }
     }
 
-    // Check size before writing
-    if (_logFile.size() >= kMaxLogFileSize) {
-        _rotateLogs();
-    }
-
-    // Write all pending lines
-    QTextStream out(&_logFile);
+    // Write all pending lines - use direct write for better performance
+    int writtenCount = 0;
     for (const QString &line : std::as_const(_pendingDiskWrites)) {
-        out << line << '\n';
-        if (out.status() != QTextStream::Ok) {
+        const QByteArray data = line.toUtf8() + '\n';
+        const qint64 written = _logFile.write(data);
+        if (written != data.size()) {
             _ioError = true;
             qCWarning(QGCLoggingLog) << "Error writing to log file:" << _logFile.errorString();
             break;
         }
+        writtenCount++;
     }
+
     (void) _logFile.flush();
-    _pendingDiskWrites.clear();
+
+    // Only remove successfully written messages to prevent data loss
+    if (writtenCount > 0) {
+        _pendingDiskWrites.erase(_pendingDiskWrites.begin(),
+                                 _pendingDiskWrites.begin() + writtenCount);
+    }
+
+    // Check size after writing to avoid TOCTOU race - rotate on next flush if needed
+    if (_logFile.size() >= kMaxLogFileSize) {
+        _rotateLogs();
+    }
 }
 
 void QGCLogging::writeMessages(const QString &destFile)
@@ -194,20 +221,32 @@ void QGCLogging::writeMessages(const QString &destFile)
     // Snapshot current logs on GUI thread
     const QStringList logs = stringList();
 
-    // Run the file write in a separate thread
-    (void) QtConcurrent::run([this, destFile, logs]() {
-        emit writeStarted();
-        bool success = false;
-        QSaveFile file(destFile);
-        if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-            QTextStream out(&file);
-            for (const QString &line : logs) {
-                out << line << '\n';
-            }
-            success = ((out.status() == QTextStream::Ok) && file.commit());
-        } else {
-            qCWarning(QGCLoggingLog) << "write failed:" << file.errorString();
+    // Use QPointer for safe 'this' access in case object is destroyed before completion
+    QPointer<QGCLogging> self(this);
+
+    // Set up future watcher to handle completion
+    auto *watcher = new QFutureWatcher<bool>(this);
+    connect(watcher, &QFutureWatcher<bool>::finished, this, [self, watcher]() {
+        if (self) {
+            emit self->writeFinished(watcher->result());
         }
-        emit writeFinished(success);
+        watcher->deleteLater();
     });
+
+    // Run the file write in a separate thread
+    auto future = QtConcurrent::run([logs, destFile]() -> bool {
+        QSaveFile file(destFile);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            qCWarning(QGCLoggingLog) << "write failed:" << file.errorString();
+            return false;
+        }
+        QTextStream out(&file);
+        for (const QString &line : logs) {
+            out << line << '\n';
+        }
+        return (out.status() == QTextStream::Ok) && file.commit();
+    });
+
+    watcher->setFuture(future);
+    emit writeStarted();
 }
