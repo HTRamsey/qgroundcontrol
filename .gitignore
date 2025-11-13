@@ -25,10 +25,15 @@ tags
 build/
 cmake-build-*/
 out/
-CMakeFiles
+CMakeFiles/
+CMakeCache.txt
 CMakeUserPresets.json
+cmake_install.cmake
+CTestTestfile.cmake
+install_manifest.txt
+Testing/
 compile_commands.json
-cpm_modules
+cpm_modules/
 .cache/
 
 # ------------------------------------------------------------------------------

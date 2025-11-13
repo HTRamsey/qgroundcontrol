@@ -252,7 +252,7 @@ void QGCCacheWorker::_saveTile(QGCMapTask *mtask)
     query.addBindValue(task->tile()->format);
     query.addBindValue(task->tile()->img);
     query.addBindValue(task->tile()->img.size());
-    query.addBindValue(task->tile()->type);
+    query.addBindValue(task->tile()->type); // TODO: Convert to int?
     query.addBindValue(QDateTime::currentSecsSinceEpoch());
     if (!query.exec()) {
         // Tile was already there.
@@ -281,11 +281,11 @@ void QGCCacheWorker::_getTile(QGCMapTask* mtask)
     QSqlQuery query(*_db);
     const QString s = QStringLiteral("SELECT tile, format, type FROM Tiles WHERE hash = \"%1\"").arg(task->hash());
     if (query.exec(s) && query.next()) {
-        const QByteArray &arrray = query.value(0).toByteArray();
+        const QByteArray &array = query.value(0).toByteArray();
         const QString &format = query.value(1).toString();
-        const QString &type = query.value(2).toString();
+        const QString type = UrlFactory::getProviderTypeFromQtMapId(query.value(2).toInt());
         qCDebug(QGCTileCacheWorkerLog) << "(Found in DB) HASH:" << task->hash();
-        QGCCacheTile *tile = new QGCCacheTile(task->hash(), arrray, format, type);
+        QGCCacheTile *tile = new QGCCacheTile(task->hash(), array, format, type);
         task->setTileFetched(tile);
         return;
     }
