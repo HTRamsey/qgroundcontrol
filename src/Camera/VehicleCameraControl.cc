@@ -6,7 +6,7 @@
 #include "VideoManager.h"
 #include "QGCCameraManager.h"
 #include "FTPManager.h"
-#include "QGCLZMA.h"
+#include "QGCCompression.h"
 #include "QGCCorePlugin.h"
 #include "Vehicle.h"
 #include "LinkInterface.h"
@@ -2174,16 +2174,9 @@ void VehicleCameraControl::_ftpDownloadComplete(const QString& fileName, const Q
 
     disconnect(_vehicle->ftpManager(), &FTPManager::downloadComplete, this, &VehicleCameraControl::_ftpDownloadComplete);
 
-    QString outputFileName = fileName;
-
-    if (fileName.endsWith(".lzma", Qt::CaseInsensitive) || fileName.endsWith(".xz", Qt::CaseInsensitive)) {
-        outputFileName = fileName.left(fileName.lastIndexOf("."));
-        if (QGCLZMA::inflateLZMAFile(fileName, outputFileName)) {
-            QFile(fileName).remove();
-        } else {
-            qCWarning(CameraControlLog) << "Inflate of compressed xml failed" << fileName;
-            outputFileName.clear();
-        }
+    QString outputFileName = QGCCompression::decompressIfNeeded(fileName);
+    if (outputFileName.isEmpty()) {
+        qCWarning(CameraControlLog) << "Inflate of compressed xml failed" << fileName;
     }
 
     QFile xmlFile(outputFileName);
