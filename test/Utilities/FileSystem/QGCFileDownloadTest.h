@@ -9,4 +9,7 @@ class QGCFileDownloadTest : public UnitTest
 private slots:
     void _testFileDownload();
     void _testCachedFileDownload();
+    void _testAutoDecompressGzip();
+    void _testAutoDecompressDisabled();
+    void _testAutoDecompressUncompressedFile();
 };

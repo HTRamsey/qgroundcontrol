@@ -16,6 +16,8 @@ target_sources(${CMAKE_PROJECT_NAME}
         FileSystem/QGCCachedFileDownload.h
         FileSystem/QGCFileDownload.cc
         FileSystem/QGCFileDownload.h
+        FileSystem/QGCFileHelper.cc
+        FileSystem/QGCFileHelper.h
         FileSystem/QGCTemporaryFile.cc
         FileSystem/QGCTemporaryFile.h
         Platform.cc

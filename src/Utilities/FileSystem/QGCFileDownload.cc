@@ -1,4 +1,5 @@
 #include "QGCFileDownload.h"
+#include "QGCCompression.h"
 #include "QGCLoggingCategory.h"
 
 #include <QtCore/QFileInfo>
@@ -11,12 +12,12 @@ QGCFileDownload::QGCFileDownload(QObject *parent)
     : QObject(parent)
     , _networkManager(new QNetworkAccessManager(this))
 {
-    // qCDebug(QGCFileDownloadLog) << Q_FUNC_INFO << this;
+    qCDebug(QGCFileDownloadLog) << this;
 }
 
 QGCFileDownload::~QGCFileDownload()
 {
-    // qCDebug(QGCFileDownloadLog) << Q_FUNC_INFO << this;
+    qCDebug(QGCFileDownloadLog) << this;
 }
 
 void QGCFileDownload::setCache(QAbstractNetworkCache *cache)
@@ -36,12 +37,20 @@ void QGCFileDownload::setIgnoreSSLErrorsIfNeeded(QNetworkReply &networkReply)
     }
 }
 
-bool QGCFileDownload::download(const QString &remoteFile, const QList<QPair<QNetworkRequest::Attribute,QVariant>> &requestAttributes, bool redirect)
+bool QGCFileDownload::download(const QString &remoteFile,
+                               const QList<QPair<QNetworkRequest::Attribute,QVariant>> &requestAttributes,
+                               bool autoDecompress)
 {
-    if (!redirect) {
-        _requestAttributes = requestAttributes;
-        _originalRemoteFile = remoteFile;
-    }
+    _requestAttributes = requestAttributes;
+    _originalRemoteFile = remoteFile;
+    _autoDecompress = autoDecompress;
+
+    return _downloadInternal(remoteFile, false);
+}
+
+bool QGCFileDownload::_downloadInternal(const QString &remoteFile, bool redirect)
+{
+    Q_UNUSED(redirect);
 
     if (remoteFile.isEmpty()) {
         qCWarning(QGCFileDownloadLog) << "downloadFile empty";
@@ -62,7 +71,7 @@ bool QGCFileDownload::download(const QString &remoteFile, const QList<QPair<QNet
     }
 
     QNetworkRequest networkRequest(remoteUrl);
-    for (const QPair<QNetworkRequest::Attribute,QVariant> &attribute : requestAttributes) {
+    for (const QPair<QNetworkRequest::Attribute,QVariant> &attribute : _requestAttributes) {
         networkRequest.setAttribute(attribute.first, attribute.second);
     }
 
@@ -113,7 +122,7 @@ void QGCFileDownload::_downloadFinished()
     QVariant redirectionTarget = reply->attribute(QNetworkRequest::RedirectionTargetAttribute);
     if (!redirectionTarget.isNull()) {
         const QUrl redirectUrl = reply->url().resolved(redirectionTarget.toUrl());
-        (void) download(redirectUrl.toString(), _requestAttributes, true);
+        (void) _downloadInternal(redirectUrl.toString(), true);
         return;
     }
 
@@ -140,23 +149,39 @@ void QGCFileDownload::_downloadFinished()
     }
     downloadFilename += "/" + remoteFileName;
 
-    if (!downloadFilename.isEmpty()) {
-        // Store downloaded file in download location
-        QFile file(downloadFilename);
-        if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-            emit downloadComplete(_originalRemoteFile, downloadFilename, tr("Could not save downloaded file to %1. Error: %2").arg(downloadFilename, file.errorString()));
-            return;
-        }
-
-        file.write(reply->readAll());
-        file.close();
-
-        emit downloadComplete(_originalRemoteFile, downloadFilename, QString());
-    } else {
+    if (downloadFilename.isEmpty()) {
         const QString errorMsg = "Internal error";
         qCWarning(QGCFileDownloadLog) << errorMsg;
         emit downloadComplete(_originalRemoteFile, downloadFilename, errorMsg);
+        return;
     }
+
+    // Check if we should auto-decompress this file
+    if (_autoDecompress && QGCCompression::isCompressedFile(remoteFileName)) {
+        // Stream decompress directly from QNetworkReply to decompressed output
+        const QString decompressedFilename = QGCCompression::strippedPath(downloadFilename);
+
+        if (QGCCompression::decompressFromDevice(reply, decompressedFilename)) {
+            qCDebug(QGCFileDownloadLog) << "Auto-decompressed" << remoteFileName << "to" << decompressedFilename;
+            emit downloadComplete(_originalRemoteFile, decompressedFilename, QString());
+            return;
+        }
+
+        // Decompression failed - fall back to saving compressed file
+        qCWarning(QGCFileDownloadLog) << "Auto-decompression failed for" << remoteFileName << "- saving compressed file";
+    }
+
+    // Save file normally (either not compressed, or decompression failed/disabled)
+    QFile file(downloadFilename);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        emit downloadComplete(_originalRemoteFile, downloadFilename, tr("Could not save downloaded file to %1. Error: %2").arg(downloadFilename, file.errorString()));
+        return;
+    }
+
+    file.write(reply->readAll());
+    file.close();
+
+    emit downloadComplete(_originalRemoteFile, downloadFilename, QString());
 }
 
 void QGCFileDownload::_downloadError(QNetworkReply::NetworkError code)

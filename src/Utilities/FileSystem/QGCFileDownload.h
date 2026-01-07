@@ -20,15 +20,18 @@ class QGCFileDownload : public QObject
     };
 
 public:
-    QGCFileDownload(QObject *parent = nullptr);
-    ~QGCFileDownload();
+    explicit QGCFileDownload(QObject *parent = nullptr);
+    ~QGCFileDownload() override;
 
     /// Download the specified remote file.
     ///     @param remoteFile File to download. Can be http address or file system path.
     ///     @param requestAttributes Optional request attributes to set
-    ///     @param redirect true: call is internal due to redirect
+    ///     @param autoDecompress If true, automatically decompress .gz/.xz/.zst/.bz2/.lz4 files
+    ///                           during download (streams directly to decompressed output)
     ///     @return true: Asynchronous download has started, false: Download initialization failed
-    bool download(const QString &remoteFile, const QList<QPair<QNetworkRequest::Attribute,QVariant>> &requestAttributes = {}, bool redirect = false);
+    bool download(const QString &remoteFile,
+                  const QList<QPair<QNetworkRequest::Attribute,QVariant>> &requestAttributes = {},
+                  bool autoDecompress = false);
 
     void setCache(QAbstractNetworkCache *cache);
 
@@ -45,7 +48,10 @@ private slots:
     void _downloadError(QNetworkReply::NetworkError code);
 
 private:
+    bool _downloadInternal(const QString &remoteFile, bool redirect);
+
     QNetworkAccessManager *_networkManager = nullptr;
     QString _originalRemoteFile;
     QList<QPair<QNetworkRequest::Attribute, QVariant>> _requestAttributes;
+    bool _autoDecompress = false;
 };

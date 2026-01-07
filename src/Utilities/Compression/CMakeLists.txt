@@ -1,17 +1,22 @@
 # ============================================================================
-# Compression Subsystem
-# Unified compression/decompression using libarchive
+# Decompression Subsystem
+# Unified decompression using libarchive (decompression-only)
 # Formats: ZIP, GZIP, XZ/LZMA, ZSTD, LZ4, BZip2
 # ============================================================================
 
 target_sources(${CMAKE_PROJECT_NAME}
     PRIVATE
-        # Unified compression interface
+        # Unified decompression interface
         QGCCompression.cc
         QGCCompression.h
-        # libarchive-based implementation
+        # libarchive-based implementation (private)
         QGClibarchive.cc
         QGClibarchive.h
+        # QIODevice streaming wrappers
+        QGCDecompressDevice.cc
+        QGCDecompressDevice.h
+        QGCArchiveFile.cc
+        QGCArchiveFile.h
 )
 
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
@@ -46,6 +51,7 @@ CPMAddPackage(
         "ZLIB_BUILD_MINIZIP OFF"
         "ZLIB_INSTALL OFF"
         "ZLIB_PREFIX OFF"
+        "WITH_GZFILEOP OFF"              # QGC uses libarchive API, not gzFile
         "${ZLIB_EXTRA_OPTIONS}"
 )
 
@@ -83,9 +89,13 @@ CPMAddPackage(
         "XZ_TOOL_SCRIPTS OFF"
         "XZ_NLS OFF"
         "XZ_THREADS no"
-        "XZ_SMALL OFF"
+        "XZ_SMALL ON"                    # Smaller code size (slightly slower)
         "XZ_DOC OFF"
         "XZ_DOXYGEN OFF"
+        "XZ_ENCODERS "                   # Decoder-only: disable all encoders
+        "XZ_MICROLZMA_ENCODER OFF"       # Not used by QGC
+        "XZ_MICROLZMA_DECODER OFF"       # Not used by QGC
+        "XZ_LZIP_DECODER OFF"            # Not used by QGC
 )
 
 if(TARGET liblzma)
@@ -95,8 +105,8 @@ if(TARGET liblzma)
     set(LIBLZMA_FOUND TRUE CACHE BOOL "" FORCE)
     set(LIBLZMA_LIBRARIES "liblzma" CACHE STRING "" FORCE)
     set(LIBLZMA_HAS_AUTO_DECODER TRUE CACHE BOOL "" FORCE)
-    set(LIBLZMA_HAS_EASY_ENCODER TRUE CACHE BOOL "" FORCE)
-    set(LIBLZMA_HAS_LZMA_PRESET TRUE CACHE BOOL "" FORCE)
+    set(LIBLZMA_HAS_EASY_ENCODER FALSE CACHE BOOL "" FORCE)  # Encoders disabled
+    set(LIBLZMA_HAS_LZMA_PRESET FALSE CACHE BOOL "" FORCE)   # Encoders disabled
     set(LibLZMA_FOUND TRUE CACHE BOOL "" FORCE)
     # libarchive's FindLibLZMA expects LibLZMA::LibLZMA target
     if(NOT TARGET LibLZMA::LibLZMA)
@@ -124,6 +134,8 @@ CPMAddPackage(
         "ZSTD_BUILD_SHARED OFF"
         "ZSTD_BUILD_STATIC ON"
         "ZSTD_MULTITHREAD_SUPPORT OFF"
+        "ZSTD_BUILD_COMPRESSION OFF"     # Decoder-only: QGC only decompresses
+        "ZSTD_BUILD_DICTBUILDER OFF"     # Dictionary builder not needed
 )
 
 if(TARGET libzstd_static)
@@ -179,12 +191,17 @@ endif()
 # ============================================================================
 # BZip2 Integration (official repo with CMake support)
 # ============================================================================
+# NOTE: Using commit from master branch because:
+# - Official releases (1.0.8 and earlier) do not include CMakeLists.txt
+# - CMake support was added post-1.0.8 and no new release has been made
+# - Risk: Commit may become unavailable if repo history is rewritten
+# - TODO: Update to tagged release when bzip2 publishes one with CMake support
 
 CPMAddPackage(
     NAME bzip2
     VERSION 1.0.8
     GIT_REPOSITORY https://gitlab.com/bzip2/bzip2.git
-    GIT_TAG 66c46b8c9436613fd81bc5d03f63a61933a4dcc3  # master (tagged releases lack CMake)
+    GIT_TAG 66c46b8c9436613fd81bc5d03f63a61933a4dcc3
     OPTIONS
         "ENABLE_LIB_ONLY ON"
         "ENABLE_SHARED_LIB OFF"

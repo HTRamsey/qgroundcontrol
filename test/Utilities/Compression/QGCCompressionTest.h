@@ -4,7 +4,7 @@
 
 #include <QtCore/QTemporaryDir>
 
-/// Comprehensive tests for QGCCompression (format detection, ZIP, GZIP, LZMA)
+/// Tests for QGCCompression (decompression-only: format detection, extraction, decompression)
 class QGCCompressionTest : public UnitTest
 {
     Q_OBJECT
@@ -20,26 +20,39 @@ private slots:
     void _testFormatDetection();
     void _testFormatHelpers();
 
-    // ZIP archive operations
-    void _testZipRoundtrip();
-    void _testZipNestedDirectories();
-    void _testZipEmptyFiles();
+    // Archive extraction from Qt resources
     void _testZipFromResource();
+    void _test7zFromResource();
+    void _testListArchive();
+    void _testListArchiveDetailed();
+    void _testGetArchiveStats();
+    void _testValidateArchive();
+    void _testFileExists();
+    void _testExtractArchiveFiltered();
+    void _testExtractSingleFile();
+    void _testExtractFileData();
+    void _testExtractMultipleFiles();
+    void _testExtractByPattern();
 
-    // Single-file decompression
-    void _testDecompressGzip();
-    void _testDecompressLZMA();
+    // Single-file decompression from Qt resources
+    void _testDecompressFromResource();
+    void _testDecompressData();
+    void _testDecompressIfNeeded();
+
+    // Progress callbacks
+    void _testProgressCallbackExtract();
+
+    // Edge cases and error handling
+    void _testCorruptArchive();
+    void _testNonExistentInput();
+
+    // QIODevice-based operations
+    void _testDecompressFromDevice();
+    void _testExtractFromDevice();
+    void _testExtractFileDataFromDevice();
 
 private:
-    void _createTestData();
-    bool _compareDirectories(const QString &dir1, const QString &dir2);
     bool _compareFiles(const QString &file1, const QString &file2);
 
-    QTemporaryDir *_testDataDir = nullptr;
     QTemporaryDir *_tempOutputDir = nullptr;
-
-    QString _testTextFile;
-    QString _testBinaryFile;
-    QString _testNestedDir;
-    QString _testNestedFile;
 };
