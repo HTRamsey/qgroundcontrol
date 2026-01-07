@@ -46,7 +46,7 @@ bool ShapeFileHelper::loadPolygonFromFile(const QString &file, QList<QGeoCoordin
 
     switch (_getShapeFileType(file, errorString)) {
     case ShapeFileType::KML:
-        return KMLHelper::loadPolygonFromFile(file, vertices, errorString);
+        return KMLHelper::loadPolygonFromFile(file, vertices, errorString, filterMeters);
     case ShapeFileType::SHP:
         return SHPFileHelper::loadPolygonFromFile(file, vertices, errorString, filterMeters);
     case ShapeFileType::None:
@@ -62,7 +62,7 @@ bool ShapeFileHelper::loadPolylineFromFile(const QString &file, QList<QGeoCoordi
 
     switch (_getShapeFileType(file, errorString)) {
     case ShapeFileType::KML:
-        return KMLHelper::loadPolylineFromFile(file, coords, errorString);
+        return KMLHelper::loadPolylineFromFile(file, coords, errorString, filterMeters);
     case ShapeFileType::SHP:
         return SHPFileHelper::loadPolylineFromFile(file, coords, errorString, filterMeters);
     case ShapeFileType::None:
@@ -77,7 +77,7 @@ int ShapeFileHelper::getEntityCount(const QString &file, QString &errorString)
 
     switch (_getShapeFileType(file, errorString)) {
     case ShapeFileType::KML:
-        return 1;
+        return KMLHelper::getEntityCount(file, errorString);
     case ShapeFileType::SHP:
         return SHPFileHelper::getEntityCount(file, errorString);
     case ShapeFileType::None:
@@ -93,14 +93,7 @@ bool ShapeFileHelper::loadPolygonsFromFile(const QString &file, QList<QList<QGeo
 
     switch (_getShapeFileType(file, errorString)) {
     case ShapeFileType::KML:
-        {
-            QList<QGeoCoordinate> vertices;
-            if (!KMLHelper::loadPolygonFromFile(file, vertices, errorString)) {
-                return false;
-            }
-            polygons.append(vertices);
-            return true;
-        }
+        return KMLHelper::loadPolygonsFromFile(file, polygons, errorString, filterMeters);
     case ShapeFileType::SHP:
         return SHPFileHelper::loadPolygonsFromFile(file, polygons, errorString, filterMeters);
     case ShapeFileType::None:
@@ -116,14 +109,7 @@ bool ShapeFileHelper::loadPolylinesFromFile(const QString &file, QList<QList<QGe
 
     switch (_getShapeFileType(file, errorString)) {
     case ShapeFileType::KML:
-        {
-            QList<QGeoCoordinate> coords;
-            if (!KMLHelper::loadPolylineFromFile(file, coords, errorString)) {
-                return false;
-            }
-            polylines.append(coords);
-            return true;
-        }
+        return KMLHelper::loadPolylinesFromFile(file, polylines, errorString, filterMeters);
     case ShapeFileType::SHP:
         return SHPFileHelper::loadPolylinesFromFile(file, polylines, errorString, filterMeters);
     case ShapeFileType::None:
@@ -139,9 +125,7 @@ bool ShapeFileHelper::loadPointsFromFile(const QString &file, QList<QGeoCoordina
 
     switch (_getShapeFileType(file, errorString)) {
     case ShapeFileType::KML:
-        // KML point loading not supported - use placemarks via KMLHelper if needed
-        errorString = QString(_errorPrefix).arg(tr("Point loading not supported for KML files."));
-        return false;
+        return KMLHelper::loadPointsFromFile(file, points, errorString);
     case ShapeFileType::SHP:
         return SHPFileHelper::loadPointsFromFile(file, points, errorString);
     case ShapeFileType::None:
