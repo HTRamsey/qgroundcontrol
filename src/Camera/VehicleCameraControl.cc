@@ -8,6 +8,7 @@
 #include "FTPManager.h"
 #include "QGCCompression.h"
 #include "QGCCorePlugin.h"
+#include "QGCFileHelper.h"
 #include "Vehicle.h"
 #include "LinkInterface.h"
 #include "MAVLinkProtocol.h"
@@ -20,8 +21,9 @@
 #include <QtXml/QDomDocument>
 #include <QtXml/QDomNodeList>
 #include <QtQml/QQmlEngine>
-#include <QtNetwork/QNetworkProxy>
 #include <QtNetwork/QNetworkReply>
+
+#include "QGCNetworkHelper.h"
 
 //-----------------------------------------------------------------------------
 QGCCameraOptionExclusion::QGCCameraOptionExclusion(QObject* parent, QString param_, QString value_, QStringList exclusions_)
@@ -1574,9 +1576,9 @@ VehicleCameraControl::handleCaptureStatus(const mavlink_camera_capture_status_t&
     //-- Time Lapse
     if(photoCaptureStatus() == PHOTO_CAPTURE_INTERVAL_IDLE || photoCaptureStatus() == PHOTO_CAPTURE_INTERVAL_IN_PROGRESS) {
         //-- Capture local image as well
-        QString photoPath = SettingsManager::instance()->appSettings()->savePath()->rawValue().toString() + QStringLiteral("/Photo");
-        QDir().mkpath(photoPath);
-        photoPath += "/" + QDateTime::currentDateTime().toString("yyyy-MM-dd_hh.mm.ss.zzz") + ".jpg";
+        const QString photoDir = SettingsManager::instance()->appSettings()->savePath()->rawValue().toString() + QStringLiteral("/Photo");
+        QGCFileHelper::ensureDirectoryExists(photoDir);
+        const QString photoPath = photoDir + "/" + QDateTime::currentDateTime().toString("yyyy-MM-dd_hh.mm.ss.zzz") + ".jpg";
         VideoManager::instance()->grabImage(photoPath);
     }
 }
@@ -2129,10 +2131,7 @@ VehicleCameraControl::_httpRequest(const QString &url)
     if(!_netManager) {
         _netManager = new QNetworkAccessManager(this);
     }
-    QNetworkProxy savedProxy = _netManager->proxy();
-    QNetworkProxy tempProxy;
-    tempProxy.setType(QNetworkProxy::DefaultProxy);
-    _netManager->setProxy(tempProxy);
+    QGCNetworkHelper::configureProxy(_netManager);
     QNetworkRequest request(QUrl::fromUserInput(url));
     request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, true);
     QSslConfiguration conf = request.sslConfiguration();
@@ -2140,7 +2139,6 @@ VehicleCameraControl::_httpRequest(const QString &url)
     request.setSslConfiguration(conf);
     QNetworkReply* reply = _netManager->get(request);
     connect(reply, &QNetworkReply::finished,  this, &VehicleCameraControl::_downloadFinished);
-    _netManager->setProxy(savedProxy);
 }
 
 //-----------------------------------------------------------------------------

@@ -9,10 +9,19 @@ target_sources(${CMAKE_PROJECT_NAME}
         # Unified decompression interface
         QGCCompression.cc
         QGCCompression.h
+        QGCCompressionTypes.h
+        # Async job wrapper (QObject with signals)
+        QGCCompressionJob.cc
+        QGCCompressionJob.h
+        # QML model for archive contents
+        QGCArchiveModel.cc
+        QGCArchiveModel.h
         # libarchive-based implementation (private)
         QGClibarchive.cc
         QGClibarchive.h
         # QIODevice streaming wrappers
+        QGCArchiveDeviceBase.cc
+        QGCArchiveDeviceBase.h
         QGCDecompressDevice.cc
         QGCDecompressDevice.h
         QGCArchiveFile.cc

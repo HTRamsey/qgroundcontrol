@@ -3,15 +3,10 @@
 /// @file QGCArchiveFile.h
 /// @brief QIODevice for reading a single entry from an archive
 
-#include <QtCore/QBuffer>
+#include "QGCArchiveDeviceBase.h"
+
 #include <QtCore/QDateTime>
-#include <QtCore/QFile>
-#include <QtCore/QIODevice>
 #include <QtCore/QLoggingCategory>
-
-#include <memory>
-
-struct archive;
 
 Q_DECLARE_LOGGING_CATEGORY(QGCArchiveFileLog)
 
@@ -25,7 +20,7 @@ Q_DECLARE_LOGGING_CATEGORY(QGCArchiveFileLog)
 /// file.open(QIODevice::ReadOnly);
 /// QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
 /// @endcode
-class QGCArchiveFile : public QIODevice
+class QGCArchiveFile : public QGCArchiveDeviceBase
 {
     Q_OBJECT
 
@@ -43,13 +38,10 @@ public:
     /// @note The source device must remain valid until this device is closed
     QGCArchiveFile(QIODevice *source, const QString &entryName, QObject *parent = nullptr);
 
-    ~QGCArchiveFile() override;
+    ~QGCArchiveFile() override = default;
 
     // QIODevice interface
     bool open(OpenMode mode) override;
-    void close() override;
-    bool isSequential() const override { return true; }
-    qint64 bytesAvailable() const override;
     qint64 size() const override;
 
     /// Get entry name being read
@@ -68,51 +60,17 @@ public:
     /// @return Modification time, or invalid QDateTime if unknown
     QDateTime entryModified() const { return _entryModified; }
 
-    /// Get error description
-    /// @return Error string if error occurred, empty otherwise
-    QString errorString() const;
-
-    /// Get detected archive format name (available after open)
-    /// @return Format name like "ZIP 2.0", "POSIX ustar", or empty if not detected
-    QString formatName() const { return _formatName; }
-
-    /// Get detected compression filter name (available after open)
-    /// @return Filter name like "gzip", "xz", "none", or empty if not detected
-    QString filterName() const { return _filterName; }
-
 protected:
-    qint64 readData(char *data, qint64 maxSize) override;
-    qint64 writeData(const char *data, qint64 maxSize) override;
+    bool initArchive() override;
+    bool prepareForReading() override;
+    bool isReadyToRead() const override { return _entryFound; }
+    void resetState() override;
 
 private:
-    bool initArchive();
     bool seekToEntry();
-    bool fillBuffer();
 
-    // Source management
-    QString _archivePath;
     QString _entryName;
-    QIODevice *_sourceDevice = nullptr;
-    bool _ownsSource = false;
-    std::unique_ptr<QIODevice> _ownedSource;
-
-    // libarchive state
-    struct archive *_archive = nullptr;
-    QByteArray _resourceData;  // For Qt resources
     bool _entryFound = false;
-    bool _eof = false;
-
-    // Entry metadata
     qint64 _entrySize = -1;
     QDateTime _entryModified;
-
-    // Decompressed data buffer
-    QByteArray _buffer;
-
-    // Error state
-    QString _errorString;
-
-    // Format info
-    QString _formatName;
-    QString _filterName;
 };

@@ -4,15 +4,14 @@
 /// @brief Private implementation details for QGCCompression
 /// @note This is an internal header - use QGCCompression.h for public API
 
+#include "QGCCompressionTypes.h"
+
 #include <QtCore/QByteArray>
-#include <QtCore/QDateTime>
 #include <QtCore/QFile>
 #include <QtCore/QIODevice>
 #include <QtCore/QLoggingCategory>
 #include <QtCore/QString>
 #include <QtCore/QStringList>
-
-#include <functional>
 
 #include <archive.h>
 
@@ -21,41 +20,15 @@ Q_DECLARE_LOGGING_CATEGORY(QGClibarchiveLog)
 namespace QGClibarchive {
 
 // ============================================================================
-// Types
+// Types (re-export from QGCCompression for internal use)
 // ============================================================================
 
-/// Progress callback for long-running operations
-/// @param bytesProcessed Bytes processed so far
-/// @param totalBytes Total bytes to process (0 if unknown)
-/// @return true to continue, false to cancel operation
-using ProgressCallback = std::function<bool(qint64 bytesProcessed, qint64 totalBytes)>;
+using ProgressCallback = QGCCompression::ProgressCallback;
+using ArchiveEntry = QGCCompression::ArchiveEntry;
+using ArchiveStats = QGCCompression::ArchiveStats;
+using EntryFilter = QGCCompression::EntryFilter;
 
-/// Default Unix permissions for extracted files (rw-r--r--)
-constexpr quint32 kDefaultFilePermissions = 0644;
-
-/// Metadata for a single entry in an archive (internal representation)
-struct EntryInfo {
-    QString name;
-    qint64 size = 0;
-    QDateTime modified;
-    bool isDirectory = false;
-    quint32 permissions = kDefaultFilePermissions;
-};
-
-/// Summary statistics for an archive
-struct ArchiveStats {
-    int totalEntries = 0;
-    int fileCount = 0;
-    int directoryCount = 0;
-    qint64 totalUncompressedSize = 0;
-    qint64 largestFileSize = 0;
-    QString largestFileName;
-};
-
-/// Entry filter callback for selective extraction
-/// @param entry Metadata for the archive entry
-/// @return true to extract this entry, false to skip it
-using EntryFilter = std::function<bool(const EntryInfo &entry)>;
+using QGCCompression::kDefaultFilePermissions;
 
 // ============================================================================
 // Archive Reader Mode
@@ -150,6 +123,15 @@ int deviceCloseCallback(struct archive *a, void *clientData);
 la_int64_t deviceSeekCallback(struct archive *a, void *clientData, la_int64_t offset, int whence);
 
 // ============================================================================
+// Utility Functions
+// ============================================================================
+
+/// Convert libarchive entry to ArchiveEntry struct
+/// @param entry libarchive entry pointer (from archive_read_next_header)
+/// @return Populated ArchiveEntry with name, size, modified time, isDirectory, permissions
+ArchiveEntry toArchiveEntry(struct archive_entry *entry);
+
+// ============================================================================
 // Low-level Operations
 // ============================================================================
 
@@ -171,6 +153,20 @@ bool openArchiveForReading(struct archive *a, const QString &filePath, QByteArra
 bool extractAnyArchive(const QString &archivePath, const QString &outputDirectoryPath,
                        ProgressCallback progress = nullptr,
                        qint64 maxBytes = 0);
+
+/// Extract archive atomically using a temporary staging directory
+/// Provides all-or-nothing semantics: if extraction fails, no partial files remain.
+/// Uses QTemporaryDir to stage files, then moves them to the final destination.
+/// @param archivePath Path to the archive file (or Qt resource path)
+/// @param outputDirectoryPath Path where files will be extracted
+/// @param progress Optional progress callback (return false to cancel)
+/// @param maxBytes Maximum total decompressed bytes (0 = unlimited)
+/// @return true on success, false on failure (no partial files left on failure)
+/// @note Requires ~2x disk space during extraction for staging
+/// @note Cross-filesystem moves may be slower (requires copy + delete)
+bool extractArchiveAtomic(const QString &archivePath, const QString &outputDirectoryPath,
+                          ProgressCallback progress = nullptr,
+                          qint64 maxBytes = 0);
 
 /// Extract a single file from any archive by name
 /// @param archivePath Path to the archive file (or Qt resource path)
@@ -223,8 +219,8 @@ QStringList listArchiveEntries(const QString &archivePath);
 
 /// List all entries in an archive with detailed metadata
 /// @param archivePath Path to the archive file (or Qt resource path)
-/// @return List of EntryInfo structs, empty on failure
-QList<EntryInfo> listArchiveEntriesDetailed(const QString &archivePath);
+/// @return List of ArchiveEntry structs, empty on failure
+QList<ArchiveEntry> listArchiveEntriesDetailed(const QString &archivePath);
 
 /// Get summary statistics for an archive
 /// @param archivePath Path to the archive file (or Qt resource path)

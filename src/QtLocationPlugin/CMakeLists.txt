@@ -84,6 +84,7 @@ target_include_directories(QGCLocation
         ${CMAKE_CURRENT_SOURCE_DIR}/../Settings
         ${CMAKE_CURRENT_SOURCE_DIR}/../Utilities
         ${CMAKE_CURRENT_SOURCE_DIR}/../Utilities/FileSystem
+        ${CMAKE_CURRENT_SOURCE_DIR}/../Utilities/Network
         Providers
 )
 

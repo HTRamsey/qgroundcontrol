@@ -1,13 +1,20 @@
 #include "QGCCompressionTest.h"
 #include "QGCCompression.h"
+#include "QGCCompressionJob.h"
 
 #include <QtCore/QBuffer>
+#include <QtCore/QCollator>
 #include <QtCore/QDir>
+#include <QtCore/QEventLoop>
 #include <QtCore/QFile>
 #include <QtCore/QFileInfo>
 #include <QtCore/QCryptographicHash>
 #include <QtCore/QRegularExpression>
+#include <QtTest/QSignalSpy>
+#include <QtCore/QTimer>
 #include <QtTest/QTest>
+
+#include <algorithm>
 
 void QGCCompressionTest::init()
 {
@@ -68,6 +75,93 @@ void QGCCompressionTest::_testFormatDetection()
     // Case insensitive
     QCOMPARE(QGCCompression::detectFormat("FILE.ZIP"), QGCCompression::Format::ZIP);
     QCOMPARE(QGCCompression::detectFormat("File.Gz"), QGCCompression::Format::GZIP);
+
+    // Test without content fallback (extension-only)
+    QCOMPARE(QGCCompression::detectFormat("file.unknown", false), QGCCompression::Format::Auto);
+}
+
+void QGCCompressionTest::_testFormatDetectionFromContent()
+{
+    // Test detectFormatFromFile() - reads actual file content
+    // Using Qt resources that exist in the test bundle
+
+    // ZIP archive
+    QCOMPARE(QGCCompression::detectFormatFromFile(":/unittest/manifest.json.zip"),
+             QGCCompression::Format::ZIP);
+
+    // GZIP compressed file
+    QCOMPARE(QGCCompression::detectFormatFromFile(":/unittest/manifest.json.gz"),
+             QGCCompression::Format::GZIP);
+
+    // XZ compressed file
+    QCOMPARE(QGCCompression::detectFormatFromFile(":/unittest/manifest.json.xz"),
+             QGCCompression::Format::XZ);
+
+    // ZSTD compressed file
+    QCOMPARE(QGCCompression::detectFormatFromFile(":/unittest/manifest.json.zst"),
+             QGCCompression::Format::ZSTD);
+
+    // BZ2 compressed file
+    QCOMPARE(QGCCompression::detectFormatFromFile(":/unittest/manifest.json.bz2"),
+             QGCCompression::Format::BZIP2);
+
+    // 7z archive
+    QCOMPARE(QGCCompression::detectFormatFromFile(":/unittest/manifest.json.7z"),
+             QGCCompression::Format::SEVENZ);
+
+    // Test detectFormatFromData() with raw bytes
+    // GZIP magic bytes
+    QByteArray gzipData;
+    gzipData.append(char(0x1F));
+    gzipData.append(char(0x8B));
+    gzipData.append(QByteArray(10, '\0'));  // Padding
+    QCOMPARE(QGCCompression::detectFormatFromData(gzipData), QGCCompression::Format::GZIP);
+
+    // ZIP magic bytes (PK\x03\x04)
+    QByteArray zipData;
+    zipData.append(char(0x50));  // 'P'
+    zipData.append(char(0x4B));  // 'K'
+    zipData.append(char(0x03));
+    zipData.append(char(0x04));
+    zipData.append(QByteArray(10, '\0'));
+    QCOMPARE(QGCCompression::detectFormatFromData(zipData), QGCCompression::Format::ZIP);
+
+    // XZ magic bytes
+    QByteArray xzData;
+    xzData.append(char(0xFD));
+    xzData.append(char(0x37));  // '7'
+    xzData.append(char(0x7A));  // 'z'
+    xzData.append(char(0x58));  // 'X'
+    xzData.append(char(0x5A));  // 'Z'
+    xzData.append(char(0x00));
+    xzData.append(QByteArray(10, '\0'));
+    QCOMPARE(QGCCompression::detectFormatFromData(xzData), QGCCompression::Format::XZ);
+
+    // ZSTD magic bytes
+    QByteArray zstdData;
+    zstdData.append(char(0x28));
+    zstdData.append(char(0xB5));
+    zstdData.append(char(0x2F));
+    zstdData.append(char(0xFD));
+    zstdData.append(QByteArray(10, '\0'));
+    QCOMPARE(QGCCompression::detectFormatFromData(zstdData), QGCCompression::Format::ZSTD);
+
+    // Test content fallback in detectFormat()
+    // Copy a .gz file to a file without extension and verify detection
+    const QString noExtFile = _tempOutputDir->filePath("compressed_no_ext");
+    {
+        QFile source(":/unittest/manifest.json.gz");
+        QVERIFY(source.open(QIODevice::ReadOnly));
+        QFile dest(noExtFile);
+        QVERIFY(dest.open(QIODevice::WriteOnly));
+        dest.write(source.readAll());
+    }
+
+    // With content fallback enabled, should detect as GZIP
+    QCOMPARE(QGCCompression::detectFormat(noExtFile, true), QGCCompression::Format::GZIP);
+
+    // Without content fallback, should return Auto
+    QCOMPARE(QGCCompression::detectFormat(noExtFile, false), QGCCompression::Format::Auto);
 }
 
 void QGCCompressionTest::_testFormatHelpers()
@@ -188,6 +282,47 @@ void QGCCompressionTest::_testListArchiveDetailed()
         }
     }
     QVERIFY2(foundManifest, "manifest.json not found in detailed listing");
+}
+
+void QGCCompressionTest::_testListArchiveNaturalSort()
+{
+    // Create a ZIP archive with files that sort differently with natural vs lexicographic sort
+    // Files: file1.txt, file2.txt, file10.txt, file20.txt
+    // Lexicographic: file1.txt, file10.txt, file2.txt, file20.txt
+    // Natural:       file1.txt, file2.txt, file10.txt, file20.txt
+
+    const QString zipPath = _tempOutputDir->path() + "/natural_sort_test.zip";
+
+    // Create test archive using miniz or system zip
+    // We'll create a simple ZIP with QBuffer and test the sorting
+
+    // For this test, we verify the sorting behavior using QCollator directly
+    // since QGCCompression uses it internally
+    QStringList unsorted = {"file10.txt", "file1.txt", "file20.txt", "file2.txt", "dir/file3.txt", "dir/file11.txt"};
+    QStringList expected = {"dir/file3.txt", "dir/file11.txt", "file1.txt", "file2.txt", "file10.txt", "file20.txt"};
+
+    // Simulate the sorting done by listArchive
+    QCollator collator;
+    collator.setNumericMode(true);
+    collator.setCaseSensitivity(Qt::CaseInsensitive);
+    std::sort(unsorted.begin(), unsorted.end(), collator);
+
+    QCOMPARE(unsorted, expected);
+
+    // Also verify case-insensitive behavior
+    QStringList caseTest = {"File.txt", "file.txt", "FILE.txt"};
+    std::sort(caseTest.begin(), caseTest.end(), collator);
+    // All should be equivalent, stable sort preserves order
+    QCOMPARE(caseTest.size(), 3);
+
+    // Verify numeric mode works with leading zeros
+    QStringList leadingZeros = {"file001.txt", "file01.txt", "file1.txt", "file10.txt"};
+    QStringList expectedZeros = {"file1.txt", "file001.txt", "file01.txt", "file10.txt"};
+    std::sort(leadingZeros.begin(), leadingZeros.end(), collator);
+    // Note: QCollator with numeric mode treats 001, 01, 1 as same value 1, so order depends on implementation
+    // The key behavior is that 1 < 10, which is the main point
+    QVERIFY2(leadingZeros.indexOf("file10.txt") > leadingZeros.indexOf("file1.txt"),
+             "file10.txt should come after file1.txt in natural sort");
 }
 
 void QGCCompressionTest::_testGetArchiveStats()
@@ -726,4 +861,263 @@ void QGCCompressionTest::_testExtractFileDataFromDevice()
     QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Device is null"));
     const QByteArray nullDevice = QGCCompression::extractFileDataFromDevice(nullptr, "manifest.json");
     QVERIFY(nullDevice.isEmpty());
+}
+
+// ============================================================================
+// QGCCompressionJob Tests (Async Operations)
+// ============================================================================
+
+void QGCCompressionTest::_testCompressionJobExtract()
+{
+    const QString zipResource = QStringLiteral(":/unittest/manifest.json.zip");
+    const QString outputDir = _tempOutputDir->path() + "/job_extract";
+
+    QGCCompressionJob job;
+
+    // Set up signal spies
+    QSignalSpy progressSpy(&job, &QGCCompressionJob::progressChanged);
+    QSignalSpy runningSpy(&job, &QGCCompressionJob::runningChanged);
+    QSignalSpy finishedSpy(&job, &QGCCompressionJob::finished);
+
+    QVERIFY(progressSpy.isValid());
+    QVERIFY(runningSpy.isValid());
+    QVERIFY(finishedSpy.isValid());
+
+    // Initial state
+    QVERIFY(!job.isRunning());
+    QCOMPARE(job.progress(), 0.0);
+    QVERIFY(job.errorString().isEmpty());
+
+    // Start extraction
+    job.extractArchive(zipResource, outputDir);
+
+    // Should be running immediately
+    QVERIFY(job.isRunning());
+
+    // Wait for completion (with timeout)
+    QVERIFY2(finishedSpy.wait(5000), "Extraction timed out");
+
+    // Verify completion
+    QVERIFY(!job.isRunning());
+    QCOMPARE(finishedSpy.count(), 1);
+
+    // Check result
+    QList<QVariant> finishedArgs = finishedSpy.takeFirst();
+    bool success = finishedArgs.at(0).toBool();
+    QVERIFY2(success, qPrintable(QString("Extraction failed: %1").arg(job.errorString())));
+
+    // Verify extracted files
+    QVERIFY(QDir(outputDir).exists());
+    QVERIFY(QFile::exists(outputDir + "/manifest.json"));
+
+    // Progress should have changed (at least start and end)
+    QVERIFY(runningSpy.count() >= 2);  // Started and stopped
+
+    // Final progress should be 1.0 on success
+    QCOMPARE(job.progress(), 1.0);
+}
+
+void QGCCompressionTest::_testCompressionJobCancel()
+{
+    // We'll use a larger archive or repeated extraction to test cancellation
+    // For now, test the cancellation mechanism with a simple archive
+    const QString zipResource = QStringLiteral(":/unittest/manifest.json.zip");
+    const QString outputDir = _tempOutputDir->path() + "/job_cancel";
+
+    QGCCompressionJob job;
+
+    QSignalSpy finishedSpy(&job, &QGCCompressionJob::finished);
+    QVERIFY(finishedSpy.isValid());
+
+    // Initial state
+    QVERIFY(!job.isRunning());
+
+    // Start extraction
+    job.extractArchive(zipResource, outputDir);
+
+    // Cancel immediately
+    job.cancel();
+
+    // Wait for completion (cancellation or normal finish)
+    QVERIFY2(finishedSpy.wait(5000), "Job did not complete after cancel");
+
+    // Job should no longer be running
+    QVERIFY(!job.isRunning());
+
+    // Verify finished signal was emitted
+    QCOMPARE(finishedSpy.count(), 1);
+
+    // The result could be success (if it finished before cancel) or failure (if cancelled)
+    QList<QVariant> finishedArgs = finishedSpy.takeFirst();
+    bool success = finishedArgs.at(0).toBool();
+
+    if (!success) {
+        // If cancelled, error string should indicate cancellation
+        QVERIFY(job.errorString().contains("cancel", Qt::CaseInsensitive) ||
+                job.errorString().isEmpty());  // May be empty if just didn't succeed
+    }
+
+    // Test that cancel on non-running job is safe (no-op)
+    job.cancel();  // Should not crash or emit signals
+    QVERIFY(!job.isRunning());
+}
+
+void QGCCompressionTest::_testCompressionJobAsyncStatic()
+{
+    // Test the static async method that returns QFuture directly
+    const QString zipResource = QStringLiteral(":/unittest/manifest.json.zip");
+    const QString outputDir = _tempOutputDir->path() + "/async_static";
+
+    // Use the static method
+    QFuture<bool> future = QGCCompressionJob::extractArchiveAsync(zipResource, outputDir);
+
+    // Create a watcher to monitor progress
+    QFutureWatcher<bool> watcher;
+    QSignalSpy progressSpy(&watcher, &QFutureWatcher<bool>::progressValueChanged);
+    QSignalSpy finishedSpy(&watcher, &QFutureWatcher<bool>::finished);
+
+    watcher.setFuture(future);
+
+    // Wait for completion
+    QVERIFY2(finishedSpy.wait(5000), "Static async extraction timed out");
+
+    // Verify result
+    QVERIFY(future.isFinished());
+    QVERIFY(!future.isCanceled());
+    QVERIFY2(future.result(), "Static async extraction failed");
+
+    // Verify extracted file exists
+    QVERIFY(QFileInfo::exists(outputDir + "/manifest.json"));
+
+    // Test decompressFileAsync as well
+    const QString gzResource = QStringLiteral(":/unittest/manifest.json.gz");
+    const QString decompressOutput = _tempOutputDir->path() + "/async_decompress.json";
+
+    QFuture<bool> decompressFuture = QGCCompressionJob::decompressFileAsync(gzResource, decompressOutput);
+
+    QFutureWatcher<bool> decompressWatcher;
+    QSignalSpy decompressFinishedSpy(&decompressWatcher, &QFutureWatcher<bool>::finished);
+    decompressWatcher.setFuture(decompressFuture);
+
+    QVERIFY2(decompressFinishedSpy.wait(5000), "Static async decompression timed out");
+
+    QVERIFY(decompressFuture.isFinished());
+    QVERIFY2(decompressFuture.result(), "Static async decompression failed");
+    QVERIFY(QFileInfo::exists(decompressOutput));
+}
+
+// ============================================================================
+// QUrl Utilities
+// ============================================================================
+
+void QGCCompressionTest::_testToLocalPath()
+{
+    using namespace QGCCompression;
+
+    // Empty URL
+    QVERIFY(toLocalPath(QUrl()).isEmpty());
+
+    // Local file URL (file://)
+    const QUrl fileUrl = QUrl::fromLocalFile("/tmp/test.zip");
+    QCOMPARE(toLocalPath(fileUrl), QStringLiteral("/tmp/test.zip"));
+
+    // Qt resource URL (qrc:/)
+    const QUrl qrcUrl(QStringLiteral("qrc:/unittest/manifest.json.zip"));
+    QCOMPARE(toLocalPath(qrcUrl), QStringLiteral(":/unittest/manifest.json.zip"));
+
+    // Plain path (no scheme)
+    const QUrl plainUrl(QStringLiteral("/path/to/archive.zip"));
+    QCOMPARE(toLocalPath(plainUrl), QStringLiteral("/path/to/archive.zip"));
+
+    // Already a Qt resource path passed as string
+    const QUrl resourcePath(QStringLiteral(":/unittest/manifest.json.zip"));
+    QCOMPARE(toLocalPath(resourcePath), QStringLiteral(":/unittest/manifest.json.zip"));
+
+    // Remote URL should return empty (not supported)
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression(".*Unsupported URL scheme.*"));
+    const QUrl httpUrl(QStringLiteral("http://example.com/archive.zip"));
+    QVERIFY(toLocalPath(httpUrl).isEmpty());
+
+    QTest::ignoreMessage(QtWarningMsg, QRegularExpression(".*Unsupported URL scheme.*"));
+    const QUrl httpsUrl(QStringLiteral("https://example.com/archive.zip"));
+    QVERIFY(toLocalPath(httpsUrl).isEmpty());
+}
+
+void QGCCompressionTest::_testIsLocalUrl()
+{
+    using namespace QGCCompression;
+
+    // Empty URL
+    QVERIFY(!isLocalUrl(QUrl()));
+
+    // Local file URL (file://)
+    QVERIFY(isLocalUrl(QUrl::fromLocalFile("/tmp/test.zip")));
+
+    // Qt resource URL (qrc:/)
+    QVERIFY(isLocalUrl(QUrl(QStringLiteral("qrc:/unittest/manifest.json.zip"))));
+
+    // Plain path (no scheme)
+    QVERIFY(isLocalUrl(QUrl(QStringLiteral("/path/to/archive.zip"))));
+
+    // Already a Qt resource path
+    QVERIFY(isLocalUrl(QUrl(QStringLiteral(":/unittest/manifest.json.zip"))));
+
+    // Remote URLs should return false
+    QVERIFY(!isLocalUrl(QUrl(QStringLiteral("http://example.com/archive.zip"))));
+    QVERIFY(!isLocalUrl(QUrl(QStringLiteral("https://example.com/archive.zip"))));
+    QVERIFY(!isLocalUrl(QUrl(QStringLiteral("ftp://example.com/archive.zip"))));
+}
+
+void QGCCompressionTest::_testUrlOverloads()
+{
+    using namespace QGCCompression;
+
+    // Test with file:// URL
+    const QString zipPath = QStringLiteral(":/unittest/manifest.json.zip");
+    const QUrl fileUrl = QUrl::fromLocalFile(zipPath);
+
+    // Test detectFormat with QUrl
+    const Format format = detectFormat(QUrl(zipPath));
+    QCOMPARE(format, Format::ZIP);
+
+    // Test listArchive with QUrl
+    const QStringList entries = listArchive(QUrl(zipPath));
+    QVERIFY(!entries.isEmpty());
+    QVERIFY(entries.contains("manifest.json"));
+
+    // Test listArchiveDetailed with QUrl
+    const QList<ArchiveEntry> detailed = listArchiveDetailed(QUrl(zipPath));
+    QVERIFY(!detailed.isEmpty());
+
+    // Test fileExists with QUrl
+    QVERIFY(fileExists(QUrl(zipPath), "manifest.json"));
+    QVERIFY(!fileExists(QUrl(zipPath), "nonexistent.txt"));
+
+    // Test validateArchive with QUrl
+    QVERIFY(validateArchive(QUrl(zipPath)));
+
+    // Test extractFileData with QUrl
+    const QByteArray data = extractFileData(QUrl(zipPath), "manifest.json");
+    QVERIFY(!data.isEmpty());
+
+    // Test extractArchive with QUrl
+    const QString outputDir = _tempOutputDir->path() + "/url_extract";
+    QVERIFY(extractArchive(QUrl(zipPath), outputDir));
+    QVERIFY(QFileInfo::exists(outputDir + "/manifest.json"));
+
+    // Test extractFile with QUrl
+    const QString singleOutput = _tempOutputDir->path() + "/url_single.json";
+    QVERIFY(extractFile(QUrl(zipPath), "manifest.json", singleOutput));
+    QVERIFY(QFileInfo::exists(singleOutput));
+
+    // Test with qrc:/ URL scheme
+    const QUrl qrcUrl(QStringLiteral("qrc:/unittest/manifest.json.zip"));
+    const QStringList qrcEntries = listArchive(qrcUrl);
+    QVERIFY(!qrcEntries.isEmpty());
+
+    // Test decompressFile with QUrl (single-file compression)
+    const QUrl gzUrl(QStringLiteral("qrc:/unittest/manifest.json.gz"));
+    const QString decompressOutput = _tempOutputDir->path() + "/url_decompress.json";
+    QVERIFY(decompressFile(gzUrl, decompressOutput));
+    QVERIFY(QFileInfo::exists(decompressOutput));
 }

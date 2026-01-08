@@ -52,6 +52,28 @@ private slots:
     void _testHasSufficientDiskSpaceZeroBytes();
     void _testHasSufficientDiskSpaceWithMargin();
 
+    // URL/Path utilities tests
+    void _testToLocalPathPlainPaths();
+    void _testToLocalPathFileUrls();
+    void _testToLocalPathQrcUrls();
+    void _testIsLocalPath();
+    void _testIsQtResource();
+
+    // Checksum utilities tests
+    void _testComputeHash();
+    void _testComputeFileHash();
+    void _testVerifyFileHash();
+    void _testHashAlgorithmName();
+
+    // Temporary file utilities tests
+    void _testTempDirectory();
+    void _testUniqueTempPath();
+    void _testCreateTempFile();
+    void _testCreateTempFileWithTemplate();
+    void _testCreateTempCopy();
+    void _testReplaceFileFromTemp();
+    void _testReplaceFileFromTempWithBackup();
+
 private:
     QTemporaryDir *_tempDir = nullptr;
 };

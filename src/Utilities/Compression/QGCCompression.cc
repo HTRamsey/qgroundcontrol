@@ -3,9 +3,14 @@
 #include "QGCFileHelper.h"
 #include "QGCLoggingCategory.h"
 
+#include <QtCore/QCollator>
 #include <QtCore/QDir>
+#include <QtCore/QFile>
 #include <QtCore/QFileInfo>
+#include <QtCore/QMimeDatabase>
+#include <QtCore/QMimeType>
 
+#include <algorithm>
 #include <cstring>
 
 QGC_LOGGING_CATEGORY(QGCCompressionLog, "Utilities.QGCCompression")
@@ -37,6 +42,64 @@ constexpr unsigned char kMagicXz[] = {0xFD, 0x37, 0x7A, 0x58, 0x5A, 0x00};  // "
 constexpr unsigned char kMagicZstd[] = {0x28, 0xB5, 0x2F, 0xFD};
 constexpr unsigned char kMagicBzip2[] = {0x42, 0x5A, 0x68};   // "BZh"
 constexpr unsigned char kMagicLz4[] = {0x04, 0x22, 0x4D, 0x18};
+
+/// Convert Qt MIME type name to Format
+/// @param mimeType MIME type name (e.g., "application/gzip")
+/// @return Corresponding Format, or Format::Auto if not recognized
+Format formatFromMimeType(const QString &mimeType)
+{
+    // Archive formats
+    if (mimeType == QLatin1String("application/zip") ||
+        mimeType == QLatin1String("application/x-zip-compressed")) {
+        return Format::ZIP;
+    }
+    if (mimeType == QLatin1String("application/x-7z-compressed")) {
+        return Format::SEVENZ;
+    }
+    if (mimeType == QLatin1String("application/x-tar")) {
+        return Format::TAR;
+    }
+
+    // Compression formats
+    if (mimeType == QLatin1String("application/gzip") ||
+        mimeType == QLatin1String("application/x-gzip")) {
+        return Format::GZIP;
+    }
+    if (mimeType == QLatin1String("application/x-xz")) {
+        return Format::XZ;
+    }
+    if (mimeType == QLatin1String("application/zstd") ||
+        mimeType == QLatin1String("application/x-zstd")) {
+        return Format::ZSTD;
+    }
+    if (mimeType == QLatin1String("application/x-bzip2") ||
+        mimeType == QLatin1String("application/bzip2")) {
+        return Format::BZIP2;
+    }
+    if (mimeType == QLatin1String("application/x-lz4")) {
+        return Format::LZ4;
+    }
+
+    // Compound TAR formats (Qt may detect these as compressed TAR)
+    if (mimeType == QLatin1String("application/x-compressed-tar")) {
+        return Format::TAR_GZ;  // Most common, fallback will refine
+    }
+    if (mimeType == QLatin1String("application/x-xz-compressed-tar")) {
+        return Format::TAR_XZ;
+    }
+    if (mimeType == QLatin1String("application/x-zstd-compressed-tar")) {
+        return Format::TAR_ZSTD;
+    }
+    if (mimeType == QLatin1String("application/x-bzip2-compressed-tar") ||
+        mimeType == QLatin1String("application/x-bzip-compressed-tar")) {
+        return Format::TAR_BZ2;
+    }
+    if (mimeType == QLatin1String("application/x-lz4-compressed-tar")) {
+        return Format::TAR_LZ4;
+    }
+
+    return Format::Auto;
+}
 
 } // namespace
 
@@ -182,18 +245,6 @@ static bool validateDeviceInput(QIODevice *device)
     return true;
 }
 
-/// Convert internal EntryInfo to public ArchiveEntry
-static ArchiveEntry toArchiveEntry(const QGClibarchive::EntryInfo &info)
-{
-    return ArchiveEntry{
-        .name = info.name,
-        .size = info.size,
-        .modified = info.modified,
-        .isDirectory = info.isDirectory,
-        .permissions = info.permissions
-    };
-}
-
 /// Capture format detection info from QGClibarchive after an operation
 static void captureFormatInfo()
 {
@@ -205,7 +256,8 @@ static void captureFormatInfo()
 // Format Detection
 // ============================================================================
 
-Format detectFormat(const QString &filePath)
+/// Extension-based format detection (internal helper)
+static Format detectFormatFromExtension(const QString &filePath)
 {
     const QString lower = filePath.toLower();
 
@@ -253,6 +305,57 @@ Format detectFormat(const QString &filePath)
     }
 
     return Format::Auto;
+}
+
+Format detectFormat(const QString &filePath, bool useContentFallback)
+{
+    // Try extension-based detection first
+    Format format = detectFormatFromExtension(filePath);
+    if (format != Format::Auto) {
+        return format;
+    }
+
+    // If extension detection failed and content fallback is enabled, try content-based
+    if (useContentFallback && QGCFileHelper::exists(filePath)) {
+        format = detectFormatFromFile(filePath);
+        if (format != Format::Auto) {
+            qCDebug(QGCCompressionLog) << "Format detected from content:" << formatName(format)
+                                        << "for" << filePath;
+        }
+    }
+
+    return format;
+}
+
+Format detectFormatFromFile(const QString &filePath)
+{
+    // Handle Qt resources
+    if (QGCFileHelper::isQtResource(filePath)) {
+        QFile file(filePath);
+        if (!file.open(QIODevice::ReadOnly)) {
+            return Format::Auto;
+        }
+        return detectFormatFromData(file.read(512));
+    }
+
+    // Try QMimeDatabase first (uses both filename and content)
+    QMimeDatabase mimeDb;
+    QMimeType mimeType = mimeDb.mimeTypeForFile(filePath);
+
+    if (mimeType.isValid() && mimeType.name() != QLatin1String("application/octet-stream")) {
+        Format format = formatFromMimeType(mimeType.name());
+        if (format != Format::Auto) {
+            qCDebug(QGCCompressionLog) << "MIME detection:" << mimeType.name() << "->" << formatName(format);
+            return format;
+        }
+    }
+
+    // Fall back to reading raw bytes and using magic byte detection
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        return Format::Auto;
+    }
+    return detectFormatFromData(file.read(512));
 }
 
 Format detectFormatFromData(const QByteArray &data)
@@ -303,6 +406,17 @@ Format detectFormatFromData(const QByteArray &data)
     if (static_cast<size_t>(data.size()) >= kMinBytesForTar) {
         if (data.mid(kTarUstarOffset, kTarUstarMagicLen) == "ustar") {
             return Format::TAR;
+        }
+    }
+
+    // Fallback: Use QMimeDatabase for content-based detection
+    QMimeDatabase mimeDb;
+    QMimeType mimeType = mimeDb.mimeTypeForData(data);
+    if (mimeType.isValid() && mimeType.name() != QLatin1String("application/octet-stream")) {
+        Format format = formatFromMimeType(mimeType.name());
+        if (format != Format::Auto) {
+            qCDebug(QGCCompressionLog) << "MIME fallback detection:" << mimeType.name() << "->" << formatName(format);
+            return format;
         }
     }
 
@@ -395,6 +509,87 @@ QString strippedPath(const QString &filePath)
     }
 
     return filePath;
+}
+
+// ============================================================================
+// URL Utilities
+// ============================================================================
+
+QString toLocalPath(const QUrl &url)
+{
+    if (url.isEmpty()) {
+        return {};
+    }
+
+    // Get string representation first to check for Qt resource paths
+    // QUrl parsing can mangle :/ paths, so check the original string first
+    const QString urlStr = url.toString();
+
+    // Check if it's already a Qt resource path (:/ prefix)
+    // This must be checked BEFORE QUrl parsing mangles it
+    if (urlStr.startsWith(QLatin1String(":/"))) {
+        return urlStr;
+    }
+
+    // Local file URL: file:///path/to/file
+    if (url.isLocalFile()) {
+        return url.toLocalFile();
+    }
+
+    // Qt resource URL: qrc:/path or qrc:///path
+    if (url.scheme() == QLatin1String("qrc")) {
+        // Convert qrc:/path to :/path for QFile
+        QString path = url.path();
+        if (path.startsWith(QLatin1Char('/'))) {
+            return QLatin1Char(':') + path;
+        }
+        return QStringLiteral(":/") + path;
+    }
+
+    // Plain path string (no scheme) - common from QML when user types a path
+    // Check this AFTER scheme checks since scheme() returns empty for invalid URLs too
+    if (url.scheme().isEmpty()) {
+        // If it looks like a path (starts with /), return as-is
+        if (urlStr.startsWith(QLatin1Char('/'))) {
+            return urlStr;
+        }
+        // Otherwise return the path component
+        return url.path().isEmpty() ? urlStr : url.path();
+    }
+
+    // Remote URLs (http://, https://, ftp://) are not supported
+    qCWarning(QGCCompressionLog) << "Unsupported URL scheme:" << url.scheme() << "- only file://, qrc:/, and local paths are supported";
+    return {};
+}
+
+bool isLocalUrl(const QUrl &url)
+{
+    if (url.isEmpty()) {
+        return false;
+    }
+
+    // Check string representation for Qt resource path first
+    const QString urlStr = url.toString();
+    if (urlStr.startsWith(QLatin1String(":/"))) {
+        return true;
+    }
+
+    // Local file URL
+    if (url.isLocalFile()) {
+        return true;
+    }
+
+    // Qt resource URL
+    if (url.scheme() == QLatin1String("qrc")) {
+        return true;
+    }
+
+    // Plain path string (no scheme or empty scheme)
+    if (url.scheme().isEmpty()) {
+        return true;
+    }
+
+    return false;
 }
 
 // ============================================================================
@@ -531,14 +726,8 @@ bool extractArchiveFiltered(const QString &archivePath, const QString &outputDir
 
     qCDebug(QGCCompressionLog) << "Extracting archive with filter:" << archivePath;
 
-    // Convert public EntryFilter to internal EntryFilter
-    auto internalFilter = [&filter](const QGClibarchive::EntryInfo &info) -> bool {
-        ArchiveEntry entry = toArchiveEntry(info);
-        return filter(entry);
-    };
-
     const bool success = QGClibarchive::extractWithFilter(archivePath, outputDirectoryPath,
-                                                          internalFilter, progress, maxDecompressedBytes);
+                                                          filter, progress, maxDecompressedBytes);
     captureFormatInfo();
     if (!success) {
         setError(Error::IoError, QStringLiteral("Failed to extract archive: ") + archivePath);
@@ -551,7 +740,15 @@ QStringList listArchive(const QString &archivePath, Format format)
     if (!validateArchiveInput(archivePath, format)) {
         return {};
     }
-    return QGClibarchive::listArchiveEntries(archivePath);
+    QStringList entries = QGClibarchive::listArchiveEntries(archivePath);
+
+    // Natural sort: "file2.txt" before "file10.txt"
+    QCollator collator;
+    collator.setNumericMode(true);
+    collator.setCaseSensitivity(Qt::CaseInsensitive);
+    std::sort(entries.begin(), entries.end(), collator);
+
+    return entries;
 }
 
 QList<ArchiveEntry> listArchiveDetailed(const QString &archivePath, Format format)
@@ -559,13 +756,17 @@ QList<ArchiveEntry> listArchiveDetailed(const QString &archivePath, Format forma
     if (!validateArchiveInput(archivePath, format)) {
         return {};
     }
+    QList<ArchiveEntry> entries = QGClibarchive::listArchiveEntriesDetailed(archivePath);
 
-    const QList<QGClibarchive::EntryInfo> internalEntries = QGClibarchive::listArchiveEntriesDetailed(archivePath);
-    QList<ArchiveEntry> entries;
-    entries.reserve(internalEntries.size());
-    for (const auto &info : internalEntries) {
-        entries.append(toArchiveEntry(info));
-    }
+    // Natural sort by name: "file2.txt" before "file10.txt"
+    QCollator collator;
+    collator.setNumericMode(true);
+    collator.setCaseSensitivity(Qt::CaseInsensitive);
+    std::sort(entries.begin(), entries.end(),
+              [&collator](const ArchiveEntry &a, const ArchiveEntry &b) {
+                  return collator.compare(a.name, b.name) < 0;
+              });
+
     return entries;
 }
 
@@ -574,17 +775,7 @@ ArchiveStats getArchiveStats(const QString &archivePath, Format format)
     if (!validateArchiveInput(archivePath, format)) {
         return {};
     }
-
-    const QGClibarchive::ArchiveStats internalStats = QGClibarchive::getArchiveStats(archivePath);
-
-    ArchiveStats stats;
-    stats.totalEntries = internalStats.totalEntries;
-    stats.fileCount = internalStats.fileCount;
-    stats.directoryCount = internalStats.directoryCount;
-    stats.totalUncompressedSize = internalStats.totalUncompressedSize;
-    stats.largestFileSize = internalStats.largestFileSize;
-    stats.largestFileName = internalStats.largestFileName;
-    return stats;
+    return QGClibarchive::getArchiveStats(archivePath);
 }
 
 bool validateArchive(const QString &archivePath, Format format)

@@ -1,12 +1,12 @@
 #pragma once
 
+#include "QGCCompressionTypes.h"
+
 #include <QtCore/QByteArray>
-#include <QtCore/QDateTime>
 #include <QtCore/QIODevice>
 #include <QtCore/QString>
 #include <QtCore/QStringList>
-
-#include <functional>
+#include <QtCore/QUrl>
 
 /// Unified decompression interface for archives and single-file compression
 /// Uses libarchive for all operations (ZIP, GZIP, XZ, ZSTD, TAR, etc.)
@@ -41,48 +41,6 @@ QString lastErrorString();
 QString errorName(Error error);
 
 // ============================================================================
-// Progress Callback
-// ============================================================================
-
-/// Progress callback for long-running operations
-/// @param bytesProcessed Bytes processed so far
-/// @param totalBytes Total bytes to process (0 if unknown)
-/// @return true to continue, false to cancel operation
-using ProgressCallback = std::function<bool(qint64 bytesProcessed, qint64 totalBytes)>;
-
-// ============================================================================
-// Archive Entry Metadata
-// ============================================================================
-
-/// Default Unix permissions for extracted files (rw-r--r--)
-constexpr quint32 kDefaultFilePermissions = 0644;
-
-/// Metadata for a single entry in an archive
-struct ArchiveEntry {
-    QString name;                    ///< Path/name within archive
-    qint64 size = 0;                 ///< Uncompressed size in bytes
-    QDateTime modified;              ///< Last modification time
-    bool isDirectory = false;        ///< True if entry is a directory
-    quint32 permissions = kDefaultFilePermissions;  ///< Unix-style permissions
-};
-
-/// Summary statistics for an archive
-struct ArchiveStats {
-    int totalEntries = 0;            ///< Total number of entries (files + directories)
-    int fileCount = 0;               ///< Number of files
-    int directoryCount = 0;          ///< Number of directories
-    qint64 totalUncompressedSize = 0;///< Sum of all file sizes (uncompressed)
-    qint64 largestFileSize = 0;      ///< Size of largest file
-    QString largestFileName;         ///< Name of largest file
-};
-
-/// Entry filter callback for selective extraction
-/// Called for each entry before extraction; return true to extract, false to skip
-/// @param entry Metadata for the archive entry
-/// @return true to extract this entry, false to skip it
-using EntryFilter = std::function<bool(const ArchiveEntry &entry)>;
-
-// ============================================================================
 // Format Definitions
 // ============================================================================
 
@@ -108,10 +66,23 @@ enum class Format {
 // Format Detection
 // ============================================================================
 
-/// Detect format from file path (extension-based)
-Format detectFormat(const QString &filePath);
+/// Detect format from file path (extension-based, with content fallback)
+/// First tries extension-based detection; if that fails, reads file content
+/// and uses magic bytes and Qt MIME detection as fallback
+/// @param filePath Path to file
+/// @param useContentFallback If true (default), read file content when extension fails
+/// @return Detected format, or Format::Auto if detection failed
+Format detectFormat(const QString &filePath, bool useContentFallback = true);
 
-/// Detect format from data (magic bytes)
+/// Detect format from file content only (ignores extension)
+/// Reads file and uses magic bytes + Qt MIME detection
+/// @param filePath Path to file
+/// @return Detected format, or Format::Auto if detection failed
+Format detectFormatFromFile(const QString &filePath);
+
+/// Detect format from data (magic bytes + MIME detection)
+/// @param data Raw file data (at least first 512 bytes recommended)
+/// @return Detected format, or Format::Auto if detection failed
 Format detectFormatFromData(const QByteArray &data);
 
 /// Get file extension for a format
@@ -151,6 +122,28 @@ QString detectedFormatName();
 QString detectedFilterName();
 
 // ============================================================================
+// URL Utilities
+// ============================================================================
+
+/// Convert a QUrl to a local file path
+/// Handles file://, qrc:/, and plain paths from QML
+/// @param url URL to convert (file://, qrc:/, or local path)
+/// @return Local file path, or empty string if URL scheme is not supported
+/// @note Remote URLs (http://, https://) return empty string - not supported
+QString toLocalPath(const QUrl &url);
+
+/// Check if a URL refers to a local file (file://, qrc:/, or plain path)
+/// @param url URL to check
+/// @return true if URL can be converted to a local path
+bool isLocalUrl(const QUrl &url);
+
+/// Detect format from URL (convenience overload)
+/// @see detectFormat(const QString&, bool)
+inline Format detectFormat(const QUrl &url, bool useContentFallback = true) {
+    return detectFormat(toLocalPath(url), useContentFallback);
+}
+
+// ============================================================================
 // Single-File Decompression
 // ============================================================================
 
@@ -182,6 +175,15 @@ QString decompressIfNeeded(const QString &filePath,
 /// @return Decompressed data, or empty on failure or if size limit exceeded
 QByteArray decompressData(const QByteArray &data, Format format = Format::Auto,
                           qint64 maxDecompressedBytes = 0);
+
+/// Decompress a single file (QUrl convenience overload)
+/// @see decompressFile(const QString&, const QString&, Format, ProgressCallback, qint64)
+inline bool decompressFile(const QUrl &inputUrl, const QString &outputPath = QString(),
+                           Format format = Format::Auto,
+                           ProgressCallback progress = nullptr,
+                           qint64 maxDecompressedBytes = 0) {
+    return decompressFile(toLocalPath(inputUrl), outputPath, format, progress, maxDecompressedBytes);
+}
 
 // ============================================================================
 // Archive Extraction (Multiple Files)
@@ -283,6 +285,57 @@ bool extractByPattern(const QString &archivePath, const QStringList &patterns,
                       const QString &outputDirectoryPath,
                       QStringList *extractedFiles = nullptr,
                       Format format = Format::Auto);
+
+// --- QUrl convenience overloads for archive functions ---
+
+/// Extract an archive (QUrl convenience overload)
+/// @see extractArchive(const QString&, const QString&, Format, ProgressCallback, qint64)
+inline bool extractArchive(const QUrl &archiveUrl, const QString &outputDirectoryPath,
+                           Format format = Format::Auto,
+                           ProgressCallback progress = nullptr,
+                           qint64 maxDecompressedBytes = 0) {
+    return extractArchive(toLocalPath(archiveUrl), outputDirectoryPath, format, progress, maxDecompressedBytes);
+}
+
+/// List archive contents (QUrl convenience overload)
+/// @see listArchive(const QString&, Format)
+inline QStringList listArchive(const QUrl &archiveUrl, Format format = Format::Auto) {
+    return listArchive(toLocalPath(archiveUrl), format);
+}
+
+/// List archive contents with details (QUrl convenience overload)
+/// @see listArchiveDetailed(const QString&, Format)
+inline QList<ArchiveEntry> listArchiveDetailed(const QUrl &archiveUrl, Format format = Format::Auto) {
+    return listArchiveDetailed(toLocalPath(archiveUrl), format);
+}
+
+/// Extract single file from archive (QUrl convenience overload)
+/// @see extractFile(const QString&, const QString&, const QString&, Format)
+inline bool extractFile(const QUrl &archiveUrl, const QString &fileName,
+                        const QString &outputPath = QString(),
+                        Format format = Format::Auto) {
+    return extractFile(toLocalPath(archiveUrl), fileName, outputPath, format);
+}
+
+/// Extract single file to memory (QUrl convenience overload)
+/// @see extractFileData(const QString&, const QString&, Format)
+inline QByteArray extractFileData(const QUrl &archiveUrl, const QString &fileName,
+                                  Format format = Format::Auto) {
+    return extractFileData(toLocalPath(archiveUrl), fileName, format);
+}
+
+/// Check if file exists in archive (QUrl convenience overload)
+/// @see fileExists(const QString&, const QString&, Format)
+inline bool fileExists(const QUrl &archiveUrl, const QString &fileName,
+                       Format format = Format::Auto) {
+    return fileExists(toLocalPath(archiveUrl), fileName, format);
+}
+
+/// Validate archive integrity (QUrl convenience overload)
+/// @see validateArchive(const QString&, Format)
+inline bool validateArchive(const QUrl &archiveUrl, Format format = Format::Auto) {
+    return validateArchive(toLocalPath(archiveUrl), format);
+}
 
 // ============================================================================
 // QIODevice-based Operations (streaming)

@@ -6,6 +6,7 @@
 #include <QtCore/QFileInfo>
 #include <QtCore/QSaveFile>
 #include <QtCore/QSet>
+#include <QtCore/QTemporaryDir>
 
 #include <archive.h>
 #include <archive_entry.h>
@@ -143,6 +144,26 @@ la_int64_t deviceSeekCallback(struct archive *, void *clientData, la_int64_t off
     return newPos;
 }
 
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+ArchiveEntry toArchiveEntry(struct archive_entry *entry)
+{
+    ArchiveEntry info;
+    info.name = QString::fromUtf8(archive_entry_pathname(entry));
+    info.size = archive_entry_size(entry);
+    info.isDirectory = (archive_entry_filetype(entry) == AE_IFDIR);
+    info.permissions = static_cast<quint32>(archive_entry_perm(entry));
+
+    const time_t mtime = archive_entry_mtime(entry);
+    if (mtime > 0) {
+        info.modified = QDateTime::fromSecsSinceEpoch(mtime);
+    }
+
+    return info;
+}
+
 } // namespace QGClibarchive
 
 // ============================================================================
@@ -181,16 +202,18 @@ QByteArray readArchiveToMemory(struct archive *a, qint64 expectedSize = 0, qint6
     return result;
 }
 
-/// Write current archive entry data to a file (sparse-aware)
+/// Write current archive entry data to a file atomically
 /// @param a Archive handle (must have entry header already read)
 /// @param outputPath Output file path (parent directory must exist)
-/// @return true on success, false on read/write error (file removed on failure)
-/// @note Uses archive_read_data_block() with seeking to preserve sparse file holes
+/// @return true on success, false on read/write error (no partial file left on failure)
+/// @note Uses QSaveFile for atomic writes - writes to temp file, then renames on commit
+/// @note Uses archive_read_data_block() with seeking to preserve sparse file structure
 bool writeArchiveEntryToFile(struct archive *a, const QString &outputPath)
 {
-    QFile outFile(outputPath);
-    if (!outFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        qCWarning(QGClibarchiveLog) << "Failed to open output file:" << outputPath;
+    QSaveFile outFile(outputPath);
+    if (!outFile.open(QIODevice::WriteOnly)) {
+        qCWarning(QGClibarchiveLog) << "Failed to open output file:" << outputPath
+                                    << outFile.errorString();
         return false;
     }
 
@@ -203,26 +226,89 @@ bool writeArchiveEntryToFile(struct archive *a, const QString &outputPath)
         // Seek to offset - creates sparse hole if gap from previous position
         if (!outFile.seek(offset)) {
             qCWarning(QGClibarchiveLog) << "Failed to seek:" << outFile.errorString();
-            outFile.close();
-            QFile::remove(outputPath);
+            outFile.cancelWriting();
             return false;
         }
         if (outFile.write(static_cast<const char*>(buff), static_cast<qint64>(size)) != static_cast<qint64>(size)) {
             qCWarning(QGClibarchiveLog) << "Failed to write output:" << outFile.errorString();
-            outFile.close();
-            QFile::remove(outputPath);
+            outFile.cancelWriting();
             return false;
         }
     }
 
-    outFile.close();
-
     if (r != ARCHIVE_EOF) {
         qCWarning(QGClibarchiveLog) << "Read error:" << archive_error_string(a);
-        QFile::remove(outputPath);
+        outFile.cancelWriting();
         return false;
     }
 
+    // Atomically commit - renames temp file to final path
+    if (!outFile.commit()) {
+        qCWarning(QGClibarchiveLog) << "Failed to commit output file:" << outFile.errorString();
+        return false;
+    }
+
+    return true;
+}
+
+/// Decompress archive stream to file atomically with progress and size limit
+/// @param a Archive handle (must have entry header already read)
+/// @param outputPath Output file path (parent directory must exist)
+/// @param progress Optional progress callback
+/// @param totalSize Total size for progress reporting (0 if unknown)
+/// @param maxBytes Maximum decompressed bytes (0 = unlimited)
+/// @return true on success, false on error/cancel/limit exceeded (no partial file)
+bool decompressStreamToFile(struct archive *a, const QString &outputPath,
+                            const QGClibarchive::ProgressCallback &progress,
+                            qint64 totalSize, qint64 maxBytes)
+{
+    QSaveFile outFile(outputPath);
+    if (!outFile.open(QIODevice::WriteOnly)) {
+        qCWarning(QGClibarchiveLog) << "Failed to open output file:" << outputPath
+                                    << outFile.errorString();
+        return false;
+    }
+
+    qint64 totalBytesWritten = 0;
+    char buffer[QGCFileHelper::kBufferSizeMax];
+    la_ssize_t size;
+
+    while ((size = archive_read_data(a, buffer, sizeof(buffer))) > 0) {
+        if (maxBytes > 0 && (totalBytesWritten + size) > maxBytes) {
+            qCWarning(QGClibarchiveLog) << "Size limit exceeded:" << maxBytes << "bytes";
+            outFile.cancelWriting();
+            return false;
+        }
+
+        if (outFile.write(buffer, size) != size) {
+            qCWarning(QGClibarchiveLog) << "Failed to write output:" << outFile.errorString();
+            outFile.cancelWriting();
+            return false;
+        }
+        totalBytesWritten += size;
+
+        if (progress) {
+            const qint64 bytesRead = archive_filter_bytes(a, -1);
+            if (!progress(bytesRead, totalSize)) {
+                qCDebug(QGClibarchiveLog) << "Decompression cancelled by user";
+                outFile.cancelWriting();
+                return false;
+            }
+        }
+    }
+
+    if (size < 0) {
+        qCWarning(QGClibarchiveLog) << "Decompression error:" << archive_error_string(a);
+        outFile.cancelWriting();
+        return false;
+    }
+
+    if (!outFile.commit()) {
+        qCWarning(QGClibarchiveLog) << "Failed to commit output file:" << outFile.errorString();
+        return false;
+    }
+
+    qCDebug(QGClibarchiveLog) << "Decompressed" << totalBytesWritten << "bytes to" << outputPath;
     return true;
 }
 
@@ -325,7 +411,7 @@ bool extractArchiveEntries(struct archive *a, const QString &outputDirectoryPath
 
         const char *currentFile = archive_entry_pathname(entry);
         QString entryName = QString::fromUtf8(currentFile);
-        QString outputPath = outputDirectoryPath + "/" + entryName;
+        QString outputPath = QGCFileHelper::joinPath(outputDirectoryPath, entryName);
 
         // Prevent path traversal attacks
         QFileInfo outputInfo(outputPath);
@@ -620,7 +706,7 @@ bool ArchiveReader::open(QIODevice *device, ReaderMode mode)
 
 bool openArchiveForReading(struct archive *a, const QString &filePath, QByteArray &resourceData)
 {
-    const bool isResource = filePath.startsWith(QStringLiteral(":/"));
+    const bool isResource = QGCFileHelper::isQtResource(filePath);
 
     if (isResource) {
         // Qt resources must be loaded into memory
@@ -679,6 +765,79 @@ bool extractAnyArchive(const QString &archivePath, const QString &outputDirector
 
     const qint64 totalSize = reader.dataSize();
     return extractArchiveEntries(reader.release(), outputDirectoryPath, progress, totalSize, maxBytes);
+}
+
+bool extractArchiveAtomic(const QString &archivePath, const QString &outputDirectoryPath,
+                          ProgressCallback progress, qint64 maxBytes)
+{
+    // Pre-check: verify archive can be opened and get stats for disk space check
+    const ArchiveStats stats = getArchiveStats(archivePath);
+    if (stats.totalEntries == 0) {
+        qCWarning(QGClibarchiveLog) << "Archive is empty or invalid:" << archivePath;
+        return false;
+    }
+
+    // Need ~2x space: one for temp extraction, one for final location
+    // (though move on same filesystem doesn't need extra space)
+    if (stats.totalUncompressedSize > 0) {
+        if (!QGCFileHelper::hasSufficientDiskSpace(outputDirectoryPath, stats.totalUncompressedSize * 2)) {
+            return false;
+        }
+    }
+
+    // Create temporary directory for staging extraction
+    // QTemporaryDir auto-removes on destruction (success or failure)
+    QTemporaryDir tempDir;
+    if (!tempDir.isValid()) {
+        qCWarning(QGClibarchiveLog) << "Failed to create temporary directory:" << tempDir.errorString();
+        return false;
+    }
+
+    qCDebug(QGClibarchiveLog) << "Atomic extraction: staging to" << tempDir.path();
+
+    // Extract to temporary directory
+    ArchiveReader reader;
+    if (!reader.open(archivePath, ReaderMode::AllFormats)) {
+        return false;
+    }
+
+    const qint64 totalSize = reader.dataSize();
+    if (!extractArchiveEntries(reader.release(), tempDir.path(), progress, totalSize, maxBytes)) {
+        // Extraction failed - QTemporaryDir destructor will clean up
+        qCDebug(QGClibarchiveLog) << "Extraction failed, cleaning up temp directory";
+        return false;
+    }
+
+    // Ensure output directory exists
+    if (!QGCFileHelper::ensureDirectoryExists(outputDirectoryPath)) {
+        return false;
+    }
+
+    // Move extracted files from temp to final destination
+    QDir tempDirObj(tempDir.path());
+    const QStringList entries = tempDirObj.entryList(QDir::AllEntries | QDir::NoDotAndDotDot);
+
+    for (const QString &entry : entries) {
+        const QString srcPath = QGCFileHelper::joinPath(tempDir.path(), entry);
+        const QString dstPath = QGCFileHelper::joinPath(outputDirectoryPath, entry);
+
+        // Remove existing destination if it exists (for atomic replacement)
+        if (QFileInfo::exists(dstPath)) {
+            if (QFileInfo(dstPath).isDir()) {
+                QDir(dstPath).removeRecursively();
+            } else {
+                QFile::remove(dstPath);
+            }
+        }
+
+        if (!QGCFileHelper::moveFileOrCopy(srcPath, dstPath)) {
+            qCWarning(QGClibarchiveLog) << "Failed to move entry:" << entry;
+            return false;
+        }
+    }
+
+    qCDebug(QGClibarchiveLog) << "Atomic extraction complete:" << entries.size() << "entries";
+    return true;
 }
 
 bool extractSingleFile(const QString &archivePath, const QString &fileName, const QString &outputPath)
@@ -765,7 +924,7 @@ bool extractMultipleFiles(const QString &archivePath, const QStringList &fileNam
             continue;
         }
 
-        const QString outputPath = outputDirectoryPath + "/" + entryName;
+        const QString outputPath = QGCFileHelper::joinPath(outputDirectoryPath, entryName);
         QGCFileHelper::ensureParentExists(outputPath);
 
         if (!writeArchiveEntryToFile(reader.handle(), outputPath)) {
@@ -837,7 +996,7 @@ bool extractByPattern(const QString &archivePath, const QStringList &patterns,
         }
 
         const QString entryName = QString::fromUtf8(archive_entry_pathname(entry));
-        const QString outputPath = outputDirectoryPath + "/" + entryName;
+        const QString outputPath = QGCFileHelper::joinPath(outputDirectoryPath, entryName);
 
         QGCFileHelper::ensureParentExists(outputPath);
 
@@ -934,28 +1093,17 @@ QStringList listArchiveEntries(const QString &archivePath)
     return entries;
 }
 
-QList<EntryInfo> listArchiveEntriesDetailed(const QString &archivePath)
+QList<ArchiveEntry> listArchiveEntriesDetailed(const QString &archivePath)
 {
     ArchiveReader reader;
     if (!reader.open(archivePath, ReaderMode::AllFormats)) {
         return {};
     }
 
-    QList<EntryInfo> entries;
+    QList<ArchiveEntry> entries;
     struct archive_entry *entry;
     while (archive_read_next_header(reader.handle(), &entry) == ARCHIVE_OK) {
-        EntryInfo info;
-        info.name = QString::fromUtf8(archive_entry_pathname(entry));
-        info.size = archive_entry_size(entry);
-        info.isDirectory = (archive_entry_filetype(entry) == AE_IFDIR);
-        info.permissions = static_cast<quint32>(archive_entry_perm(entry));
-
-        const time_t mtime = archive_entry_mtime(entry);
-        if (mtime > 0) {
-            info.modified = QDateTime::fromSecsSinceEpoch(mtime);
-        }
-
-        entries.append(info);
+        entries.append(toArchiveEntry(entry));
         archive_read_data_skip(reader.handle());
     }
 
@@ -1031,16 +1179,8 @@ bool extractWithFilter(const QString &archivePath, const QString &outputDirector
     struct archive_entry *entry;
 
     while (archive_read_next_header(reader.handle(), &entry) == ARCHIVE_OK) {
-        // Build EntryInfo for filter callback
-        EntryInfo info;
-        info.name = QString::fromUtf8(archive_entry_pathname(entry));
-        info.size = archive_entry_size(entry);
-        info.isDirectory = (archive_entry_filetype(entry) == AE_IFDIR);
-        info.permissions = static_cast<quint32>(archive_entry_perm(entry));
-        const time_t mtime = archive_entry_mtime(entry);
-        if (mtime > 0) {
-            info.modified = QDateTime::fromSecsSinceEpoch(mtime);
-        }
+        // Build ArchiveEntry for filter callback
+        const ArchiveEntry info = toArchiveEntry(entry);
 
         // Check filter
         if (!filter(info)) {
@@ -1061,7 +1201,7 @@ bool extractWithFilter(const QString &archivePath, const QString &outputDirector
             return false;
         }
 
-        const QString outputPath = outputDirectoryPath + "/" + info.name;
+        const QString outputPath = QGCFileHelper::joinPath(outputDirectoryPath, info.name);
         QGCFileHelper::ensureParentExists(outputPath);
 
         if (!writeArchiveEntryToFile(reader.handle(), outputPath)) {
@@ -1097,71 +1237,16 @@ bool decompressSingleFile(const QString &inputPath, const QString &outputPath,
         return false;
     }
 
-    struct archive_entry *entry;
+    struct archive_entry *entry = nullptr;
     if (archive_read_next_header(reader.handle(), &entry) != ARCHIVE_OK) {
         qCWarning(QGClibarchiveLog) << "Failed to read header:" << archive_error_string(reader.handle());
         return false;
     }
 
     updateFormatState(reader.handle());
-
-    // Ensure parent directory exists
     QGCFileHelper::ensureParentExists(outputPath);
 
-    // Use QSaveFile for atomic writes - prevents partial files on crash/error
-    // Writes to temp file, then atomically renames on commit()
-    QSaveFile outputFile(outputPath);
-    if (!outputFile.open(QIODevice::WriteOnly)) {
-        qCWarning(QGClibarchiveLog) << "Failed to open output file:" << outputPath
-                                    << outputFile.errorString();
-        return false;
-    }
-
-    const qint64 totalSize = reader.dataSize();
-    qint64 totalBytesWritten = 0;
-    char buffer[QGCFileHelper::kBufferSizeMax];
-    la_ssize_t size;
-
-    while ((size = archive_read_data(reader.handle(), buffer, sizeof(buffer))) > 0) {
-        // Check size limit before writing
-        if (maxBytes > 0 && (totalBytesWritten + size) > maxBytes) {
-            qCWarning(QGClibarchiveLog) << "Size limit exceeded:" << maxBytes << "bytes";
-            outputFile.cancelWriting();
-            return false;
-        }
-
-        if (outputFile.write(buffer, size) != size) {
-            qCWarning(QGClibarchiveLog) << "Failed to write output:" << outputFile.errorString();
-            outputFile.cancelWriting();
-            return false;
-        }
-        totalBytesWritten += size;
-
-        if (progress) {
-            const qint64 bytesRead = archive_filter_bytes(reader.handle(), -1);
-            if (!progress(bytesRead, totalSize)) {
-                qCDebug(QGClibarchiveLog) << "Decompression cancelled by user";
-                outputFile.cancelWriting();
-                return false;
-            }
-        }
-    }
-
-    if (size < 0) {
-        qCWarning(QGClibarchiveLog) << "Decompression error:" << archive_error_string(reader.handle());
-        outputFile.cancelWriting();
-        return false;
-    }
-
-    // Atomically commit the file (renames temp file to final path)
-    if (!outputFile.commit()) {
-        qCWarning(QGClibarchiveLog) << "Failed to commit output file:" << outputFile.errorString();
-        return false;
-    }
-
-    qCDebug(QGClibarchiveLog) << "Decompressed" << inputPath << "to" << outputPath
-                              << "(" << totalBytesWritten << "bytes)";
-    return true;
+    return decompressStreamToFile(reader.handle(), outputPath, progress, reader.dataSize(), maxBytes);
 }
 
 QByteArray decompressDataFromMemory(const QByteArray &data, qint64 maxBytes)
@@ -1258,10 +1343,9 @@ bool decompressFromDevice(QIODevice *device, const QString &outputPath,
         return false;
     }
 
-    // Ensure parent directory exists
     QGCFileHelper::ensureParentExists(outputPath);
 
-    struct archive_entry *entry;
+    struct archive_entry *entry = nullptr;
     if (archive_read_next_header(reader.handle(), &entry) != ARCHIVE_OK) {
         qCWarning(QGClibarchiveLog) << "Failed to read header:" << archive_error_string(reader.handle());
         return false;
@@ -1269,57 +1353,8 @@ bool decompressFromDevice(QIODevice *device, const QString &outputPath,
 
     updateFormatState(reader.handle());
 
-    // Use QSaveFile for atomic writes - prevents partial files on crash/error
-    QSaveFile outFile(outputPath);
-    if (!outFile.open(QIODevice::WriteOnly)) {
-        qCWarning(QGClibarchiveLog) << "Failed to open output file:" << outputPath;
-        return false;
-    }
-
     const qint64 totalSize = device->size() > 0 ? device->size() : 0;
-    qint64 totalBytesWritten = 0;
-    char buffer[QGCFileHelper::kBufferSizeMax];
-    la_ssize_t size;
-
-    while ((size = archive_read_data(reader.handle(), buffer, sizeof(buffer))) > 0) {
-        // Check size limit before writing
-        if (maxBytes > 0 && (totalBytesWritten + size) > maxBytes) {
-            qCWarning(QGClibarchiveLog) << "Size limit exceeded:" << maxBytes << "bytes";
-            outFile.cancelWriting();
-            return false;
-        }
-
-        if (outFile.write(buffer, size) != size) {
-            qCWarning(QGClibarchiveLog) << "Failed to write output:" << outFile.errorString();
-            outFile.cancelWriting();
-            return false;
-        }
-
-        totalBytesWritten += size;
-
-        if (progress) {
-            const qint64 bytesRead = archive_filter_bytes(reader.handle(), -1);
-            if (!progress(bytesRead, totalSize)) {
-                qCDebug(QGClibarchiveLog) << "Decompression cancelled by user";
-                outFile.cancelWriting();
-                return false;
-            }
-        }
-    }
-
-    if (size < 0) {
-        qCWarning(QGClibarchiveLog) << "Read error:" << archive_error_string(reader.handle());
-        outFile.cancelWriting();
-        return false;
-    }
-
-    // Atomically commit the file
-    if (!outFile.commit()) {
-        qCWarning(QGClibarchiveLog) << "Failed to commit output file:" << outFile.errorString();
-        return false;
-    }
-
-    return true;
+    return decompressStreamToFile(reader.handle(), outputPath, progress, totalSize, maxBytes);
 }
 
 QByteArray decompressDataFromDevice(QIODevice *device, qint64 maxBytes)

@@ -2,6 +2,7 @@
 
 #include "FTPManager.h"
 #include "MultiVehicleManager.h"
+#include "QGCFileHelper.h"
 #include "Vehicle.h"
 
 #include <QtCore/QDir>
@@ -69,15 +70,14 @@ bool FTPController::downloadFile(const QString &uri, const QString &localDir, co
         return false;
     }
 
-    QDir directory(localDir);
-    if (!directory.exists()) {
-        if (!directory.mkpath(QStringLiteral("."))) {
-            const QString error = tr("Directory %1 does not exist").arg(localDir);
-            _setErrorString(error);
-            emit downloadComplete(QString(), error);
-            return false;
-        }
+    if (!QGCFileHelper::ensureDirectoryExists(localDir)) {
+        const QString error = tr("Could not create directory %1").arg(localDir);
+        _setErrorString(error);
+        emit downloadComplete(QString(), error);
+        return false;
     }
+
+    const QString absoluteLocalDir = QDir(localDir).absolutePath();
 
     _lastDownloadFile.clear();
     emit lastDownloadFileChanged();
@@ -89,8 +89,8 @@ bool FTPController::downloadFile(const QString &uri, const QString &localDir, co
     emit progressChanged();
 
     const uint8_t compId = _componentIdForRequest(componentId);
-    if (!_ftpManager->download(compId, uri, directory.absolutePath(), fileName)) {
-        qCWarning(FTPControllerLog) << "Failed to start download" << uri << directory.absolutePath();
+    if (!_ftpManager->download(compId, uri, absoluteLocalDir, fileName)) {
+        qCWarning(FTPControllerLog) << "Failed to start download" << uri << absoluteLocalDir;
         const QString error = tr("Failed to download %1").arg(uri);
         _setErrorString(error);
         _setBusy(false);

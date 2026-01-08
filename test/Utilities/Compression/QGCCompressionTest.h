@@ -18,6 +18,7 @@ private slots:
 
     // Format detection
     void _testFormatDetection();
+    void _testFormatDetectionFromContent();
     void _testFormatHelpers();
 
     // Archive extraction from Qt resources
@@ -25,6 +26,7 @@ private slots:
     void _test7zFromResource();
     void _testListArchive();
     void _testListArchiveDetailed();
+    void _testListArchiveNaturalSort();
     void _testGetArchiveStats();
     void _testValidateArchive();
     void _testFileExists();
@@ -50,6 +52,16 @@ private slots:
     void _testDecompressFromDevice();
     void _testExtractFromDevice();
     void _testExtractFileDataFromDevice();
+
+    // QGCCompressionJob (async operations)
+    void _testCompressionJobExtract();
+    void _testCompressionJobCancel();
+    void _testCompressionJobAsyncStatic();
+
+    // QUrl utilities
+    void _testToLocalPath();
+    void _testIsLocalUrl();
+    void _testUrlOverloads();
 
 private:
     bool _compareFiles(const QString &file1, const QString &file2);

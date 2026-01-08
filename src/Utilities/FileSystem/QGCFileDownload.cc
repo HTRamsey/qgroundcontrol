@@ -1,10 +1,11 @@
 #include "QGCFileDownload.h"
 #include "QGCCompression.h"
+#include "QGCCompressionJob.h"
 #include "QGCLoggingCategory.h"
+#include "QGCNetworkHelper.h"
 
 #include <QtCore/QFileInfo>
 #include <QtCore/QStandardPaths>
-#include <QtNetwork/QNetworkProxy>
 
 QGC_LOGGING_CATEGORY(QGCFileDownloadLog, "Utilities.QGCFileDownload");
 
@@ -23,18 +24,6 @@ QGCFileDownload::~QGCFileDownload()
 void QGCFileDownload::setCache(QAbstractNetworkCache *cache)
 {
     _networkManager->setCache(cache);
-}
-
-void QGCFileDownload::setIgnoreSSLErrorsIfNeeded(QNetworkReply &networkReply)
-{
-    const bool sslLibraryBuildIs1x = ((QSslSocket::sslLibraryBuildVersionNumber() & 0xf0000000) == 0x10000000);
-    const bool sslLibraryIs3x = ((QSslSocket::sslLibraryVersionNumber() & 0xf0000000) == 0x30000000);
-    if (sslLibraryBuildIs1x && sslLibraryIs3x) {
-        qCWarning(QGCFileDownloadLog) << "Ignoring ssl certificates due to OpenSSL version mismatch";
-        QList<QSslError> errorsThatCanBeIgnored;
-        errorsThatCanBeIgnored << QSslError(QSslError::NoPeerCertificate);
-        networkReply.ignoreSslErrors(errorsThatCanBeIgnored);
-    }
 }
 
 bool QGCFileDownload::download(const QString &remoteFile,
@@ -75,11 +64,7 @@ bool QGCFileDownload::_downloadInternal(const QString &remoteFile, bool redirect
         networkRequest.setAttribute(attribute.first, attribute.second);
     }
 
-#if !defined(Q_OS_IOS) && !defined(Q_OS_ANDROID)
-    QNetworkProxy tProxy = _networkManager->proxy();
-    tProxy.setType(QNetworkProxy::DefaultProxy);
-    _networkManager->setProxy(tProxy);
-#endif
+    QGCNetworkHelper::configureProxy(_networkManager);
 
     QNetworkReply *const networkReply = _networkManager->get(networkRequest);
     if (!networkReply) {
@@ -87,7 +72,7 @@ bool QGCFileDownload::_downloadInternal(const QString &remoteFile, bool redirect
         return false;
     }
 
-    setIgnoreSSLErrorsIfNeeded(*networkReply);
+    QGCNetworkHelper::ignoreSslErrorsIfNeeded(networkReply);
 
     (void) connect(networkReply, &QNetworkReply::downloadProgress, this, &QGCFileDownload::downloadProgress);
     (void) connect(networkReply, &QNetworkReply::finished, this, &QGCFileDownload::_downloadFinished);
@@ -114,7 +99,7 @@ void QGCFileDownload::_downloadFinished()
 
     if (!reply->url().isLocalFile()) {
         const int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-        if ((statusCode < HTTP_Response::SUCCESS_OK) || (statusCode >= HTTP_Response::REDIRECTION_MULTIPLE_CHOICES)) {
+        if (!QGCNetworkHelper::isHttpSuccess(statusCode)) {
             return;
         }
     }
@@ -156,22 +141,7 @@ void QGCFileDownload::_downloadFinished()
         return;
     }
 
-    // Check if we should auto-decompress this file
-    if (_autoDecompress && QGCCompression::isCompressedFile(remoteFileName)) {
-        // Stream decompress directly from QNetworkReply to decompressed output
-        const QString decompressedFilename = QGCCompression::strippedPath(downloadFilename);
-
-        if (QGCCompression::decompressFromDevice(reply, decompressedFilename)) {
-            qCDebug(QGCFileDownloadLog) << "Auto-decompressed" << remoteFileName << "to" << decompressedFilename;
-            emit downloadComplete(_originalRemoteFile, decompressedFilename, QString());
-            return;
-        }
-
-        // Decompression failed - fall back to saving compressed file
-        qCWarning(QGCFileDownloadLog) << "Auto-decompression failed for" << remoteFileName << "- saving compressed file";
-    }
-
-    // Save file normally (either not compressed, or decompression failed/disabled)
+    // Save downloaded data to file
     QFile file(downloadFilename);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
         emit downloadComplete(_originalRemoteFile, downloadFilename, tr("Could not save downloaded file to %1. Error: %2").arg(downloadFilename, file.errorString()));
@@ -181,7 +151,48 @@ void QGCFileDownload::_downloadFinished()
     file.write(reply->readAll());
     file.close();
 
+    // Check if we should auto-decompress this file (async with progress)
+    if (_autoDecompress && QGCCompression::isCompressedFile(remoteFileName)) {
+        const QString decompressedFilename = QGCCompression::strippedPath(downloadFilename);
+
+        qCDebug(QGCFileDownloadLog) << "Starting async decompression of" << downloadFilename << "to" << decompressedFilename;
+
+        _pendingDecompressedFilename = decompressedFilename;
+
+        if (!_decompressionJob) {
+            _decompressionJob = new QGCCompressionJob(this);
+            connect(_decompressionJob, &QGCCompressionJob::progressChanged, this, &QGCFileDownload::decompressionProgress);
+            connect(_decompressionJob, &QGCCompressionJob::finished, this, &QGCFileDownload::_decompressionFinished);
+        }
+
+        _decompressionJob->decompressFile(downloadFilename, decompressedFilename);
+        return;
+    }
+
     emit downloadComplete(_originalRemoteFile, downloadFilename, QString());
+}
+
+void QGCFileDownload::_decompressionFinished(bool success)
+{
+    if (success) {
+        qCDebug(QGCFileDownloadLog) << "Async decompression completed:" << _pendingDecompressedFilename;
+
+        // Remove the compressed file after successful decompression
+        const QString compressedFile = _decompressionJob->sourcePath();
+        if (compressedFile != _pendingDecompressedFilename) {
+            QFile::remove(compressedFile);
+        }
+
+        emit downloadComplete(_originalRemoteFile, _pendingDecompressedFilename, QString());
+    } else {
+        qCWarning(QGCFileDownloadLog) << "Async decompression failed:" << _decompressionJob->errorString();
+
+        // Fall back to returning the compressed file
+        emit downloadComplete(_originalRemoteFile, _decompressionJob->sourcePath(),
+                              tr("Decompression failed: %1").arg(_decompressionJob->errorString()));
+    }
+
+    _pendingDecompressedFilename.clear();
 }
 
 void QGCFileDownload::_downloadError(QNetworkReply::NetworkError code)
