@@ -72,10 +72,10 @@ RowLayout {
         }
     }
 
-    function _saveAsKMLClicked() {
-        // Don't save if we only have Mission Settings item
+    function _exportClicked() {
+        // Don't export if we only have Mission Settings item
         if (_visualItems.count > 1) {
-            _planMasterController.saveKmlToSelectedFile()
+            _planMasterController.exportToSelectedFile()
         }
     }
 
@@ -196,12 +196,12 @@ RowLayout {
 
                     QGCButton {
                         Layout.fillWidth: true
-                        text: qsTr("Save as KML")
+                        text: qsTr("Export...")
                         enabled: !_syncInProgress && _hasPlanItems
 
                         onClicked: {
                             dropPanel.close()
-                            _saveAsKMLClicked()
+                            _exportClicked()
                         }
                     }
 

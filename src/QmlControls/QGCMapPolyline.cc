@@ -349,7 +349,7 @@ QList<QGeoCoordinate> QGCMapPolyline::offsetPolyline(double distance)
     return rgNewPolyline;
 }
 
-bool QGCMapPolyline::loadKMLOrSHPFile(const QString &file)
+bool QGCMapPolyline::loadShapeFile(const QString &file)
 {
     QString errorString;
     QList<QGeoCoordinate> rgCoords;

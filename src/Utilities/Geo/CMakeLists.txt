@@ -1,12 +1,18 @@
 # ============================================================================
 # Geo Subsystem
-# Geographic data handling (GeoJSON, KML, Shapefiles)
+# Geographic data handling (GeoJSON, GPX, KML, Shapefiles)
 # ============================================================================
 
 target_sources(${CMAKE_PROJECT_NAME}
     PRIVATE
         GeoJsonHelper.cc
         GeoJsonHelper.h
+        GeoUtilities.cc
+        GeoUtilities.h
+        GPXHelper.cc
+        GPXHelper.h
+        GPXSchemaValidator.cc
+        GPXSchemaValidator.h
         KMLDomDocument.cc
         KMLDomDocument.h
         KMLHelper.cc
@@ -28,6 +34,13 @@ qt_add_resources(${CMAKE_PROJECT_NAME} "kml_schema"
     PREFIX "/kml"
     FILES
         ogckml22.xsd
+)
+
+# GPX Schema Resources (GPX 1.1 XSD for validation)
+qt_add_resources(${CMAKE_PROJECT_NAME} "gpx_schema"
+    PREFIX "/gpx"
+    FILES
+        gpx11.xsd
 )
 
 # ============================================================================

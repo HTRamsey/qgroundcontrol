@@ -13,7 +13,6 @@ namespace KMLHelper
 {
     QDomDocument _loadFile(const QString &kmlFile, QString &errorString);
     bool _parseCoordinateString(const QString &coordinatesString, QList<QGeoCoordinate> &coords, QString &errorString);
-    void _filterVertices(QList<QGeoCoordinate> &vertices, double filterMeters, int minVertices);
     void _checkAltitudeMode(const QDomNode &geometryNode, const QString &geometryType, int index);
 
     constexpr const char *_errorPrefix = QT_TR_NOOP("KML file load failed. %1");
@@ -92,21 +91,6 @@ bool KMLHelper::_parseCoordinateString(const QString &coordinatesString, QList<Q
     return true;
 }
 
-void KMLHelper::_filterVertices(QList<QGeoCoordinate> &vertices, double filterMeters, int minVertices)
-{
-    if (filterMeters <= 0 || vertices.count() <= minVertices) {
-        return;
-    }
-
-    int i = 0;
-    while (i < (vertices.count() - 1)) {
-        if ((vertices.count() > minVertices) && (vertices[i].distanceTo(vertices[i + 1]) < filterMeters)) {
-            vertices.removeAt(i + 1);
-        } else {
-            i++;
-        }
-    }
-}
 
 void KMLHelper::_checkAltitudeMode(const QDomNode &geometryNode, const QString &geometryType, int index)
 {
@@ -178,10 +162,6 @@ bool KMLHelper::loadPolygonFromFile(const QString &kmlFile, QList<QGeoCoordinate
     if (!loadPolygonsFromFile(kmlFile, polygons, errorString, filterMeters)) {
         return false;
     }
-    if (polygons.isEmpty()) {
-        errorString = QString(_errorPrefix).arg(QT_TRANSLATE_NOOP("KML", "No polygons found in KML file"));
-        return false;
-    }
     vertices = polygons.first();
     return true;
 }
@@ -206,6 +186,7 @@ bool KMLHelper::loadPolygonsFromFile(const QString &kmlFile, QList<QList<QGeoCoo
         const QDomNode polygonNode = rgNodes.item(nodeIdx);
         _checkAltitudeMode(polygonNode, "Polygon", nodeIdx);
 
+        // Note: This function ignores holes. Use loadPolygonsWithHolesFromFile() to preserve hole information.
         const QDomNode coordinatesNode = polygonNode.namedItem("outerBoundaryIs").namedItem("LinearRing").namedItem("coordinates");
         if (coordinatesNode.isNull()) {
             qCWarning(KMLHelperLog) << "Polygon" << nodeIdx << QStringLiteral("(line %1)").arg(polygonNode.lineNumber())
@@ -244,8 +225,119 @@ bool KMLHelper::loadPolygonsFromFile(const QString &kmlFile, QList<QList<QGeoCoo
             std::reverse(rgCoords.begin(), rgCoords.end());
         }
 
-        _filterVertices(rgCoords, filterMeters, 3);
+        ShapeFileHelper::filterVertices(rgCoords, filterMeters, 3);
         polygons.append(rgCoords);
+    }
+
+    if (polygons.isEmpty()) {
+        errorString = QString(_errorPrefix).arg(QT_TRANSLATE_NOOP("KML", "No valid polygons found in KML file"));
+        return false;
+    }
+
+    return true;
+}
+
+bool KMLHelper::loadPolygonWithHolesFromFile(const QString &kmlFile, QGeoPolygon &polygon, QString &errorString)
+{
+    QList<QGeoPolygon> polygons;
+    if (!loadPolygonsWithHolesFromFile(kmlFile, polygons, errorString)) {
+        return false;
+    }
+    polygon = polygons.first();
+    return true;
+}
+
+bool KMLHelper::loadPolygonsWithHolesFromFile(const QString &kmlFile, QList<QGeoPolygon> &polygons, QString &errorString)
+{
+    errorString.clear();
+    polygons.clear();
+
+    const QDomDocument domDocument = KMLHelper::_loadFile(kmlFile, errorString);
+    if (!errorString.isEmpty()) {
+        return false;
+    }
+
+    const QDomNodeList rgNodes = domDocument.elementsByTagName("Polygon");
+    if (rgNodes.isEmpty()) {
+        errorString = QString(_errorPrefix).arg(QT_TRANSLATE_NOOP("KML", "Unable to find Polygon node in KML"));
+        return false;
+    }
+
+    for (int nodeIdx = 0; nodeIdx < rgNodes.count(); nodeIdx++) {
+        const QDomNode polygonNode = rgNodes.item(nodeIdx);
+        _checkAltitudeMode(polygonNode, "Polygon", nodeIdx);
+
+        // Parse outer boundary
+        const QDomNode outerCoordinatesNode = polygonNode.namedItem("outerBoundaryIs").namedItem("LinearRing").namedItem("coordinates");
+        if (outerCoordinatesNode.isNull()) {
+            qCWarning(KMLHelperLog) << "Polygon" << nodeIdx << QStringLiteral("(line %1)").arg(polygonNode.lineNumber())
+                                    << "missing outer boundary coordinates, skipping";
+            continue;
+        }
+
+        QList<QGeoCoordinate> outerRing;
+        if (!_parseCoordinateString(outerCoordinatesNode.toElement().text(), outerRing, errorString)) {
+            qCWarning(KMLHelperLog) << "Polygon" << nodeIdx << "failed to parse outer boundary:" << errorString;
+            errorString.clear();
+            continue;
+        }
+
+        if (outerRing.count() < 3) {
+            qCWarning(KMLHelperLog) << "Polygon" << nodeIdx << "outer boundary has fewer than 3 vertices, skipping";
+            continue;
+        }
+
+        // Remove duplicate closing vertex
+        if (outerRing.count() > 3 && outerRing.first().latitude() == outerRing.last().latitude() &&
+            outerRing.first().longitude() == outerRing.last().longitude()) {
+            outerRing.removeLast();
+        }
+
+        // Ensure clockwise winding for outer ring
+        double sum = 0;
+        for (int i = 0; i < outerRing.count(); i++) {
+            const QGeoCoordinate &coord1 = outerRing[i];
+            const QGeoCoordinate &coord2 = outerRing[(i + 1) % outerRing.count()];
+            sum += (coord2.longitude() - coord1.longitude()) * (coord2.latitude() + coord1.latitude());
+        }
+        if (sum < 0.0) {
+            std::reverse(outerRing.begin(), outerRing.end());
+        }
+
+        QGeoPolygon geoPolygon(outerRing);
+
+        // Parse inner boundaries (holes)
+        const QDomNodeList innerBoundaries = polygonNode.toElement().elementsByTagName("innerBoundaryIs");
+        for (int holeIdx = 0; holeIdx < innerBoundaries.count(); holeIdx++) {
+            const QDomNode innerNode = innerBoundaries.item(holeIdx);
+            const QDomNode innerCoordinatesNode = innerNode.namedItem("LinearRing").namedItem("coordinates");
+            if (innerCoordinatesNode.isNull()) {
+                qCWarning(KMLHelperLog) << "Polygon" << nodeIdx << "hole" << holeIdx << "missing coordinates, skipping hole";
+                continue;
+            }
+
+            QList<QGeoCoordinate> holeRing;
+            if (!_parseCoordinateString(innerCoordinatesNode.toElement().text(), holeRing, errorString)) {
+                qCWarning(KMLHelperLog) << "Polygon" << nodeIdx << "hole" << holeIdx << "failed to parse:" << errorString;
+                errorString.clear();
+                continue;
+            }
+
+            if (holeRing.count() < 3) {
+                qCWarning(KMLHelperLog) << "Polygon" << nodeIdx << "hole" << holeIdx << "has fewer than 3 vertices, skipping";
+                continue;
+            }
+
+            // Remove duplicate closing vertex
+            if (holeRing.count() > 3 && holeRing.first().latitude() == holeRing.last().latitude() &&
+                holeRing.first().longitude() == holeRing.last().longitude()) {
+                holeRing.removeLast();
+            }
+
+            geoPolygon.addHole(holeRing);
+        }
+
+        polygons.append(geoPolygon);
     }
 
     if (polygons.isEmpty()) {
@@ -260,10 +352,6 @@ bool KMLHelper::loadPolylineFromFile(const QString &kmlFile, QList<QGeoCoordinat
 {
     QList<QList<QGeoCoordinate>> polylines;
     if (!loadPolylinesFromFile(kmlFile, polylines, errorString, filterMeters)) {
-        return false;
-    }
-    if (polylines.isEmpty()) {
-        errorString = QString(_errorPrefix).arg(QT_TRANSLATE_NOOP("KML", "No polylines found in KML file"));
         return false;
     }
     coords = polylines.first();
@@ -311,7 +399,7 @@ bool KMLHelper::loadPolylinesFromFile(const QString &kmlFile, QList<QList<QGeoCo
             continue;
         }
 
-        _filterVertices(rgCoords, filterMeters, 2);
+        ShapeFileHelper::filterVertices(rgCoords, filterMeters, 2);
         polylines.append(rgCoords);
     }
 
@@ -369,4 +457,294 @@ bool KMLHelper::loadPointsFromFile(const QString &kmlFile, QList<QGeoCoordinate>
     }
 
     return true;
+}
+
+// ============================================================================
+// Save functions
+// ============================================================================
+
+namespace KMLHelper
+{
+    constexpr const char *_saveErrorPrefix = QT_TR_NOOP("KML file save failed. %1");
+    constexpr const char *_kmlNamespace = "http://www.opengis.net/kml/2.2";
+
+    QString _formatCoordinate(const QGeoCoordinate &coord)
+    {
+        if (qIsNaN(coord.altitude())) {
+            return QStringLiteral("%1,%2,0").arg(coord.longitude(), 0, 'f', 8).arg(coord.latitude(), 0, 'f', 8);
+        }
+        return QStringLiteral("%1,%2,%3").arg(coord.longitude(), 0, 'f', 8).arg(coord.latitude(), 0, 'f', 8).arg(coord.altitude(), 0, 'f', 2);
+    }
+
+    QString _formatCoordinates(const QList<QGeoCoordinate> &coords)
+    {
+        QStringList coordStrings;
+        for (const QGeoCoordinate &coord : coords) {
+            coordStrings.append(_formatCoordinate(coord));
+        }
+        return coordStrings.join(' ');
+    }
+
+    bool _hasAnyAltitude(const QList<QGeoCoordinate> &coords)
+    {
+        for (const QGeoCoordinate &coord : coords) {
+            if (!qIsNaN(coord.altitude())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    QDomDocument _createKmlDocument()
+    {
+        QDomDocument doc;
+        doc.appendChild(doc.createProcessingInstruction("xml", "version=\"1.0\" encoding=\"UTF-8\""));
+        QDomElement kml = doc.createElement("kml");
+        kml.setAttribute("xmlns", _kmlNamespace);
+        doc.appendChild(kml);
+        QDomElement document = doc.createElement("Document");
+        kml.appendChild(document);
+        return doc;
+    }
+
+    QDomElement _getDocumentElement(QDomDocument &doc)
+    {
+        return doc.documentElement().firstChildElement("Document");
+    }
+
+    void _addAltitudeMode(QDomDocument &doc, QDomElement &parent, bool hasAltitude)
+    {
+        if (hasAltitude) {
+            QDomElement altMode = doc.createElement("altitudeMode");
+            altMode.appendChild(doc.createTextNode("absolute"));
+            parent.appendChild(altMode);
+        }
+    }
+
+    bool _saveDocument(const QDomDocument &doc, const QString &kmlFile, QString &errorString)
+    {
+        QFile file(kmlFile);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            errorString = QString(_saveErrorPrefix).arg(
+                QObject::tr("Unable to create file: %1").arg(file.errorString()));
+            return false;
+        }
+        QTextStream stream(&file);
+        stream << doc.toString(2);
+        return true;
+    }
+}
+
+bool KMLHelper::savePolygonToFile(const QString &kmlFile, const QList<QGeoCoordinate> &vertices, QString &errorString)
+{
+    return savePolygonsToFile(kmlFile, {vertices}, errorString);
+}
+
+bool KMLHelper::savePolygonsToFile(const QString &kmlFile, const QList<QList<QGeoCoordinate>> &polygons, QString &errorString)
+{
+    errorString.clear();
+
+    if (polygons.isEmpty()) {
+        errorString = QString(_saveErrorPrefix).arg(QObject::tr("No polygons to save"));
+        return false;
+    }
+
+    QDomDocument doc = _createKmlDocument();
+    QDomElement document = _getDocumentElement(doc);
+
+    for (int i = 0; i < polygons.count(); i++) {
+        const QList<QGeoCoordinate> &vertices = polygons[i];
+        if (vertices.count() < 3) {
+            qCWarning(KMLHelperLog) << "Skipping polygon" << i << "with fewer than 3 vertices";
+            continue;
+        }
+
+        QDomElement placemark = doc.createElement("Placemark");
+        document.appendChild(placemark);
+
+        QDomElement polygon = doc.createElement("Polygon");
+        placemark.appendChild(polygon);
+
+        const bool hasAltitude = _hasAnyAltitude(vertices);
+        _addAltitudeMode(doc, polygon, hasAltitude);
+
+        QDomElement outerBoundary = doc.createElement("outerBoundaryIs");
+        polygon.appendChild(outerBoundary);
+
+        QDomElement linearRing = doc.createElement("LinearRing");
+        outerBoundary.appendChild(linearRing);
+
+        // Close the ring (KML requires first == last for polygons)
+        QList<QGeoCoordinate> closedVertices = vertices;
+        if (closedVertices.first().latitude() != closedVertices.last().latitude() ||
+            closedVertices.first().longitude() != closedVertices.last().longitude()) {
+            closedVertices.append(closedVertices.first());
+        }
+
+        QDomElement coordinates = doc.createElement("coordinates");
+        coordinates.appendChild(doc.createTextNode(_formatCoordinates(closedVertices)));
+        linearRing.appendChild(coordinates);
+    }
+
+    return _saveDocument(doc, kmlFile, errorString);
+}
+
+bool KMLHelper::savePolygonWithHolesToFile(const QString &kmlFile, const QGeoPolygon &polygon, QString &errorString)
+{
+    return savePolygonsWithHolesToFile(kmlFile, {polygon}, errorString);
+}
+
+bool KMLHelper::savePolygonsWithHolesToFile(const QString &kmlFile, const QList<QGeoPolygon> &polygons, QString &errorString)
+{
+    errorString.clear();
+
+    if (polygons.isEmpty()) {
+        errorString = QString(_saveErrorPrefix).arg(QObject::tr("No polygons to save"));
+        return false;
+    }
+
+    QDomDocument doc = _createKmlDocument();
+    QDomElement document = _getDocumentElement(doc);
+
+    for (int i = 0; i < polygons.count(); i++) {
+        const QGeoPolygon &geoPolygon = polygons[i];
+        const QList<QGeoCoordinate> perimeter = geoPolygon.perimeter();
+
+        if (perimeter.count() < 3) {
+            qCWarning(KMLHelperLog) << "Skipping polygon" << i << "with fewer than 3 vertices";
+            continue;
+        }
+
+        QDomElement placemark = doc.createElement("Placemark");
+        document.appendChild(placemark);
+
+        QDomElement polygon = doc.createElement("Polygon");
+        placemark.appendChild(polygon);
+
+        // Check if any coordinate in outer ring or holes has altitude
+        bool hasAltitude = _hasAnyAltitude(perimeter);
+        for (int h = 0; !hasAltitude && h < geoPolygon.holesCount(); h++) {
+            hasAltitude = _hasAnyAltitude(geoPolygon.holePath(h));
+        }
+        _addAltitudeMode(doc, polygon, hasAltitude);
+
+        // Outer boundary
+        QDomElement outerBoundary = doc.createElement("outerBoundaryIs");
+        polygon.appendChild(outerBoundary);
+
+        QDomElement outerLinearRing = doc.createElement("LinearRing");
+        outerBoundary.appendChild(outerLinearRing);
+
+        // Close the ring
+        QList<QGeoCoordinate> closedPerimeter = perimeter;
+        if (closedPerimeter.first().latitude() != closedPerimeter.last().latitude() ||
+            closedPerimeter.first().longitude() != closedPerimeter.last().longitude()) {
+            closedPerimeter.append(closedPerimeter.first());
+        }
+
+        QDomElement outerCoordinates = doc.createElement("coordinates");
+        outerCoordinates.appendChild(doc.createTextNode(_formatCoordinates(closedPerimeter)));
+        outerLinearRing.appendChild(outerCoordinates);
+
+        // Inner boundaries (holes)
+        for (int h = 0; h < geoPolygon.holesCount(); h++) {
+            const QList<QGeoCoordinate> holePath = geoPolygon.holePath(h);
+
+            QDomElement innerBoundary = doc.createElement("innerBoundaryIs");
+            polygon.appendChild(innerBoundary);
+
+            QDomElement innerLinearRing = doc.createElement("LinearRing");
+            innerBoundary.appendChild(innerLinearRing);
+
+            // Close the ring
+            QList<QGeoCoordinate> closedHole = holePath;
+            if (closedHole.first().latitude() != closedHole.last().latitude() ||
+                closedHole.first().longitude() != closedHole.last().longitude()) {
+                closedHole.append(closedHole.first());
+            }
+
+            QDomElement innerCoordinates = doc.createElement("coordinates");
+            innerCoordinates.appendChild(doc.createTextNode(_formatCoordinates(closedHole)));
+            innerLinearRing.appendChild(innerCoordinates);
+        }
+    }
+
+    return _saveDocument(doc, kmlFile, errorString);
+}
+
+bool KMLHelper::savePolylineToFile(const QString &kmlFile, const QList<QGeoCoordinate> &coords, QString &errorString)
+{
+    return savePolylinesToFile(kmlFile, {coords}, errorString);
+}
+
+bool KMLHelper::savePolylinesToFile(const QString &kmlFile, const QList<QList<QGeoCoordinate>> &polylines, QString &errorString)
+{
+    errorString.clear();
+
+    if (polylines.isEmpty()) {
+        errorString = QString(_saveErrorPrefix).arg(QObject::tr("No polylines to save"));
+        return false;
+    }
+
+    QDomDocument doc = _createKmlDocument();
+    QDomElement document = _getDocumentElement(doc);
+
+    for (int i = 0; i < polylines.count(); i++) {
+        const QList<QGeoCoordinate> &coords = polylines[i];
+        if (coords.count() < 2) {
+            qCWarning(KMLHelperLog) << "Skipping polyline" << i << "with fewer than 2 vertices";
+            continue;
+        }
+
+        QDomElement placemark = doc.createElement("Placemark");
+        document.appendChild(placemark);
+
+        QDomElement lineString = doc.createElement("LineString");
+        placemark.appendChild(lineString);
+
+        const bool hasAltitude = _hasAnyAltitude(coords);
+        _addAltitudeMode(doc, lineString, hasAltitude);
+
+        QDomElement coordinates = doc.createElement("coordinates");
+        coordinates.appendChild(doc.createTextNode(_formatCoordinates(coords)));
+        lineString.appendChild(coordinates);
+    }
+
+    return _saveDocument(doc, kmlFile, errorString);
+}
+
+bool KMLHelper::savePointsToFile(const QString &kmlFile, const QList<QGeoCoordinate> &points, QString &errorString)
+{
+    errorString.clear();
+
+    if (points.isEmpty()) {
+        errorString = QString(_saveErrorPrefix).arg(QObject::tr("No points to save"));
+        return false;
+    }
+
+    QDomDocument doc = _createKmlDocument();
+    QDomElement document = _getDocumentElement(doc);
+
+    for (int i = 0; i < points.count(); i++) {
+        const QGeoCoordinate &point = points[i];
+        if (!point.isValid()) {
+            qCWarning(KMLHelperLog) << "Skipping invalid point" << i;
+            continue;
+        }
+
+        QDomElement placemark = doc.createElement("Placemark");
+        document.appendChild(placemark);
+
+        QDomElement pointElem = doc.createElement("Point");
+        placemark.appendChild(pointElem);
+
+        const bool hasAltitude = !qIsNaN(point.altitude());
+        _addAltitudeMode(doc, pointElem, hasAltitude);
+
+        QDomElement coordinates = doc.createElement("coordinates");
+        coordinates.appendChild(doc.createTextNode(_formatCoordinate(point)));
+        pointElem.appendChild(coordinates);
+    }
+
+    return _saveDocument(doc, kmlFile, errorString);
 }

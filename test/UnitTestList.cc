@@ -50,6 +50,7 @@
 #include "MissionItemTest.h"
 #include "MissionManagerTest.h"
 #include "MissionSettingsTest.h"
+#include "PlanExporterTest.h"
 #include "PlanMasterControllerTest.h"
 #include "QGCMapPolygonTest.h"
 #include "QGCMapPolylineTest.h"
@@ -158,6 +159,7 @@ int QGCUnitTest::runTests(bool stress, const QStringList& unitTests)
     UT_REGISTER_TEST(MissionItemTest)
     UT_REGISTER_TEST(MissionManagerTest)
     UT_REGISTER_TEST(MissionSettingsTest)
+    UT_REGISTER_TEST(PlanExporterTest)
     UT_REGISTER_TEST(PlanMasterControllerTest)
     UT_REGISTER_TEST(QGCMapPolygonTest)
     UT_REGISTER_TEST(QGCMapPolylineTest)

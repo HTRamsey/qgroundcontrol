@@ -35,6 +35,8 @@ target_sources(${CMAKE_PROJECT_NAME}
 
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
+add_subdirectory(Trajectory)
+
 # ----------------------------------------------------------------------------
 # QML Module for Analyze View UI
 # ----------------------------------------------------------------------------
@@ -50,6 +52,7 @@ qt_add_qml_module(AnalyzeViewModule
         LogDownloadPage.qml
         MAVLinkConsolePage.qml
         MAVLinkInspectorPage.qml
+        Trajectory/TrajectoryExportPage.qml
         VibrationPage.qml
     NO_PLUGIN
 )

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "TimestampedTrajectoryPoint.h"
+
 #include <QtCore/QObject>
 #include <QtCore/QVariantList>
 #include <QtPositioning/QGeoCoordinate>
@@ -12,21 +14,31 @@ class TrajectoryPoints : public QObject
     Q_OBJECT
     QML_ELEMENT
     QML_UNCREATABLE("")
+
+    Q_PROPERTY(int count READ count NOTIFY countChanged)
+
 public:
     TrajectoryPoints(Vehicle* vehicle, QObject* parent = nullptr);
 
-    Q_INVOKABLE QVariantList list(void) const { return _points; }
+    Q_INVOKABLE QVariantList list() const { return _points; }
 
-    void start  (void);
-    void stop   (void);
+    /// Returns timestamped trajectory points for export
+    QList<TimestampedTrajectoryPoint> timestampedPoints() const { return _timestampedPoints; }
+
+    /// Returns the number of trajectory points
+    int count() const { return static_cast<int>(_points.count()); }
+
+    void start();
+    void stop();
 
 public slots:
-    void clear  (void);
+    void clear();
 
 signals:
-    void pointAdded     (QGeoCoordinate coordinate);
+    void pointAdded(QGeoCoordinate coordinate);
     void updateLastPoint(QGeoCoordinate coordinate);
-    void pointsCleared  (void);
+    void pointsCleared();
+    void countChanged();
 
 private slots:
     void _vehicleCoordinateChanged(QGeoCoordinate coordinate);
@@ -34,6 +46,7 @@ private slots:
 private:
     Vehicle*        _vehicle;
     QVariantList    _points;
+    QList<TimestampedTrajectoryPoint> _timestampedPoints;
     QGeoCoordinate  _lastPoint;
     double          _lastAzimuth;
 

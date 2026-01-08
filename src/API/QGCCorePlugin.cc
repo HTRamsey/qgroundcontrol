@@ -71,6 +71,10 @@ const QVariantList &QGCCorePlugin::analyzePages()
             tr("GeoTag Images"),
             QUrl::fromUserInput(QStringLiteral("qrc:/qml/QGroundControl/AnalyzeView/GeoTagPage.qml")),
             QUrl::fromUserInput(QStringLiteral("qrc:/qmlimages/GeoTagIcon.svg")))),
+        QVariant::fromValue(new QmlComponentInfo(
+            tr("Trajectory Export"),
+            QUrl::fromUserInput(QStringLiteral("qrc:/qml/QGroundControl/AnalyzeView/TrajectoryExportPage.qml")),
+            QUrl::fromUserInput(QStringLiteral("qrc:/qmlimages/GeoTagIcon.svg")))),
 #endif
         QVariant::fromValue(new QmlComponentInfo(
             tr("MAVLink Console"),

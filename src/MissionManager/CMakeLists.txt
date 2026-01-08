@@ -25,8 +25,6 @@ target_sources(${CMAKE_PROJECT_NAME}
         GeoFenceController.h
         GeoFenceManager.cc
         GeoFenceManager.h
-        KMLPlanDomDocument.cc
-        KMLPlanDomDocument.h
         LandingComplexItem.cc
         LandingComplexItem.h
         MissionCommandList.cc
@@ -51,6 +49,26 @@ target_sources(${CMAKE_PROJECT_NAME}
         PlanManager.h
         PlanMasterController.cc
         PlanMasterController.h
+        PlanShapes/GeoJsonPlanDocument.cc
+        PlanShapes/GeoJsonPlanDocument.h
+        PlanShapes/GeoJsonPlanExporter.cc
+        PlanShapes/GeoJsonPlanExporter.h
+        PlanShapes/GpxPlanDocument.cc
+        PlanShapes/GpxPlanDocument.h
+        PlanShapes/GpxPlanExporter.cc
+        PlanShapes/GpxPlanExporter.h
+        PlanShapes/KMLPlanDomDocument.cc
+        PlanShapes/KMLPlanDomDocument.h
+        PlanShapes/KmlPlanExporter.cc
+        PlanShapes/KmlPlanExporter.h
+        PlanShapes/KmzPlanExporter.cc
+        PlanShapes/KmzPlanExporter.h
+        PlanShapes/PlanExporter.cc
+        PlanShapes/PlanExporter.h
+        PlanShapes/ShpPlanDocument.cc
+        PlanShapes/ShpPlanDocument.h
+        PlanShapes/ShpPlanExporter.cc
+        PlanShapes/ShpPlanExporter.h
         RallyPoint.cc
         RallyPointController.cc
         RallyPointController.h
@@ -89,7 +107,10 @@ qt_add_resources(${CMAKE_PROJECT_NAME} json_mission_manager
     FILES ${JSON_FILES}
 )
 
-target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/PlanShapes
+)
 
 # qt_add_qml_module(QGC
 #     URI QGroundControl.MissionManager

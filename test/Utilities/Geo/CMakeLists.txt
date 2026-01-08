@@ -23,6 +23,11 @@ qt_add_resources(${CMAKE_PROJECT_NAME} "Test_Utilities_Geo_res"
         pline.prj
         pline.shp
         pline.shx
+        point.dbf
+        point.prj
+        point.shp
+        point.shx
+        point.kml
         polygon.dbf
         polygon.prj
         polygon.shp

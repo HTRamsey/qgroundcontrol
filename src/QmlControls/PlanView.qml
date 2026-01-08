@@ -153,13 +153,13 @@ Item {
             mapFitFunctions.fitMapViewportToMissionItems()
         }
 
-        function saveKmlToSelectedFile() {
+        function exportToSelectedFile() {
             if (!checkReadyForSaveUpload(true /* save */)) {
                 return
             }
-            fileDialog.title =          qsTr("Save KML")
+            fileDialog.title =          qsTr("Export Plan")
             fileDialog.planFiles =      false
-            fileDialog.nameFilters =    ShapeFileHelper.fileDialogKMLFilters
+            fileDialog.nameFilters =    _planMasterController.exportFilters
             fileDialog.openForSave()
         }
     }
@@ -209,13 +209,13 @@ Item {
         id: fileDialog
         folder: _appSettings ? _appSettings.missionSavePath : ""
 
-        property bool planFiles: true    ///< true: working with plan files, false: working with kml file
+        property bool planFiles: true    ///< true: working with plan files, false: working with export file (kml/geojson)
 
         onAcceptedForSave: (file) => {
             if (planFiles) {
                 _planMasterController.saveToFile(file)
             } else {
-                _planMasterController.saveToKml(file)
+                _planMasterController.exportToFile(file)
             }
             close()
         }
