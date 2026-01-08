@@ -22,11 +22,14 @@ class QGCCompressionJob;
 /// QGCArchiveWatcher watcher;
 /// watcher.setAutoDecompress(true);
 /// watcher.setOutputDirectory("/extracted");
-/// connect(&watcher, &QGCArchiveWatcher::archiveDetected, [](const QString &path) {
+/// connect(&watcher, &QGCArchiveWatcher::archiveDetected,
+///         [](const QString &path) {
 ///     qDebug() << "Found archive:" << path;
 /// });
-/// connect(&watcher, &QGCArchiveWatcher::extractionComplete, [](const QString &archive, const QString &output, bool success) {
-///     qDebug() << "Extracted" << archive << "to" << output << (success ? "OK" : "FAILED");
+/// connect(&watcher, &QGCArchiveWatcher::extractionComplete,
+///         [](const QString &archive, const QString &output, bool success) {
+///     qDebug() << "Extracted" << archive << "to" << output
+///              << (success ? "OK" : "FAILED");
 /// });
 /// watcher.watchDirectory("/downloads");
 /// @endcode
@@ -45,7 +48,8 @@ class QGCArchiveWatcher : public QObject
     Q_PROPERTY(qreal progress READ progress NOTIFY progressChanged FINAL)
 
     /// Output directory for extractions (empty = same directory as archive)
-    Q_PROPERTY(QString outputDirectory READ outputDirectory WRITE setOutputDirectory NOTIFY outputDirectoryChanged FINAL)
+    Q_PROPERTY(QString outputDirectory READ outputDirectory WRITE setOutputDirectory
+               NOTIFY outputDirectoryChanged FINAL)
 
 public:
     /// Filter mode for which files to watch

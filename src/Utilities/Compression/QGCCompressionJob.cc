@@ -235,7 +235,8 @@ QFuture<bool> QGCCompressionJob::_runWithProgress(WorkFunction work)
                 progressValue = static_cast<int>((bytesProcessed * 100) / totalBytes);
             } else if (bytesProcessed > 0) {
                 // Unknown total - asymptotic progress
-                progressValue = static_cast<int>(50.0 * (1.0 - (1.0 / (1.0 + static_cast<double>(bytesProcessed) / 1048576.0))));
+                const double normalized = static_cast<double>(bytesProcessed) / 1048576.0;
+                progressValue = static_cast<int>(50.0 * (1.0 - (1.0 / (1.0 + normalized))));
             }
 
             promise.setProgressValue(progressValue);

@@ -558,7 +558,8 @@ QString toLocalPath(const QUrl &url)
     }
 
     // Remote URLs (http://, https://, ftp://) are not supported
-    qCWarning(QGCCompressionLog) << "Unsupported URL scheme:" << url.scheme() << "- only file://, qrc:/, and local paths are supported";
+    qCWarning(QGCCompressionLog) << "Unsupported URL scheme:" << url.scheme()
+                                 << "- only file://, qrc:/, and local paths are supported";
     return {};
 }
 
@@ -619,7 +620,8 @@ bool decompressFile(const QString &inputPath, const QString &outputPath, Format 
 
     // Single-file compression formats
     if (isCompressionFormat(format)) {
-        const bool success = QGClibarchive::decompressSingleFile(inputPath, actualOutput, progress, maxDecompressedBytes);
+        const bool success = QGClibarchive::decompressSingleFile(inputPath, actualOutput, progress,
+                                                                   maxDecompressedBytes);
         captureFormatInfo();
         if (!success) {
             setError(Error::IoError, QStringLiteral("Decompression failed: ") + inputPath);
@@ -704,7 +706,8 @@ bool extractArchive(const QString &archivePath, const QString &outputDirectoryPa
     qCDebug(QGCCompressionLog) << "Extracting" << formatName(format) << "archive"
                                 << archivePath << "to" << outputDirectoryPath;
 
-    const bool success = QGClibarchive::extractAnyArchive(archivePath, outputDirectoryPath, progress, maxDecompressedBytes);
+    const bool success = QGClibarchive::extractAnyArchive(archivePath, outputDirectoryPath, progress,
+                                                            maxDecompressedBytes);
     captureFormatInfo();
     if (!success) {
         setError(Error::IoError, QStringLiteral("Failed to extract archive: ") + archivePath);

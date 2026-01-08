@@ -2,7 +2,10 @@
 #include "QGCLoggingCategory.h"
 
 #include <QtCore/QCoreApplication>
+#include <QtCore/QIODevice>
+#include <QtCore/QJsonDocument>
 #include <QtCore/QUrlQuery>
+#include <QtNetwork/QHttpPart>
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkInformation>
 #include <QtNetwork/QNetworkProxy>
@@ -12,9 +15,6 @@
 #ifdef QGC_ENABLE_BLUETOOTH
 #include <QtBluetooth/QBluetoothLocalDevice>
 #endif
-
-// http-parser provides HTTP status codes, methods, and status text
-#include <http_parser.h>
 
 QGC_LOGGING_CATEGORY(QGCNetworkHelperLog, "Utilities.QGCNetworkHelper")
 
@@ -44,14 +44,82 @@ HttpStatusClass classifyHttpStatus(int statusCode)
     return HttpStatusClass::Unknown;
 }
 
+QString httpStatusText(HttpStatusCode statusCode)
+{
+    switch (statusCode) {
+    // 1xx Informational
+    case HttpStatusCode::Continue:                      return QStringLiteral("Continue");
+    case HttpStatusCode::SwitchingProtocols:            return QStringLiteral("Switching Protocols");
+    case HttpStatusCode::Processing:                    return QStringLiteral("Processing");
+    // 2xx Success
+    case HttpStatusCode::Ok:                            return QStringLiteral("OK");
+    case HttpStatusCode::Created:                       return QStringLiteral("Created");
+    case HttpStatusCode::Accepted:                      return QStringLiteral("Accepted");
+    case HttpStatusCode::NonAuthoritativeInformation:   return QStringLiteral("Non-Authoritative Information");
+    case HttpStatusCode::NoContent:                     return QStringLiteral("No Content");
+    case HttpStatusCode::ResetContent:                  return QStringLiteral("Reset Content");
+    case HttpStatusCode::PartialContent:                return QStringLiteral("Partial Content");
+    case HttpStatusCode::MultiStatus:                   return QStringLiteral("Multi-Status");
+    case HttpStatusCode::AlreadyReported:               return QStringLiteral("Already Reported");
+    case HttpStatusCode::IMUsed:                        return QStringLiteral("IM Used");
+    // 3xx Redirection
+    case HttpStatusCode::MultipleChoices:               return QStringLiteral("Multiple Choices");
+    case HttpStatusCode::MovedPermanently:              return QStringLiteral("Moved Permanently");
+    case HttpStatusCode::Found:                         return QStringLiteral("Found");
+    case HttpStatusCode::SeeOther:                      return QStringLiteral("See Other");
+    case HttpStatusCode::NotModified:                   return QStringLiteral("Not Modified");
+    case HttpStatusCode::UseProxy:                      return QStringLiteral("Use Proxy");
+    case HttpStatusCode::TemporaryRedirect:             return QStringLiteral("Temporary Redirect");
+    case HttpStatusCode::PermanentRedirect:             return QStringLiteral("Permanent Redirect");
+    // 4xx Client Errors
+    case HttpStatusCode::BadRequest:                    return QStringLiteral("Bad Request");
+    case HttpStatusCode::Unauthorized:                  return QStringLiteral("Unauthorized");
+    case HttpStatusCode::PaymentRequired:               return QStringLiteral("Payment Required");
+    case HttpStatusCode::Forbidden:                     return QStringLiteral("Forbidden");
+    case HttpStatusCode::NotFound:                      return QStringLiteral("Not Found");
+    case HttpStatusCode::MethodNotAllowed:              return QStringLiteral("Method Not Allowed");
+    case HttpStatusCode::NotAcceptable:                 return QStringLiteral("Not Acceptable");
+    case HttpStatusCode::ProxyAuthenticationRequired:   return QStringLiteral("Proxy Authentication Required");
+    case HttpStatusCode::RequestTimeout:                return QStringLiteral("Request Timeout");
+    case HttpStatusCode::Conflict:                      return QStringLiteral("Conflict");
+    case HttpStatusCode::Gone:                          return QStringLiteral("Gone");
+    case HttpStatusCode::LengthRequired:                return QStringLiteral("Length Required");
+    case HttpStatusCode::PreconditionFailed:            return QStringLiteral("Precondition Failed");
+    case HttpStatusCode::PayloadTooLarge:               return QStringLiteral("Payload Too Large");
+    case HttpStatusCode::UriTooLong:                    return QStringLiteral("URI Too Long");
+    case HttpStatusCode::UnsupportedMediaType:          return QStringLiteral("Unsupported Media Type");
+    case HttpStatusCode::RequestRangeNotSatisfiable:    return QStringLiteral("Range Not Satisfiable");
+    case HttpStatusCode::ExpectationFailed:             return QStringLiteral("Expectation Failed");
+    case HttpStatusCode::ImATeapot:                     return QStringLiteral("I'm a teapot");
+    case HttpStatusCode::MisdirectedRequest:            return QStringLiteral("Misdirected Request");
+    case HttpStatusCode::UnprocessableEntity:           return QStringLiteral("Unprocessable Entity");
+    case HttpStatusCode::Locked:                        return QStringLiteral("Locked");
+    case HttpStatusCode::FailedDependency:              return QStringLiteral("Failed Dependency");
+    case HttpStatusCode::UpgradeRequired:               return QStringLiteral("Upgrade Required");
+    case HttpStatusCode::PreconditionRequired:          return QStringLiteral("Precondition Required");
+    case HttpStatusCode::TooManyRequests:               return QStringLiteral("Too Many Requests");
+    case HttpStatusCode::RequestHeaderFieldsTooLarge:   return QStringLiteral("Request Header Fields Too Large");
+    case HttpStatusCode::UnavailableForLegalReasons:    return QStringLiteral("Unavailable For Legal Reasons");
+    // 5xx Server Errors
+    case HttpStatusCode::InternalServerError:           return QStringLiteral("Internal Server Error");
+    case HttpStatusCode::NotImplemented:                return QStringLiteral("Not Implemented");
+    case HttpStatusCode::BadGateway:                    return QStringLiteral("Bad Gateway");
+    case HttpStatusCode::ServiceUnavailable:            return QStringLiteral("Service Unavailable");
+    case HttpStatusCode::GatewayTimeout:                return QStringLiteral("Gateway Timeout");
+    case HttpStatusCode::HttpVersionNotSupported:       return QStringLiteral("HTTP Version Not Supported");
+    case HttpStatusCode::VariantAlsoNegotiates:         return QStringLiteral("Variant Also Negotiates");
+    case HttpStatusCode::InsufficientStorage:           return QStringLiteral("Insufficient Storage");
+    case HttpStatusCode::LoopDetected:                  return QStringLiteral("Loop Detected");
+    case HttpStatusCode::NotExtended:                   return QStringLiteral("Not Extended");
+    case HttpStatusCode::NetworkAuthenticationRequired: return QStringLiteral("Network Authentication Required");
+    case HttpStatusCode::NetworkConnectTimeoutError:    return QStringLiteral("Network Connect Timeout Error");
+    default:                                            return QStringLiteral("Unknown Status");
+    }
+}
+
 QString httpStatusText(int statusCode)
 {
-    // Use http-parser's status text lookup (covers all standard HTTP status codes)
-    const char *text = http_status_str(static_cast<http_status>(statusCode));
-    if (text != nullptr && text[0] != '\0') {
-        return QString::fromLatin1(text);
-    }
-    return QStringLiteral("Unknown Status %1").arg(statusCode);
+    return httpStatusText(static_cast<HttpStatusCode>(statusCode));
 }
 
 // ============================================================================
@@ -60,12 +128,18 @@ QString httpStatusText(int statusCode)
 
 QString httpMethodName(HttpMethod method)
 {
-    // Use http-parser's method name lookup
-    const char *name = http_method_str(static_cast<http_method>(static_cast<int>(method)));
-    if (name != nullptr) {
-        return QString::fromLatin1(name);
+    switch (method) {
+    case HttpMethod::Get:     return QStringLiteral("GET");
+    case HttpMethod::Post:    return QStringLiteral("POST");
+    case HttpMethod::Put:     return QStringLiteral("PUT");
+    case HttpMethod::Delete:  return QStringLiteral("DELETE");
+    case HttpMethod::Head:    return QStringLiteral("HEAD");
+    case HttpMethod::Options: return QStringLiteral("OPTIONS");
+    case HttpMethod::Patch:   return QStringLiteral("PATCH");
+    case HttpMethod::Connect: return QStringLiteral("CONNECT");
+    case HttpMethod::Trace:   return QStringLiteral("TRACE");
+    default:                  return QStringLiteral("GET");
     }
-    return QStringLiteral("GET");
 }
 
 HttpMethod parseHttpMethod(const QString &methodStr)
@@ -73,7 +147,6 @@ HttpMethod parseHttpMethod(const QString &methodStr)
     const QByteArray upper = methodStr.toUpper().toLatin1();
     const char *str = upper.constData();
 
-    // Check common methods first for performance
     if (qstrcmp(str, "GET") == 0)     return HttpMethod::Get;
     if (qstrcmp(str, "POST") == 0)    return HttpMethod::Post;
     if (qstrcmp(str, "PUT") == 0)     return HttpMethod::Put;
@@ -84,7 +157,7 @@ HttpMethod parseHttpMethod(const QString &methodStr)
     if (qstrcmp(str, "CONNECT") == 0) return HttpMethod::Connect;
     if (qstrcmp(str, "TRACE") == 0)   return HttpMethod::Trace;
 
-    return HttpMethod::Get;  // Default fallback
+    return HttpMethod::Get;
 }
 
 // ============================================================================
@@ -304,6 +377,143 @@ QString defaultUserAgent()
             .arg(QString::fromLatin1(qVersion()));
     }
     return userAgent;
+}
+
+// ============================================================================
+// Authentication Helpers
+// ============================================================================
+
+void setBasicAuth(QNetworkRequest &request, const QString &credentials)
+{
+    request.setRawHeader("Authorization", ("Basic " + credentials).toUtf8());
+}
+
+void setBasicAuth(QNetworkRequest &request, const QString &username, const QString &password)
+{
+    setBasicAuth(request, createBasicAuthCredentials(username, password));
+}
+
+void setBearerToken(QNetworkRequest &request, const QString &token)
+{
+    request.setRawHeader("Authorization", ("Bearer " + token).toUtf8());
+}
+
+QString createBasicAuthCredentials(const QString &username, const QString &password)
+{
+    const QString credentials = username + QLatin1Char(':') + password;
+    return QString::fromLatin1(credentials.toUtf8().toBase64());
+}
+
+// ============================================================================
+// Multipart Form Data Helpers
+// ============================================================================
+
+QHttpPart createFormField(const QString &name, const QString &value)
+{
+    QHttpPart part;
+    part.setHeader(QNetworkRequest::ContentDispositionHeader,
+                   QStringLiteral("form-data; name=\"%1\"").arg(name));
+    part.setBody(value.toUtf8());
+    return part;
+}
+
+QHttpPart createFilePart(const QString &name, const QString &fileName,
+                         const QString &contentType, QIODevice *device)
+{
+    QHttpPart part;
+    part.setHeader(QNetworkRequest::ContentTypeHeader, contentType);
+    part.setHeader(QNetworkRequest::ContentDispositionHeader,
+                   QStringLiteral("form-data; name=\"%1\"; filename=\"%2\"").arg(name, fileName));
+    part.setBodyDevice(device);
+    return part;
+}
+
+QHttpPart createFilePart(const QString &name, const QString &fileName, QIODevice *device)
+{
+    return createFilePart(name, fileName, kContentTypeOctetStream, device);
+}
+
+// ============================================================================
+// SSL/TLS Configuration Builders
+// ============================================================================
+
+QSslConfiguration createSslConfig(QSsl::SslProtocol protocol)
+{
+    QSslConfiguration config = QSslConfiguration::defaultConfiguration();
+    config.setProtocol(protocol);
+    return config;
+}
+
+QSslConfiguration createInsecureSslConfig()
+{
+    QSslConfiguration config = QSslConfiguration::defaultConfiguration();
+    config.setPeerVerifyMode(QSslSocket::VerifyNone);
+    return config;
+}
+
+void applySslConfig(QNetworkRequest &request, const QSslConfiguration &config)
+{
+    request.setSslConfiguration(config);
+}
+
+// ============================================================================
+// JSON Response Helpers
+// ============================================================================
+
+QJsonDocument parseJson(const QByteArray &data, QJsonParseError *error)
+{
+    QJsonParseError localError;
+    QJsonParseError *errorPtr = (error != nullptr) ? error : &localError;
+
+    QJsonDocument doc = QJsonDocument::fromJson(data, errorPtr);
+
+    if (errorPtr->error != QJsonParseError::NoError) {
+        qCWarning(QGCNetworkHelperLog) << "JSON parse error:" << errorPtr->errorString()
+                                       << "at offset" << errorPtr->offset;
+        return {};
+    }
+
+    return doc;
+}
+
+QJsonDocument parseJsonReply(QNetworkReply *reply, QJsonParseError *error)
+{
+    if (reply == nullptr) {
+        if (error != nullptr) {
+            error->error = QJsonParseError::UnterminatedObject;
+            error->offset = 0;
+        }
+        return {};
+    }
+
+    if (reply->error() != QNetworkReply::NoError) {
+        qCWarning(QGCNetworkHelperLog) << "Network error before JSON parse:" << reply->errorString();
+        if (error != nullptr) {
+            error->error = QJsonParseError::UnterminatedObject;
+            error->offset = 0;
+        }
+        return {};
+    }
+
+    return parseJson(reply->readAll(), error);
+}
+
+bool looksLikeJson(const QByteArray &data)
+{
+    if (data.isEmpty()) {
+        return false;
+    }
+
+    // Skip leading whitespace
+    for (int i = 0; i < data.size(); ++i) {
+        const char c = data.at(i);
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+            continue;
+        }
+        return c == '{' || c == '[';
+    }
+
+    return false;
 }
 
 // ============================================================================

@@ -47,6 +47,12 @@ private slots:
     // QUrl support
     void _testArchiveUrl();
 
+    // Model invariants (QAbstractItemModelTester)
+    void _testModelTesterEmpty();
+    void _testModelTesterLoaded();
+    void _testModelTesterFilterChange();
+    void _testModelTesterClearAndReload();
+
 private:
     QTemporaryDir *_tempDir = nullptr;
 };

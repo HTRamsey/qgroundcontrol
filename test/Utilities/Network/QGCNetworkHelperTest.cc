@@ -111,7 +111,7 @@ void QGCNetworkHelperTest::_testIsHttpServerError()
 
 void QGCNetworkHelperTest::_testHttpStatusText()
 {
-    // Common status codes (via http-parser)
+    // Common status codes
     QCOMPARE(QGCNetworkHelper::httpStatusText(200), QStringLiteral("OK"));
     QCOMPARE(QGCNetworkHelper::httpStatusText(201), QStringLiteral("Created"));
     QCOMPARE(QGCNetworkHelper::httpStatusText(204), QStringLiteral("No Content"));
@@ -128,6 +128,58 @@ void QGCNetworkHelperTest::_testHttpStatusText()
 
     // Unknown status should return formatted message
     QVERIFY(QGCNetworkHelper::httpStatusText(999).contains("999"));
+}
+
+void QGCNetworkHelperTest::_testHttpStatusTextFromEnum()
+{
+    using HttpStatusCode = QGCNetworkHelper::HttpStatusCode;
+
+    // Test Qt HttpStatusCode enum overload
+    QCOMPARE(QGCNetworkHelper::httpStatusText(HttpStatusCode::Continue), QStringLiteral("Continue"));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(HttpStatusCode::SwitchingProtocols), QStringLiteral("Switching Protocols"));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(HttpStatusCode::Ok), QStringLiteral("OK"));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(HttpStatusCode::Created), QStringLiteral("Created"));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(HttpStatusCode::Accepted), QStringLiteral("Accepted"));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(HttpStatusCode::NoContent), QStringLiteral("No Content"));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(HttpStatusCode::MovedPermanently), QStringLiteral("Moved Permanently"));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(HttpStatusCode::Found), QStringLiteral("Found"));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(HttpStatusCode::NotModified), QStringLiteral("Not Modified"));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(HttpStatusCode::BadRequest), QStringLiteral("Bad Request"));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(HttpStatusCode::Unauthorized), QStringLiteral("Unauthorized"));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(HttpStatusCode::Forbidden), QStringLiteral("Forbidden"));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(HttpStatusCode::NotFound), QStringLiteral("Not Found"));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(HttpStatusCode::MethodNotAllowed), QStringLiteral("Method Not Allowed"));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(HttpStatusCode::RequestTimeout), QStringLiteral("Request Timeout"));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(HttpStatusCode::TooManyRequests), QStringLiteral("Too Many Requests"));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(HttpStatusCode::InternalServerError), QStringLiteral("Internal Server Error"));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(HttpStatusCode::BadGateway), QStringLiteral("Bad Gateway"));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(HttpStatusCode::ServiceUnavailable), QStringLiteral("Service Unavailable"));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(HttpStatusCode::GatewayTimeout), QStringLiteral("Gateway Timeout"));
+}
+
+void QGCNetworkHelperTest::_testHttpStatusCodeEnumRoundTrip()
+{
+    using HttpStatusCode = QGCNetworkHelper::HttpStatusCode;
+
+    // Verify that int and enum overloads produce consistent results
+    QCOMPARE(QGCNetworkHelper::httpStatusText(200), QGCNetworkHelper::httpStatusText(HttpStatusCode::Ok));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(201), QGCNetworkHelper::httpStatusText(HttpStatusCode::Created));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(204), QGCNetworkHelper::httpStatusText(HttpStatusCode::NoContent));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(301), QGCNetworkHelper::httpStatusText(HttpStatusCode::MovedPermanently));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(302), QGCNetworkHelper::httpStatusText(HttpStatusCode::Found));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(304), QGCNetworkHelper::httpStatusText(HttpStatusCode::NotModified));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(400), QGCNetworkHelper::httpStatusText(HttpStatusCode::BadRequest));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(401), QGCNetworkHelper::httpStatusText(HttpStatusCode::Unauthorized));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(403), QGCNetworkHelper::httpStatusText(HttpStatusCode::Forbidden));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(404), QGCNetworkHelper::httpStatusText(HttpStatusCode::NotFound));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(500), QGCNetworkHelper::httpStatusText(HttpStatusCode::InternalServerError));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(502), QGCNetworkHelper::httpStatusText(HttpStatusCode::BadGateway));
+    QCOMPARE(QGCNetworkHelper::httpStatusText(503), QGCNetworkHelper::httpStatusText(HttpStatusCode::ServiceUnavailable));
+
+    // Verify static_cast round-trip
+    QCOMPARE(static_cast<int>(HttpStatusCode::Ok), 200);
+    QCOMPARE(static_cast<int>(HttpStatusCode::NotFound), 404);
+    QCOMPARE(static_cast<int>(HttpStatusCode::InternalServerError), 500);
 }
 
 // ============================================================================

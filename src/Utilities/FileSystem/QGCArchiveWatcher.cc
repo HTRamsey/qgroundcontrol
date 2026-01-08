@@ -316,7 +316,8 @@ void QGCArchiveWatcher::_startExtraction(const QString &archivePath)
         _extractionJob->extractArchive(archivePath, outputPath);
     } else {
         // For compressed files, output is a file, not directory
-        const QString decompressedPath = outputPath + "/" + QFileInfo(QGCCompression::strippedPath(archivePath)).fileName();
+        const QString strippedName = QFileInfo(QGCCompression::strippedPath(archivePath)).fileName();
+        const QString decompressedPath = outputPath + "/" + strippedName;
         _extractionJob->decompressFile(archivePath, decompressedPath);
     }
 }

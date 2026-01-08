@@ -2,6 +2,7 @@
 #include "QGCArchiveModel.h"
 
 #include <QtCore/QRegularExpression>
+#include <QtTest/QAbstractItemModelTester>
 #include <QtTest/QSignalSpy>
 #include <QtTest/QTest>
 
@@ -458,4 +459,130 @@ void QGCArchiveModelTest::_testArchiveUrl()
 
     QCOMPARE(pathSpy.count(), 1);
     QVERIFY(model.count() > 0);
+}
+
+// ============================================================================
+// Model Invariants (QAbstractItemModelTester)
+// ============================================================================
+
+void QGCArchiveModelTest::_testModelTesterEmpty()
+{
+    // Test an empty model passes all QAbstractItemModel invariants
+    QGCArchiveModel model;
+
+    // QAbstractItemModelTester will assert if model violates any invariants
+    // FailureReportingMode::Fatal makes failures cause test to abort
+    QAbstractItemModelTester tester(&model, QAbstractItemModelTester::FailureReportingMode::Fatal);
+
+    // Verify empty state
+    QCOMPARE(model.rowCount(), 0);
+
+    // Access invalid indices - tester will catch any issues
+    const QModelIndex invalid = model.index(-1);
+    QVERIFY(!invalid.isValid());
+
+    const QModelIndex outOfBounds = model.index(100);
+    QVERIFY(!outOfBounds.isValid());
+}
+
+void QGCArchiveModelTest::_testModelTesterLoaded()
+{
+    // Test a loaded model passes all invariants
+    QGCArchiveModel model;
+    QAbstractItemModelTester tester(&model, QAbstractItemModelTester::FailureReportingMode::Fatal);
+
+    // Load archive - tester monitors all signals during load
+    model.setArchivePath(QStringLiteral(":/unittest/manifest.json.zip"));
+
+    QVERIFY(model.rowCount() > 0);
+
+    // Access all rows - tester will verify data() returns valid values
+    for (int i = 0; i < model.rowCount(); ++i) {
+        const QModelIndex idx = model.index(i);
+        QVERIFY(idx.isValid());
+        QCOMPARE(idx.row(), i);
+        QCOMPARE(idx.column(), 0);
+
+        // Access data for all roles
+        QVERIFY(!model.data(idx, QGCArchiveModel::NameRole).isNull());
+        QVERIFY(!model.data(idx, QGCArchiveModel::SizeRole).isNull());
+        QVERIFY(!model.data(idx, QGCArchiveModel::IsDirectoryRole).isNull());
+    }
+}
+
+void QGCArchiveModelTest::_testModelTesterFilterChange()
+{
+    // Test that filter changes emit proper signals
+    QGCArchiveModel model;
+    QAbstractItemModelTester tester(&model, QAbstractItemModelTester::FailureReportingMode::Fatal);
+
+    model.setArchivePath(QStringLiteral(":/unittest/manifest.json.zip"));
+
+    const int originalCount = model.rowCount();
+    QVERIFY(originalCount > 0);
+
+    // Change filter - tester will verify beginResetModel/endResetModel signals
+    model.setFilterMode(QGCArchiveModel::FilesOnly);
+
+    // Verify rows are accessible after filter change
+    for (int i = 0; i < model.rowCount(); ++i) {
+        const QModelIndex idx = model.index(i);
+        QVERIFY(idx.isValid());
+        QVERIFY(!model.data(idx, QGCArchiveModel::IsDirectoryRole).toBool());
+    }
+
+    // Change to directories only
+    model.setFilterMode(QGCArchiveModel::DirectoriesOnly);
+
+    for (int i = 0; i < model.rowCount(); ++i) {
+        const QModelIndex idx = model.index(i);
+        QVERIFY(idx.isValid());
+        QVERIFY(model.data(idx, QGCArchiveModel::IsDirectoryRole).toBool());
+    }
+
+    // Back to all entries
+    model.setFilterMode(QGCArchiveModel::AllEntries);
+    QCOMPARE(model.rowCount(), originalCount);
+}
+
+void QGCArchiveModelTest::_testModelTesterClearAndReload()
+{
+    // Test clear and reload emit proper signals
+    QGCArchiveModel model;
+    QAbstractItemModelTester tester(&model, QAbstractItemModelTester::FailureReportingMode::Fatal);
+
+    // Load
+    model.setArchivePath(QStringLiteral(":/unittest/manifest.json.zip"));
+    const int originalCount = model.rowCount();
+    QVERIFY(originalCount > 0);
+
+    // Clear - tester verifies reset signals (but path remains set)
+    model.clear();
+    QCOMPARE(model.rowCount(), 0);
+
+    // Refresh reloads from existing path (path was not cleared)
+    model.refresh();
+    QCOMPARE(model.rowCount(), originalCount);
+
+    // Clear and set empty path
+    model.clear();
+    model.setArchivePath(QString());
+    QCOMPARE(model.rowCount(), 0);
+
+    // Now refresh should do nothing (no path)
+    model.refresh();
+    QCOMPARE(model.rowCount(), 0);
+
+    // Set path again
+    model.setArchivePath(QStringLiteral(":/unittest/manifest.json.7z"));
+    QVERIFY(model.rowCount() > 0);
+
+    // Refresh with valid path
+    const int count = model.rowCount();
+    model.refresh();
+    QCOMPARE(model.rowCount(), count);
+
+    // Change path - tester verifies reset signals
+    model.setArchivePath(QStringLiteral(":/unittest/manifest.json.zip"));
+    QVERIFY(model.rowCount() > 0);
 }

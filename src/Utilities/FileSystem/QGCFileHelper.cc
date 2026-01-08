@@ -229,9 +229,10 @@ bool hasSufficientDiskSpace(const QString &path, qint64 requiredBytes, double ma
     const qint64 bytesRequired = static_cast<qint64>(static_cast<double>(requiredBytes) * margin);
 
     if (bytesAvailable < bytesRequired) {
+        const int marginPercent = static_cast<int>((margin - 1.0) * 100);
         qCWarning(QGCFileHelperLog) << "Insufficient disk space:"
                                     << "required" << bytesRequired << "bytes"
-                                    << "(" << requiredBytes << "+" << static_cast<int>((margin - 1.0) * 100) << "% margin)"
+                                    << "(" << requiredBytes << "+" << marginPercent << "% margin)"
                                     << "available" << bytesAvailable << "bytes";
         return false;
     }

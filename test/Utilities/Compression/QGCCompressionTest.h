@@ -63,6 +63,32 @@ private slots:
     void _testIsLocalUrl();
     void _testUrlOverloads();
 
+    // Sparse file handling
+    void _testSparseFileExtraction();
+
+    // Thread safety
+    void _testThreadLocalState();
+    void _testConcurrentExtractions();
+
+    // Boundary conditions
+    void _testEmptyArchive();
+    void _testSingleByteFile();
+    void _testLargeFileDecompression();
+    void _testMaxEntriesArchive();
+
+    // Cross-platform path handling
+    void _testWindowsPathSeparators();
+    void _testSpecialCharactersInPath();
+    void _testUnicodePaths();
+
+    // Benchmarks (run with --benchmark flag)
+    void _benchmarkExtractZip();
+    void _benchmarkExtract7z();
+    void _benchmarkDecompressGzip();
+    void _benchmarkDecompressXz();
+    void _benchmarkConcurrentExtraction();
+    void _benchmarkListArchive();
+
 private:
     bool _compareFiles(const QString &file1, const QString &file2);
 

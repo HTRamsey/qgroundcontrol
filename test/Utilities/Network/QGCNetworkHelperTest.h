@@ -23,6 +23,8 @@ private slots:
     void _testIsHttpClientError();
     void _testIsHttpServerError();
     void _testHttpStatusText();
+    void _testHttpStatusTextFromEnum();
+    void _testHttpStatusCodeEnumRoundTrip();
 
     // HTTP methods tests
     void _testHttpMethodName();

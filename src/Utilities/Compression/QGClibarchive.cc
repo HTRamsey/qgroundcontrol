@@ -439,7 +439,8 @@ bool extractArchiveEntries(struct archive *a, const QString &outputDirectoryPath
 
                 if (QFileInfo(target).isAbsolute()) {
                     // Absolute symlink - reject outright
-                    qCWarning(QGClibarchiveLog) << "Skipping symlink with absolute target:" << currentFile << "->" << target;
+                    qCWarning(QGClibarchiveLog) << "Skipping symlink with absolute target:"
+                                                << currentFile << "->" << target;
                     continue;
                 } else {
                     // Relative symlink - resolve against entry's parent directory
@@ -730,7 +731,8 @@ bool openArchiveForReading(struct archive *a, const QString &filePath, QByteArra
         }
     } else {
         // Stream directly from file (memory efficient)
-        if (archive_read_open_filename(a, filePath.toLocal8Bit().constData(), QGCFileHelper::optimalBufferSize(filePath)) != ARCHIVE_OK) {
+        if (archive_read_open_filename(a, filePath.toLocal8Bit().constData(),
+                                       QGCFileHelper::optimalBufferSize(filePath)) != ARCHIVE_OK) {
             qCWarning(QGClibarchiveLog) << "Failed to open file:" << filePath << archive_error_string(a);
             return false;
         }
