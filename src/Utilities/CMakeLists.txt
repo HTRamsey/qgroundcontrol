@@ -12,18 +12,6 @@ target_sources(${CMAKE_PROJECT_NAME}
         DeviceInfo.h
         JsonHelper.cc
         JsonHelper.h
-        FileSystem/QGCCachedFileDownload.cc
-        FileSystem/QGCCachedFileDownload.h
-        FileSystem/QGCFileDownload.cc
-        FileSystem/QGCFileDownload.h
-        FileSystem/QGCFileHelper.cc
-        FileSystem/QGCFileHelper.h
-        FileSystem/QGCArchiveWatcher.cc
-        FileSystem/QGCArchiveWatcher.h
-        FileSystem/QGCFileWatcher.cc
-        FileSystem/QGCFileWatcher.h
-        FileSystem/QGCTemporaryFile.cc
-        FileSystem/QGCTemporaryFile.h
         Platform.cc
         Platform.h
         QGC.cc
@@ -59,18 +47,24 @@ if(IOS)
     )
 endif()
 
-target_include_directories(${CMAKE_PROJECT_NAME}
-    PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        FileSystem
-)
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 # ============================================================================
 # Utility Subdirectories
 # ============================================================================
 
+add_subdirectory(Async)
 add_subdirectory(Audio)
 add_subdirectory(Compression)
+add_subdirectory(Config)
+add_subdirectory(Data)
+add_subdirectory(FileSystem)
+add_subdirectory(Flight)
 add_subdirectory(Geo)
+add_subdirectory(Logging)
+add_subdirectory(Math)
+add_subdirectory(Memory)
 add_subdirectory(Network)
+add_subdirectory(Security)
 add_subdirectory(StateMachine)
+add_subdirectory(Telemetry)

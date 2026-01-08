@@ -11,8 +11,12 @@ target_sources(${CMAKE_PROJECT_NAME}
         KMLDomDocument.h
         KMLHelper.cc
         KMLHelper.h
+        QGCCoordinateParser.cc
+        QGCCoordinateParser.h
         QGCGeo.cc
         QGCGeo.h
+        QGCUnitConverter.cc
+        QGCUnitConverter.h
         ShapeFileHelper.cc
         ShapeFileHelper.h
         SHPFileHelper.cc

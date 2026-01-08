@@ -82,9 +82,22 @@
 #include "QGCStreamingDecompressionTest.h"
 // FileSystem
 #include "QGCArchiveWatcherTest.h"
+#include "QGCDownloadQueueTest.h"
 #include "QGCFileDownloadTest.h"
 #include "QGCFileHelperTest.h"
+#include "QGCFileUploadTest.h"
 #include "QGCFileWatcherTest.h"
+// Network
+#include "QGCJsonRequestTest.h"
+#include "QGCNetworkHelperTest.h"
+#include "QGCNetworkManagerTest.h"
+#include "QGCNetworkRetryTest.h"
+#include "QGCOAuth2Test.h"
+#include "QGCRateLimiterTest.h"
+// Async
+#include "QGCDebouncerTest.h"
+// Data
+#include "QGCCacheTest.h"
 // Geo
 #include "GeoTest.h"
 // Shape
@@ -188,9 +201,22 @@ int QGCUnitTest::runTests(bool stress, const QStringList& unitTests)
     UT_REGISTER_TEST(QGCStreamingDecompressionTest)
     // FileSystem
     UT_REGISTER_TEST(QGCArchiveWatcherTest)
+    UT_REGISTER_TEST(QGCDownloadQueueTest)
     UT_REGISTER_TEST(QGCFileDownloadTest)
     UT_REGISTER_TEST(QGCFileHelperTest)
+    UT_REGISTER_TEST(QGCFileUploadTest)
     UT_REGISTER_TEST(QGCFileWatcherTest)
+    // Network
+    UT_REGISTER_TEST(QGCJsonRequestTest)
+    UT_REGISTER_TEST(QGCNetworkHelperTest)
+    UT_REGISTER_TEST(QGCNetworkManagerTest)
+    UT_REGISTER_TEST(QGCNetworkRetryTest)
+    UT_REGISTER_TEST(QGCOAuth2Test)
+    UT_REGISTER_TEST(QGCRateLimiterTest)
+    // Async
+    UT_REGISTER_TEST(QGCDebouncerTest)
+    // Data
+    UT_REGISTER_TEST(QGCCacheTest)
     // Geo
     UT_REGISTER_TEST(GeoTest)
     // Shape
