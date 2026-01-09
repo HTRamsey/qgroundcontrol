@@ -6,21 +6,12 @@
 #include <QtCore/QFile>
 #include <QtCore/QTextStream>
 
-KmlPlanExporter* KmlPlanExporter::s_instance = nullptr;
-
 KmlPlanExporter::KmlPlanExporter(QObject* parent)
     : PlanExporter(parent)
 {
 }
 
-KmlPlanExporter* KmlPlanExporter::instance()
-{
-    if (!s_instance) {
-        s_instance = new KmlPlanExporter();
-        PlanExporter::registerExporter(s_instance->fileExtension(), s_instance);
-    }
-    return s_instance;
-}
+IMPLEMENT_PLAN_EXPORTER_SINGLETON(KmlPlanExporter)
 
 bool KmlPlanExporter::exportToFile(const QString& filename,
                                     MissionController* missionController,

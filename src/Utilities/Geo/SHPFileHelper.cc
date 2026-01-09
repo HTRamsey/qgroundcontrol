@@ -1,4 +1,5 @@
 #include "SHPFileHelper.h"
+#include "GeoUtilities.h"
 #include "QGCGeo.h"
 #include "QGCLoggingCategory.h"
 
@@ -9,7 +10,7 @@
 
 #include "shapefil.h"
 
-QGC_LOGGING_CATEGORY(SHPFileHelperLog, "Utilities.SHPFileHelper")
+QGC_LOGGING_CATEGORY(SHPFileHelperLog, "Utilities.Geo.SHPFileHelper")
 
 namespace {
     constexpr const char *_errorPrefix = QT_TR_NOOP("SHP file load failed. %1");
@@ -52,6 +53,15 @@ namespace {
             }
         }
         return false;
+    }
+
+    // Create validation callback for SHP coordinate logging
+    GeoUtilities::ValidationWarningCallback makeValidationCallback(int entityIdx)
+    {
+        return [entityIdx](int vertexIdx, const QString &type, double value) {
+            qCWarning(SHPFileHelperLog) << "Entity" << entityIdx << "vertex" << vertexIdx
+                                        << type << "out of range:" << value;
+        };
     }
 
     // QFile-based hooks for shapelib to support Qt Resource System (qrc:/) paths.
@@ -269,7 +279,7 @@ SHPHandle SHPFileHelper::_loadShape(const QString &shpFile, int *utmZone, bool *
     setupQFileHooks(&sHooks);
 
     SHPHandle shpHandle = SHPOpenLL(shpFile.toUtf8().constData(), "rb", &sHooks);
-    if (!shpHandle) {
+    if (shpHandle == nullptr) {
         errorString = QString(_errorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "SHPOpen failed."));
     }
 
@@ -288,8 +298,7 @@ ShapeFileHelper::ShapeType SHPFileHelper::determineShapeType(const QString &shpF
     bool utmSouthernHemisphere;
     SHPHandle shpHandle = SHPFileHelper::_loadShape(shpFile, &utmZone, &utmSouthernHemisphere, errorString);
     if (errorString.isEmpty()) {
-        Q_CHECK_PTR(shpHandle);
-
+        
         int cEntities, type;
         SHPGetInfo(shpHandle, &cEntities, &type, nullptr, nullptr);
         qCDebug(SHPFileHelperLog) << "SHPGetInfo" << shpHandle << cEntities << type;
@@ -306,7 +315,7 @@ ShapeFileHelper::ShapeType SHPFileHelper::determineShapeType(const QString &shpF
         }
     }
 
-    if (shpHandle) {
+    if (shpHandle != nullptr) {
         SHPClose(shpHandle);
     }
 
@@ -320,7 +329,7 @@ int SHPFileHelper::getEntityCount(const QString &shpFile, QString &errorString)
     int utmZone;
     bool utmSouthernHemisphere;
     SHPHandle shpHandle = SHPFileHelper::_loadShape(shpFile, &utmZone, &utmSouthernHemisphere, errorString);
-    if (!shpHandle) {
+    if (shpHandle == nullptr) {
         return 0;
     }
 
@@ -361,15 +370,14 @@ bool SHPFileHelper::loadPolygonsFromFile(const QString &shpFile, QList<QList<QGe
     polygons.clear();
 
     auto cleanup = qScopeGuard([&]() {
-        if (shpHandle) SHPClose(shpHandle);
+        if (shpHandle != nullptr) SHPClose(shpHandle);
     });
 
     shpHandle = SHPFileHelper::_loadShape(shpFile, &utmZone, &utmSouthernHemisphere, errorString);
     if (!errorString.isEmpty()) {
         return false;
     }
-    Q_CHECK_PTR(shpHandle);
-
+    
     int cEntities, shapeType;
     SHPGetInfo(shpHandle, &cEntities, &shapeType, nullptr, nullptr);
     if (shapeType != SHPT_POLYGON && shapeType != SHPT_POLYGONZ) {
@@ -381,10 +389,11 @@ bool SHPFileHelper::loadPolygonsFromFile(const QString &shpFile, QList<QList<QGe
 
     for (int entityIdx = 0; entityIdx < cEntities; entityIdx++) {
         SHPObject *shpObject = SHPReadObject(shpHandle, entityIdx);
-        if (!shpObject) {
+        if (shpObject == nullptr) {
             qCWarning(SHPFileHelperLog) << "Failed to read polygon entity" << entityIdx;
             continue;
         }
+        auto objectCleanup = qScopeGuard([shpObject]() { SHPDestroyObject(shpObject); });
 
         // Ensure clockwise winding for outer rings (QGC requirement)
         SHPRewindObject(shpHandle, shpObject);
@@ -416,38 +425,19 @@ bool SHPFileHelper::loadPolygonsFromFile(const QString &shpFile, QList<QList<QGe
             vertices.append(coord);
         }
 
-        // SHP format requires closed rings (first == last), but QGC uses open polygons.
-        // Remove the closing vertex for internal consistency with KML/GeoJSON loaders.
-        if (vertices.count() > 3) {
-            const QGeoCoordinate &first = vertices.first();
-            const QGeoCoordinate &last = vertices.last();
-            if (qFuzzyCompare(first.latitude(), last.latitude()) &&
-                qFuzzyCompare(first.longitude(), last.longitude())) {
-                vertices.removeLast();
-            }
-        }
+        // SHP format requires closed rings (first == last), but QGC uses open polygons
+        GeoUtilities::removeClosingVertex(vertices);
 
-        if (vertices.count() < 3) {
+        if (vertices.count() < GeoUtilities::kMinPolygonVertices) {
             qCWarning(SHPFileHelperLog) << "Skipping polygon entity" << entityIdx << "with less than 3 vertices";
             continue;
         }
 
-        // Filter nearby vertices if enabled
-        if (filterMeters > 0) {
-            const QGeoCoordinate firstVertex = vertices[0];
-            while ((vertices.count() > 3) && (vertices.last().distanceTo(firstVertex) < filterMeters)) {
-                vertices.removeLast();
-            }
+        // Validate and normalize coordinates
+        GeoUtilities::validateAndNormalizeCoordinates(vertices, makeValidationCallback(entityIdx));
 
-            int i = 0;
-            while (i < (vertices.count() - 2)) {
-                if ((vertices.count() > 3) && (vertices[i].distanceTo(vertices[i+1]) < filterMeters)) {
-                    vertices.removeAt(i+1);
-                } else {
-                    i++;
-                }
-            }
-        }
+        // Filter nearby vertices if enabled
+        ShapeFileHelper::filterVertices(vertices, filterMeters, GeoUtilities::kMinPolygonVertices);
 
         polygons.append(vertices);
     }
@@ -480,15 +470,14 @@ bool SHPFileHelper::loadPolygonsWithHolesFromFile(const QString &shpFile, QList<
     polygons.clear();
 
     auto cleanup = qScopeGuard([&]() {
-        if (shpHandle) SHPClose(shpHandle);
+        if (shpHandle != nullptr) SHPClose(shpHandle);
     });
 
     shpHandle = SHPFileHelper::_loadShape(shpFile, &utmZone, &utmSouthernHemisphere, errorString);
     if (!errorString.isEmpty()) {
         return false;
     }
-    Q_CHECK_PTR(shpHandle);
-
+    
     int cEntities, shapeType;
     SHPGetInfo(shpHandle, &cEntities, &shapeType, nullptr, nullptr);
     if (shapeType != SHPT_POLYGON && shapeType != SHPT_POLYGONZ) {
@@ -500,10 +489,11 @@ bool SHPFileHelper::loadPolygonsWithHolesFromFile(const QString &shpFile, QList<
 
     for (int entityIdx = 0; entityIdx < cEntities; entityIdx++) {
         SHPObject *shpObject = SHPReadObject(shpHandle, entityIdx);
-        if (!shpObject) {
+        if (shpObject == nullptr) {
             qCWarning(SHPFileHelperLog) << "Failed to read polygon entity" << entityIdx;
             continue;
         }
+        auto objectCleanup = qScopeGuard([shpObject]() { SHPDestroyObject(shpObject); });
 
         // Ensure clockwise winding for outer rings
         SHPRewindObject(shpHandle, shpObject);
@@ -511,7 +501,6 @@ bool SHPFileHelper::loadPolygonsWithHolesFromFile(const QString &shpFile, QList<
         // Multi-part polygons: part 0 is outer ring, parts 1..N are holes
         if (shpObject->nParts < 1) {
             qCWarning(SHPFileHelperLog) << "Polygon entity" << entityIdx << "has no parts, skipping";
-            SHPDestroyObject(shpObject);
             continue;
         }
 
@@ -540,20 +529,15 @@ bool SHPFileHelper::loadPolygonsWithHolesFromFile(const QString &shpFile, QList<
         }
 
         // Remove closing vertex (SHP rings are closed, QGC uses open)
-        if (outerRing.count() > 3) {
-            const QGeoCoordinate &first = outerRing.first();
-            const QGeoCoordinate &last = outerRing.last();
-            if (qFuzzyCompare(first.latitude(), last.latitude()) &&
-                qFuzzyCompare(first.longitude(), last.longitude())) {
-                outerRing.removeLast();
-            }
-        }
+        GeoUtilities::removeClosingVertex(outerRing);
 
-        if (outerRing.count() < 3) {
+        if (outerRing.count() < GeoUtilities::kMinPolygonVertices) {
             qCWarning(SHPFileHelperLog) << "Polygon entity" << entityIdx << "outer ring has less than 3 vertices, skipping";
-            SHPDestroyObject(shpObject);
             continue;
         }
+
+        // Validate and normalize outer ring coordinates
+        GeoUtilities::validateAndNormalizeCoordinates(outerRing, makeValidationCallback(entityIdx));
 
         QGeoPolygon geoPolygon(outerRing);
 
@@ -580,22 +564,16 @@ bool SHPFileHelper::loadPolygonsWithHolesFromFile(const QString &shpFile, QList<
             }
 
             // Remove closing vertex
-            if (holeRing.count() > 3) {
-                const QGeoCoordinate &first = holeRing.first();
-                const QGeoCoordinate &last = holeRing.last();
-                if (qFuzzyCompare(first.latitude(), last.latitude()) &&
-                    qFuzzyCompare(first.longitude(), last.longitude())) {
-                    holeRing.removeLast();
-                }
-            }
+            GeoUtilities::removeClosingVertex(holeRing);
 
-            if (holeRing.count() >= 3) {
+            if (holeRing.count() >= GeoUtilities::kMinPolygonVertices) {
+                // Validate and normalize hole ring coordinates
+                GeoUtilities::validateAndNormalizeCoordinates(holeRing, makeValidationCallback(entityIdx));
                 geoPolygon.addHole(holeRing);
             }
         }
 
         polygons.append(geoPolygon);
-        SHPDestroyObject(shpObject);
     }
 
     if (polygons.isEmpty()) {
@@ -616,15 +594,14 @@ bool SHPFileHelper::loadPolylinesFromFile(const QString &shpFile, QList<QList<QG
     polylines.clear();
 
     auto cleanup = qScopeGuard([&]() {
-        if (shpHandle) SHPClose(shpHandle);
+        if (shpHandle != nullptr) SHPClose(shpHandle);
     });
 
     shpHandle = SHPFileHelper::_loadShape(shpFile, &utmZone, &utmSouthernHemisphere, errorString);
     if (!errorString.isEmpty()) {
         return false;
     }
-    Q_CHECK_PTR(shpHandle);
-
+    
     int cEntities, shapeType;
     SHPGetInfo(shpHandle, &cEntities, &shapeType, nullptr, nullptr);
     if (shapeType != SHPT_ARC && shapeType != SHPT_ARCZ) {
@@ -636,10 +613,11 @@ bool SHPFileHelper::loadPolylinesFromFile(const QString &shpFile, QList<QList<QG
 
     for (int entityIdx = 0; entityIdx < cEntities; entityIdx++) {
         SHPObject *shpObject = SHPReadObject(shpHandle, entityIdx);
-        if (!shpObject) {
+        if (shpObject == nullptr) {
             qCWarning(SHPFileHelperLog) << "Failed to read polyline entity" << entityIdx;
             continue;
         }
+        auto objectCleanup = qScopeGuard([shpObject]() { SHPDestroyObject(shpObject); });
 
         // For multi-part polylines (disconnected segments), we extract only the first part.
         // This maintains consistency with polygon handling and provides the primary path.
@@ -670,22 +648,16 @@ bool SHPFileHelper::loadPolylinesFromFile(const QString &shpFile, QList<QList<QG
             vertices.append(coord);
         }
 
-        if (vertices.count() < 2) {
+        if (vertices.count() < GeoUtilities::kMinPolylineVertices) {
             qCWarning(SHPFileHelperLog) << "Skipping polyline entity" << entityIdx << "with less than 2 vertices";
             continue;
         }
 
+        // Validate and normalize coordinates
+        GeoUtilities::validateAndNormalizeCoordinates(vertices, makeValidationCallback(entityIdx));
+
         // Filter nearby vertices if enabled
-        if (filterMeters > 0) {
-            int i = 0;
-            while (i < (vertices.count() - 1)) {
-                if ((vertices.count() > 2) && (vertices[i].distanceTo(vertices[i+1]) < filterMeters)) {
-                    vertices.removeAt(i+1);
-                } else {
-                    i++;
-                }
-            }
-        }
+        ShapeFileHelper::filterVertices(vertices, filterMeters, GeoUtilities::kMinPolylineVertices);
 
         polylines.append(vertices);
     }
@@ -708,15 +680,14 @@ bool SHPFileHelper::loadPointsFromFile(const QString &shpFile, QList<QGeoCoordin
     points.clear();
 
     auto cleanup = qScopeGuard([&]() {
-        if (shpHandle) SHPClose(shpHandle);
+        if (shpHandle != nullptr) SHPClose(shpHandle);
     });
 
     shpHandle = SHPFileHelper::_loadShape(shpFile, &utmZone, &utmSouthernHemisphere, errorString);
     if (!errorString.isEmpty()) {
         return false;
     }
-    Q_CHECK_PTR(shpHandle);
-
+    
     int cEntities, shapeType;
     SHPGetInfo(shpHandle, &cEntities, &shapeType, nullptr, nullptr);
     if (shapeType != SHPT_POINT && shapeType != SHPT_POINTZ) {
@@ -728,10 +699,11 @@ bool SHPFileHelper::loadPointsFromFile(const QString &shpFile, QList<QGeoCoordin
 
     for (int entityIdx = 0; entityIdx < cEntities; entityIdx++) {
         SHPObject *shpObject = SHPReadObject(shpHandle, entityIdx);
-        if (!shpObject) {
+        if (shpObject == nullptr) {
             qCWarning(SHPFileHelperLog) << "Failed to read point entity" << entityIdx;
             continue;
         }
+        auto objectCleanup = qScopeGuard([shpObject]() { SHPDestroyObject(shpObject); });
 
         // Point shapes have exactly one vertex per entity
         if (shpObject->nVertices != 1) {
@@ -752,6 +724,15 @@ bool SHPFileHelper::loadPointsFromFile(const QString &shpFile, QList<QGeoCoordin
 
         if (hasAltitude && shpObject->padfZ) {
             coord.setAltitude(shpObject->padfZ[0]);
+        }
+
+        // Validate and normalize coordinate
+        if (!GeoUtilities::isValidCoordinate(coord)) {
+            qCWarning(SHPFileHelperLog) << "Point entity" << entityIdx << "coordinate out of range, normalizing";
+            coord = GeoUtilities::normalizeCoordinate(coord);
+        }
+        if (!std::isnan(coord.altitude()) && !GeoUtilities::isValidAltitude(coord.altitude())) {
+            qCWarning(SHPFileHelperLog) << "Point entity" << entityIdx << "altitude out of expected range:" << coord.altitude();
         }
 
         points.append(coord);
@@ -783,12 +764,22 @@ bool SHPFileHelper::savePolygonsToFile(const QString &shpFile, const QList<QList
         return false;
     }
 
+    // Validate all coordinates before saving
+    for (int i = 0; i < polygons.size(); i++) {
+        QString validationError;
+        if (!GeoUtilities::validateCoordinates(polygons[i], validationError)) {
+            errorString = QString(_saveErrorPrefix).arg(
+                QObject::tr("Polygon %1: %2").arg(i + 1).arg(validationError));
+            return false;
+        }
+    }
+
     // Check if any coordinate has altitude - use PolygonZ if so
     const bool useZ = hasAnyAltitude(polygons);
     const int shapeType = useZ ? SHPT_POLYGONZ : SHPT_POLYGON;
 
     SHPHandle shpHandle = SHPCreate(shpFile.toUtf8().constData(), shapeType);
-    if (!shpHandle) {
+    if (shpHandle == nullptr) {
         errorString = QString(_saveErrorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "Unable to create SHP file."));
         return false;
     }
@@ -805,7 +796,7 @@ bool SHPFileHelper::savePolygonsToFile(const QString &shpFile, const QList<QList
 
         // Shapelib expects closed polygons (first == last), so add closing vertex if needed
         const bool needsClosing = (vertices.first() != vertices.last());
-        const int nVertices = vertices.count() + (needsClosing ? 1 : 0);
+        const int nVertices = static_cast<int>(vertices.count()) + (needsClosing ? 1 : 0);
 
         QVector<double> padfX(nVertices);
         QVector<double> padfY(nVertices);
@@ -841,7 +832,7 @@ bool SHPFileHelper::savePolygonsToFile(const QString &shpFile, const QList<QList
             nullptr                 // padfM
         );
 
-        if (!shpObject) {
+        if (shpObject == nullptr) {
             qCWarning(SHPFileHelperLog) << "Failed to create polygon shape object";
             continue;
         }
@@ -877,6 +868,23 @@ bool SHPFileHelper::savePolygonsWithHolesToFile(const QString &shpFile, const QL
         return false;
     }
 
+    // Validate all coordinates before saving
+    for (int i = 0; i < polygons.size(); i++) {
+        QString validationError;
+        if (!GeoUtilities::validateCoordinates(polygons[i].perimeter(), validationError)) {
+            errorString = QString(_saveErrorPrefix).arg(
+                QObject::tr("Polygon %1 perimeter: %2").arg(i + 1).arg(validationError));
+            return false;
+        }
+        for (int h = 0; h < polygons[i].holesCount(); h++) {
+            if (!GeoUtilities::validateCoordinates(polygons[i].holePath(h), validationError)) {
+                errorString = QString(_saveErrorPrefix).arg(
+                    QObject::tr("Polygon %1 hole %2: %3").arg(i + 1).arg(h + 1).arg(validationError));
+                return false;
+            }
+        }
+    }
+
     // Check if any coordinate has altitude - use PolygonZ if so
     bool useZ = false;
     for (const QGeoPolygon &poly : polygons) {
@@ -895,7 +903,7 @@ bool SHPFileHelper::savePolygonsWithHolesToFile(const QString &shpFile, const QL
     const int shapeType = useZ ? SHPT_POLYGONZ : SHPT_POLYGON;
 
     SHPHandle shpHandle = SHPCreate(shpFile.toUtf8().constData(), shapeType);
-    if (!shpHandle) {
+    if (shpHandle == nullptr) {
         errorString = QString(_saveErrorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "Unable to create SHP file."));
         return false;
     }
@@ -911,18 +919,18 @@ bool SHPFileHelper::savePolygonsWithHolesToFile(const QString &shpFile, const QL
             continue;
         }
 
-        const int nParts = 1 + geoPolygon.holesCount();
+        const int nParts = 1 + static_cast<int>(geoPolygon.holesCount());
 
         // Calculate total vertices (each ring needs closing vertex)
         int totalVertices = 0;
         const bool outerNeedsClosing = (perimeter.first() != perimeter.last());
-        totalVertices += perimeter.count() + (outerNeedsClosing ? 1 : 0);
+        totalVertices += static_cast<int>(perimeter.count()) + (outerNeedsClosing ? 1 : 0);
 
         QVector<bool> holeNeedsClosing(geoPolygon.holesCount());
         for (int h = 0; h < geoPolygon.holesCount(); h++) {
             const QList<QGeoCoordinate> holePath = geoPolygon.holePath(h);
             holeNeedsClosing[h] = (holePath.first() != holePath.last());
-            totalVertices += holePath.count() + (holeNeedsClosing[h] ? 1 : 0);
+            totalVertices += static_cast<int>(holePath.count()) + (holeNeedsClosing[h] ? 1 : 0);
         }
 
         QVector<int> panPartStart(nParts);
@@ -986,7 +994,7 @@ bool SHPFileHelper::savePolygonsWithHolesToFile(const QString &shpFile, const QL
             nullptr                 // padfM
         );
 
-        if (!shpObject) {
+        if (shpObject == nullptr) {
             qCWarning(SHPFileHelperLog) << "Failed to create polygon shape object";
             continue;
         }
@@ -1022,12 +1030,22 @@ bool SHPFileHelper::savePolylinesToFile(const QString &shpFile, const QList<QLis
         return false;
     }
 
+    // Validate all coordinates before saving
+    for (int i = 0; i < polylines.size(); i++) {
+        QString validationError;
+        if (!GeoUtilities::validateCoordinates(polylines[i], validationError)) {
+            errorString = QString(_saveErrorPrefix).arg(
+                QObject::tr("Polyline %1: %2").arg(i + 1).arg(validationError));
+            return false;
+        }
+    }
+
     // Check if any coordinate has altitude - use ArcZ if so
     const bool useZ = hasAnyAltitude(polylines);
     const int shapeType = useZ ? SHPT_ARCZ : SHPT_ARC;
 
     SHPHandle shpHandle = SHPCreate(shpFile.toUtf8().constData(), shapeType);
-    if (!shpHandle) {
+    if (shpHandle == nullptr) {
         errorString = QString(_saveErrorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "Unable to create SHP file."));
         return false;
     }
@@ -1042,7 +1060,7 @@ bool SHPFileHelper::savePolylinesToFile(const QString &shpFile, const QList<QLis
             continue;
         }
 
-        const int nVertices = coords.count();
+        const int nVertices = static_cast<int>(coords.count());
 
         QVector<double> padfX(nVertices);
         QVector<double> padfY(nVertices);
@@ -1069,7 +1087,7 @@ bool SHPFileHelper::savePolylinesToFile(const QString &shpFile, const QList<QLis
             nullptr                 // padfM
         );
 
-        if (!shpObject) {
+        if (shpObject == nullptr) {
             qCWarning(SHPFileHelperLog) << "Failed to create polyline shape object";
             continue;
         }
@@ -1100,12 +1118,19 @@ bool SHPFileHelper::savePointsToFile(const QString &shpFile, const QList<QGeoCoo
         return false;
     }
 
+    // Validate all coordinates before saving
+    QString validationError;
+    if (!GeoUtilities::validateCoordinates(points, validationError)) {
+        errorString = QString(_saveErrorPrefix).arg(validationError);
+        return false;
+    }
+
     // Check if any coordinate has altitude - use PointZ if so
     const bool useZ = hasAnyAltitude(points);
     const int shapeType = useZ ? SHPT_POINTZ : SHPT_POINT;
 
     SHPHandle shpHandle = SHPCreate(shpFile.toUtf8().constData(), shapeType);
-    if (!shpHandle) {
+    if (shpHandle == nullptr) {
         errorString = QString(_saveErrorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "Unable to create SHP file."));
         return false;
     }
@@ -1132,7 +1157,7 @@ bool SHPFileHelper::savePointsToFile(const QString &shpFile, const QList<QGeoCoo
             nullptr                 // padfM
         );
 
-        if (!shpObject) {
+        if (shpObject == nullptr) {
             qCWarning(SHPFileHelperLog) << "Failed to create point shape object";
             continue;
         }

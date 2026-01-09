@@ -74,8 +74,6 @@ namespace {
     }
 }
 
-GpxPlanDocument::GpxPlanDocument() = default;
-
 void GpxPlanDocument::_addFlightPath(Vehicle* vehicle, QList<MissionItem*> rgMissionItems)
 {
     if (rgMissionItems.count() == 0) {

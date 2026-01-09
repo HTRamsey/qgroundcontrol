@@ -19,9 +19,6 @@ public:
     QString formatName() const override { return tr("GPX"); }
     QString fileFilter() const override { return tr("GPX Files (*.gpx)"); }
 
-    /// Returns the singleton instance
-    static GpxPlanExporter* instance();
-
 private:
-    static GpxPlanExporter* s_instance;
+    DECLARE_PLAN_EXPORTER_SINGLETON(GpxPlanExporter)
 };

@@ -5,7 +5,7 @@
 #include "SHPFileHelper.h"
 #include "QGCLoggingCategory.h"
 
-QGC_LOGGING_CATEGORY(ShapeFileHelperLog, "Utilities.ShapeFileHelper")
+QGC_LOGGING_CATEGORY(ShapeFileHelperLog, "Utilities.Geo.ShapeFileHelper")
 
 namespace {
     constexpr const char *_errorPrefix = QT_TR_NOOP("Shape file load failed. %1");
@@ -46,6 +46,94 @@ void ShapeFileHelper::filterVertices(QList<QGeoCoordinate> &vertices, double fil
             i++;
         }
     }
+}
+
+bool ShapeFileHelper::supportsFeature(const QString &file, Feature feature)
+{
+    QString errorString;
+    const ShapeFileType type = _getShapeFileType(file, errorString);
+    if (type == ShapeFileType::None) {
+        return false;
+    }
+
+    // Map file type to extension for the lookup
+    QString extension;
+    switch (type) {
+    case ShapeFileType::KML:     extension = kmlFileExtension; break;
+    case ShapeFileType::SHP:     extension = shpFileExtension; break;
+    case ShapeFileType::GeoJson: extension = geojsonFileExtension; break;
+    case ShapeFileType::GPX:     extension = gpxFileExtension; break;
+    default: return false;
+    }
+
+    return supportsFeatureByExtension(extension, feature);
+}
+
+bool ShapeFileHelper::supportsFeatureByExtension(const QString &extension, Feature feature)
+{
+    // Feature support matrix by format
+    // Format:          KML    SHP    GeoJSON  GPX
+    // Polygons:        Yes    Yes    Yes      Yes (as closed routes)
+    // PolygonsWithHoles: Yes  Yes    Yes      No
+    // Polylines:       Yes    Yes    Yes      Yes (routes/tracks)
+    // Points:          Yes    Yes    Yes      Yes (waypoints)
+    // Tracks:          No     No     No       Yes
+    // Altitude:        Yes    Yes*   Yes      Yes  (*SHPZ variants)
+    // MultipleEntities: Yes   Yes    Yes      Yes
+
+    const QString ext = extension.toLower();
+
+    if (ext == kmlFileExtension) {
+        switch (feature) {
+        case Feature::Polygons:
+        case Feature::PolygonsWithHoles:
+        case Feature::Polylines:
+        case Feature::Points:
+        case Feature::Altitude:
+        case Feature::MultipleEntities:
+            return true;
+        case Feature::Tracks:
+            return false;
+        }
+    } else if (ext == shpFileExtension) {
+        switch (feature) {
+        case Feature::Polygons:
+        case Feature::PolygonsWithHoles:
+        case Feature::Polylines:
+        case Feature::Points:
+        case Feature::Altitude:
+        case Feature::MultipleEntities:
+            return true;
+        case Feature::Tracks:
+            return false;
+        }
+    } else if (ext == geojsonFileExtension) {
+        switch (feature) {
+        case Feature::Polygons:
+        case Feature::PolygonsWithHoles:
+        case Feature::Polylines:
+        case Feature::Points:
+        case Feature::Altitude:
+        case Feature::MultipleEntities:
+            return true;
+        case Feature::Tracks:
+            return false;
+        }
+    } else if (ext == gpxFileExtension) {
+        switch (feature) {
+        case Feature::Polygons:
+        case Feature::Polylines:
+        case Feature::Points:
+        case Feature::Tracks:
+        case Feature::Altitude:
+        case Feature::MultipleEntities:
+            return true;
+        case Feature::PolygonsWithHoles:
+            return false;
+        }
+    }
+
+    return false;
 }
 
 ShapeFileHelper::ShapeType ShapeFileHelper::determineShapeType(const QString &file, QString &errorString)
@@ -366,6 +454,44 @@ bool ShapeFileHelper::savePointsToFile(const QString &file, const QList<QGeoCoor
         return GeoJsonHelper::savePointsToFile(file, points, errorString);
     case ShapeFileType::GPX:
         return GPXHelper::savePointsToFile(file, points, errorString);
+    case ShapeFileType::None:
+    default:
+        errorString = QString(_saveErrorPrefix).arg(tr("Unsupported file type"));
+        return false;
+    }
+}
+
+bool ShapeFileHelper::saveTrackToFile(const QString &file, const QList<QGeoCoordinate> &coords, QString &errorString)
+{
+    errorString.clear();
+
+    switch (_getShapeFileType(file, errorString)) {
+    case ShapeFileType::GPX:
+        return GPXHelper::saveTrackToFile(file, coords, errorString);
+    case ShapeFileType::KML:
+    case ShapeFileType::SHP:
+    case ShapeFileType::GeoJson:
+        errorString = QString(_saveErrorPrefix).arg(tr("Tracks are only supported in GPX format. Use savePolylineToFile for other formats."));
+        return false;
+    case ShapeFileType::None:
+    default:
+        errorString = QString(_saveErrorPrefix).arg(tr("Unsupported file type"));
+        return false;
+    }
+}
+
+bool ShapeFileHelper::saveTracksToFile(const QString &file, const QList<QList<QGeoCoordinate>> &tracks, QString &errorString)
+{
+    errorString.clear();
+
+    switch (_getShapeFileType(file, errorString)) {
+    case ShapeFileType::GPX:
+        return GPXHelper::saveTracksToFile(file, tracks, errorString);
+    case ShapeFileType::KML:
+    case ShapeFileType::SHP:
+    case ShapeFileType::GeoJson:
+        errorString = QString(_saveErrorPrefix).arg(tr("Tracks are only supported in GPX format. Use savePolylinesToFile for other formats."));
+        return false;
     case ShapeFileType::None:
     default:
         errorString = QString(_saveErrorPrefix).arg(tr("Unsupported file type"));

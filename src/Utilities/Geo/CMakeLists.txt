@@ -5,8 +5,12 @@
 
 target_sources(${CMAKE_PROJECT_NAME}
     PRIVATE
+        GeoFormatRegistry.cc
+        GeoFormatRegistry.h
         GeoJsonHelper.cc
         GeoJsonHelper.h
+        GeoPackageHelper.cc
+        GeoPackageHelper.h
         GeoUtilities.cc
         GeoUtilities.h
         GPXHelper.cc
@@ -19,12 +23,18 @@ target_sources(${CMAKE_PROJECT_NAME}
         KMLHelper.h
         KMLSchemaValidator.cc
         KMLSchemaValidator.h
+        OpenAirParser.cc
+        OpenAirParser.h
         QGCGeo.cc
         QGCGeo.h
         ShapeFileHelper.cc
         ShapeFileHelper.h
         SHPFileHelper.cc
         SHPFileHelper.h
+        WKBHelper.cc
+        WKBHelper.h
+        WKTHelper.cc
+        WKTHelper.h
 )
 
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

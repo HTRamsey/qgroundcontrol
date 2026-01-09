@@ -19,9 +19,6 @@ public:
     QString formatName() const override { return tr("GeoJSON"); }
     QString fileFilter() const override { return tr("GeoJSON Files (*.geojson)"); }
 
-    /// Returns the singleton instance
-    static GeoJsonPlanExporter* instance();
-
 private:
-    static GeoJsonPlanExporter* s_instance;
+    DECLARE_PLAN_EXPORTER_SINGLETON(GeoJsonPlanExporter)
 };

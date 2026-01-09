@@ -1,11 +1,16 @@
 #include "ShapeTest.h"
+#include "GeoFormatRegistry.h"
 #include "GeoJsonHelper.h"
+#include "GeoPackageHelper.h"
 #include "GPXHelper.h"
 #include "KMLHelper.h"
+#include "OpenAirParser.h"
 #include "ShapeFileHelper.h"
 #include "SHPFileHelper.h"
 #include "KMLDomDocument.h"
 #include "KMLSchemaValidator.h"
+#include "WKBHelper.h"
+#include "WKTHelper.h"
 
 #include <QtCore/QRegularExpression>
 #include <QtCore/QTemporaryDir>
@@ -410,28 +415,33 @@ void ShapeTest::_testKMLCoordinateValidation()
 
     const QString kmlFile = _writeKmlFile(tmpDir, "invalid_coords.kml", kmlContent);
 
-    // Expect warnings for invalid coordinates
+    // Expect warnings for invalid coordinates that will be normalized
     QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Latitude out of range.*91"));
     QTest::ignoreMessage(QtWarningMsg, QRegularExpression("Longitude out of range.*200"));
 
     QString errorString;
     QList<QGeoCoordinate> coords;
-    // Should succeed but skip invalid coordinates
+    // Should succeed and normalize invalid coordinates (clamp lat, wrap lon)
     QVERIFY(ShapeFileHelper::loadPolygonFromFile(kmlFile, coords, errorString, 0));
     QVERIFY(errorString.isEmpty());
 
-    // Should have 3 valid coordinates (the two invalid ones skipped, plus duplicate closing removed)
-    // Valid: -122,37 | -121,38 | -121,37
-    // Invalid: -122,91 (lat>90) | 200,38 (lon>180)
-    QCOMPARE(coords.count(), 3);
+    // Should have 5 coordinates (all normalized, duplicate closing removed, then reversed for clockwise winding)
+    // Original KML: -122,37 | -122,91 | 200,38 | -121,38 | -121,37 | -122,37 (closing)
+    // After normalize: -122,37 | -122,90 | -160,38 | -121,38 | -121,37 (closing removed)
+    // After clockwise winding check (reversed): -121,37 | -121,38 | -160,38 | -122,90 | -122,37
+    QCOMPARE(coords.count(), 5);
 
-    // Verify the valid coordinates are present
+    // Verify the coordinates are present, normalized, and in clockwise order
     QCOMPARE(coords[0].latitude(), 37.0);
-    QCOMPARE(coords[0].longitude(), -122.0);
+    QCOMPARE(coords[0].longitude(), -121.0);
     QCOMPARE(coords[1].latitude(), 38.0);
     QCOMPARE(coords[1].longitude(), -121.0);
-    QCOMPARE(coords[2].latitude(), 37.0);
-    QCOMPARE(coords[2].longitude(), -121.0);
+    QCOMPARE(coords[2].latitude(), 38.0);
+    QCOMPARE(coords[2].longitude(), -160.0);  // Wrapped from 200
+    QCOMPARE(coords[3].latitude(), 90.0);     // Clamped from 91
+    QCOMPARE(coords[3].longitude(), -122.0);
+    QCOMPARE(coords[4].latitude(), 37.0);
+    QCOMPARE(coords[4].longitude(), -122.0);
 }
 
 void ShapeTest::_testKMLExportSchemaValidation()
@@ -1388,4 +1398,1101 @@ void ShapeTest::_testGPXAltitudeParsing()
     QCOMPARE(routeCoords.count(), 2);
     QCOMPARE(routeCoords[0].altitude(), 500.0);
     QVERIFY(std::isnan(routeCoords[1].altitude()));
+}
+
+// ============================================================================
+// Round-trip tests (save then load to verify data integrity)
+// ============================================================================
+
+void ShapeTest::_testRoundTripPolygonKMLToSHP()
+{
+    const QTemporaryDir tmpDir;
+    QString errorString;
+
+    // Create test polygon coordinates
+    QList<QGeoCoordinate> originalCoords;
+    originalCoords.append(QGeoCoordinate(37.0, -122.0, 100.0));
+    originalCoords.append(QGeoCoordinate(37.1, -122.0, 110.0));
+    originalCoords.append(QGeoCoordinate(37.1, -122.1, 120.0));
+    originalCoords.append(QGeoCoordinate(37.0, -122.1, 130.0));
+    originalCoords.append(QGeoCoordinate(37.0, -122.0, 100.0));  // Closed polygon
+
+    // Save to KML
+    const QString kmlFile = tmpDir.filePath("polygon.kml");
+    QVERIFY(KMLHelper::savePolygonToFile(kmlFile, originalCoords, errorString));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    // Load from KML
+    QList<QGeoCoordinate> kmlCoords;
+    QVERIFY(KMLHelper::loadPolygonFromFile(kmlFile, kmlCoords, errorString, 0));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    // Save to SHP
+    const QString shpFile = tmpDir.filePath("polygon.shp");
+    QVERIFY(SHPFileHelper::savePolygonToFile(shpFile, kmlCoords, errorString));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    // Load from SHP
+    QList<QGeoCoordinate> shpCoords;
+    QVERIFY(SHPFileHelper::loadPolygonFromFile(shpFile, shpCoords, errorString, 0));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    // Verify coordinates match (within tolerance for floating point)
+    // Note: SHP may not preserve altitude, so only compare lat/lon
+    QCOMPARE(shpCoords.count(), kmlCoords.count());
+    for (int i = 0; i < shpCoords.count(); ++i) {
+        QVERIFY2(qAbs(shpCoords[i].latitude() - kmlCoords[i].latitude()) < 0.0001,
+                 qPrintable(QString("Latitude mismatch at index %1: %2 vs %3")
+                            .arg(i).arg(shpCoords[i].latitude()).arg(kmlCoords[i].latitude())));
+        QVERIFY2(qAbs(shpCoords[i].longitude() - kmlCoords[i].longitude()) < 0.0001,
+                 qPrintable(QString("Longitude mismatch at index %1: %2 vs %3")
+                            .arg(i).arg(shpCoords[i].longitude()).arg(kmlCoords[i].longitude())));
+    }
+}
+
+void ShapeTest::_testRoundTripPolygonKMLToGeoJSON()
+{
+    const QTemporaryDir tmpDir;
+    QString errorString;
+
+    // Create test polygon coordinates
+    QList<QGeoCoordinate> originalCoords;
+    originalCoords.append(QGeoCoordinate(47.0, -122.5, 50.0));
+    originalCoords.append(QGeoCoordinate(47.2, -122.5, 55.0));
+    originalCoords.append(QGeoCoordinate(47.2, -122.8, 60.0));
+    originalCoords.append(QGeoCoordinate(47.0, -122.8, 65.0));
+    originalCoords.append(QGeoCoordinate(47.0, -122.5, 50.0));  // Closed polygon
+
+    // Save to KML
+    const QString kmlFile = tmpDir.filePath("polygon.kml");
+    QVERIFY(KMLHelper::savePolygonToFile(kmlFile, originalCoords, errorString));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    // Load from KML
+    QList<QGeoCoordinate> kmlCoords;
+    QVERIFY(KMLHelper::loadPolygonFromFile(kmlFile, kmlCoords, errorString, 0));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    // Save to GeoJSON
+    const QString geoJsonFile = tmpDir.filePath("polygon.geojson");
+    QVERIFY(GeoJsonHelper::savePolygonToFile(geoJsonFile, kmlCoords, errorString));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    // Load from GeoJSON
+    QList<QGeoCoordinate> geoJsonCoords;
+    QVERIFY(GeoJsonHelper::loadPolygonFromFile(geoJsonFile, geoJsonCoords, errorString, 0));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    // Verify coordinates match (GeoJSON preserves altitude)
+    QCOMPARE(geoJsonCoords.count(), kmlCoords.count());
+    for (int i = 0; i < geoJsonCoords.count(); ++i) {
+        QVERIFY2(qAbs(geoJsonCoords[i].latitude() - kmlCoords[i].latitude()) < 0.0001,
+                 qPrintable(QString("Latitude mismatch at index %1").arg(i)));
+        QVERIFY2(qAbs(geoJsonCoords[i].longitude() - kmlCoords[i].longitude()) < 0.0001,
+                 qPrintable(QString("Longitude mismatch at index %1").arg(i)));
+        if (!std::isnan(kmlCoords[i].altitude())) {
+            QVERIFY2(qAbs(geoJsonCoords[i].altitude() - kmlCoords[i].altitude()) < 0.01,
+                     qPrintable(QString("Altitude mismatch at index %1").arg(i)));
+        }
+    }
+}
+
+void ShapeTest::_testRoundTripPolygonKMLToGPX()
+{
+    const QTemporaryDir tmpDir;
+    QString errorString;
+
+    // Create test polygon coordinates
+    QList<QGeoCoordinate> originalCoords;
+    originalCoords.append(QGeoCoordinate(40.0, -105.0, 1600.0));
+    originalCoords.append(QGeoCoordinate(40.1, -105.0, 1650.0));
+    originalCoords.append(QGeoCoordinate(40.1, -105.1, 1700.0));
+    originalCoords.append(QGeoCoordinate(40.0, -105.1, 1750.0));
+    originalCoords.append(QGeoCoordinate(40.0, -105.0, 1600.0));  // Closed polygon
+
+    // Save to KML
+    const QString kmlFile = tmpDir.filePath("polygon.kml");
+    QVERIFY(KMLHelper::savePolygonToFile(kmlFile, originalCoords, errorString));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    // Load from KML
+    QList<QGeoCoordinate> kmlCoords;
+    QVERIFY(KMLHelper::loadPolygonFromFile(kmlFile, kmlCoords, errorString, 0));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    // Save to GPX
+    const QString gpxFile = tmpDir.filePath("polygon.gpx");
+    QVERIFY(GPXHelper::savePolygonToFile(gpxFile, kmlCoords, errorString));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    // Load from GPX
+    QList<QGeoCoordinate> gpxCoords;
+    QVERIFY(GPXHelper::loadPolygonFromFile(gpxFile, gpxCoords, errorString, 0));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    // Verify coordinates match (GPX preserves altitude)
+    QCOMPARE(gpxCoords.count(), kmlCoords.count());
+    for (int i = 0; i < gpxCoords.count(); ++i) {
+        QVERIFY2(qAbs(gpxCoords[i].latitude() - kmlCoords[i].latitude()) < 0.0001,
+                 qPrintable(QString("Latitude mismatch at index %1").arg(i)));
+        QVERIFY2(qAbs(gpxCoords[i].longitude() - kmlCoords[i].longitude()) < 0.0001,
+                 qPrintable(QString("Longitude mismatch at index %1").arg(i)));
+        if (!std::isnan(kmlCoords[i].altitude())) {
+            QVERIFY2(qAbs(gpxCoords[i].altitude() - kmlCoords[i].altitude()) < 0.01,
+                     qPrintable(QString("Altitude mismatch at index %1").arg(i)));
+        }
+    }
+}
+
+void ShapeTest::_testRoundTripPolylineAllFormats()
+{
+    const QTemporaryDir tmpDir;
+    QString errorString;
+
+    // Create test polyline coordinates (flight path)
+    QList<QGeoCoordinate> originalCoords;
+    originalCoords.append(QGeoCoordinate(33.0, -117.0, 500.0));
+    originalCoords.append(QGeoCoordinate(33.1, -117.1, 550.0));
+    originalCoords.append(QGeoCoordinate(33.2, -117.0, 600.0));
+    originalCoords.append(QGeoCoordinate(33.3, -116.9, 650.0));
+
+    // Test KML -> GeoJSON -> GPX -> KML round-trip
+    const QString kmlFile1 = tmpDir.filePath("polyline1.kml");
+    QVERIFY(KMLHelper::savePolylineToFile(kmlFile1, originalCoords, errorString));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    QList<QGeoCoordinate> kmlCoords;
+    QVERIFY(KMLHelper::loadPolylineFromFile(kmlFile1, kmlCoords, errorString, 0));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    const QString geoJsonFile = tmpDir.filePath("polyline.geojson");
+    QVERIFY(GeoJsonHelper::savePolylineToFile(geoJsonFile, kmlCoords, errorString));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    QList<QGeoCoordinate> geoJsonCoords;
+    QVERIFY(GeoJsonHelper::loadPolylineFromFile(geoJsonFile, geoJsonCoords, errorString, 0));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    const QString gpxFile = tmpDir.filePath("polyline.gpx");
+    QVERIFY(GPXHelper::savePolylineToFile(gpxFile, geoJsonCoords, errorString));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    QList<QGeoCoordinate> gpxCoords;
+    QVERIFY(GPXHelper::loadPolylineFromFile(gpxFile, gpxCoords, errorString, 0));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    const QString kmlFile2 = tmpDir.filePath("polyline2.kml");
+    QVERIFY(KMLHelper::savePolylineToFile(kmlFile2, gpxCoords, errorString));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    QList<QGeoCoordinate> finalCoords;
+    QVERIFY(KMLHelper::loadPolylineFromFile(kmlFile2, finalCoords, errorString, 0));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    // Verify final coords match original
+    QCOMPARE(finalCoords.count(), originalCoords.count());
+    for (int i = 0; i < finalCoords.count(); ++i) {
+        QVERIFY2(qAbs(finalCoords[i].latitude() - originalCoords[i].latitude()) < 0.0001,
+                 qPrintable(QString("Latitude mismatch at index %1: expected %2, got %3")
+                            .arg(i).arg(originalCoords[i].latitude()).arg(finalCoords[i].latitude())));
+        QVERIFY2(qAbs(finalCoords[i].longitude() - originalCoords[i].longitude()) < 0.0001,
+                 qPrintable(QString("Longitude mismatch at index %1: expected %2, got %3")
+                            .arg(i).arg(originalCoords[i].longitude()).arg(finalCoords[i].longitude())));
+        if (!std::isnan(originalCoords[i].altitude())) {
+            QVERIFY2(qAbs(finalCoords[i].altitude() - originalCoords[i].altitude()) < 0.01,
+                     qPrintable(QString("Altitude mismatch at index %1: expected %2, got %3")
+                                .arg(i).arg(originalCoords[i].altitude()).arg(finalCoords[i].altitude())));
+        }
+    }
+}
+
+void ShapeTest::_testRoundTripPointsAllFormats()
+{
+    const QTemporaryDir tmpDir;
+    QString errorString;
+
+    // Create test waypoints
+    QList<QGeoCoordinate> originalPoints;
+    originalPoints.append(QGeoCoordinate(45.0, -110.0, 1000.0));
+    originalPoints.append(QGeoCoordinate(45.5, -110.5, 1100.0));
+    originalPoints.append(QGeoCoordinate(46.0, -111.0, 1200.0));
+
+    // Test KML -> GeoJSON -> GPX -> KML round-trip
+    const QString kmlFile1 = tmpDir.filePath("points1.kml");
+    QVERIFY(KMLHelper::savePointsToFile(kmlFile1, originalPoints, errorString));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    QList<QGeoCoordinate> kmlPoints;
+    QVERIFY(KMLHelper::loadPointsFromFile(kmlFile1, kmlPoints, errorString));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    const QString geoJsonFile = tmpDir.filePath("points.geojson");
+    QVERIFY(GeoJsonHelper::savePointsToFile(geoJsonFile, kmlPoints, errorString));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    QList<QGeoCoordinate> geoJsonPoints;
+    QVERIFY(GeoJsonHelper::loadPointsFromFile(geoJsonFile, geoJsonPoints, errorString));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    const QString gpxFile = tmpDir.filePath("points.gpx");
+    QVERIFY(GPXHelper::savePointsToFile(gpxFile, geoJsonPoints, errorString));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    QList<QGeoCoordinate> gpxPoints;
+    QVERIFY(GPXHelper::loadPointsFromFile(gpxFile, gpxPoints, errorString));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    const QString kmlFile2 = tmpDir.filePath("points2.kml");
+    QVERIFY(KMLHelper::savePointsToFile(kmlFile2, gpxPoints, errorString));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    QList<QGeoCoordinate> finalPoints;
+    QVERIFY(KMLHelper::loadPointsFromFile(kmlFile2, finalPoints, errorString));
+    QVERIFY2(errorString.isEmpty(), qPrintable(errorString));
+
+    // Verify final points match original
+    QCOMPARE(finalPoints.count(), originalPoints.count());
+    for (int i = 0; i < finalPoints.count(); ++i) {
+        QVERIFY2(qAbs(finalPoints[i].latitude() - originalPoints[i].latitude()) < 0.0001,
+                 qPrintable(QString("Latitude mismatch at point %1: expected %2, got %3")
+                            .arg(i).arg(originalPoints[i].latitude()).arg(finalPoints[i].latitude())));
+        QVERIFY2(qAbs(finalPoints[i].longitude() - originalPoints[i].longitude()) < 0.0001,
+                 qPrintable(QString("Longitude mismatch at point %1: expected %2, got %3")
+                            .arg(i).arg(originalPoints[i].longitude()).arg(finalPoints[i].longitude())));
+        if (!std::isnan(originalPoints[i].altitude())) {
+            QVERIFY2(qAbs(finalPoints[i].altitude() - originalPoints[i].altitude()) < 0.01,
+                     qPrintable(QString("Altitude mismatch at point %1: expected %2, got %3")
+                                .arg(i).arg(originalPoints[i].altitude()).arg(finalPoints[i].altitude())));
+        }
+    }
+}
+
+void ShapeTest::_testSupportsFeatureAPI()
+{
+    using Feature = ShapeFileHelper::Feature;
+
+    // KML supports most features
+    QVERIFY(ShapeFileHelper::supportsFeatureByExtension(".kml", Feature::Polygons));
+    QVERIFY(ShapeFileHelper::supportsFeatureByExtension(".kml", Feature::PolygonsWithHoles));
+    QVERIFY(ShapeFileHelper::supportsFeatureByExtension(".kml", Feature::Polylines));
+    QVERIFY(ShapeFileHelper::supportsFeatureByExtension(".kml", Feature::Points));
+    QVERIFY(!ShapeFileHelper::supportsFeatureByExtension(".kml", Feature::Tracks));  // KML doesn't have GPX-style tracks
+    QVERIFY(ShapeFileHelper::supportsFeatureByExtension(".kml", Feature::Altitude));
+    QVERIFY(ShapeFileHelper::supportsFeatureByExtension(".kml", Feature::MultipleEntities));
+
+    // GPX supports tracks but not polygons with holes
+    QVERIFY(ShapeFileHelper::supportsFeatureByExtension(".gpx", Feature::Polygons));
+    QVERIFY(!ShapeFileHelper::supportsFeatureByExtension(".gpx", Feature::PolygonsWithHoles));  // GPX doesn't support holes
+    QVERIFY(ShapeFileHelper::supportsFeatureByExtension(".gpx", Feature::Polylines));
+    QVERIFY(ShapeFileHelper::supportsFeatureByExtension(".gpx", Feature::Points));
+    QVERIFY(ShapeFileHelper::supportsFeatureByExtension(".gpx", Feature::Tracks));
+    QVERIFY(ShapeFileHelper::supportsFeatureByExtension(".gpx", Feature::Altitude));
+
+    // SHP supports all basic features
+    QVERIFY(ShapeFileHelper::supportsFeatureByExtension(".shp", Feature::Polygons));
+    QVERIFY(ShapeFileHelper::supportsFeatureByExtension(".shp", Feature::PolygonsWithHoles));
+    QVERIFY(ShapeFileHelper::supportsFeatureByExtension(".shp", Feature::Polylines));
+    QVERIFY(ShapeFileHelper::supportsFeatureByExtension(".shp", Feature::Points));
+    QVERIFY(!ShapeFileHelper::supportsFeatureByExtension(".shp", Feature::Tracks));
+
+    // GeoJSON supports all basic features
+    QVERIFY(ShapeFileHelper::supportsFeatureByExtension(".geojson", Feature::Polygons));
+    QVERIFY(ShapeFileHelper::supportsFeatureByExtension(".geojson", Feature::PolygonsWithHoles));
+    QVERIFY(ShapeFileHelper::supportsFeatureByExtension(".geojson", Feature::Polylines));
+    QVERIFY(ShapeFileHelper::supportsFeatureByExtension(".geojson", Feature::Points));
+    QVERIFY(ShapeFileHelper::supportsFeatureByExtension(".geojson", Feature::Altitude));
+    QVERIFY(ShapeFileHelper::supportsFeatureByExtension(".geojson", Feature::MultipleEntities));
+
+    // Unknown extension should return false for all features
+    QVERIFY(!ShapeFileHelper::supportsFeatureByExtension(".xyz", Feature::Polygons));
+    QVERIFY(!ShapeFileHelper::supportsFeatureByExtension(".xyz", Feature::Tracks));
+
+    // Also test with file path
+    QVERIFY(ShapeFileHelper::supportsFeature("/some/path/file.kml", Feature::Polygons));
+    QVERIFY(ShapeFileHelper::supportsFeature("/some/path/file.gpx", Feature::Tracks));
+    QVERIFY(!ShapeFileHelper::supportsFeature("/some/path/file.kml", Feature::Tracks));
+}
+
+void ShapeTest::_testSaveInvalidCoordinates()
+{
+    QTemporaryDir tmpDir;
+    QVERIFY(tmpDir.isValid());
+
+    // Create coordinates with an invalid value (latitude > 90)
+    QList<QGeoCoordinate> invalidPolygon;
+    invalidPolygon << QGeoCoordinate(100.0, 0.0);  // Invalid latitude
+    invalidPolygon << QGeoCoordinate(0.0, 1.0);
+    invalidPolygon << QGeoCoordinate(0.0, -1.0);
+
+    QString errorString;
+
+    // Test that save functions reject invalid coordinates for all formats
+    const QString kmlFile = tmpDir.filePath("invalid.kml");
+    QVERIFY(!ShapeFileHelper::savePolygonToFile(kmlFile, invalidPolygon, errorString));
+    QVERIFY(!errorString.isEmpty());
+    qDebug() << "KML save rejected with:" << errorString;
+
+    errorString.clear();
+    const QString geoJsonFile = tmpDir.filePath("invalid.geojson");
+    QVERIFY(!ShapeFileHelper::savePolygonToFile(geoJsonFile, invalidPolygon, errorString));
+    QVERIFY(!errorString.isEmpty());
+    qDebug() << "GeoJSON save rejected with:" << errorString;
+
+    errorString.clear();
+    const QString gpxFile = tmpDir.filePath("invalid.gpx");
+    QVERIFY(!ShapeFileHelper::savePolygonToFile(gpxFile, invalidPolygon, errorString));
+    QVERIFY(!errorString.isEmpty());
+    qDebug() << "GPX save rejected with:" << errorString;
+
+    errorString.clear();
+    const QString shpFile = tmpDir.filePath("invalid.shp");
+    QVERIFY(!ShapeFileHelper::savePolygonToFile(shpFile, invalidPolygon, errorString));
+    QVERIFY(!errorString.isEmpty());
+    qDebug() << "SHP save rejected with:" << errorString;
+
+    // Test with invalid longitude
+    QList<QGeoCoordinate> invalidLongitude;
+    invalidLongitude << QGeoCoordinate(0.0, 200.0);  // Invalid longitude
+    invalidLongitude << QGeoCoordinate(1.0, 0.0);
+    invalidLongitude << QGeoCoordinate(-1.0, 0.0);
+
+    errorString.clear();
+    QVERIFY(!ShapeFileHelper::savePolygonToFile(kmlFile, invalidLongitude, errorString));
+    QVERIFY(!errorString.isEmpty());
+    qDebug() << "Invalid longitude rejected with:" << errorString;
+}
+
+// ============================================================================
+// OpenAir Parser Tests
+// ============================================================================
+
+void ShapeTest::_testOpenAirParsePolygon()
+{
+    QTemporaryDir tmpDir;
+    QVERIFY(tmpDir.isValid());
+
+    // Create a simple OpenAir file with a polygon
+    const QString content = R"(
+AC R
+AN Test Restricted Area
+AH 5000FT MSL
+AL GND
+DP 47:00:00N 008:00:00E
+DP 47:00:00N 009:00:00E
+DP 46:00:00N 009:00:00E
+DP 46:00:00N 008:00:00E
+)";
+
+    const QString filePath = tmpDir.filePath("test.txt");
+    QFile file(filePath);
+    QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
+    file.write(content.toUtf8());
+    file.close();
+
+    OpenAirParser::ParseResult result = OpenAirParser::parseFile(filePath);
+    QVERIFY(result.success);
+    QCOMPARE(result.airspaces.count(), 1);
+    QCOMPARE(result.airspaces[0].name, QStringLiteral("Test Restricted Area"));
+    QVERIFY(result.airspaces[0].boundary.count() >= 4);
+}
+
+void ShapeTest::_testOpenAirParseCircle()
+{
+    QTemporaryDir tmpDir;
+    QVERIFY(tmpDir.isValid());
+
+    // Create an OpenAir file with a circle
+    const QString content = R"(
+AC D
+AN Test Circle
+AH FL100
+AL 2000FT MSL
+V X=47:30:00N 008:30:00E
+DC 5
+)";
+
+    const QString filePath = tmpDir.filePath("circle.txt");
+    QFile file(filePath);
+    QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
+    file.write(content.toUtf8());
+    file.close();
+
+    OpenAirParser::ParseResult result = OpenAirParser::parseFile(filePath);
+    QVERIFY(result.success);
+    QCOMPARE(result.airspaces.count(), 1);
+    // Circle should generate multiple points (72 by default)
+    QVERIFY(result.airspaces[0].boundary.count() >= 36);
+}
+
+void ShapeTest::_testOpenAirParseArc()
+{
+    QTemporaryDir tmpDir;
+    QVERIFY(tmpDir.isValid());
+
+    // Create an OpenAir file with an arc
+    const QString content = R"(
+AC C
+AN Test Arc Area
+AH 3000FT MSL
+AL GND
+DP 47:00:00N 008:00:00E
+V X=47:00:00N 008:30:00E
+V D=+
+DA 10,0,90
+DP 47:00:00N 009:00:00E
+)";
+
+    const QString filePath = tmpDir.filePath("arc.txt");
+    QFile file(filePath);
+    QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
+    file.write(content.toUtf8());
+    file.close();
+
+    OpenAirParser::ParseResult result = OpenAirParser::parseFile(filePath);
+    QVERIFY(result.success);
+    QCOMPARE(result.airspaces.count(), 1);
+    QVERIFY(result.airspaces[0].boundary.count() >= 3);
+}
+
+void ShapeTest::_testOpenAirParseCoordinate()
+{
+    QGeoCoordinate coord;
+    QString errorString;
+
+    // Test DMS format
+    QVERIFY(OpenAirParser::parseCoordinate(QStringLiteral("47:30:00N 008:30:00E"), coord));
+    QCOMPARE(qRound(coord.latitude() * 100), 4750);
+    QCOMPARE(qRound(coord.longitude() * 100), 850);
+
+    // Test decimal format
+    QVERIFY(OpenAirParser::parseCoordinate(QStringLiteral("47.5N 8.5E"), coord));
+    QCOMPARE(qRound(coord.latitude() * 10), 475);
+    QCOMPARE(qRound(coord.longitude() * 10), 85);
+
+    // Test southern/western coordinates
+    QVERIFY(OpenAirParser::parseCoordinate(QStringLiteral("33:45:00S 070:40:00W"), coord));
+    QVERIFY(coord.latitude() < 0);
+    QVERIFY(coord.longitude() < 0);
+}
+
+void ShapeTest::_testOpenAirParseAltitude()
+{
+    // Test various altitude formats
+    OpenAirParser::Altitude alt;
+
+    alt = OpenAirParser::parseAltitude(QStringLiteral("5000FT MSL"));
+    QCOMPARE(alt.reference, OpenAirParser::AltitudeReference::MSL);
+    QCOMPARE(qRound(alt.value), 5000);
+
+    alt = OpenAirParser::parseAltitude(QStringLiteral("FL100"));
+    QCOMPARE(alt.reference, OpenAirParser::AltitudeReference::FL);
+    QCOMPARE(qRound(alt.value), 100);
+
+    alt = OpenAirParser::parseAltitude(QStringLiteral("GND"));
+    QCOMPARE(alt.reference, OpenAirParser::AltitudeReference::SFC);
+    QCOMPARE(qRound(alt.value), 0);
+
+    alt = OpenAirParser::parseAltitude(QStringLiteral("2500FT AGL"));
+    QCOMPARE(alt.reference, OpenAirParser::AltitudeReference::AGL);
+    QCOMPARE(qRound(alt.value), 2500);
+}
+
+// ============================================================================
+// WKB (Well-Known Binary) Tests
+// ============================================================================
+
+void ShapeTest::_testWKBParsePoint()
+{
+    // Create a WKB point (little endian)
+    QByteArray wkb;
+    QDataStream stream(&wkb, QIODevice::WriteOnly);
+    stream.setByteOrder(QDataStream::LittleEndian);
+    stream << quint8(1);  // Little endian
+    stream << quint32(1); // wkbPoint
+    stream << double(8.5);  // X (longitude)
+    stream << double(47.5); // Y (latitude)
+
+    QGeoCoordinate coord;
+    QString errorString;
+    QVERIFY(WKBHelper::parsePoint(wkb, coord, errorString));
+    QCOMPARE(qRound(coord.longitude() * 10), 85);
+    QCOMPARE(qRound(coord.latitude() * 10), 475);
+}
+
+void ShapeTest::_testWKBParseLineString()
+{
+    // Create a WKB linestring
+    QByteArray wkb;
+    QDataStream stream(&wkb, QIODevice::WriteOnly);
+    stream.setByteOrder(QDataStream::LittleEndian);
+    stream << quint8(1);  // Little endian
+    stream << quint32(2); // wkbLineString
+    stream << quint32(3); // 3 points
+    stream << double(8.0) << double(47.0);
+    stream << double(8.5) << double(47.5);
+    stream << double(9.0) << double(48.0);
+
+    QList<QGeoCoordinate> coords;
+    QString errorString;
+    QVERIFY(WKBHelper::parseLineString(wkb, coords, errorString));
+    QCOMPARE(coords.count(), 3);
+}
+
+void ShapeTest::_testWKBParsePolygon()
+{
+    // Create a WKB polygon (closed ring)
+    QByteArray wkb;
+    QDataStream stream(&wkb, QIODevice::WriteOnly);
+    stream.setByteOrder(QDataStream::LittleEndian);
+    stream << quint8(1);  // Little endian
+    stream << quint32(3); // wkbPolygon
+    stream << quint32(1); // 1 ring
+    stream << quint32(5); // 5 points (closed)
+    stream << double(8.0) << double(47.0);
+    stream << double(9.0) << double(47.0);
+    stream << double(9.0) << double(48.0);
+    stream << double(8.0) << double(48.0);
+    stream << double(8.0) << double(47.0); // Closing point
+
+    QList<QGeoCoordinate> coords;
+    QString errorString;
+    QVERIFY(WKBHelper::parsePolygon(wkb, coords, errorString));
+    QVERIFY(coords.count() >= 4);
+}
+
+void ShapeTest::_testWKBGenerate()
+{
+    QList<QGeoCoordinate> polygon;
+    polygon << QGeoCoordinate(47.0, 8.0);
+    polygon << QGeoCoordinate(47.0, 9.0);
+    polygon << QGeoCoordinate(48.0, 9.0);
+    polygon << QGeoCoordinate(48.0, 8.0);
+
+    QByteArray wkb = WKBHelper::toWKBPolygon(polygon, false);
+    QVERIFY(!wkb.isEmpty());
+
+    // Parse it back
+    QList<QGeoCoordinate> parsed;
+    QString errorString;
+    QVERIFY(WKBHelper::parsePolygon(wkb, parsed, errorString));
+    QCOMPARE(parsed.count(), polygon.count());
+}
+
+void ShapeTest::_testWKBRoundTrip()
+{
+    // Test point round-trip
+    QGeoCoordinate originalPoint(47.5, 8.5, 500.0);
+    QByteArray pointWkb = WKBHelper::toWKBPoint(originalPoint, true);
+
+    QGeoCoordinate parsedPoint;
+    QString errorString;
+    QVERIFY(WKBHelper::parsePoint(pointWkb, parsedPoint, errorString));
+    QCOMPARE(qRound(parsedPoint.latitude() * 100), qRound(originalPoint.latitude() * 100));
+    QCOMPARE(qRound(parsedPoint.longitude() * 100), qRound(originalPoint.longitude() * 100));
+}
+
+// ============================================================================
+// GeoPackage Tests
+// ============================================================================
+
+void ShapeTest::_testGeoPackageCreate()
+{
+    QTemporaryDir tmpDir;
+    QVERIFY(tmpDir.isValid());
+
+    const QString gpkgFile = tmpDir.filePath("test.gpkg");
+    QString errorString;
+
+    QVERIFY(GeoPackageHelper::createGeoPackage(gpkgFile, errorString));
+    QVERIFY(QFile::exists(gpkgFile));
+    QVERIFY(GeoPackageHelper::isValidGeoPackage(gpkgFile));
+}
+
+void ShapeTest::_testGeoPackageSavePoints()
+{
+    QTemporaryDir tmpDir;
+    QVERIFY(tmpDir.isValid());
+
+    const QString gpkgFile = tmpDir.filePath("points.gpkg");
+    QString errorString;
+
+    QList<QGeoCoordinate> points;
+    points << QGeoCoordinate(47.0, 8.0, 100.0);
+    points << QGeoCoordinate(47.5, 8.5, 200.0);
+    points << QGeoCoordinate(48.0, 9.0, 300.0);
+
+    QVERIFY(GeoPackageHelper::savePoints(gpkgFile, points, QStringLiteral("test_points"), errorString));
+    QVERIFY(QFile::exists(gpkgFile));
+}
+
+void ShapeTest::_testGeoPackageSavePolygons()
+{
+    QTemporaryDir tmpDir;
+    QVERIFY(tmpDir.isValid());
+
+    const QString gpkgFile = tmpDir.filePath("polygons.gpkg");
+    QString errorString;
+
+    QList<QList<QGeoCoordinate>> polygons;
+    QList<QGeoCoordinate> polygon;
+    polygon << QGeoCoordinate(47.0, 8.0);
+    polygon << QGeoCoordinate(47.0, 9.0);
+    polygon << QGeoCoordinate(48.0, 9.0);
+    polygon << QGeoCoordinate(48.0, 8.0);
+    polygons.append(polygon);
+
+    QVERIFY(GeoPackageHelper::savePolygons(gpkgFile, polygons, QStringLiteral("test_polygons"), errorString));
+    QVERIFY(QFile::exists(gpkgFile));
+}
+
+void ShapeTest::_testGeoPackageLoadFeatures()
+{
+    QTemporaryDir tmpDir;
+    QVERIFY(tmpDir.isValid());
+
+    const QString gpkgFile = tmpDir.filePath("features.gpkg");
+    QString errorString;
+
+    // Create and save some polygons
+    QList<QList<QGeoCoordinate>> polygons;
+    QList<QGeoCoordinate> polygon;
+    polygon << QGeoCoordinate(47.0, 8.0);
+    polygon << QGeoCoordinate(47.0, 9.0);
+    polygon << QGeoCoordinate(48.0, 9.0);
+    polygon << QGeoCoordinate(48.0, 8.0);
+    polygons.append(polygon);
+
+    QVERIFY(GeoPackageHelper::savePolygons(gpkgFile, polygons, QStringLiteral("areas"), errorString));
+
+    // Load them back
+    GeoPackageHelper::LoadResult result = GeoPackageHelper::loadAllFeatures(gpkgFile);
+    QVERIFY(result.success);
+    QCOMPARE(result.polygons.count(), 1);
+}
+
+void ShapeTest::_testGeoPackageRoundTrip()
+{
+    QTemporaryDir tmpDir;
+    QVERIFY(tmpDir.isValid());
+
+    const QString gpkgFile = tmpDir.filePath("roundtrip.gpkg");
+    QString errorString;
+
+    // Create test data
+    QList<QGeoCoordinate> originalPoints;
+    originalPoints << QGeoCoordinate(47.1, 8.1);
+    originalPoints << QGeoCoordinate(47.2, 8.2);
+
+    QList<QList<QGeoCoordinate>> originalPolygons;
+    QList<QGeoCoordinate> poly;
+    poly << QGeoCoordinate(46.0, 7.0);
+    poly << QGeoCoordinate(46.0, 8.0);
+    poly << QGeoCoordinate(47.0, 8.0);
+    poly << QGeoCoordinate(47.0, 7.0);
+    originalPolygons.append(poly);
+
+    // Save
+    QVERIFY(GeoPackageHelper::savePoints(gpkgFile, originalPoints, QStringLiteral("waypoints"), errorString));
+    QVERIFY(GeoPackageHelper::savePolygons(gpkgFile, originalPolygons, QStringLiteral("areas"), errorString));
+
+    // Load and verify
+    GeoPackageHelper::LoadResult result = GeoPackageHelper::loadAllFeatures(gpkgFile);
+    QVERIFY(result.success);
+    QCOMPARE(result.points.count(), originalPoints.count());
+    QCOMPARE(result.polygons.count(), originalPolygons.count());
+}
+
+// ============================================================================
+// GeoFormatRegistry Tests
+// ============================================================================
+
+void ShapeTest::_testGeoFormatRegistrySupportedFormats()
+{
+    QList<GeoFormatRegistry::FormatInfo> formats = GeoFormatRegistry::supportedFormats();
+    QVERIFY(formats.count() >= 8); // At least KML, KMZ, GeoJSON, GPX, SHP, WKT, OpenAir, GeoPackage
+
+    // Check that native formats are included
+    QList<GeoFormatRegistry::FormatInfo> nativeFormats = GeoFormatRegistry::nativeFormats();
+    QVERIFY(nativeFormats.count() >= 8);
+
+    // Verify format info structure
+    for (const auto& format : nativeFormats) {
+        QVERIFY(!format.name.isEmpty());
+        QVERIFY(!format.extensions.isEmpty());
+        QVERIFY(format.isNative);
+    }
+}
+
+void ShapeTest::_testGeoFormatRegistryLoadFile()
+{
+    QTemporaryDir tmpDir;
+    QVERIFY(tmpDir.isValid());
+
+    // Create a test KML file
+    const QString kmlContent = R"(<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+<Placemark>
+<Polygon><outerBoundaryIs><LinearRing><coordinates>
+8,47,0 9,47,0 9,48,0 8,48,0 8,47,0
+</coordinates></LinearRing></outerBoundaryIs></Polygon>
+</Placemark>
+</Document>
+</kml>)";
+
+    const QString kmlFile = tmpDir.filePath("test.kml");
+    QFile file(kmlFile);
+    QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
+    file.write(kmlContent.toUtf8());
+    file.close();
+
+    // Load using registry
+    GeoFormatRegistry::LoadResult result = GeoFormatRegistry::loadFile(kmlFile);
+    QVERIFY(result.success);
+    QCOMPARE(result.formatUsed, QStringLiteral("KML"));
+    QVERIFY(result.totalFeatures() > 0);
+}
+
+void ShapeTest::_testGeoFormatRegistryFileFilters()
+{
+    QString readFilter = GeoFormatRegistry::readFileFilter();
+    QVERIFY(!readFilter.isEmpty());
+    QVERIFY(readFilter.contains(QStringLiteral("*.kml")));
+    QVERIFY(readFilter.contains(QStringLiteral("*.geojson")));
+    QVERIFY(readFilter.contains(QStringLiteral("*.gpx")));
+    QVERIFY(readFilter.contains(QStringLiteral("*.shp")));
+
+    QString writeFilter = GeoFormatRegistry::writeFileFilter();
+    QVERIFY(!writeFilter.isEmpty());
+}
+
+void ShapeTest::_testGeoFormatRegistrySaveFunctions()
+{
+    QTemporaryDir tmpDir;
+    QVERIFY(tmpDir.isValid());
+
+    // Test data
+    QList<QGeoCoordinate> polygon;
+    polygon << QGeoCoordinate(47.0, 8.0);
+    polygon << QGeoCoordinate(47.0, 9.0);
+    polygon << QGeoCoordinate(48.0, 9.0);
+    polygon << QGeoCoordinate(48.0, 8.0);
+
+    QList<QGeoCoordinate> polyline;
+    polyline << QGeoCoordinate(47.0, 8.0);
+    polyline << QGeoCoordinate(47.5, 8.5);
+    polyline << QGeoCoordinate(48.0, 9.0);
+
+    QList<QGeoCoordinate> points;
+    points << QGeoCoordinate(47.1, 8.1);
+    points << QGeoCoordinate(47.2, 8.2);
+
+    // Test save to KML
+    const QString kmlFile = tmpDir.filePath("registry_test.kml");
+    GeoFormatRegistry::SaveResult kmlResult = GeoFormatRegistry::savePolygon(kmlFile, polygon);
+    QVERIFY2(kmlResult.success, qPrintable(kmlResult.errorString));
+    QVERIFY(QFile::exists(kmlFile));
+
+    // Test save to GeoJSON
+    const QString geojsonFile = tmpDir.filePath("registry_test.geojson");
+    GeoFormatRegistry::SaveResult geojsonResult = GeoFormatRegistry::savePolygon(geojsonFile, polygon);
+    QVERIFY2(geojsonResult.success, qPrintable(geojsonResult.errorString));
+    QVERIFY(QFile::exists(geojsonFile));
+
+    // Test save to GPX (polyline)
+    const QString gpxFile = tmpDir.filePath("registry_test.gpx");
+    GeoFormatRegistry::SaveResult gpxResult = GeoFormatRegistry::savePolyline(gpxFile, polyline);
+    QVERIFY2(gpxResult.success, qPrintable(gpxResult.errorString));
+    QVERIFY(QFile::exists(gpxFile));
+
+    // Test save to WKT
+    const QString wktFile = tmpDir.filePath("registry_test.wkt");
+    GeoFormatRegistry::SaveResult wktResult = GeoFormatRegistry::savePolygon(wktFile, polygon);
+    QVERIFY2(wktResult.success, qPrintable(wktResult.errorString));
+    QVERIFY(QFile::exists(wktFile));
+
+    // Test save points to WKT
+    const QString wktPointsFile = tmpDir.filePath("registry_points.wkt");
+    GeoFormatRegistry::SaveResult wktPointsResult = GeoFormatRegistry::savePoints(wktPointsFile, points);
+    QVERIFY2(wktPointsResult.success, qPrintable(wktPointsResult.errorString));
+    QVERIFY(QFile::exists(wktPointsFile));
+
+    // Test save multiple polygons
+    QList<QList<QGeoCoordinate>> polygons;
+    polygons.append(polygon);
+    const QString multiFile = tmpDir.filePath("registry_multi.geojson");
+    GeoFormatRegistry::SaveResult multiResult = GeoFormatRegistry::savePolygons(multiFile, polygons);
+    QVERIFY2(multiResult.success, qPrintable(multiResult.errorString));
+}
+
+void ShapeTest::_testGeoFormatRegistryCapabilityValidation()
+{
+    // Test that all registered formats have valid capability declarations
+    QList<GeoFormatRegistry::ValidationResult> results = GeoFormatRegistry::validateCapabilities();
+
+    // Verify validation returns results for all formats
+    QVERIFY(results.count() > 0);
+
+    // Check that all native formats are valid (no capability mismatches)
+    bool allValid = GeoFormatRegistry::allCapabilitiesValid();
+    if (!allValid) {
+        for (const auto& result : results) {
+            if (!result.valid) {
+                qDebug() << "Format" << result.formatName << "has issues:" << result.issues;
+            }
+        }
+    }
+    QVERIFY2(allValid, "Some formats have capability mismatches");
+}
+
+// ============================================================================
+// WKT (Well-Known Text) Tests
+// ============================================================================
+
+QString ShapeTest::_writeWktFile(const QTemporaryDir &tmpDir, const QString &name, const QString &content)
+{
+    const QString path = tmpDir.filePath(name);
+    QFile file(path);
+    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QTextStream stream(&file);
+        stream << content;
+    }
+    return path;
+}
+
+void ShapeTest::_testWKTParsePoint()
+{
+    QGeoCoordinate coord;
+    QString errorString;
+
+    // Test basic POINT
+    QVERIFY(WKTHelper::parsePoint(QStringLiteral("POINT (8.5 47.5)"), coord, errorString));
+    QCOMPARE(qRound(coord.longitude() * 10), 85);
+    QCOMPARE(qRound(coord.latitude() * 10), 475);
+
+    // Test POINT Z (with altitude)
+    QVERIFY(WKTHelper::parsePoint(QStringLiteral("POINT Z (8.5 47.5 100)"), coord, errorString));
+    QCOMPARE(qRound(coord.longitude() * 10), 85);
+    QCOMPARE(qRound(coord.latitude() * 10), 475);
+    QCOMPARE(qRound(coord.altitude()), 100);
+
+    // Test invalid point
+    QVERIFY(!WKTHelper::parsePoint(QStringLiteral("POINT ()"), coord, errorString));
+}
+
+void ShapeTest::_testWKTParseLineString()
+{
+    QList<QGeoCoordinate> coords;
+    QString errorString;
+
+    // Test basic LINESTRING
+    QVERIFY(WKTHelper::parseLineString(
+        QStringLiteral("LINESTRING (8 47, 8.5 47.5, 9 48)"), coords, errorString));
+    QCOMPARE(coords.count(), 3);
+    QCOMPARE(qRound(coords[0].longitude()), 8);
+    QCOMPARE(qRound(coords[0].latitude()), 47);
+    QCOMPARE(qRound(coords[2].longitude()), 9);
+    QCOMPARE(qRound(coords[2].latitude()), 48);
+
+    // Test LINESTRING Z
+    coords.clear();
+    QVERIFY(WKTHelper::parseLineString(
+        QStringLiteral("LINESTRING Z (8 47 100, 9 48 200)"), coords, errorString));
+    QCOMPARE(coords.count(), 2);
+    QCOMPARE(qRound(coords[0].altitude()), 100);
+    QCOMPARE(qRound(coords[1].altitude()), 200);
+}
+
+void ShapeTest::_testWKTParsePolygon()
+{
+    QList<QGeoCoordinate> vertices;
+    QString errorString;
+
+    // Test basic POLYGON (ring is auto-closed in WKT)
+    QVERIFY(WKTHelper::parsePolygon(
+        QStringLiteral("POLYGON ((8 47, 9 47, 9 48, 8 48, 8 47))"), vertices, errorString));
+    QVERIFY(vertices.count() >= 4);
+
+    // Test POLYGON with holes (outer ring should be extracted)
+    vertices.clear();
+    QVERIFY(WKTHelper::parsePolygon(
+        QStringLiteral("POLYGON ((8 47, 9 47, 9 48, 8 48, 8 47), (8.2 47.2, 8.8 47.2, 8.8 47.8, 8.2 47.8, 8.2 47.2))"),
+        vertices, errorString));
+    QVERIFY(vertices.count() >= 4);
+}
+
+void ShapeTest::_testWKTGenerate()
+{
+    // Test POINT generation
+    QGeoCoordinate point(47.5, 8.5, 100.0);
+    QString pointWkt = WKTHelper::toWKTPoint(point, false);
+    QVERIFY(pointWkt.startsWith(QStringLiteral("POINT")));
+    QVERIFY(pointWkt.contains(QStringLiteral("8.5")));
+    QVERIFY(pointWkt.contains(QStringLiteral("47.5")));
+
+    // Test POINT Z generation
+    QString pointZWkt = WKTHelper::toWKTPoint(point, true);
+    QVERIFY(pointZWkt.startsWith(QStringLiteral("POINT Z")));
+    QVERIFY(pointZWkt.contains(QStringLiteral("100")));
+
+    // Test LINESTRING generation
+    QList<QGeoCoordinate> line;
+    line << QGeoCoordinate(47.0, 8.0);
+    line << QGeoCoordinate(47.5, 8.5);
+    line << QGeoCoordinate(48.0, 9.0);
+    QString lineWkt = WKTHelper::toWKTLineString(line, false);
+    QVERIFY(lineWkt.startsWith(QStringLiteral("LINESTRING")));
+
+    // Test POLYGON generation
+    QList<QGeoCoordinate> polygon;
+    polygon << QGeoCoordinate(47.0, 8.0);
+    polygon << QGeoCoordinate(47.0, 9.0);
+    polygon << QGeoCoordinate(48.0, 9.0);
+    polygon << QGeoCoordinate(48.0, 8.0);
+    QString polygonWkt = WKTHelper::toWKTPolygon(polygon, false);
+    QVERIFY(polygonWkt.startsWith(QStringLiteral("POLYGON")));
+}
+
+void ShapeTest::_testWKTRoundTrip()
+{
+    QString errorString;
+
+    // Point round-trip
+    QGeoCoordinate originalPoint(47.5, 8.5, 100.0);
+    QString pointWkt = WKTHelper::toWKTPoint(originalPoint, true);
+    QGeoCoordinate parsedPoint;
+    QVERIFY(WKTHelper::parsePoint(pointWkt, parsedPoint, errorString));
+    QCOMPARE(qRound(parsedPoint.latitude() * 100), qRound(originalPoint.latitude() * 100));
+    QCOMPARE(qRound(parsedPoint.longitude() * 100), qRound(originalPoint.longitude() * 100));
+
+    // LineString round-trip
+    QList<QGeoCoordinate> originalLine;
+    originalLine << QGeoCoordinate(47.0, 8.0);
+    originalLine << QGeoCoordinate(47.5, 8.5);
+    originalLine << QGeoCoordinate(48.0, 9.0);
+    QString lineWkt = WKTHelper::toWKTLineString(originalLine, false);
+    QList<QGeoCoordinate> parsedLine;
+    QVERIFY(WKTHelper::parseLineString(lineWkt, parsedLine, errorString));
+    QCOMPARE(parsedLine.count(), originalLine.count());
+
+    // Polygon round-trip
+    QList<QGeoCoordinate> originalPolygon;
+    originalPolygon << QGeoCoordinate(47.0, 8.0);
+    originalPolygon << QGeoCoordinate(47.0, 9.0);
+    originalPolygon << QGeoCoordinate(48.0, 9.0);
+    originalPolygon << QGeoCoordinate(48.0, 8.0);
+    QString polygonWkt = WKTHelper::toWKTPolygon(originalPolygon, false);
+    QList<QGeoCoordinate> parsedPolygon;
+    QVERIFY(WKTHelper::parsePolygon(polygonWkt, parsedPolygon, errorString));
+    QCOMPARE(parsedPolygon.count(), originalPolygon.count());
+}
+
+void ShapeTest::_testWKTLoadFromFile()
+{
+    QTemporaryDir tmpDir;
+    QVERIFY(tmpDir.isValid());
+    QString errorString;
+
+    // Test loading point from file
+    const QString pointWkt = _writeWktFile(tmpDir, "point.wkt", "POINT (8.5 47.5)");
+    QGeoCoordinate point;
+    QVERIFY(WKTHelper::loadPointFromFile(pointWkt, point, errorString));
+    QCOMPARE(qRound(point.longitude() * 10), 85);
+    QCOMPARE(qRound(point.latitude() * 10), 475);
+
+    // Test loading points from MULTIPOINT file
+    const QString multiPointWkt = _writeWktFile(tmpDir, "multipoint.wkt",
+        "MULTIPOINT ((8 47), (8.5 47.5), (9 48))");
+    QList<QGeoCoordinate> points;
+    QVERIFY2(WKTHelper::loadPointsFromFile(multiPointWkt, points, errorString),
+             qPrintable(QStringLiteral("loadPointsFromFile failed: %1").arg(errorString)));
+    QCOMPARE(points.count(), 3);
+
+    // Test loading polyline from file
+    const QString lineWkt = _writeWktFile(tmpDir, "line.wkt",
+        "LINESTRING (8 47, 8.5 47.5, 9 48)");
+    QList<QGeoCoordinate> polyline;
+    QVERIFY(WKTHelper::loadPolylineFromFile(lineWkt, polyline, errorString));
+    QCOMPARE(polyline.count(), 3);
+
+    // Test loading polygon from file
+    const QString polygonWkt = _writeWktFile(tmpDir, "polygon.wkt",
+        "POLYGON ((8 47, 9 47, 9 48, 8 48, 8 47))");
+    QList<QGeoCoordinate> polygon;
+    QVERIFY(WKTHelper::loadPolygonFromFile(polygonWkt, polygon, errorString));
+    QVERIFY(polygon.count() >= 4);
+
+    // Test loading multiple polygons from MULTIPOLYGON file
+    const QString multiPolygonWkt = _writeWktFile(tmpDir, "multipolygon.wkt",
+        "MULTIPOLYGON (((8 47, 9 47, 9 48, 8 48, 8 47)), ((10 50, 11 50, 11 51, 10 51, 10 50)))");
+    QList<QList<QGeoCoordinate>> polygons;
+    QVERIFY(WKTHelper::loadPolygonsFromFile(multiPolygonWkt, polygons, errorString));
+    QCOMPARE(polygons.count(), 2);
+}
+
+void ShapeTest::_testWKTSaveToFile()
+{
+    QTemporaryDir tmpDir;
+    QVERIFY(tmpDir.isValid());
+    QString errorString;
+
+    // Test saving point to file
+    QGeoCoordinate point(47.5, 8.5, 100.0);
+    const QString pointFile = tmpDir.filePath("save_point.wkt");
+    QVERIFY(WKTHelper::savePointToFile(pointFile, point, errorString));
+    QVERIFY(QFile::exists(pointFile));
+
+    // Verify by loading back
+    QGeoCoordinate loadedPoint;
+    QVERIFY(WKTHelper::loadPointFromFile(pointFile, loadedPoint, errorString));
+    QCOMPARE(qRound(loadedPoint.latitude() * 10), qRound(point.latitude() * 10));
+
+    // Test saving points to file
+    QList<QGeoCoordinate> points;
+    points << QGeoCoordinate(47.1, 8.1);
+    points << QGeoCoordinate(47.2, 8.2);
+    const QString pointsFile = tmpDir.filePath("save_points.wkt");
+    QVERIFY(WKTHelper::savePointsToFile(pointsFile, points, errorString));
+    QVERIFY(QFile::exists(pointsFile));
+
+    // Test saving polyline to file
+    QList<QGeoCoordinate> polyline;
+    polyline << QGeoCoordinate(47.0, 8.0);
+    polyline << QGeoCoordinate(47.5, 8.5);
+    polyline << QGeoCoordinate(48.0, 9.0);
+    const QString polylineFile = tmpDir.filePath("save_polyline.wkt");
+    QVERIFY(WKTHelper::savePolylineToFile(polylineFile, polyline, errorString));
+    QVERIFY(QFile::exists(polylineFile));
+
+    // Verify by loading back
+    QList<QGeoCoordinate> loadedPolyline;
+    QVERIFY(WKTHelper::loadPolylineFromFile(polylineFile, loadedPolyline, errorString));
+    QCOMPARE(loadedPolyline.count(), polyline.count());
+
+    // Test saving polygon to file
+    QList<QGeoCoordinate> polygon;
+    polygon << QGeoCoordinate(47.0, 8.0);
+    polygon << QGeoCoordinate(47.0, 9.0);
+    polygon << QGeoCoordinate(48.0, 9.0);
+    polygon << QGeoCoordinate(48.0, 8.0);
+    const QString polygonFile = tmpDir.filePath("save_polygon.wkt");
+    QVERIFY(WKTHelper::savePolygonToFile(polygonFile, polygon, errorString));
+    QVERIFY(QFile::exists(polygonFile));
+
+    // Verify by loading back
+    QList<QGeoCoordinate> loadedPolygon;
+    QVERIFY(WKTHelper::loadPolygonFromFile(polygonFile, loadedPolygon, errorString));
+    QCOMPARE(loadedPolygon.count(), polygon.count());
+
+    // Test saving multiple polygons to file
+    QList<QList<QGeoCoordinate>> polygons;
+    polygons.append(polygon);
+    const QString polygonsFile = tmpDir.filePath("save_polygons.wkt");
+    QVERIFY(WKTHelper::savePolygonsToFile(polygonsFile, polygons, errorString));
+    QVERIFY(QFile::exists(polygonsFile));
+
+    // Verify by loading back
+    QList<QList<QGeoCoordinate>> loadedPolygons;
+    QVERIFY(WKTHelper::loadPolygonsFromFile(polygonsFile, loadedPolygons, errorString));
+    QCOMPARE(loadedPolygons.count(), polygons.count());
 }

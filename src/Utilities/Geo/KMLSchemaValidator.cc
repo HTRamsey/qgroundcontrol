@@ -5,7 +5,7 @@
 #include <QtCore/QFile>
 #include <QtXml/QDomDocument>
 
-QGC_LOGGING_CATEGORY(KMLSchemaValidatorLog, "Utilities.KMLSchemaValidator")
+QGC_LOGGING_CATEGORY(KMLSchemaValidatorLog, "Utilities.Geo.KMLSchemaValidator")
 
 namespace {
     // XSD namespace

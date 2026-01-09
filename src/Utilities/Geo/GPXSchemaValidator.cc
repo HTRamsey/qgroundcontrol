@@ -4,7 +4,7 @@
 #include <QtCore/QFile>
 #include <QtXml/QDomDocument>
 
-QGC_LOGGING_CATEGORY(GPXSchemaValidatorLog, "Utilities.GPXSchemaValidator")
+QGC_LOGGING_CATEGORY(GPXSchemaValidatorLog, "Utilities.Geo.GPXSchemaValidator")
 
 namespace {
     // Schema resource path (PREFIX "/gpx" + FILES "gpx11.xsd")

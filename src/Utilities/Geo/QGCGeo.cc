@@ -22,7 +22,7 @@
 #include <GeographicLib/PolygonArea.hpp>
 #include <GeographicLib/UTMUPS.hpp>
 
-QGC_LOGGING_CATEGORY(QGCGeoLog, "Utilities.QGCGeo")
+QGC_LOGGING_CATEGORY(QGCGeoLog, "Utilities.Geo.QGCGeo")
 
 namespace QGCGeo
 {

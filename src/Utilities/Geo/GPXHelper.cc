@@ -1,16 +1,17 @@
 #include "GPXHelper.h"
+#include "GeoUtilities.h"
+#include "GPXSchemaValidator.h"
 #include "QGCLoggingCategory.h"
 
 #include <QtCore/QFile>
 #include <QtCore/QXmlStreamReader>
 #include <QtCore/QXmlStreamWriter>
 
-QGC_LOGGING_CATEGORY(GPXHelperLog, "qgc.utilities.geo.gpxhelper")
+QGC_LOGGING_CATEGORY(GPXHelperLog, "Utilities.Geo.GPXHelper")
 
 namespace {
     constexpr const char *_errorPrefix = QT_TR_NOOP("GPX file load failed. %1");
     constexpr const char *_saveErrorPrefix = QT_TR_NOOP("GPX file save failed. %1");
-    constexpr double _polygonClosureThresholdMeters = 1.0;
 
     constexpr const char *_gpxNamespace = "http://www.topografix.com/GPX/1/1";
     constexpr const char *_gpxSchemaLocation = "http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd";
@@ -39,15 +40,60 @@ namespace {
         return true;
     }
 
+    bool closeFileAndCheck(QFile &file, QXmlStreamWriter &xml, QString &errorString)
+    {
+        // Check for XML writer errors
+        if (xml.hasError()) {
+            errorString = QString(_saveErrorPrefix).arg(QObject::tr("XML write error"));
+            file.close();
+            return false;
+        }
+
+        file.close();
+        if (file.error() != QFileDevice::NoError) {
+            errorString = QString(_saveErrorPrefix).arg(
+                QObject::tr("File close error: %1").arg(file.errorString()));
+            return false;
+        }
+        return true;
+    }
+
+    // Validate saved file in debug builds
+    void validateSavedFile([[maybe_unused]] const QString &filePath)
+    {
+#ifndef NDEBUG
+        const auto result = GPXSchemaValidator::instance()->validateFile(filePath);
+        if (!result.isValid) {
+            qCWarning(GPXHelperLog) << "Post-save validation failed for" << filePath;
+            for (const QString &error : result.errors) {
+                qCWarning(GPXHelperLog) << "  Error:" << error;
+            }
+        }
+        for (const QString &warning : result.warnings) {
+            qCDebug(GPXHelperLog) << "  Warning:" << warning;
+        }
+#endif
+    }
+
     QGeoCoordinate parsePoint(QXmlStreamReader &xml)
     {
         const QXmlStreamAttributes attrs = xml.attributes();
         bool latOk = false, lonOk = false;
-        const double lat = attrs.value(QStringLiteral("lat")).toDouble(&latOk);
-        const double lon = attrs.value(QStringLiteral("lon")).toDouble(&lonOk);
+        double lat = attrs.value(QStringLiteral("lat")).toDouble(&latOk);
+        double lon = attrs.value(QStringLiteral("lon")).toDouble(&lonOk);
 
         if (!latOk || !lonOk) {
             return QGeoCoordinate();
+        }
+
+        // Validate and normalize coordinates
+        if (lat < -90.0 || lat > 90.0) {
+            qCWarning(GPXHelperLog) << "Latitude out of range, clamping:" << lat;
+            lat = GeoUtilities::normalizeLatitude(lat);
+        }
+        if (lon < -180.0 || lon > 180.0) {
+            qCWarning(GPXHelperLog) << "Longitude out of range, wrapping:" << lon;
+            lon = GeoUtilities::normalizeLongitude(lon);
         }
 
         double altitude = qQNaN();
@@ -57,6 +103,10 @@ namespace {
                 bool ok = false;
                 const double ele = xml.readElementText().toDouble(&ok);
                 if (ok) {
+                    // Validate altitude range
+                    if (!GeoUtilities::isValidAltitude(ele)) {
+                        qCWarning(GPXHelperLog) << "Altitude out of expected range:" << ele;
+                    }
                     altitude = ele;
                 }
             } else {
@@ -126,10 +176,10 @@ namespace {
 
     bool isClosed(const QList<QGeoCoordinate> &coords)
     {
-        if (coords.count() < 3) {
+        if (coords.count() < GeoUtilities::kMinPolygonVertices) {
             return false;
         }
-        return coords.first().distanceTo(coords.last()) < _polygonClosureThresholdMeters;
+        return coords.first().distanceTo(coords.last()) < GeoUtilities::kPolygonClosureThresholdMeters;
     }
 
     void writeGpxHeader(QXmlStreamWriter &xml, const QString &creator = QStringLiteral("QGroundControl"))
@@ -296,10 +346,10 @@ bool loadPolygonFromFile(const QString &filePath, QList<QGeoCoordinate> &vertice
     for (const QList<QGeoCoordinate> &route : data.routes) {
         if (isClosed(route)) {
             vertices = route;
-            if (!vertices.isEmpty() && vertices.first().distanceTo(vertices.last()) < _polygonClosureThresholdMeters) {
+            if (!vertices.isEmpty() && vertices.first().distanceTo(vertices.last()) < GeoUtilities::kPolygonClosureThresholdMeters) {
                 vertices.removeLast();
             }
-            ShapeFileHelper::filterVertices(vertices, filterMeters, 3);
+            ShapeFileHelper::filterVertices(vertices, filterMeters, GeoUtilities::kMinPolygonVertices);
             return true;
         }
     }
@@ -307,10 +357,10 @@ bool loadPolygonFromFile(const QString &filePath, QList<QGeoCoordinate> &vertice
     for (const QList<QGeoCoordinate> &segment : data.trackSegments) {
         if (isClosed(segment)) {
             vertices = segment;
-            if (!vertices.isEmpty() && vertices.first().distanceTo(vertices.last()) < _polygonClosureThresholdMeters) {
+            if (!vertices.isEmpty() && vertices.first().distanceTo(vertices.last()) < GeoUtilities::kPolygonClosureThresholdMeters) {
                 vertices.removeLast();
             }
-            ShapeFileHelper::filterVertices(vertices, filterMeters, 3);
+            ShapeFileHelper::filterVertices(vertices, filterMeters, GeoUtilities::kMinPolygonVertices);
             return true;
         }
     }
@@ -331,11 +381,11 @@ bool loadPolygonsFromFile(const QString &filePath, QList<QList<QGeoCoordinate>> 
     for (const QList<QGeoCoordinate> &route : data.routes) {
         if (isClosed(route)) {
             QList<QGeoCoordinate> vertices = route;
-            if (!vertices.isEmpty() && vertices.first().distanceTo(vertices.last()) < _polygonClosureThresholdMeters) {
+            if (!vertices.isEmpty() && vertices.first().distanceTo(vertices.last()) < GeoUtilities::kPolygonClosureThresholdMeters) {
                 vertices.removeLast();
             }
-            ShapeFileHelper::filterVertices(vertices, filterMeters, 3);
-            if (vertices.count() >= 3) {
+            ShapeFileHelper::filterVertices(vertices, filterMeters, GeoUtilities::kMinPolygonVertices);
+            if (vertices.count() >= GeoUtilities::kMinPolygonVertices) {
                 polygons.append(vertices);
             }
         }
@@ -344,11 +394,11 @@ bool loadPolygonsFromFile(const QString &filePath, QList<QList<QGeoCoordinate>> 
     for (const QList<QGeoCoordinate> &segment : data.trackSegments) {
         if (isClosed(segment)) {
             QList<QGeoCoordinate> vertices = segment;
-            if (!vertices.isEmpty() && vertices.first().distanceTo(vertices.last()) < _polygonClosureThresholdMeters) {
+            if (!vertices.isEmpty() && vertices.first().distanceTo(vertices.last()) < GeoUtilities::kPolygonClosureThresholdMeters) {
                 vertices.removeLast();
             }
-            ShapeFileHelper::filterVertices(vertices, filterMeters, 3);
-            if (vertices.count() >= 3) {
+            ShapeFileHelper::filterVertices(vertices, filterMeters, GeoUtilities::kMinPolygonVertices);
+            if (vertices.count() >= GeoUtilities::kMinPolygonVertices) {
                 polygons.append(vertices);
             }
         }
@@ -373,13 +423,13 @@ bool loadPolylineFromFile(const QString &filePath, QList<QGeoCoordinate> &coords
 
     if (!data.routes.isEmpty()) {
         coords = data.routes.first();
-        ShapeFileHelper::filterVertices(coords, filterMeters, 2);
+        ShapeFileHelper::filterVertices(coords, filterMeters, GeoUtilities::kMinPolylineVertices);
         return true;
     }
 
     if (!data.trackSegments.isEmpty()) {
         coords = data.trackSegments.first();
-        ShapeFileHelper::filterVertices(coords, filterMeters, 2);
+        ShapeFileHelper::filterVertices(coords, filterMeters, GeoUtilities::kMinPolylineVertices);
         return true;
     }
 
@@ -397,15 +447,15 @@ bool loadPolylinesFromFile(const QString &filePath, QList<QList<QGeoCoordinate>>
     }
 
     for (QList<QGeoCoordinate> route : data.routes) {
-        ShapeFileHelper::filterVertices(route, filterMeters, 2);
-        if (route.count() >= 2) {
+        ShapeFileHelper::filterVertices(route, filterMeters, GeoUtilities::kMinPolylineVertices);
+        if (route.count() >= GeoUtilities::kMinPolylineVertices) {
             polylines.append(route);
         }
     }
 
     for (QList<QGeoCoordinate> segment : data.trackSegments) {
-        ShapeFileHelper::filterVertices(segment, filterMeters, 2);
-        if (segment.count() >= 2) {
+        ShapeFileHelper::filterVertices(segment, filterMeters, GeoUtilities::kMinPolylineVertices);
+        if (segment.count() >= GeoUtilities::kMinPolylineVertices) {
             polylines.append(segment);
         }
     }
@@ -439,8 +489,15 @@ bool loadPointsFromFile(const QString &filePath, QList<QGeoCoordinate> &points, 
 
 bool savePolygonToFile(const QString &filePath, const QList<QGeoCoordinate> &vertices, QString &errorString)
 {
-    if (vertices.count() < 3) {
+    if (vertices.count() < GeoUtilities::kMinPolygonVertices) {
         errorString = QString(_saveErrorPrefix).arg(QObject::tr("Polygon must have at least 3 vertices"));
+        return false;
+    }
+
+    // Validate all coordinates before saving
+    QString validationError;
+    if (!GeoUtilities::validateCoordinates(vertices, validationError)) {
+        errorString = QString(_saveErrorPrefix).arg(validationError);
         return false;
     }
 
@@ -453,7 +510,7 @@ bool savePolygonToFile(const QString &filePath, const QList<QGeoCoordinate> &ver
     writeGpxHeader(xml);
 
     QList<QGeoCoordinate> closedVertices = vertices;
-    if (closedVertices.first().distanceTo(closedVertices.last()) >= _polygonClosureThresholdMeters) {
+    if (closedVertices.first().distanceTo(closedVertices.last()) >= GeoUtilities::kPolygonClosureThresholdMeters) {
         closedVertices.append(closedVertices.first());
     }
 
@@ -461,7 +518,11 @@ bool savePolygonToFile(const QString &filePath, const QList<QGeoCoordinate> &ver
 
     xml.writeEndElement();
     xml.writeEndDocument();
+    if (!closeFileAndCheck(file, xml, errorString)) {
+        return false;
+    }
 
+    validateSavedFile(filePath);
     return true;
 }
 
@@ -470,6 +531,16 @@ bool savePolygonsToFile(const QString &filePath, const QList<QList<QGeoCoordinat
     if (polygons.isEmpty()) {
         errorString = QString(_saveErrorPrefix).arg(QObject::tr("No polygons to save"));
         return false;
+    }
+
+    // Validate all coordinates before saving
+    for (int i = 0; i < polygons.size(); i++) {
+        QString validationError;
+        if (!GeoUtilities::validateCoordinates(polygons[i], validationError)) {
+            errorString = QString(_saveErrorPrefix).arg(
+                QObject::tr("Polygon %1: %2").arg(i + 1).arg(validationError));
+            return false;
+        }
     }
 
     QFile file;
@@ -482,12 +553,12 @@ bool savePolygonsToFile(const QString &filePath, const QList<QList<QGeoCoordinat
 
     int index = 1;
     for (const QList<QGeoCoordinate> &vertices : polygons) {
-        if (vertices.count() < 3) {
+        if (vertices.count() < GeoUtilities::kMinPolygonVertices) {
             continue;
         }
 
         QList<QGeoCoordinate> closedVertices = vertices;
-        if (closedVertices.first().distanceTo(closedVertices.last()) >= _polygonClosureThresholdMeters) {
+        if (closedVertices.first().distanceTo(closedVertices.last()) >= GeoUtilities::kPolygonClosureThresholdMeters) {
             closedVertices.append(closedVertices.first());
         }
 
@@ -496,14 +567,25 @@ bool savePolygonsToFile(const QString &filePath, const QList<QList<QGeoCoordinat
 
     xml.writeEndElement();
     xml.writeEndDocument();
+    if (!closeFileAndCheck(file, xml, errorString)) {
+        return false;
+    }
 
+    validateSavedFile(filePath);
     return true;
 }
 
 bool savePolylineToFile(const QString &filePath, const QList<QGeoCoordinate> &coords, QString &errorString)
 {
-    if (coords.count() < 2) {
+    if (coords.count() < GeoUtilities::kMinPolylineVertices) {
         errorString = QString(_saveErrorPrefix).arg(QObject::tr("Polyline must have at least 2 points"));
+        return false;
+    }
+
+    // Validate all coordinates before saving
+    QString validationError;
+    if (!GeoUtilities::validateCoordinates(coords, validationError)) {
+        errorString = QString(_saveErrorPrefix).arg(validationError);
         return false;
     }
 
@@ -519,7 +601,11 @@ bool savePolylineToFile(const QString &filePath, const QList<QGeoCoordinate> &co
 
     xml.writeEndElement();
     xml.writeEndDocument();
+    if (!closeFileAndCheck(file, xml, errorString)) {
+        return false;
+    }
 
+    validateSavedFile(filePath);
     return true;
 }
 
@@ -528,6 +614,16 @@ bool savePolylinesToFile(const QString &filePath, const QList<QList<QGeoCoordina
     if (polylines.isEmpty()) {
         errorString = QString(_saveErrorPrefix).arg(QObject::tr("No polylines to save"));
         return false;
+    }
+
+    // Validate all coordinates before saving
+    for (int i = 0; i < polylines.size(); i++) {
+        QString validationError;
+        if (!GeoUtilities::validateCoordinates(polylines[i], validationError)) {
+            errorString = QString(_saveErrorPrefix).arg(
+                QObject::tr("Polyline %1: %2").arg(i + 1).arg(validationError));
+            return false;
+        }
     }
 
     QFile file;
@@ -540,14 +636,18 @@ bool savePolylinesToFile(const QString &filePath, const QList<QList<QGeoCoordina
 
     int index = 1;
     for (const QList<QGeoCoordinate> &coords : polylines) {
-        if (coords.count() >= 2) {
+        if (coords.count() >= GeoUtilities::kMinPolylineVertices) {
             writeRoute(xml, coords, QStringLiteral("Route %1").arg(index++));
         }
     }
 
     xml.writeEndElement();
     xml.writeEndDocument();
+    if (!closeFileAndCheck(file, xml, errorString)) {
+        return false;
+    }
 
+    validateSavedFile(filePath);
     return true;
 }
 
@@ -555,6 +655,13 @@ bool savePointsToFile(const QString &filePath, const QList<QGeoCoordinate> &poin
 {
     if (points.isEmpty()) {
         errorString = QString(_saveErrorPrefix).arg(QObject::tr("No points to save"));
+        return false;
+    }
+
+    // Validate all coordinates before saving
+    QString validationError;
+    if (!GeoUtilities::validateCoordinates(points, validationError)) {
+        errorString = QString(_saveErrorPrefix).arg(validationError);
         return false;
     }
 
@@ -573,14 +680,25 @@ bool savePointsToFile(const QString &filePath, const QList<QGeoCoordinate> &poin
 
     xml.writeEndElement();
     xml.writeEndDocument();
+    if (!closeFileAndCheck(file, xml, errorString)) {
+        return false;
+    }
 
+    validateSavedFile(filePath);
     return true;
 }
 
 bool saveTrackToFile(const QString &filePath, const QList<QGeoCoordinate> &coords, QString &errorString)
 {
-    if (coords.count() < 2) {
+    if (coords.count() < GeoUtilities::kMinPolylineVertices) {
         errorString = QString(_saveErrorPrefix).arg(QObject::tr("Track must have at least 2 points"));
+        return false;
+    }
+
+    // Validate all coordinates before saving
+    QString validationError;
+    if (!GeoUtilities::validateCoordinates(coords, validationError)) {
+        errorString = QString(_saveErrorPrefix).arg(validationError);
         return false;
     }
 
@@ -596,7 +714,11 @@ bool saveTrackToFile(const QString &filePath, const QList<QGeoCoordinate> &coord
 
     xml.writeEndElement();
     xml.writeEndDocument();
+    if (!closeFileAndCheck(file, xml, errorString)) {
+        return false;
+    }
 
+    validateSavedFile(filePath);
     return true;
 }
 
@@ -605,6 +727,16 @@ bool saveTracksToFile(const QString &filePath, const QList<QList<QGeoCoordinate>
     if (tracks.isEmpty()) {
         errorString = QString(_saveErrorPrefix).arg(QObject::tr("No tracks to save"));
         return false;
+    }
+
+    // Validate all coordinates before saving
+    for (int i = 0; i < tracks.size(); i++) {
+        QString validationError;
+        if (!GeoUtilities::validateCoordinates(tracks[i], validationError)) {
+            errorString = QString(_saveErrorPrefix).arg(
+                QObject::tr("Track %1: %2").arg(i + 1).arg(validationError));
+            return false;
+        }
     }
 
     QFile file;
@@ -617,14 +749,18 @@ bool saveTracksToFile(const QString &filePath, const QList<QList<QGeoCoordinate>
 
     int index = 1;
     for (const QList<QGeoCoordinate> &coords : tracks) {
-        if (coords.count() >= 2) {
+        if (coords.count() >= GeoUtilities::kMinPolylineVertices) {
             writeTrack(xml, coords, QStringLiteral("Track %1").arg(index++));
         }
     }
 
     xml.writeEndElement();
     xml.writeEndDocument();
+    if (!closeFileAndCheck(file, xml, errorString)) {
+        return false;
+    }
 
+    validateSavedFile(filePath);
     return true;
 }
 

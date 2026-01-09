@@ -19,9 +19,6 @@ public:
     QString formatName() const override { return tr("KML"); }
     QString fileFilter() const override { return tr("KML Files (*.kml)"); }
 
-    /// Returns the singleton instance
-    static KmlPlanExporter* instance();
-
 private:
-    static KmlPlanExporter* s_instance;
+    DECLARE_PLAN_EXPORTER_SINGLETON(KmlPlanExporter)
 };

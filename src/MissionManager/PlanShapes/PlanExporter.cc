@@ -1,9 +1,12 @@
 #include "PlanExporter.h"
+#include "CsvPlanExporter.h"
+#include "GeoJsonPlanExporter.h"
+#include "GeoPackagePlanExporter.h"
+#include "GpxPlanExporter.h"
 #include "KmlPlanExporter.h"
 #include "KmzPlanExporter.h"
-#include "GeoJsonPlanExporter.h"
-#include "GpxPlanExporter.h"
 #include "ShpPlanExporter.h"
+#include "WktPlanExporter.h"
 #include "QGCLoggingCategory.h"
 
 #include <QtCore/QFileInfo>
@@ -66,11 +69,14 @@ void PlanExporter::initializeExporters()
     s_initialized = true;
 
     // Initialize built-in exporters (they register themselves)
+    CsvPlanExporter::instance();
+    GeoJsonPlanExporter::instance();
+    GeoPackagePlanExporter::instance();
+    GpxPlanExporter::instance();
     KmlPlanExporter::instance();
     KmzPlanExporter::instance();
-    GeoJsonPlanExporter::instance();
-    GpxPlanExporter::instance();
     ShpPlanExporter::instance();
+    WktPlanExporter::instance();
 
     qCDebug(PlanExporterLog) << "PlanExporter system initialized with" << s_exporters.count() << "exporters";
 }

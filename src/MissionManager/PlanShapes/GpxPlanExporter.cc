@@ -3,21 +3,12 @@
 #include "MissionController.h"
 #include "GpxPlanDocument.h"
 
-GpxPlanExporter* GpxPlanExporter::s_instance = nullptr;
-
 GpxPlanExporter::GpxPlanExporter(QObject* parent)
     : PlanExporter(parent)
 {
 }
 
-GpxPlanExporter* GpxPlanExporter::instance()
-{
-    if (!s_instance) {
-        s_instance = new GpxPlanExporter();
-        PlanExporter::registerExporter(s_instance->fileExtension(), s_instance);
-    }
-    return s_instance;
-}
+IMPLEMENT_PLAN_EXPORTER_SINGLETON(GpxPlanExporter)
 
 bool GpxPlanExporter::exportToFile(const QString& filename,
                                     MissionController* missionController,

@@ -3,21 +3,12 @@
 #include "MissionController.h"
 #include "ShpPlanDocument.h"
 
-ShpPlanExporter* ShpPlanExporter::s_instance = nullptr;
-
 ShpPlanExporter::ShpPlanExporter(QObject* parent)
     : PlanExporter(parent)
 {
 }
 
-ShpPlanExporter* ShpPlanExporter::instance()
-{
-    if (!s_instance) {
-        s_instance = new ShpPlanExporter();
-        PlanExporter::registerExporter(s_instance->fileExtension(), s_instance);
-    }
-    return s_instance;
-}
+IMPLEMENT_PLAN_EXPORTER_SINGLETON(ShpPlanExporter)
 
 bool ShpPlanExporter::exportToFile(const QString& filename,
                                     MissionController* missionController,

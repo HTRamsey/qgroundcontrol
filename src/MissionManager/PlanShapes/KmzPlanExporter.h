@@ -19,9 +19,6 @@ public:
     QString formatName() const override { return tr("KMZ (Compressed KML)"); }
     QString fileFilter() const override { return tr("KMZ Files (*.kmz)"); }
 
-    /// Returns the singleton instance
-    static KmzPlanExporter* instance();
-
 private:
-    static KmzPlanExporter* s_instance;
+    DECLARE_PLAN_EXPORTER_SINGLETON(KmzPlanExporter)
 };

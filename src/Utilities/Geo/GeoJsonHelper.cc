@@ -1,4 +1,5 @@
 #include "GeoJsonHelper.h"
+#include "GeoUtilities.h"
 #include "JsonHelper.h"
 #include "QGCLoggingCategory.h"
 
@@ -13,7 +14,7 @@
 #include <QtPositioning/QGeoPolygon>
 #include <QtPositioning/QGeoCircle>
 
-QGC_LOGGING_CATEGORY(GeoJsonHelperLog, "Utilities.GeoJsonHelper")
+QGC_LOGGING_CATEGORY(GeoJsonHelperLog, "Utilities.Geo.GeoJsonHelper")
 
 namespace GeoJsonHelper
 {
@@ -159,15 +160,14 @@ bool GeoJsonHelper::loadPolygonFromFile(const QString &filePath, QList<QGeoCoord
 }
 
 namespace {
-    // Helper to remove closing point from a closed ring (GeoJSON rings are closed, but QGC works with open lists)
-    void removeClosingPoint(QList<QGeoCoordinate> &coords)
+    // Logging callback for coordinate validation warnings
+    void logValidationWarning(int index, const QString &type, double value)
     {
-        if (coords.size() > 1 && coords.first() == coords.last()) {
-            coords.removeLast();
-        }
+        qCWarning(GeoJsonHelperLog) << "Coordinate" << index << type << "out of range:" << value;
     }
 
     // Helper to extract polygons from a QVariantList of QGeoJson items (handles nested FeatureCollections)
+    // Also converts circles to polygon approximations
     void extractPolygons(const QVariantList &items, QList<QList<QGeoCoordinate>> &polygons, double filterMeters)
     {
         for (const QVariant &item : items) {
@@ -181,12 +181,31 @@ namespace {
             if (type == QStringLiteral("FeatureCollection") && data.canConvert<QVariantList>()) {
                 // Recursively process nested features
                 extractPolygons(data.toList(), polygons, filterMeters);
-            } else if (data.canConvert<QGeoPolygon>()) {
-                const QGeoPolygon poly = data.value<QGeoPolygon>();
-                QList<QGeoCoordinate> vertices = poly.perimeter();
-                removeClosingPoint(vertices);  // Strip the closing point for consistency with QGC's polygon representation
-                ShapeFileHelper::filterVertices(vertices, filterMeters, 3);
-                polygons.append(vertices);
+            } else if (data.canConvert<QGeoShape>()) {
+                const QGeoShape shape = data.value<QGeoShape>();
+
+                if (shape.type() == QGeoShape::PolygonType) {
+                    const QGeoPolygon poly = data.value<QGeoPolygon>();
+                    QList<QGeoCoordinate> vertices = poly.perimeter();
+                    GeoUtilities::removeClosingVertex(vertices);
+                    GeoUtilities::validateAndNormalizeCoordinates(vertices, logValidationWarning);
+                    ShapeFileHelper::filterVertices(vertices, filterMeters, GeoUtilities::kMinPolygonVertices);
+                    polygons.append(vertices);
+                } else if (shape.type() == QGeoShape::CircleType) {
+                    // Convert circle to polygon approximation
+                    const QGeoCircle circle = data.value<QGeoCircle>();
+                    if (circle.isValid() && circle.radius() > 0) {
+                        QList<QGeoCoordinate> vertices = GeoUtilities::circleToPolygon(
+                            circle.center(), circle.radius());
+                        if (vertices.size() >= GeoUtilities::kMinPolygonVertices) {
+                            GeoUtilities::validateAndNormalizeCoordinates(vertices, logValidationWarning);
+                            ShapeFileHelper::filterVertices(vertices, filterMeters, GeoUtilities::kMinPolygonVertices);
+                            polygons.append(vertices);
+                            qCDebug(GeoJsonHelperLog) << "Converted circle (r=" << circle.radius() << "m) to polygon with"
+                                                      << vertices.size() << "vertices";
+                        }
+                    }
+                }
             }
         }
     }
@@ -312,7 +331,8 @@ namespace {
             } else if (data.canConvert<QGeoPath>()) {
                 const QGeoPath path = data.value<QGeoPath>();
                 QList<QGeoCoordinate> coords = path.path();
-                ShapeFileHelper::filterVertices(coords, filterMeters, 2);
+                GeoUtilities::validateAndNormalizeCoordinates(coords, logValidationWarning);
+                ShapeFileHelper::filterVertices(coords, filterMeters, GeoUtilities::kMinPolylineVertices);
                 polylines.append(coords);
             }
         }
@@ -368,7 +388,16 @@ namespace {
                 const QGeoShape shape = data.value<QGeoShape>();
                 if (shape.type() == QGeoShape::CircleType) {
                     // QGeoCircle is used for Point features - get the center
-                    points.append(shape.center());
+                    QGeoCoordinate coord = shape.center();
+                    // Validate and normalize the point
+                    if (!GeoUtilities::isValidCoordinate(coord)) {
+                        qCWarning(GeoJsonHelperLog) << "Point coordinate out of range, normalizing";
+                        coord = GeoUtilities::normalizeCoordinate(coord);
+                    }
+                    if (!std::isnan(coord.altitude()) && !GeoUtilities::isValidAltitude(coord.altitude())) {
+                        qCWarning(GeoJsonHelperLog) << "Point altitude out of expected range:" << coord.altitude();
+                    }
+                    points.append(coord);
                 }
             }
         }
@@ -412,6 +441,14 @@ bool GeoJsonHelper::loadPointsFromFile(const QString &filePath, QList<QGeoCoordi
 
 bool GeoJsonHelper::savePolygonToFile(const QString &filePath, const QList<QGeoCoordinate> &vertices, QString &errorString)
 {
+    // Validate coordinates before saving
+    QString validationError;
+    if (!GeoUtilities::validateCoordinates(vertices, validationError)) {
+        errorString = QString(_saveErrorPrefix).arg(validationError);
+        qCWarning(GeoJsonHelperLog) << errorString;
+        return false;
+    }
+
     // Build coordinates array: [[[lon, lat, alt?], ...]]
     QJsonArray ring;
     for (const QGeoCoordinate &coord : vertices) {
@@ -459,6 +496,17 @@ bool GeoJsonHelper::savePolygonsToFile(const QString &filePath, const QList<QLis
             QT_TRANSLATE_NOOP("GeoJson", "No polygons to save."));
         qCWarning(GeoJsonHelperLog) << errorString;
         return false;
+    }
+
+    // Validate all coordinates before saving
+    for (int i = 0; i < polygons.size(); i++) {
+        QString validationError;
+        if (!GeoUtilities::validateCoordinates(polygons[i], validationError)) {
+            errorString = QString(_saveErrorPrefix).arg(
+                QObject::tr("Polygon %1: %2").arg(i + 1).arg(validationError));
+            qCWarning(GeoJsonHelperLog) << errorString;
+            return false;
+        }
     }
 
     QJsonArray features;
@@ -511,6 +559,24 @@ bool GeoJsonHelper::savePolygonsToFile(const QString &filePath, const QList<QLis
 
 bool GeoJsonHelper::savePolygonWithHolesToFile(const QString &filePath, const QGeoPolygon &polygon, QString &errorString)
 {
+    // Validate perimeter coordinates
+    QString validationError;
+    if (!GeoUtilities::validateCoordinates(polygon.perimeter(), validationError)) {
+        errorString = QString(_saveErrorPrefix).arg(
+            QObject::tr("Polygon perimeter: %1").arg(validationError));
+        qCWarning(GeoJsonHelperLog) << errorString;
+        return false;
+    }
+    // Validate hole coordinates
+    for (int h = 0; h < polygon.holesCount(); h++) {
+        if (!GeoUtilities::validateCoordinates(polygon.holePath(h), validationError)) {
+            errorString = QString(_saveErrorPrefix).arg(
+                QObject::tr("Polygon hole %1: %2").arg(h + 1).arg(validationError));
+            qCWarning(GeoJsonHelperLog) << errorString;
+            return false;
+        }
+    }
+
     QJsonArray coordinates;
 
     // Helper lambda to create a ring from coordinates
@@ -566,6 +632,25 @@ bool GeoJsonHelper::savePolygonsWithHolesToFile(const QString &filePath, const Q
             QT_TRANSLATE_NOOP("GeoJson", "No polygons to save."));
         qCWarning(GeoJsonHelperLog) << errorString;
         return false;
+    }
+
+    // Validate all coordinates before saving
+    for (int i = 0; i < polygons.size(); i++) {
+        QString validationError;
+        if (!GeoUtilities::validateCoordinates(polygons[i].perimeter(), validationError)) {
+            errorString = QString(_saveErrorPrefix).arg(
+                QObject::tr("Polygon %1 perimeter: %2").arg(i + 1).arg(validationError));
+            qCWarning(GeoJsonHelperLog) << errorString;
+            return false;
+        }
+        for (int h = 0; h < polygons[i].holesCount(); h++) {
+            if (!GeoUtilities::validateCoordinates(polygons[i].holePath(h), validationError)) {
+                errorString = QString(_saveErrorPrefix).arg(
+                    QObject::tr("Polygon %1 hole %2: %3").arg(i + 1).arg(h + 1).arg(validationError));
+                qCWarning(GeoJsonHelperLog) << errorString;
+                return false;
+            }
+        }
     }
 
     // Helper lambda to create a ring from coordinates
@@ -627,6 +712,14 @@ bool GeoJsonHelper::savePolygonsWithHolesToFile(const QString &filePath, const Q
 
 bool GeoJsonHelper::savePolylineToFile(const QString &filePath, const QList<QGeoCoordinate> &coords, QString &errorString)
 {
+    // Validate coordinates before saving
+    QString validationError;
+    if (!GeoUtilities::validateCoordinates(coords, validationError)) {
+        errorString = QString(_saveErrorPrefix).arg(validationError);
+        qCWarning(GeoJsonHelperLog) << errorString;
+        return false;
+    }
+
     QJsonArray coordinates;
     for (const QGeoCoordinate &coord : coords) {
         QJsonArray point;
@@ -658,6 +751,17 @@ bool GeoJsonHelper::savePolylinesToFile(const QString &filePath, const QList<QLi
             QT_TRANSLATE_NOOP("GeoJson", "No polylines to save."));
         qCWarning(GeoJsonHelperLog) << errorString;
         return false;
+    }
+
+    // Validate all coordinates before saving
+    for (int i = 0; i < polylines.size(); i++) {
+        QString validationError;
+        if (!GeoUtilities::validateCoordinates(polylines[i], validationError)) {
+            errorString = QString(_saveErrorPrefix).arg(
+                QObject::tr("Polyline %1: %2").arg(i + 1).arg(validationError));
+            qCWarning(GeoJsonHelperLog) << errorString;
+            return false;
+        }
     }
 
     QJsonArray features;
@@ -698,6 +802,14 @@ bool GeoJsonHelper::savePointsToFile(const QString &filePath, const QList<QGeoCo
     if (points.isEmpty()) {
         errorString = QString(_saveErrorPrefix).arg(
             QT_TRANSLATE_NOOP("GeoJson", "No points to save."));
+        qCWarning(GeoJsonHelperLog) << errorString;
+        return false;
+    }
+
+    // Validate all coordinates before saving
+    QString validationError;
+    if (!GeoUtilities::validateCoordinates(points, validationError)) {
+        errorString = QString(_saveErrorPrefix).arg(validationError);
         qCWarning(GeoJsonHelperLog) << errorString;
         return false;
     }

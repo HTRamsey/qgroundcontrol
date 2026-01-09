@@ -1,0 +1,869 @@
+#include "WKTHelper.h"
+#include "GeoUtilities.h"
+
+#include <QtCore/QFile>
+#include <QtCore/QRegularExpression>
+#include <QtCore/QTextStream>
+#include <cmath>
+
+Q_LOGGING_CATEGORY(WKTHelperLog, "Utilities.Geo.WKTHelper")
+
+namespace {
+    constexpr const char *kParseErrorPrefix = QT_TR_NOOP("WKT parse failed. %1");
+    constexpr const char *kLoadErrorPrefix = QT_TR_NOOP("WKT file load failed. %1");
+    constexpr const char *kSaveErrorPrefix = QT_TR_NOOP("WKT file save failed. %1");
+
+    // Regex patterns for WKT geometry types
+    static const QRegularExpression kGeometryTypeRx(
+        QStringLiteral("^\\s*(POINT|MULTIPOINT|LINESTRING|MULTILINESTRING|POLYGON|MULTIPOLYGON)"
+                       "\\s*(Z|M|ZM)?\\s*\\("),
+        QRegularExpression::CaseInsensitiveOption);
+
+    // Split coordinate string into individual coordinates
+    QStringList splitCoordinates(const QString &coordStr)
+    {
+        return coordStr.split(QLatin1Char(','), Qt::SkipEmptyParts);
+    }
+}
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+QString WKTHelper::geometryType(const QString &wkt)
+{
+    const QRegularExpressionMatch match = kGeometryTypeRx.match(wkt);
+    if (match.hasMatch()) {
+        return match.captured(1).toUpper();
+    }
+    return QString();
+}
+
+bool WKTHelper::hasAltitude(const QString &wkt)
+{
+    const QRegularExpressionMatch match = kGeometryTypeRx.match(wkt);
+    if (match.hasMatch()) {
+        const QString modifier = match.captured(2).toUpper();
+        return modifier.contains(QLatin1Char('Z'));
+    }
+    return false;
+}
+
+// ============================================================================
+// Private Helper Functions
+// ============================================================================
+
+bool WKTHelper::parseCoordinateList(const QString &coordStr, QList<QGeoCoordinate> &coords,
+                                     bool hasZ, QString &errorString)
+{
+    coords.clear();
+    const QStringList coordParts = splitCoordinates(coordStr);
+
+    for (const QString &part : coordParts) {
+        const QStringList values = part.trimmed().split(QRegularExpression(QStringLiteral("\\s+")));
+
+        if (values.size() < 2) {
+            errorString = QString(kParseErrorPrefix).arg(
+                QStringLiteral("Invalid coordinate: %1").arg(part));
+            return false;
+        }
+
+        bool okX = false, okY = false, okZ = false;
+        const double x = values[0].toDouble(&okX);  // longitude
+        const double y = values[1].toDouble(&okY);  // latitude
+
+        if (!okX || !okY) {
+            errorString = QString(kParseErrorPrefix).arg(
+                QStringLiteral("Invalid coordinate values: %1").arg(part));
+            return false;
+        }
+
+        QGeoCoordinate coord(y, x);  // Note: QGeoCoordinate takes lat, lon
+
+        if (hasZ && values.size() >= 3) {
+            const double z = values[2].toDouble(&okZ);
+            if (okZ) {
+                coord.setAltitude(z);
+            }
+        }
+
+        coords.append(coord);
+    }
+
+    return true;
+}
+
+bool WKTHelper::parseRing(const QString &ringStr, QList<QGeoCoordinate> &coords,
+                          bool hasZ, QString &errorString)
+{
+    QString inner = ringStr.trimmed();
+
+    // Remove surrounding parentheses if present
+    if (inner.startsWith(QLatin1Char('(')) && inner.endsWith(QLatin1Char(')'))) {
+        inner = inner.mid(1, inner.length() - 2);
+    }
+
+    if (!parseCoordinateList(inner, coords, hasZ, errorString)) {
+        return false;
+    }
+
+    // Remove closing vertex if present
+    GeoUtilities::removeClosingVertex(coords);
+
+    return true;
+}
+
+QString WKTHelper::coordToString(const QGeoCoordinate &coord, bool includeAltitude)
+{
+    if (includeAltitude && !std::isnan(coord.altitude())) {
+        return QStringLiteral("%1 %2 %3")
+            .arg(coord.longitude(), 0, 'f', 8)
+            .arg(coord.latitude(), 0, 'f', 8)
+            .arg(coord.altitude(), 0, 'f', 2);
+    }
+    return QStringLiteral("%1 %2")
+        .arg(coord.longitude(), 0, 'f', 8)
+        .arg(coord.latitude(), 0, 'f', 8);
+}
+
+QString WKTHelper::coordListToString(const QList<QGeoCoordinate> &coords, bool includeAltitude, bool closeRing)
+{
+    QStringList parts;
+    for (const auto &coord : coords) {
+        parts.append(coordToString(coord, includeAltitude));
+    }
+
+    // Close the ring if needed (first == last for polygons)
+    if (closeRing && !coords.isEmpty()) {
+        parts.append(coordToString(coords.first(), includeAltitude));
+    }
+
+    return parts.join(QStringLiteral(", "));
+}
+
+// ============================================================================
+// Parsing Functions
+// ============================================================================
+
+bool WKTHelper::parsePoint(const QString &wkt, QGeoCoordinate &coord, QString &errorString)
+{
+    static const QRegularExpression rx(
+        QStringLiteral("^\\s*POINT\\s*(Z|M|ZM)?\\s*\\(\\s*([^)]+)\\s*\\)\\s*$"),
+        QRegularExpression::CaseInsensitiveOption);
+
+    const QRegularExpressionMatch match = rx.match(wkt);
+    if (!match.hasMatch()) {
+        errorString = QString(kParseErrorPrefix).arg(QStringLiteral("Invalid POINT format"));
+        return false;
+    }
+
+    const bool hasZ = match.captured(1).toUpper().contains(QLatin1Char('Z'));
+    QList<QGeoCoordinate> coords;
+
+    if (!parseCoordinateList(match.captured(2), coords, hasZ, errorString)) {
+        return false;
+    }
+
+    if (coords.isEmpty()) {
+        errorString = QString(kParseErrorPrefix).arg(QStringLiteral("No coordinates in POINT"));
+        return false;
+    }
+
+    coord = coords.first();
+    return true;
+}
+
+bool WKTHelper::parseMultiPoint(const QString &wkt, QList<QGeoCoordinate> &points, QString &errorString)
+{
+    static const QRegularExpression rx(
+        QStringLiteral("^\\s*MULTIPOINT\\s*(Z|M|ZM)?\\s*\\((.+)\\)\\s*$"),
+        QRegularExpression::CaseInsensitiveOption);
+
+    const QRegularExpressionMatch match = rx.match(wkt);
+    if (!match.hasMatch()) {
+        errorString = QString(kParseErrorPrefix).arg(QStringLiteral("Invalid MULTIPOINT format"));
+        return false;
+    }
+
+    const bool hasZ = match.captured(1).toUpper().contains(QLatin1Char('Z'));
+    QString content = match.captured(2).trimmed();
+
+    points.clear();
+
+    // MULTIPOINT can be in two formats:
+    // MULTIPOINT ((10 40), (40 30)) or MULTIPOINT (10 40, 40 30)
+    // After outer regex strips MULTIPOINT (), content is "(10 40), (40 30)" or "10 40, 40 30"
+    if (content.startsWith(QLatin1Char('('))) {
+        // Format with nested parentheses
+        static const QRegularExpression pointRx(QStringLiteral("\\(([^)]+)\\)"));
+        QRegularExpressionMatchIterator it = pointRx.globalMatch(content);
+
+        while (it.hasNext()) {
+            const QRegularExpressionMatch pointMatch = it.next();
+            QList<QGeoCoordinate> coords;
+            if (!parseCoordinateList(pointMatch.captured(1), coords, hasZ, errorString)) {
+                return false;
+            }
+            if (!coords.isEmpty()) {
+                points.append(coords.first());
+            }
+        }
+    } else {
+        // Simple format without nested parentheses
+        if (!parseCoordinateList(content, points, hasZ, errorString)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool WKTHelper::parseLineString(const QString &wkt, QList<QGeoCoordinate> &coords, QString &errorString)
+{
+    static const QRegularExpression rx(
+        QStringLiteral("^\\s*LINESTRING\\s*(Z|M|ZM)?\\s*\\((.+)\\)\\s*$"),
+        QRegularExpression::CaseInsensitiveOption);
+
+    const QRegularExpressionMatch match = rx.match(wkt);
+    if (!match.hasMatch()) {
+        errorString = QString(kParseErrorPrefix).arg(QStringLiteral("Invalid LINESTRING format"));
+        return false;
+    }
+
+    const bool hasZ = match.captured(1).toUpper().contains(QLatin1Char('Z'));
+    return parseCoordinateList(match.captured(2), coords, hasZ, errorString);
+}
+
+bool WKTHelper::parseMultiLineString(const QString &wkt, QList<QList<QGeoCoordinate>> &polylines, QString &errorString)
+{
+    static const QRegularExpression rx(
+        QStringLiteral("^\\s*MULTILINESTRING\\s*(Z|M|ZM)?\\s*\\((.+)\\)\\s*$"),
+        QRegularExpression::CaseInsensitiveOption);
+
+    const QRegularExpressionMatch match = rx.match(wkt);
+    if (!match.hasMatch()) {
+        errorString = QString(kParseErrorPrefix).arg(QStringLiteral("Invalid MULTILINESTRING format"));
+        return false;
+    }
+
+    const bool hasZ = match.captured(1).toUpper().contains(QLatin1Char('Z'));
+    QString content = match.captured(2);
+
+    polylines.clear();
+
+    // Extract each linestring within parentheses
+    static const QRegularExpression lineRx(QStringLiteral("\\(([^)]+)\\)"));
+    QRegularExpressionMatchIterator it = lineRx.globalMatch(content);
+
+    while (it.hasNext()) {
+        const QRegularExpressionMatch lineMatch = it.next();
+        QList<QGeoCoordinate> coords;
+        if (!parseCoordinateList(lineMatch.captured(1), coords, hasZ, errorString)) {
+            return false;
+        }
+        polylines.append(coords);
+    }
+
+    return true;
+}
+
+bool WKTHelper::parsePolygon(const QString &wkt, QList<QGeoCoordinate> &vertices, QString &errorString)
+{
+    static const QRegularExpression rx(
+        QStringLiteral("^\\s*POLYGON\\s*(Z|M|ZM)?\\s*\\(\\s*\\((.+?)\\)"),
+        QRegularExpression::CaseInsensitiveOption);
+
+    const QRegularExpressionMatch match = rx.match(wkt);
+    if (!match.hasMatch()) {
+        errorString = QString(kParseErrorPrefix).arg(QStringLiteral("Invalid POLYGON format"));
+        return false;
+    }
+
+    const bool hasZ = match.captured(1).toUpper().contains(QLatin1Char('Z'));
+    return parseRing(match.captured(2), vertices, hasZ, errorString);
+}
+
+bool WKTHelper::parsePolygonWithHoles(const QString &wkt, QGeoPolygon &polygon, QString &errorString)
+{
+    static const QRegularExpression rx(
+        QStringLiteral("^\\s*POLYGON\\s*(Z|M|ZM)?\\s*\\((.+)\\)\\s*$"),
+        QRegularExpression::CaseInsensitiveOption);
+
+    const QRegularExpressionMatch match = rx.match(wkt);
+    if (!match.hasMatch()) {
+        errorString = QString(kParseErrorPrefix).arg(QStringLiteral("Invalid POLYGON format"));
+        return false;
+    }
+
+    const bool hasZ = match.captured(1).toUpper().contains(QLatin1Char('Z'));
+    QString content = match.captured(2);
+
+    // Extract all rings
+    static const QRegularExpression ringRx(QStringLiteral("\\(([^)]+)\\)"));
+    QRegularExpressionMatchIterator it = ringRx.globalMatch(content);
+
+    QList<QList<QGeoCoordinate>> rings;
+    while (it.hasNext()) {
+        const QRegularExpressionMatch ringMatch = it.next();
+        QList<QGeoCoordinate> coords;
+        if (!parseRing(ringMatch.captured(1), coords, hasZ, errorString)) {
+            return false;
+        }
+        rings.append(coords);
+    }
+
+    if (rings.isEmpty()) {
+        errorString = QString(kParseErrorPrefix).arg(QStringLiteral("No rings in POLYGON"));
+        return false;
+    }
+
+    // First ring is outer boundary
+    polygon = QGeoPolygon(rings.first());
+
+    // Remaining rings are holes
+    for (int i = 1; i < rings.size(); ++i) {
+        polygon.addHole(rings[i]);
+    }
+
+    return true;
+}
+
+bool WKTHelper::parseMultiPolygon(const QString &wkt, QList<QList<QGeoCoordinate>> &polygons, QString &errorString)
+{
+    static const QRegularExpression rx(
+        QStringLiteral("^\\s*MULTIPOLYGON\\s*(Z|M|ZM)?\\s*\\((.+)\\)\\s*$"),
+        QRegularExpression::CaseInsensitiveOption);
+
+    const QRegularExpressionMatch match = rx.match(wkt);
+    if (!match.hasMatch()) {
+        errorString = QString(kParseErrorPrefix).arg(QStringLiteral("Invalid MULTIPOLYGON format"));
+        return false;
+    }
+
+    const bool hasZ = match.captured(1).toUpper().contains(QLatin1Char('Z'));
+    QString content = match.captured(2);
+
+    polygons.clear();
+
+    // Match each polygon: ((...))
+    static const QRegularExpression polyRx(QStringLiteral("\\(\\s*\\(([^)]+)\\)"));
+    QRegularExpressionMatchIterator it = polyRx.globalMatch(content);
+
+    while (it.hasNext()) {
+        const QRegularExpressionMatch polyMatch = it.next();
+        QList<QGeoCoordinate> coords;
+        if (!parseRing(polyMatch.captured(1), coords, hasZ, errorString)) {
+            return false;
+        }
+        polygons.append(coords);
+    }
+
+    return true;
+}
+
+bool WKTHelper::parseMultiPolygonWithHoles(const QString &wkt, QList<QGeoPolygon> &polygons, QString &errorString)
+{
+    static const QRegularExpression rx(
+        QStringLiteral("^\\s*MULTIPOLYGON\\s*(Z|M|ZM)?\\s*\\((.+)\\)\\s*$"),
+        QRegularExpression::CaseInsensitiveOption);
+
+    const QRegularExpressionMatch match = rx.match(wkt);
+    if (!match.hasMatch()) {
+        errorString = QString(kParseErrorPrefix).arg(QStringLiteral("Invalid MULTIPOLYGON format"));
+        return false;
+    }
+
+    const bool hasZ = match.captured(1).toUpper().contains(QLatin1Char('Z'));
+    QString content = match.captured(2);
+
+    polygons.clear();
+
+    // This is complex because we need to match nested parentheses
+    // MULTIPOLYGON (((outer1), (hole1)), ((outer2)))
+    int depth = 0;
+    int polyStart = -1;
+
+    for (int i = 0; i < content.length(); ++i) {
+        const QChar c = content[i];
+        if (c == QLatin1Char('(')) {
+            if (depth == 0) {
+                polyStart = i;
+            }
+            ++depth;
+        } else if (c == QLatin1Char(')')) {
+            --depth;
+            if (depth == 0 && polyStart >= 0) {
+                // Extract this polygon
+                QString polyStr = content.mid(polyStart, i - polyStart + 1);
+                QString fakeWkt = QStringLiteral("POLYGON %1%2")
+                    .arg(hasZ ? QStringLiteral("Z ") : QString())
+                    .arg(polyStr);
+
+                QGeoPolygon poly;
+                if (!parsePolygonWithHoles(fakeWkt, poly, errorString)) {
+                    return false;
+                }
+                polygons.append(poly);
+                polyStart = -1;
+            }
+        }
+    }
+
+    return true;
+}
+
+// ============================================================================
+// Generation Functions
+// ============================================================================
+
+QString WKTHelper::toWKTPoint(const QGeoCoordinate &coord, bool includeAltitude)
+{
+    const bool hasZ = includeAltitude && !std::isnan(coord.altitude());
+    return QStringLiteral("POINT%1 (%2)")
+        .arg(hasZ ? QStringLiteral(" Z") : QString())
+        .arg(coordToString(coord, hasZ));
+}
+
+QString WKTHelper::toWKTMultiPoint(const QList<QGeoCoordinate> &points, bool includeAltitude)
+{
+    QStringList parts;
+    bool hasZ = false;
+
+    if (includeAltitude) {
+        for (const auto &p : points) {
+            if (!std::isnan(p.altitude())) {
+                hasZ = true;
+                break;
+            }
+        }
+    }
+
+    for (const auto &p : points) {
+        parts.append(QStringLiteral("(%1)").arg(coordToString(p, hasZ)));
+    }
+
+    return QStringLiteral("MULTIPOINT%1 (%2)")
+        .arg(hasZ ? QStringLiteral(" Z") : QString())
+        .arg(parts.join(QStringLiteral(", ")));
+}
+
+QString WKTHelper::toWKTLineString(const QList<QGeoCoordinate> &coords, bool includeAltitude)
+{
+    bool hasZ = false;
+    if (includeAltitude) {
+        for (const auto &c : coords) {
+            if (!std::isnan(c.altitude())) {
+                hasZ = true;
+                break;
+            }
+        }
+    }
+
+    return QStringLiteral("LINESTRING%1 (%2)")
+        .arg(hasZ ? QStringLiteral(" Z") : QString())
+        .arg(coordListToString(coords, hasZ, false));
+}
+
+QString WKTHelper::toWKTMultiLineString(const QList<QList<QGeoCoordinate>> &polylines, bool includeAltitude)
+{
+    bool hasZ = false;
+    if (includeAltitude) {
+        for (const auto &line : polylines) {
+            for (const auto &c : line) {
+                if (!std::isnan(c.altitude())) {
+                    hasZ = true;
+                    break;
+                }
+            }
+            if (hasZ) break;
+        }
+    }
+
+    QStringList parts;
+    for (const auto &line : polylines) {
+        parts.append(QStringLiteral("(%1)").arg(coordListToString(line, hasZ, false)));
+    }
+
+    return QStringLiteral("MULTILINESTRING%1 (%2)")
+        .arg(hasZ ? QStringLiteral(" Z") : QString())
+        .arg(parts.join(QStringLiteral(", ")));
+}
+
+QString WKTHelper::toWKTPolygon(const QList<QGeoCoordinate> &vertices, bool includeAltitude)
+{
+    bool hasZ = false;
+    if (includeAltitude) {
+        for (const auto &v : vertices) {
+            if (!std::isnan(v.altitude())) {
+                hasZ = true;
+                break;
+            }
+        }
+    }
+
+    return QStringLiteral("POLYGON%1 ((%2))")
+        .arg(hasZ ? QStringLiteral(" Z") : QString())
+        .arg(coordListToString(vertices, hasZ, true));  // closeRing = true
+}
+
+QString WKTHelper::toWKTPolygon(const QGeoPolygon &polygon, bool includeAltitude)
+{
+    bool hasZ = false;
+    if (includeAltitude) {
+        for (const auto &v : polygon.perimeter()) {
+            if (!std::isnan(v.altitude())) {
+                hasZ = true;
+                break;
+            }
+        }
+    }
+
+    QStringList rings;
+    rings.append(QStringLiteral("(%1)").arg(coordListToString(polygon.perimeter(), hasZ, true)));
+
+    for (int i = 0; i < polygon.holesCount(); ++i) {
+        rings.append(QStringLiteral("(%1)").arg(coordListToString(polygon.holePath(i), hasZ, true)));
+    }
+
+    return QStringLiteral("POLYGON%1 (%2)")
+        .arg(hasZ ? QStringLiteral(" Z") : QString())
+        .arg(rings.join(QStringLiteral(", ")));
+}
+
+QString WKTHelper::toWKTMultiPolygon(const QList<QList<QGeoCoordinate>> &polygons, bool includeAltitude)
+{
+    bool hasZ = false;
+    if (includeAltitude) {
+        for (const auto &poly : polygons) {
+            for (const auto &v : poly) {
+                if (!std::isnan(v.altitude())) {
+                    hasZ = true;
+                    break;
+                }
+            }
+            if (hasZ) break;
+        }
+    }
+
+    QStringList parts;
+    for (const auto &poly : polygons) {
+        parts.append(QStringLiteral("((%1))").arg(coordListToString(poly, hasZ, true)));
+    }
+
+    return QStringLiteral("MULTIPOLYGON%1 (%2)")
+        .arg(hasZ ? QStringLiteral(" Z") : QString())
+        .arg(parts.join(QStringLiteral(", ")));
+}
+
+QString WKTHelper::toWKTMultiPolygon(const QList<QGeoPolygon> &polygons, bool includeAltitude)
+{
+    bool hasZ = false;
+    if (includeAltitude) {
+        for (const auto &poly : polygons) {
+            for (const auto &v : poly.perimeter()) {
+                if (!std::isnan(v.altitude())) {
+                    hasZ = true;
+                    break;
+                }
+            }
+            if (hasZ) break;
+        }
+    }
+
+    QStringList polyParts;
+    for (const auto &polygon : polygons) {
+        QStringList rings;
+        rings.append(QStringLiteral("(%1)").arg(coordListToString(polygon.perimeter(), hasZ, true)));
+
+        for (int i = 0; i < polygon.holesCount(); ++i) {
+            rings.append(QStringLiteral("(%1)").arg(coordListToString(polygon.holePath(i), hasZ, true)));
+        }
+
+        polyParts.append(QStringLiteral("(%1)").arg(rings.join(QStringLiteral(", "))));
+    }
+
+    return QStringLiteral("MULTIPOLYGON%1 (%2)")
+        .arg(hasZ ? QStringLiteral(" Z") : QString())
+        .arg(polyParts.join(QStringLiteral(", ")));
+}
+
+// ============================================================================
+// File Load Functions
+// ============================================================================
+
+namespace {
+    bool readWktFromFile(const QString &filePath, QString &wkt, QString &errorString)
+    {
+        QFile file(filePath);
+        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+            errorString = QString(kLoadErrorPrefix).arg(
+                QObject::tr("Unable to open file: %1").arg(filePath));
+            qCWarning(WKTHelperLog) << errorString;
+            return false;
+        }
+
+        QTextStream stream(&file);
+        wkt = stream.readAll().trimmed();
+        file.close();
+
+        if (wkt.isEmpty()) {
+            errorString = QString(kLoadErrorPrefix).arg(
+                QObject::tr("File is empty: %1").arg(filePath));
+            qCWarning(WKTHelperLog) << errorString;
+            return false;
+        }
+
+        return true;
+    }
+}
+
+bool WKTHelper::loadPointFromFile(const QString &filePath, QGeoCoordinate &coord, QString &errorString)
+{
+    QString wkt;
+    if (!readWktFromFile(filePath, wkt, errorString)) {
+        return false;
+    }
+
+    return parsePoint(wkt, coord, errorString);
+}
+
+bool WKTHelper::loadPointsFromFile(const QString &filePath, QList<QGeoCoordinate> &points, QString &errorString)
+{
+    QString wkt;
+    if (!readWktFromFile(filePath, wkt, errorString)) {
+        return false;
+    }
+
+    const QString geomType = geometryType(wkt);
+    if (geomType == QStringLiteral("POINT")) {
+        QGeoCoordinate coord;
+        if (parsePoint(wkt, coord, errorString)) {
+            points.clear();
+            points.append(coord);
+            return true;
+        }
+        return false;
+    } else if (geomType == QStringLiteral("MULTIPOINT")) {
+        return parseMultiPoint(wkt, points, errorString);
+    }
+
+    errorString = QString(kLoadErrorPrefix).arg(QObject::tr("File does not contain point data"));
+    return false;
+}
+
+bool WKTHelper::loadPolylineFromFile(const QString &filePath, QList<QGeoCoordinate> &coords, QString &errorString)
+{
+    QString wkt;
+    if (!readWktFromFile(filePath, wkt, errorString)) {
+        return false;
+    }
+
+    return parseLineString(wkt, coords, errorString);
+}
+
+bool WKTHelper::loadPolylinesFromFile(const QString &filePath, QList<QList<QGeoCoordinate>> &polylines,
+                                       QString &errorString, bool loadAll)
+{
+    Q_UNUSED(loadAll)
+
+    QString wkt;
+    if (!readWktFromFile(filePath, wkt, errorString)) {
+        return false;
+    }
+
+    const QString geomType = geometryType(wkt);
+    if (geomType == QStringLiteral("LINESTRING")) {
+        QList<QGeoCoordinate> coords;
+        if (parseLineString(wkt, coords, errorString)) {
+            polylines.clear();
+            polylines.append(coords);
+            return true;
+        }
+        return false;
+    } else if (geomType == QStringLiteral("MULTILINESTRING")) {
+        return parseMultiLineString(wkt, polylines, errorString);
+    }
+
+    errorString = QString(kLoadErrorPrefix).arg(QObject::tr("File does not contain polyline data"));
+    return false;
+}
+
+bool WKTHelper::loadPolygonFromFile(const QString &filePath, QList<QGeoCoordinate> &vertices, QString &errorString)
+{
+    QString wkt;
+    if (!readWktFromFile(filePath, wkt, errorString)) {
+        return false;
+    }
+
+    return parsePolygon(wkt, vertices, errorString);
+}
+
+bool WKTHelper::loadPolygonsFromFile(const QString &filePath, QList<QList<QGeoCoordinate>> &polygons,
+                                      QString &errorString, bool loadAll)
+{
+    Q_UNUSED(loadAll)
+
+    QString wkt;
+    if (!readWktFromFile(filePath, wkt, errorString)) {
+        return false;
+    }
+
+    const QString geomType = geometryType(wkt);
+    if (geomType == QStringLiteral("POLYGON")) {
+        QList<QGeoCoordinate> vertices;
+        if (parsePolygon(wkt, vertices, errorString)) {
+            polygons.clear();
+            polygons.append(vertices);
+            return true;
+        }
+        return false;
+    } else if (geomType == QStringLiteral("MULTIPOLYGON")) {
+        return parseMultiPolygon(wkt, polygons, errorString);
+    }
+
+    errorString = QString(kLoadErrorPrefix).arg(QObject::tr("File does not contain polygon data"));
+    return false;
+}
+
+// ============================================================================
+// File Save Functions
+// ============================================================================
+
+namespace {
+    bool writeWktToFile(const QString &filePath, const QString &wkt, QString &errorString)
+    {
+        QFile file(filePath);
+        if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+            errorString = QString(kSaveErrorPrefix).arg(
+                QObject::tr("Unable to open file for writing: %1").arg(filePath));
+            qCWarning(WKTHelperLog) << errorString;
+            return false;
+        }
+
+        QTextStream stream(&file);
+        stream << wkt << '\n';
+        file.close();
+
+        return true;
+    }
+
+    bool validateCoordinatesForSave(const QList<QGeoCoordinate> &coords, QString &errorString)
+    {
+        for (int i = 0; i < coords.size(); ++i) {
+            if (!GeoUtilities::isValidCoordinate(coords[i])) {
+                errorString = QString(kSaveErrorPrefix).arg(
+                    QObject::tr("Invalid coordinate at index %1").arg(i));
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
+bool WKTHelper::savePointToFile(const QString &filePath, const QGeoCoordinate &coord,
+                                 QString &errorString, bool includeAltitude)
+{
+    if (!GeoUtilities::isValidCoordinate(coord)) {
+        errorString = QString(kSaveErrorPrefix).arg(QObject::tr("Invalid coordinate"));
+        return false;
+    }
+
+    const QString wkt = toWKTPoint(coord, includeAltitude);
+    return writeWktToFile(filePath, wkt, errorString);
+}
+
+bool WKTHelper::savePointsToFile(const QString &filePath, const QList<QGeoCoordinate> &points,
+                                  QString &errorString, bool includeAltitude)
+{
+    if (points.isEmpty()) {
+        errorString = QString(kSaveErrorPrefix).arg(QObject::tr("No points to save"));
+        return false;
+    }
+
+    if (!validateCoordinatesForSave(points, errorString)) {
+        return false;
+    }
+
+    const QString wkt = toWKTMultiPoint(points, includeAltitude);
+    return writeWktToFile(filePath, wkt, errorString);
+}
+
+bool WKTHelper::savePolylineToFile(const QString &filePath, const QList<QGeoCoordinate> &coords,
+                                    QString &errorString, bool includeAltitude)
+{
+    if (coords.size() < GeoUtilities::kMinPolylineVertices) {
+        errorString = QString(kSaveErrorPrefix).arg(
+            QObject::tr("Polyline requires at least %1 points").arg(GeoUtilities::kMinPolylineVertices));
+        return false;
+    }
+
+    if (!validateCoordinatesForSave(coords, errorString)) {
+        return false;
+    }
+
+    const QString wkt = toWKTLineString(coords, includeAltitude);
+    return writeWktToFile(filePath, wkt, errorString);
+}
+
+bool WKTHelper::savePolylinesToFile(const QString &filePath, const QList<QList<QGeoCoordinate>> &polylines,
+                                     QString &errorString, bool includeAltitude)
+{
+    if (polylines.isEmpty()) {
+        errorString = QString(kSaveErrorPrefix).arg(QObject::tr("No polylines to save"));
+        return false;
+    }
+
+    for (int i = 0; i < polylines.size(); ++i) {
+        if (polylines[i].size() < GeoUtilities::kMinPolylineVertices) {
+            errorString = QString(kSaveErrorPrefix).arg(
+                QObject::tr("Polyline %1 requires at least %2 points").arg(i + 1).arg(GeoUtilities::kMinPolylineVertices));
+            return false;
+        }
+        if (!validateCoordinatesForSave(polylines[i], errorString)) {
+            return false;
+        }
+    }
+
+    const QString wkt = toWKTMultiLineString(polylines, includeAltitude);
+    return writeWktToFile(filePath, wkt, errorString);
+}
+
+bool WKTHelper::savePolygonToFile(const QString &filePath, const QList<QGeoCoordinate> &vertices,
+                                   QString &errorString, bool includeAltitude)
+{
+    if (vertices.size() < GeoUtilities::kMinPolygonVertices) {
+        errorString = QString(kSaveErrorPrefix).arg(
+            QObject::tr("Polygon requires at least %1 vertices").arg(GeoUtilities::kMinPolygonVertices));
+        return false;
+    }
+
+    if (!validateCoordinatesForSave(vertices, errorString)) {
+        return false;
+    }
+
+    const QString wkt = toWKTPolygon(vertices, includeAltitude);
+    return writeWktToFile(filePath, wkt, errorString);
+}
+
+bool WKTHelper::savePolygonsToFile(const QString &filePath, const QList<QList<QGeoCoordinate>> &polygons,
+                                    QString &errorString, bool includeAltitude)
+{
+    if (polygons.isEmpty()) {
+        errorString = QString(kSaveErrorPrefix).arg(QObject::tr("No polygons to save"));
+        return false;
+    }
+
+    for (int i = 0; i < polygons.size(); ++i) {
+        if (polygons[i].size() < GeoUtilities::kMinPolygonVertices) {
+            errorString = QString(kSaveErrorPrefix).arg(
+                QObject::tr("Polygon %1 requires at least %2 vertices").arg(i + 1).arg(GeoUtilities::kMinPolygonVertices));
+            return false;
+        }
+        if (!validateCoordinatesForSave(polygons[i], errorString)) {
+            return false;
+        }
+    }
+
+    const QString wkt = toWKTMultiPolygon(polygons, includeAltitude);
+    return writeWktToFile(filePath, wkt, errorString);
+}

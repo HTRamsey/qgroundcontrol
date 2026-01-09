@@ -28,10 +28,7 @@ public:
     /// Returns list of files created by the last export
     QStringList lastCreatedFiles() const;
 
-    /// Returns the singleton instance
-    static ShpPlanExporter* instance();
-
 private:
-    static ShpPlanExporter* s_instance;
+    DECLARE_PLAN_EXPORTER_SINGLETON(ShpPlanExporter)
     QStringList _lastCreatedFiles;
 };

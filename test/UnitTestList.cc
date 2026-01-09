@@ -88,6 +88,7 @@
 #include "QGCFileWatcherTest.h"
 // Geo
 #include "GeoTest.h"
+#include "GeoUtilitiesTest.h"
 // Shape
 #include "ShapeTest.h"
 
@@ -195,6 +196,7 @@ int QGCUnitTest::runTests(bool stress, const QStringList& unitTests)
     UT_REGISTER_TEST(QGCFileWatcherTest)
     // Geo
     UT_REGISTER_TEST(GeoTest)
+    UT_REGISTER_TEST(GeoUtilitiesTest)
     // Shape
     UT_REGISTER_TEST(ShapeTest)
 

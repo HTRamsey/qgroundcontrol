@@ -9,7 +9,54 @@
 
 Q_DECLARE_LOGGING_CATEGORY(ShapeFileHelperLog)
 
-/// Routines for loading polygons or polylines from KML, SHP, GeoJSON, or GPX files.
+/// @file ShapeFileHelper.h
+/// @brief Unified API for loading and saving geographic shapes (polygons, polylines, points)
+///
+/// ShapeFileHelper provides format-agnostic I/O for geographic data, automatically selecting
+/// the appropriate helper based on file extension:
+///
+/// | Format  | Extension | Load | Save | Polygons | Polylines | Points | Holes | Altitude |
+/// |---------|-----------|------|------|----------|-----------|--------|-------|----------|
+/// | KML     | .kml      | ✓    | ✓    | ✓        | ✓         | ✓      | ✓     | ✓        |
+/// | SHP     | .shp      | ✓    | ✓    | ✓        | ✓         | ✓      | ✓     | ✓        |
+/// | GeoJSON | .geojson  | ✓    | ✓    | ✓        | ✓         | ✓      | ✓     | ✓        |
+/// | GPX     | .gpx      | ✓    | ✓    | ✓        | ✓         | ✓      | ✗     | ✓        |
+///
+/// @section usage Basic Usage
+/// @code
+/// QList<QGeoCoordinate> vertices;
+/// QString error;
+/// // Load from any supported format
+/// if (!ShapeFileHelper::loadPolygonFromFile("survey.kml", vertices, error)) {
+///     qWarning() << error;
+/// }
+/// // Save to any supported format (format determined by extension)
+/// if (!ShapeFileHelper::savePolygonToFile("survey.shp", vertices, error)) {
+///     qWarning() << error;
+/// }
+/// @endcode
+///
+/// @section filtering Vertex Filtering
+/// Load functions support automatic filtering of vertices closer than a threshold distance.
+/// This helps simplify overly dense shapes from GPS tracks or detailed surveys:
+/// @code
+/// // Filter vertices closer than 10 meters apart
+/// ShapeFileHelper::loadPolygonFromFile("track.gpx", vertices, error, 10.0);
+/// // Disable filtering (0 = keep all vertices)
+/// ShapeFileHelper::loadPolygonFromFile("precise.kml", vertices, error, 0.0);
+/// @endcode
+///
+/// @section validation Pre-save Validation
+/// All save functions validate coordinates before writing:
+/// - Latitude must be in [-90, 90]
+/// - Longitude must be in [-180, 180]
+/// - Invalid coordinates cause save to fail with descriptive error
+///
+/// @see KMLHelper for KML-specific operations and schema validation
+/// @see SHPFileHelper for Shapefile-specific operations
+/// @see GeoJsonHelper for GeoJSON-specific operations
+/// @see GPXHelper for GPX-specific operations
+/// @see GeoUtilities for coordinate validation and normalization
 class ShapeFileHelper : public QObject
 {
     Q_OBJECT
@@ -28,6 +75,29 @@ public:
         Point,
         Error
     };
+
+    /// Features that may or may not be supported by a file format
+    enum class Feature {
+        Polygons,           ///< Basic polygon support
+        PolygonsWithHoles,  ///< Polygons with interior holes
+        Polylines,          ///< Basic polyline/path support
+        Points,             ///< Point/waypoint support
+        Tracks,             ///< GPX-style tracks (ordered with timestamps)
+        Altitude,           ///< 3D coordinates with altitude
+        MultipleEntities    ///< Multiple geometries in one file
+    };
+
+    /// Check if a file format supports a specific feature
+    /// @param file File path (used to determine format from extension)
+    /// @param feature The feature to check
+    /// @return true if the format supports the feature
+    static bool supportsFeature(const QString &file, Feature feature);
+
+    /// Check if a file format supports a specific feature (by extension)
+    /// @param extension File extension including dot (e.g., ".kml")
+    /// @param feature The feature to check
+    /// @return true if the format supports the feature
+    static bool supportsFeatureByExtension(const QString &extension, Feature feature);
 
     /// Default distance threshold for filtering nearby vertices (meters)
     static constexpr double kDefaultVertexFilterMeters = 5.0;
@@ -90,6 +160,14 @@ public:
 
     /// Save points to file
     static bool savePointsToFile(const QString &file, const QList<QGeoCoordinate> &points, QString &errorString);
+
+    /// Save a track to GPX file (GPX-specific: tracks are ordered point sequences with timestamps)
+    /// Note: Only supported for GPX format. Other formats use savePolylineToFile.
+    static bool saveTrackToFile(const QString &file, const QList<QGeoCoordinate> &coords, QString &errorString);
+
+    /// Save multiple tracks to GPX file
+    /// Note: Only supported for GPX format. Other formats use savePolylinesToFile.
+    static bool saveTracksToFile(const QString &file, const QList<QList<QGeoCoordinate>> &tracks, QString &errorString);
 
     // ========================================================================
     // Utilities

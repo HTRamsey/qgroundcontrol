@@ -1,4 +1,5 @@
 #include "KMLHelper.h"
+#include "GeoUtilities.h"
 #include "KMLSchemaValidator.h"
 #include "QGCLoggingCategory.h"
 
@@ -7,7 +8,7 @@
 
 #include <algorithm>
 
-QGC_LOGGING_CATEGORY(KMLHelperLog, "Utilities.KMLHelper")
+QGC_LOGGING_CATEGORY(KMLHelperLog, "Utilities.Geo.KMLHelper")
 
 namespace KMLHelper
 {
@@ -63,23 +64,30 @@ bool KMLHelper::_parseCoordinateString(const QString &coordinatesString, QList<Q
             continue;
         }
         bool lonOk = false, latOk = false;
-        const double lon = rgValueStrings[0].toDouble(&lonOk);
-        const double lat = rgValueStrings[1].toDouble(&latOk);
+        double lon = rgValueStrings[0].toDouble(&lonOk);
+        double lat = rgValueStrings[1].toDouble(&latOk);
         if (!lonOk || !latOk) {
             qCWarning(KMLHelperLog) << "Failed to parse coordinate values:" << coordinateString;
             continue;
         }
+
+        // Normalize out-of-range coordinates instead of rejecting
         if (lat < -90.0 || lat > 90.0) {
-            qCWarning(KMLHelperLog) << "Latitude out of range [-90, 90]:" << lat << "in:" << coordinateString;
-            continue;
+            qCWarning(KMLHelperLog) << "Latitude out of range, clamping:" << lat << "in:" << coordinateString;
+            lat = GeoUtilities::normalizeLatitude(lat);
         }
         if (lon < -180.0 || lon > 180.0) {
-            qCWarning(KMLHelperLog) << "Longitude out of range [-180, 180]:" << lon << "in:" << coordinateString;
-            continue;
+            qCWarning(KMLHelperLog) << "Longitude out of range, wrapping:" << lon << "in:" << coordinateString;
+            lon = GeoUtilities::normalizeLongitude(lon);
         }
+
         double alt = 0.0;
         if (rgValueStrings.size() >= 3) {
             alt = rgValueStrings[2].toDouble();
+            // Validate altitude range
+            if (!GeoUtilities::isValidAltitude(alt)) {
+                qCWarning(KMLHelperLog) << "Altitude out of expected range:" << alt << "in:" << coordinateString;
+            }
         }
         coords.append(QGeoCoordinate(lat, lon, alt));
     }
@@ -202,30 +210,19 @@ bool KMLHelper::loadPolygonsFromFile(const QString &kmlFile, QList<QList<QGeoCoo
             continue;
         }
 
-        if (rgCoords.count() < 3) {
+        if (rgCoords.count() < GeoUtilities::kMinPolygonVertices) {
             qCWarning(KMLHelperLog) << "Polygon" << nodeIdx << QStringLiteral("(line %1)").arg(polygonNode.lineNumber())
                                     << "has fewer than 3 vertices, skipping";
             continue;
         }
 
         // Remove duplicate closing vertex (KML polygons repeat first vertex at end)
-        if (rgCoords.count() > 3 && rgCoords.first().latitude() == rgCoords.last().latitude() &&
-            rgCoords.first().longitude() == rgCoords.last().longitude()) {
-            rgCoords.removeLast();
-        }
+        GeoUtilities::removeClosingVertex(rgCoords);
 
-        // Determine winding, reverse if needed. QGC wants clockwise winding
-        double sum = 0;
-        for (int i = 0; i < rgCoords.count(); i++) {
-            const QGeoCoordinate &coord1 = rgCoords[i];
-            const QGeoCoordinate &coord2 = rgCoords[(i + 1) % rgCoords.count()];
-            sum += (coord2.longitude() - coord1.longitude()) * (coord2.latitude() + coord1.latitude());
-        }
-        if (sum < 0.0) {
-            std::reverse(rgCoords.begin(), rgCoords.end());
-        }
+        // Ensure clockwise winding (QGC convention)
+        GeoUtilities::ensureClockwise(rgCoords);
 
-        ShapeFileHelper::filterVertices(rgCoords, filterMeters, 3);
+        ShapeFileHelper::filterVertices(rgCoords, filterMeters, GeoUtilities::kMinPolygonVertices);
         polygons.append(rgCoords);
     }
 
@@ -282,27 +279,16 @@ bool KMLHelper::loadPolygonsWithHolesFromFile(const QString &kmlFile, QList<QGeo
             continue;
         }
 
-        if (outerRing.count() < 3) {
+        if (outerRing.count() < GeoUtilities::kMinPolygonVertices) {
             qCWarning(KMLHelperLog) << "Polygon" << nodeIdx << "outer boundary has fewer than 3 vertices, skipping";
             continue;
         }
 
         // Remove duplicate closing vertex
-        if (outerRing.count() > 3 && outerRing.first().latitude() == outerRing.last().latitude() &&
-            outerRing.first().longitude() == outerRing.last().longitude()) {
-            outerRing.removeLast();
-        }
+        GeoUtilities::removeClosingVertex(outerRing);
 
         // Ensure clockwise winding for outer ring
-        double sum = 0;
-        for (int i = 0; i < outerRing.count(); i++) {
-            const QGeoCoordinate &coord1 = outerRing[i];
-            const QGeoCoordinate &coord2 = outerRing[(i + 1) % outerRing.count()];
-            sum += (coord2.longitude() - coord1.longitude()) * (coord2.latitude() + coord1.latitude());
-        }
-        if (sum < 0.0) {
-            std::reverse(outerRing.begin(), outerRing.end());
-        }
+        GeoUtilities::ensureClockwise(outerRing);
 
         QGeoPolygon geoPolygon(outerRing);
 
@@ -323,16 +309,13 @@ bool KMLHelper::loadPolygonsWithHolesFromFile(const QString &kmlFile, QList<QGeo
                 continue;
             }
 
-            if (holeRing.count() < 3) {
+            if (holeRing.count() < GeoUtilities::kMinPolygonVertices) {
                 qCWarning(KMLHelperLog) << "Polygon" << nodeIdx << "hole" << holeIdx << "has fewer than 3 vertices, skipping";
                 continue;
             }
 
             // Remove duplicate closing vertex
-            if (holeRing.count() > 3 && holeRing.first().latitude() == holeRing.last().latitude() &&
-                holeRing.first().longitude() == holeRing.last().longitude()) {
-                holeRing.removeLast();
-            }
+            GeoUtilities::removeClosingVertex(holeRing);
 
             geoPolygon.addHole(holeRing);
         }
@@ -393,13 +376,13 @@ bool KMLHelper::loadPolylinesFromFile(const QString &kmlFile, QList<QList<QGeoCo
             continue;
         }
 
-        if (rgCoords.count() < 2) {
+        if (rgCoords.count() < GeoUtilities::kMinPolylineVertices) {
             qCWarning(KMLHelperLog) << "LineString" << nodeIdx << QStringLiteral("(line %1)").arg(lineStringNode.lineNumber())
                                     << "has fewer than 2 vertices, skipping";
             continue;
         }
 
-        ShapeFileHelper::filterVertices(rgCoords, filterMeters, 2);
+        ShapeFileHelper::filterVertices(rgCoords, filterMeters, GeoUtilities::kMinPolylineVertices);
         polylines.append(rgCoords);
     }
 
@@ -531,6 +514,34 @@ namespace KMLHelper
         }
         QTextStream stream(&file);
         stream << doc.toString(2);
+        stream.flush();
+        if (stream.status() != QTextStream::Ok) {
+            errorString = QString(_saveErrorPrefix).arg(
+                QObject::tr("Write error: %1").arg(file.errorString()));
+            file.close();
+            return false;
+        }
+        file.close();
+        if (file.error() != QFileDevice::NoError) {
+            errorString = QString(_saveErrorPrefix).arg(
+                QObject::tr("File close error: %1").arg(file.errorString()));
+            return false;
+        }
+
+        // Validate the saved file in debug builds
+#ifndef NDEBUG
+        const auto result = KMLSchemaValidator::instance()->validateFile(kmlFile);
+        if (!result.isValid) {
+            qCWarning(KMLHelperLog) << "Post-save validation failed for" << kmlFile;
+            for (const QString &error : result.errors) {
+                qCWarning(KMLHelperLog) << "  Error:" << error;
+            }
+        }
+        for (const QString &warning : result.warnings) {
+            qCDebug(KMLHelperLog) << "  Warning:" << warning;
+        }
+#endif
+
         return true;
     }
 }
@@ -549,12 +560,22 @@ bool KMLHelper::savePolygonsToFile(const QString &kmlFile, const QList<QList<QGe
         return false;
     }
 
+    // Validate all coordinates before saving
+    for (int i = 0; i < polygons.size(); i++) {
+        QString validationError;
+        if (!GeoUtilities::validateCoordinates(polygons[i], validationError)) {
+            errorString = QString(_saveErrorPrefix).arg(
+                QObject::tr("Polygon %1: %2").arg(i + 1).arg(validationError));
+            return false;
+        }
+    }
+
     QDomDocument doc = _createKmlDocument();
     QDomElement document = _getDocumentElement(doc);
 
     for (int i = 0; i < polygons.count(); i++) {
         const QList<QGeoCoordinate> &vertices = polygons[i];
-        if (vertices.count() < 3) {
+        if (vertices.count() < GeoUtilities::kMinPolygonVertices) {
             qCWarning(KMLHelperLog) << "Skipping polygon" << i << "with fewer than 3 vertices";
             continue;
         }
@@ -603,6 +624,23 @@ bool KMLHelper::savePolygonsWithHolesToFile(const QString &kmlFile, const QList<
         return false;
     }
 
+    // Validate all coordinates before saving
+    for (int i = 0; i < polygons.size(); i++) {
+        QString validationError;
+        if (!GeoUtilities::validateCoordinates(polygons[i].perimeter(), validationError)) {
+            errorString = QString(_saveErrorPrefix).arg(
+                QObject::tr("Polygon %1 perimeter: %2").arg(i + 1).arg(validationError));
+            return false;
+        }
+        for (int h = 0; h < polygons[i].holesCount(); h++) {
+            if (!GeoUtilities::validateCoordinates(polygons[i].holePath(h), validationError)) {
+                errorString = QString(_saveErrorPrefix).arg(
+                    QObject::tr("Polygon %1 hole %2: %3").arg(i + 1).arg(h + 1).arg(validationError));
+                return false;
+            }
+        }
+    }
+
     QDomDocument doc = _createKmlDocument();
     QDomElement document = _getDocumentElement(doc);
 
@@ -610,7 +648,7 @@ bool KMLHelper::savePolygonsWithHolesToFile(const QString &kmlFile, const QList<
         const QGeoPolygon &geoPolygon = polygons[i];
         const QList<QGeoCoordinate> perimeter = geoPolygon.perimeter();
 
-        if (perimeter.count() < 3) {
+        if (perimeter.count() < GeoUtilities::kMinPolygonVertices) {
             qCWarning(KMLHelperLog) << "Skipping polygon" << i << "with fewer than 3 vertices";
             continue;
         }
@@ -686,12 +724,22 @@ bool KMLHelper::savePolylinesToFile(const QString &kmlFile, const QList<QList<QG
         return false;
     }
 
+    // Validate all coordinates before saving
+    for (int i = 0; i < polylines.size(); i++) {
+        QString validationError;
+        if (!GeoUtilities::validateCoordinates(polylines[i], validationError)) {
+            errorString = QString(_saveErrorPrefix).arg(
+                QObject::tr("Polyline %1: %2").arg(i + 1).arg(validationError));
+            return false;
+        }
+    }
+
     QDomDocument doc = _createKmlDocument();
     QDomElement document = _getDocumentElement(doc);
 
     for (int i = 0; i < polylines.count(); i++) {
         const QList<QGeoCoordinate> &coords = polylines[i];
-        if (coords.count() < 2) {
+        if (coords.count() < GeoUtilities::kMinPolylineVertices) {
             qCWarning(KMLHelperLog) << "Skipping polyline" << i << "with fewer than 2 vertices";
             continue;
         }
@@ -719,6 +767,13 @@ bool KMLHelper::savePointsToFile(const QString &kmlFile, const QList<QGeoCoordin
 
     if (points.isEmpty()) {
         errorString = QString(_saveErrorPrefix).arg(QObject::tr("No points to save"));
+        return false;
+    }
+
+    // Validate all coordinates before saving
+    QString validationError;
+    if (!GeoUtilities::validateCoordinates(points, validationError)) {
+        errorString = QString(_saveErrorPrefix).arg(validationError);
         return false;
     }
 

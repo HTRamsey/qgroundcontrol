@@ -7,6 +7,8 @@ target_sources(${CMAKE_PROJECT_NAME}
     PRIVATE
         GeoTest.cc
         GeoTest.h
+        GeoUtilitiesTest.cc
+        GeoUtilitiesTest.h
         ShapeTest.cc
         ShapeTest.h
 )

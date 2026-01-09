@@ -63,3 +63,23 @@ private:
     static QHash<QString, PlanExporter*> s_exporters;
     static bool s_initialized;
 };
+
+/// Macro to declare singleton instance method and static member for PlanExporter subclasses
+/// Usage in header: DECLARE_PLAN_EXPORTER_SINGLETON(ClassName)
+#define DECLARE_PLAN_EXPORTER_SINGLETON(ClassName) \
+public: \
+    static ClassName* instance(); \
+private: \
+    static ClassName* s_instance;
+
+/// Macro to implement singleton instance method for PlanExporter subclasses
+/// Usage in source: IMPLEMENT_PLAN_EXPORTER_SINGLETON(ClassName)
+#define IMPLEMENT_PLAN_EXPORTER_SINGLETON(ClassName) \
+    ClassName* ClassName::s_instance = nullptr; \
+    ClassName* ClassName::instance() { \
+        if (s_instance == nullptr) { \
+            s_instance = new ClassName(); \
+            PlanExporter::registerExporter(s_instance->fileExtension(), s_instance); \
+        } \
+        return s_instance; \
+    }

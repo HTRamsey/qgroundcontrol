@@ -9,21 +9,12 @@
 #include <QtCore/QTemporaryDir>
 #include <QtCore/QTextStream>
 
-KmzPlanExporter* KmzPlanExporter::s_instance = nullptr;
-
 KmzPlanExporter::KmzPlanExporter(QObject* parent)
     : PlanExporter(parent)
 {
 }
 
-KmzPlanExporter* KmzPlanExporter::instance()
-{
-    if (!s_instance) {
-        s_instance = new KmzPlanExporter();
-        PlanExporter::registerExporter(s_instance->fileExtension(), s_instance);
-    }
-    return s_instance;
-}
+IMPLEMENT_PLAN_EXPORTER_SINGLETON(KmzPlanExporter)
 
 bool KmzPlanExporter::exportToFile(const QString& filename,
                                     MissionController* missionController,

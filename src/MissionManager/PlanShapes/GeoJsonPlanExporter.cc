@@ -5,21 +5,12 @@
 
 #include <QtCore/QFile>
 
-GeoJsonPlanExporter* GeoJsonPlanExporter::s_instance = nullptr;
-
 GeoJsonPlanExporter::GeoJsonPlanExporter(QObject* parent)
     : PlanExporter(parent)
 {
 }
 
-GeoJsonPlanExporter* GeoJsonPlanExporter::instance()
-{
-    if (!s_instance) {
-        s_instance = new GeoJsonPlanExporter();
-        PlanExporter::registerExporter(s_instance->fileExtension(), s_instance);
-    }
-    return s_instance;
-}
+IMPLEMENT_PLAN_EXPORTER_SINGLETON(GeoJsonPlanExporter)
 
 bool GeoJsonPlanExporter::exportToFile(const QString& filename,
                                         MissionController* missionController,

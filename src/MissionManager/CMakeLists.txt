@@ -49,26 +49,64 @@ target_sources(${CMAKE_PROJECT_NAME}
         PlanManager.h
         PlanMasterController.cc
         PlanMasterController.h
+        PlanShapes/CsvPlanDocument.cc
+        PlanShapes/CsvPlanDocument.h
+        PlanShapes/CsvPlanExporter.cc
+        PlanShapes/CsvPlanExporter.h
+        PlanShapes/CsvPlanImporter.cc
+        PlanShapes/CsvPlanImporter.h
         PlanShapes/GeoJsonPlanDocument.cc
         PlanShapes/GeoJsonPlanDocument.h
         PlanShapes/GeoJsonPlanExporter.cc
         PlanShapes/GeoJsonPlanExporter.h
+        PlanShapes/GeoJsonPlanImporter.cc
+        PlanShapes/GeoJsonPlanImporter.h
+        PlanShapes/GeoPackagePlanDocument.cc
+        PlanShapes/GeoPackagePlanDocument.h
+        PlanShapes/GeoPackagePlanExporter.cc
+        PlanShapes/GeoPackagePlanExporter.h
+        PlanShapes/GeoPackagePlanImporter.cc
+        PlanShapes/GeoPackagePlanImporter.h
+        PlanShapes/GeoFormatPlanImporter.cc
+        PlanShapes/GeoFormatPlanImporter.h
+        PlanShapes/PlanDocument.cc
+        PlanShapes/PlanDocument.h
         PlanShapes/GpxPlanDocument.cc
         PlanShapes/GpxPlanDocument.h
         PlanShapes/GpxPlanExporter.cc
         PlanShapes/GpxPlanExporter.h
+        PlanShapes/GpxPlanImporter.cc
+        PlanShapes/GpxPlanImporter.h
         PlanShapes/KMLPlanDomDocument.cc
         PlanShapes/KMLPlanDomDocument.h
         PlanShapes/KmlPlanExporter.cc
         PlanShapes/KmlPlanExporter.h
+        PlanShapes/KmlPlanImporter.cc
+        PlanShapes/KmlPlanImporter.h
         PlanShapes/KmzPlanExporter.cc
         PlanShapes/KmzPlanExporter.h
+        PlanShapes/KmzPlanImporter.cc
+        PlanShapes/KmzPlanImporter.h
+        PlanShapes/OpenAirPlanImporter.cc
+        PlanShapes/OpenAirPlanImporter.h
         PlanShapes/PlanExporter.cc
         PlanShapes/PlanExporter.h
+        PlanShapes/PlanImporter.cc
+        PlanShapes/PlanImporter.h
+        PlanShapes/PlanStatistics.cc
+        PlanShapes/PlanStatistics.h
         PlanShapes/ShpPlanDocument.cc
         PlanShapes/ShpPlanDocument.h
         PlanShapes/ShpPlanExporter.cc
         PlanShapes/ShpPlanExporter.h
+        PlanShapes/ShpPlanImporter.cc
+        PlanShapes/ShpPlanImporter.h
+        PlanShapes/WktPlanDocument.cc
+        PlanShapes/WktPlanDocument.h
+        PlanShapes/WktPlanExporter.cc
+        PlanShapes/WktPlanExporter.h
+        PlanShapes/WktPlanImporter.cc
+        PlanShapes/WktPlanImporter.h
         RallyPoint.cc
         RallyPointController.cc
         RallyPointController.h
