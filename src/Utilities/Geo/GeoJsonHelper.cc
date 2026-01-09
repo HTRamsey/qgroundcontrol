@@ -1,9 +1,9 @@
 #include "GeoJsonHelper.h"
+#include "GeoFileIO.h"
 #include "GeoUtilities.h"
 #include "JsonHelper.h"
 #include "QGCLoggingCategory.h"
 
-#include <QtCore/QFile>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
 #include <QtCore/QJsonArray>
@@ -16,82 +16,23 @@
 
 QGC_LOGGING_CATEGORY(GeoJsonHelperLog, "Utilities.Geo.GeoJsonHelper")
 
-namespace GeoJsonHelper
-{
-    QJsonDocument _loadFile(const QString &filePath, QString &errorString);
-    bool _saveFile(const QString &filePath, const QJsonDocument &doc, QString &errorString);
-
-    constexpr const char *_errorPrefix = QT_TR_NOOP("GeoJson file load failed. %1");
-    constexpr const char *_saveErrorPrefix = QT_TR_NOOP("GeoJson file save failed. %1");
-}
-
-QJsonDocument GeoJsonHelper::_loadFile(const QString &filePath, QString &errorString)
-{
-    errorString.clear();
-
-    QFile file(filePath);
-    if (!file.exists()) {
-        errorString = QString(_errorPrefix).arg(
-            QString(QT_TRANSLATE_NOOP("GeoJson", "File not found: %1")).arg(filePath));
-        qCWarning(GeoJsonHelperLog) << errorString;
-        return QJsonDocument();
-    }
-
-    if (!file.open(QIODevice::ReadOnly)) {
-        errorString = QString(_errorPrefix).arg(
-            QString(QT_TRANSLATE_NOOP("GeoJson", "Unable to open file: %1 error: %2"))
-                .arg(filePath, file.errorString()));
-        qCWarning(GeoJsonHelperLog) << errorString;
-        return QJsonDocument();
-    }
-
-    QJsonDocument jsonDoc;
-    const QByteArray bytes = file.readAll();
-    if (!JsonHelper::isJsonFile(bytes, jsonDoc, errorString)) {
-        errorString = QString(_errorPrefix).arg(errorString);
-        qCWarning(GeoJsonHelperLog) << errorString;
-    }
-
-    return jsonDoc;
-}
-
-bool GeoJsonHelper::_saveFile(const QString &filePath, const QJsonDocument &doc, QString &errorString)
-{
-    errorString.clear();
-
-    QFile file(filePath);
-    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        errorString = QString(_saveErrorPrefix).arg(
-            QString(QT_TRANSLATE_NOOP("GeoJson", "Unable to open file for writing: %1 error: %2"))
-                .arg(filePath, file.errorString()));
-        qCWarning(GeoJsonHelperLog) << errorString;
-        return false;
-    }
-
-    const qint64 bytesWritten = file.write(doc.toJson(QJsonDocument::Indented));
-    if (bytesWritten == -1) {
-        errorString = QString(_saveErrorPrefix).arg(
-            QString(QT_TRANSLATE_NOOP("GeoJson", "Write error: %1")).arg(file.errorString()));
-        qCWarning(GeoJsonHelperLog) << errorString;
-        return false;
-    }
-
-    qCDebug(GeoJsonHelperLog) << "Saved GeoJSON to" << filePath;
-    return true;
+namespace {
+    constexpr const char *kFormatName = "GeoJSON";
 }
 
 ShapeFileHelper::ShapeType GeoJsonHelper::determineShapeType(const QString &filePath, QString &errorString)
 {
     using ShapeType = ShapeFileHelper::ShapeType;
 
-    const QJsonDocument jsonDoc = GeoJsonHelper::_loadFile(filePath, errorString);
-    if (!errorString.isEmpty()) {
+    const auto jsonResult = GeoFileIO::loadJson(filePath, QString::fromLatin1(kFormatName));
+    if (!jsonResult.success) {
+        errorString = jsonResult.error;
         return ShapeType::Error;
     }
 
-    const QVariantList shapes = QGeoJson::importGeoJson(jsonDoc);
+    const QVariantList shapes = QGeoJson::importGeoJson(jsonResult.document);
     if (shapes.isEmpty()) {
-        errorString = QString(_errorPrefix).arg(
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),
             QT_TRANSLATE_NOOP("GeoJson", "No shapes found in GeoJson file."));
         qCWarning(GeoJsonHelperLog) << errorString;
         return ShapeType::Error;
@@ -116,7 +57,7 @@ ShapeFileHelper::ShapeType GeoJsonHelper::determineShapeType(const QString &file
         }
     }
 
-    errorString = QString(_errorPrefix).arg(
+    errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),
         QT_TRANSLATE_NOOP("GeoJson", "No supported type found in GeoJson file."));
     qCWarning(GeoJsonHelperLog) << errorString;
     return ShapeType::Error;
@@ -124,12 +65,13 @@ ShapeFileHelper::ShapeType GeoJsonHelper::determineShapeType(const QString &file
 
 int GeoJsonHelper::getEntityCount(const QString &filePath, QString &errorString)
 {
-    const QJsonDocument jsonDoc = GeoJsonHelper::_loadFile(filePath, errorString);
-    if (!errorString.isEmpty()) {
+    const auto jsonResult = GeoFileIO::loadJson(filePath, QString::fromLatin1(kFormatName));
+    if (!jsonResult.success) {
+        errorString = jsonResult.error;
         return 0;
     }
 
-    const QVariantList shapes = QGeoJson::importGeoJson(jsonDoc);
+    const QVariantList shapes = QGeoJson::importGeoJson(jsonResult.document);
     int count = 0;
     // QGeoJson::importGeoJson returns QVariantList of QVariantMaps with "type" and "data" keys
     for (const QVariant &item : shapes) {
@@ -216,14 +158,15 @@ bool GeoJsonHelper::loadPolygonsFromFile(const QString &filePath, QList<QList<QG
     errorString.clear();
     polygons.clear();
 
-    const QJsonDocument jsonDoc = GeoJsonHelper::_loadFile(filePath, errorString);
-    if (!errorString.isEmpty()) {
+    const auto jsonResult = GeoFileIO::loadJson(filePath, QString::fromLatin1(kFormatName));
+    if (!jsonResult.success) {
+        errorString = jsonResult.error;
         return false;
     }
 
-    const QVariantList shapes = QGeoJson::importGeoJson(jsonDoc);
+    const QVariantList shapes = QGeoJson::importGeoJson(jsonResult.document);
     if (shapes.isEmpty()) {
-        errorString = QString(_errorPrefix).arg(
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),
             QT_TRANSLATE_NOOP("GeoJson", "No polygon data found in GeoJson file."));
         qCWarning(GeoJsonHelperLog) << errorString;
         return false;
@@ -232,7 +175,7 @@ bool GeoJsonHelper::loadPolygonsFromFile(const QString &filePath, QList<QList<QG
     extractPolygons(shapes, polygons, filterMeters);
 
     if (polygons.isEmpty()) {
-        errorString = QString(_errorPrefix).arg(
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),
             QT_TRANSLATE_NOOP("GeoJson", "No polygon found in GeoJson file."));
         qCWarning(GeoJsonHelperLog) << errorString;
         return false;
@@ -278,14 +221,15 @@ bool GeoJsonHelper::loadPolygonsWithHolesFromFile(const QString &filePath, QList
     errorString.clear();
     polygons.clear();
 
-    const QJsonDocument jsonDoc = GeoJsonHelper::_loadFile(filePath, errorString);
-    if (!errorString.isEmpty()) {
+    const auto jsonResult = GeoFileIO::loadJson(filePath, QString::fromLatin1(kFormatName));
+    if (!jsonResult.success) {
+        errorString = jsonResult.error;
         return false;
     }
 
-    const QVariantList shapes = QGeoJson::importGeoJson(jsonDoc);
+    const QVariantList shapes = QGeoJson::importGeoJson(jsonResult.document);
     if (shapes.isEmpty()) {
-        errorString = QString(_errorPrefix).arg(
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),
             QT_TRANSLATE_NOOP("GeoJson", "No polygon data found in GeoJson file."));
         qCWarning(GeoJsonHelperLog) << errorString;
         return false;
@@ -294,7 +238,7 @@ bool GeoJsonHelper::loadPolygonsWithHolesFromFile(const QString &filePath, QList
     extractPolygonsWithHoles(shapes, polygons);
 
     if (polygons.isEmpty()) {
-        errorString = QString(_errorPrefix).arg(
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),
             QT_TRANSLATE_NOOP("GeoJson", "No polygon found in GeoJson file."));
         qCWarning(GeoJsonHelperLog) << errorString;
         return false;
@@ -344,14 +288,15 @@ bool GeoJsonHelper::loadPolylinesFromFile(const QString &filePath, QList<QList<Q
     errorString.clear();
     polylines.clear();
 
-    const QJsonDocument jsonDoc = GeoJsonHelper::_loadFile(filePath, errorString);
-    if (!errorString.isEmpty()) {
+    const auto jsonResult = GeoFileIO::loadJson(filePath, QString::fromLatin1(kFormatName));
+    if (!jsonResult.success) {
+        errorString = jsonResult.error;
         return false;
     }
 
-    const QVariantList shapes = QGeoJson::importGeoJson(jsonDoc);
+    const QVariantList shapes = QGeoJson::importGeoJson(jsonResult.document);
     if (shapes.isEmpty()) {
-        errorString = QString(_errorPrefix).arg(
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),
             QT_TRANSLATE_NOOP("GeoJson", "No polyline data found in GeoJson file."));
         qCWarning(GeoJsonHelperLog) << errorString;
         return false;
@@ -360,7 +305,7 @@ bool GeoJsonHelper::loadPolylinesFromFile(const QString &filePath, QList<QList<Q
     extractPolylines(shapes, polylines, filterMeters);
 
     if (polylines.isEmpty()) {
-        errorString = QString(_errorPrefix).arg(
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),
             QT_TRANSLATE_NOOP("GeoJson", "No polyline found in GeoJson file."));
         qCWarning(GeoJsonHelperLog) << errorString;
         return false;
@@ -409,14 +354,15 @@ bool GeoJsonHelper::loadPointsFromFile(const QString &filePath, QList<QGeoCoordi
     errorString.clear();
     points.clear();
 
-    const QJsonDocument jsonDoc = GeoJsonHelper::_loadFile(filePath, errorString);
-    if (!errorString.isEmpty()) {
+    const auto jsonResult = GeoFileIO::loadJson(filePath, QString::fromLatin1(kFormatName));
+    if (!jsonResult.success) {
+        errorString = jsonResult.error;
         return false;
     }
 
-    const QVariantList shapes = QGeoJson::importGeoJson(jsonDoc);
+    const QVariantList shapes = QGeoJson::importGeoJson(jsonResult.document);
     if (shapes.isEmpty()) {
-        errorString = QString(_errorPrefix).arg(
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),
             QT_TRANSLATE_NOOP("GeoJson", "No point data found in GeoJson file."));
         qCWarning(GeoJsonHelperLog) << errorString;
         return false;
@@ -425,7 +371,7 @@ bool GeoJsonHelper::loadPointsFromFile(const QString &filePath, QList<QGeoCoordi
     extractPoints(shapes, points);
 
     if (points.isEmpty()) {
-        errorString = QString(_errorPrefix).arg(
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),
             QT_TRANSLATE_NOOP("GeoJson", "No point found in GeoJson file."));
         qCWarning(GeoJsonHelperLog) << errorString;
         return false;
@@ -444,7 +390,7 @@ bool GeoJsonHelper::savePolygonToFile(const QString &filePath, const QList<QGeoC
     // Validate coordinates before saving
     QString validationError;
     if (!GeoUtilities::validateCoordinates(vertices, validationError)) {
-        errorString = QString(_saveErrorPrefix).arg(validationError);
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),validationError);
         qCWarning(GeoJsonHelperLog) << errorString;
         return false;
     }
@@ -486,27 +432,24 @@ bool GeoJsonHelper::savePolygonToFile(const QString &filePath, const QList<QGeoC
     feature.insert(QStringLiteral("properties"), QJsonObject());
 
     const QJsonDocument doc(feature);
-    return _saveFile(filePath, doc, errorString);
+    return GeoFileIO::saveJson(filePath, doc, QString::fromLatin1(kFormatName), errorString);
 }
 
 bool GeoJsonHelper::savePolygonsToFile(const QString &filePath, const QList<QList<QGeoCoordinate>> &polygons, QString &errorString)
 {
     if (polygons.isEmpty()) {
-        errorString = QString(_saveErrorPrefix).arg(
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),
             QT_TRANSLATE_NOOP("GeoJson", "No polygons to save."));
         qCWarning(GeoJsonHelperLog) << errorString;
         return false;
     }
 
     // Validate all coordinates before saving
-    for (int i = 0; i < polygons.size(); i++) {
-        QString validationError;
-        if (!GeoUtilities::validateCoordinates(polygons[i], validationError)) {
-            errorString = QString(_saveErrorPrefix).arg(
-                QObject::tr("Polygon %1: %2").arg(i + 1).arg(validationError));
-            qCWarning(GeoJsonHelperLog) << errorString;
-            return false;
-        }
+    QString validationError;
+    if (!GeoUtilities::validatePolygonListCoordinates(polygons, validationError)) {
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName), validationError);
+        qCWarning(GeoJsonHelperLog) << errorString;
+        return false;
     }
 
     QJsonArray features;
@@ -554,62 +497,27 @@ bool GeoJsonHelper::savePolygonsToFile(const QString &filePath, const QList<QLis
     featureCollection.insert(QStringLiteral("features"), features);
 
     const QJsonDocument doc(featureCollection);
-    return _saveFile(filePath, doc, errorString);
+    return GeoFileIO::saveJson(filePath, doc, QString::fromLatin1(kFormatName), errorString);
 }
 
 bool GeoJsonHelper::savePolygonWithHolesToFile(const QString &filePath, const QGeoPolygon &polygon, QString &errorString)
 {
-    // Validate perimeter coordinates
+    // Validate all coordinates
     QString validationError;
-    if (!GeoUtilities::validateCoordinates(polygon.perimeter(), validationError)) {
-        errorString = QString(_saveErrorPrefix).arg(
-            QObject::tr("Polygon perimeter: %1").arg(validationError));
+    if (!GeoUtilities::validateGeoPolygonCoordinates(polygon, validationError)) {
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName), validationError);
         qCWarning(GeoJsonHelperLog) << errorString;
         return false;
-    }
-    // Validate hole coordinates
-    for (int h = 0; h < polygon.holesCount(); h++) {
-        if (!GeoUtilities::validateCoordinates(polygon.holePath(h), validationError)) {
-            errorString = QString(_saveErrorPrefix).arg(
-                QObject::tr("Polygon hole %1: %2").arg(h + 1).arg(validationError));
-            qCWarning(GeoJsonHelperLog) << errorString;
-            return false;
-        }
     }
 
     QJsonArray coordinates;
 
-    // Helper lambda to create a ring from coordinates
-    auto makeRing = [](const QList<QGeoCoordinate> &coords) {
-        QJsonArray ring;
-        for (const QGeoCoordinate &coord : coords) {
-            QJsonArray point;
-            point.append(coord.longitude());
-            point.append(coord.latitude());
-            if (!qIsNaN(coord.altitude())) {
-                point.append(coord.altitude());
-            }
-            ring.append(point);
-        }
-        // Close the ring
-        if (!coords.isEmpty() && coords.first() != coords.last()) {
-            QJsonArray closePoint;
-            closePoint.append(coords.first().longitude());
-            closePoint.append(coords.first().latitude());
-            if (!qIsNaN(coords.first().altitude())) {
-                closePoint.append(coords.first().altitude());
-            }
-            ring.append(closePoint);
-        }
-        return ring;
-    };
-
     // Outer ring (perimeter)
-    coordinates.append(makeRing(polygon.perimeter()));
+    coordinates.append(coordinatesToJsonRing(polygon.perimeter()));
 
     // Inner rings (holes)
     for (int i = 0; i < polygon.holesCount(); ++i) {
-        coordinates.append(makeRing(polygon.holePath(i)));
+        coordinates.append(coordinatesToJsonRing(polygon.holePath(i)));
     }
 
     QJsonObject geometry;
@@ -622,72 +530,36 @@ bool GeoJsonHelper::savePolygonWithHolesToFile(const QString &filePath, const QG
     feature.insert(QStringLiteral("properties"), QJsonObject());
 
     const QJsonDocument doc(feature);
-    return _saveFile(filePath, doc, errorString);
+    return GeoFileIO::saveJson(filePath, doc, QString::fromLatin1(kFormatName), errorString);
 }
 
 bool GeoJsonHelper::savePolygonsWithHolesToFile(const QString &filePath, const QList<QGeoPolygon> &polygons, QString &errorString)
 {
     if (polygons.isEmpty()) {
-        errorString = QString(_saveErrorPrefix).arg(
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),
             QT_TRANSLATE_NOOP("GeoJson", "No polygons to save."));
         qCWarning(GeoJsonHelperLog) << errorString;
         return false;
     }
 
     // Validate all coordinates before saving
-    for (int i = 0; i < polygons.size(); i++) {
-        QString validationError;
-        if (!GeoUtilities::validateCoordinates(polygons[i].perimeter(), validationError)) {
-            errorString = QString(_saveErrorPrefix).arg(
-                QObject::tr("Polygon %1 perimeter: %2").arg(i + 1).arg(validationError));
-            qCWarning(GeoJsonHelperLog) << errorString;
-            return false;
-        }
-        for (int h = 0; h < polygons[i].holesCount(); h++) {
-            if (!GeoUtilities::validateCoordinates(polygons[i].holePath(h), validationError)) {
-                errorString = QString(_saveErrorPrefix).arg(
-                    QObject::tr("Polygon %1 hole %2: %3").arg(i + 1).arg(h + 1).arg(validationError));
-                qCWarning(GeoJsonHelperLog) << errorString;
-                return false;
-            }
-        }
+    QString validationError;
+    if (!GeoUtilities::validateGeoPolygonListCoordinates(polygons, validationError)) {
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName), validationError);
+        qCWarning(GeoJsonHelperLog) << errorString;
+        return false;
     }
-
-    // Helper lambda to create a ring from coordinates
-    auto makeRing = [](const QList<QGeoCoordinate> &coords) {
-        QJsonArray ring;
-        for (const QGeoCoordinate &coord : coords) {
-            QJsonArray point;
-            point.append(coord.longitude());
-            point.append(coord.latitude());
-            if (!qIsNaN(coord.altitude())) {
-                point.append(coord.altitude());
-            }
-            ring.append(point);
-        }
-        // Close the ring
-        if (!coords.isEmpty() && coords.first() != coords.last()) {
-            QJsonArray closePoint;
-            closePoint.append(coords.first().longitude());
-            closePoint.append(coords.first().latitude());
-            if (!qIsNaN(coords.first().altitude())) {
-                closePoint.append(coords.first().altitude());
-            }
-            ring.append(closePoint);
-        }
-        return ring;
-    };
 
     QJsonArray features;
     for (const QGeoPolygon &polygon : polygons) {
         QJsonArray coordinates;
 
         // Outer ring (perimeter)
-        coordinates.append(makeRing(polygon.perimeter()));
+        coordinates.append(coordinatesToJsonRing(polygon.perimeter()));
 
         // Inner rings (holes)
         for (int i = 0; i < polygon.holesCount(); ++i) {
-            coordinates.append(makeRing(polygon.holePath(i)));
+            coordinates.append(coordinatesToJsonRing(polygon.holePath(i)));
         }
 
         QJsonObject geometry;
@@ -707,7 +579,7 @@ bool GeoJsonHelper::savePolygonsWithHolesToFile(const QString &filePath, const Q
     featureCollection.insert(QStringLiteral("features"), features);
 
     const QJsonDocument doc(featureCollection);
-    return _saveFile(filePath, doc, errorString);
+    return GeoFileIO::saveJson(filePath, doc, QString::fromLatin1(kFormatName), errorString);
 }
 
 bool GeoJsonHelper::savePolylineToFile(const QString &filePath, const QList<QGeoCoordinate> &coords, QString &errorString)
@@ -715,7 +587,7 @@ bool GeoJsonHelper::savePolylineToFile(const QString &filePath, const QList<QGeo
     // Validate coordinates before saving
     QString validationError;
     if (!GeoUtilities::validateCoordinates(coords, validationError)) {
-        errorString = QString(_saveErrorPrefix).arg(validationError);
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),validationError);
         qCWarning(GeoJsonHelperLog) << errorString;
         return false;
     }
@@ -741,13 +613,13 @@ bool GeoJsonHelper::savePolylineToFile(const QString &filePath, const QList<QGeo
     feature.insert(QStringLiteral("properties"), QJsonObject());
 
     const QJsonDocument doc(feature);
-    return _saveFile(filePath, doc, errorString);
+    return GeoFileIO::saveJson(filePath, doc, QString::fromLatin1(kFormatName), errorString);
 }
 
 bool GeoJsonHelper::savePolylinesToFile(const QString &filePath, const QList<QList<QGeoCoordinate>> &polylines, QString &errorString)
 {
     if (polylines.isEmpty()) {
-        errorString = QString(_saveErrorPrefix).arg(
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),
             QT_TRANSLATE_NOOP("GeoJson", "No polylines to save."));
         qCWarning(GeoJsonHelperLog) << errorString;
         return false;
@@ -757,7 +629,7 @@ bool GeoJsonHelper::savePolylinesToFile(const QString &filePath, const QList<QLi
     for (int i = 0; i < polylines.size(); i++) {
         QString validationError;
         if (!GeoUtilities::validateCoordinates(polylines[i], validationError)) {
-            errorString = QString(_saveErrorPrefix).arg(
+            errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),
                 QObject::tr("Polyline %1: %2").arg(i + 1).arg(validationError));
             qCWarning(GeoJsonHelperLog) << errorString;
             return false;
@@ -794,13 +666,13 @@ bool GeoJsonHelper::savePolylinesToFile(const QString &filePath, const QList<QLi
     featureCollection.insert(QStringLiteral("features"), features);
 
     const QJsonDocument doc(featureCollection);
-    return _saveFile(filePath, doc, errorString);
+    return GeoFileIO::saveJson(filePath, doc, QString::fromLatin1(kFormatName), errorString);
 }
 
 bool GeoJsonHelper::savePointsToFile(const QString &filePath, const QList<QGeoCoordinate> &points, QString &errorString)
 {
     if (points.isEmpty()) {
-        errorString = QString(_saveErrorPrefix).arg(
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),
             QT_TRANSLATE_NOOP("GeoJson", "No points to save."));
         qCWarning(GeoJsonHelperLog) << errorString;
         return false;
@@ -809,7 +681,7 @@ bool GeoJsonHelper::savePointsToFile(const QString &filePath, const QList<QGeoCo
     // Validate all coordinates before saving
     QString validationError;
     if (!GeoUtilities::validateCoordinates(points, validationError)) {
-        errorString = QString(_saveErrorPrefix).arg(validationError);
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),validationError);
         qCWarning(GeoJsonHelperLog) << errorString;
         return false;
     }
@@ -834,7 +706,7 @@ bool GeoJsonHelper::savePointsToFile(const QString &filePath, const QList<QGeoCo
         feature.insert(QStringLiteral("properties"), QJsonObject());
 
         const QJsonDocument doc(feature);
-        return _saveFile(filePath, doc, errorString);
+        return GeoFileIO::saveJson(filePath, doc, QString::fromLatin1(kFormatName), errorString);
     }
 
     // Multiple points - save as FeatureCollection with Point features
@@ -864,7 +736,7 @@ bool GeoJsonHelper::savePointsToFile(const QString &filePath, const QList<QGeoCo
     featureCollection.insert(QStringLiteral("features"), features);
 
     const QJsonDocument doc(featureCollection);
-    return _saveFile(filePath, doc, errorString);
+    return GeoFileIO::saveJson(filePath, doc, QString::fromLatin1(kFormatName), errorString);
 }
 
 // ============================================================================
@@ -889,4 +761,31 @@ bool GeoJsonHelper::loadGeoJsonCoordinateArray(const QJsonValue &jsonValue, bool
 void GeoJsonHelper::saveGeoJsonCoordinateArray(const QList<QGeoCoordinate> &coordinates, bool writeAltitude, QJsonValue &jsonValue)
 {
     JsonHelper::saveGeoCoordinateArray(coordinates, writeAltitude, jsonValue, true /* geoJsonFormat */);
+}
+
+QJsonArray GeoJsonHelper::coordinatesToJsonRing(const QList<QGeoCoordinate> &coords)
+{
+    QJsonArray ring;
+    for (const QGeoCoordinate &coord : coords) {
+        QJsonArray point;
+        point.append(coord.longitude());
+        point.append(coord.latitude());
+        if (!qIsNaN(coord.altitude())) {
+            point.append(coord.altitude());
+        }
+        ring.append(point);
+    }
+
+    // Close the ring (GeoJSON requires first == last for polygon rings)
+    if (!coords.isEmpty() && coords.first() != coords.last()) {
+        QJsonArray closePoint;
+        closePoint.append(coords.first().longitude());
+        closePoint.append(coords.first().latitude());
+        if (!qIsNaN(coords.first().altitude())) {
+            closePoint.append(coords.first().altitude());
+        }
+        ring.append(closePoint);
+    }
+
+    return ring;
 }

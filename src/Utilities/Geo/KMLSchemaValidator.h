@@ -1,60 +1,32 @@
 #pragma once
 
-#include <QtCore/QHash>
-#include <QtCore/QLoggingCategory>
-#include <QtCore/QSet>
-#include <QtCore/QStringList>
+#include "XsdValidator.h"
 
-class QDomDocument;
-class QDomElement;
+#include <QtCore/QLoggingCategory>
 
 Q_DECLARE_LOGGING_CATEGORY(KMLSchemaValidatorLog)
 
 /// Validates KML documents against rules extracted from the OGC KML 2.2 XSD schema.
 /// This provides schema-driven validation without requiring a full XML Schema processor.
-class KMLSchemaValidator
+class KMLSchemaValidator : public XsdValidator
 {
 public:
     static KMLSchemaValidator *instance();
 
-    struct ValidationResult {
-        bool isValid = true;
-        QStringList errors;
-        QStringList warnings;
+    /// Get all valid values for an enum type (convenience wrapper)
+    [[nodiscard]] QStringList validEnumValues(const QString &enumTypeName) const
+    {
+        return enumValues(enumTypeName);
+    }
 
-        void addError(const QString &msg) { errors.append(msg); isValid = false; }
-        void addWarning(const QString &msg) { warnings.append(msg); }
-    };
-
-    /// Validate a KML document
-    ValidationResult validate(const QDomDocument &doc) const;
-
-    /// Validate a KML file
-    ValidationResult validateFile(const QString &kmlFile) const;
-
-    /// Check if a value is valid for a given XSD enum type (e.g., "altitudeModeEnumType")
-    bool isValidEnumValue(const QString &enumTypeName, const QString &value) const;
-
-    /// Get all valid values for an enum type
-    QStringList validEnumValues(const QString &enumTypeName) const;
-
-    /// Check if an element name is defined in the schema
-    bool isValidElement(const QString &elementName) const;
-
-    /// Get all valid KML element names
-    QStringList validElements() const;
+protected:
+    [[nodiscard]] QString expectedRootElement() const override;
+    [[nodiscard]] QString expectedNamespace() const override;
+    void validateElement(const QDomElement &element,
+                         GeoValidation::ValidationResult &result) const override;
 
 private:
     KMLSchemaValidator();
-    void loadSchema();
-    void parseSchemaDocument(const QDomDocument &schemaDoc);
-    void extractEnumTypes(const QDomElement &root);
-    void extractElements(const QDomElement &root);
-
-    void validateElement(const QDomElement &element, ValidationResult &result) const;
-    void validateCoordinates(const QString &coordString, ValidationResult &result) const;
-
-    QHash<QString, QStringList> _enumTypes;  // enumTypeName -> valid values
-    QSet<QString> _validElements;            // set of valid element names
-    bool _loaded = false;
+    void validateCoordinates(const QString &coordString,
+                             GeoValidation::ValidationResult &result) const;
 };

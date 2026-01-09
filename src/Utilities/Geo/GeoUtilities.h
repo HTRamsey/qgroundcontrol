@@ -3,6 +3,7 @@
 #include <QtCore/QList>
 #include <QtCore/QString>
 #include <QtPositioning/QGeoCoordinate>
+#include <QtPositioning/QGeoPolygon>
 #include <QtPositioning/QGeoRectangle>
 
 #include <functional>
@@ -106,6 +107,13 @@ namespace GeoUtilities
     /// @return true if a closing vertex was removed
     bool removeClosingVertex(QList<QGeoCoordinate> &coords);
 
+    /// Ensure polygon has a closing vertex (first == last)
+    /// @param coords Polygon vertices (modified in place)
+    /// @param thresholdMeters Distance threshold for considering vertices equal (default: 1m)
+    /// @return true if a closing vertex was added
+    bool ensureClosingVertex(QList<QGeoCoordinate> &coords,
+                             double thresholdMeters = kPolygonClosureThresholdMeters);
+
     /// Ensure polygon vertices are in clockwise order (reverses if counter-clockwise)
     /// @param coords Polygon vertices (modified in place)
     /// @return true if vertices were reversed
@@ -195,6 +203,117 @@ namespace GeoUtilities
     /// @param errorString Output: description of first invalid coordinate
     /// @return true if all coordinates are valid
     bool validateCoordinates(const QList<QGeoCoordinate> &coords, QString &errorString);
+
+    /// Validate coordinates for a list of simple polygons (no holes)
+    /// @param polygons List of polygon coordinate lists
+    /// @param errorString Output: description of first invalid coordinate
+    /// @return true if all coordinates are valid
+    bool validatePolygonListCoordinates(const QList<QList<QGeoCoordinate>> &polygons,
+                                        QString &errorString);
+
+    /// Validate coordinates for a QGeoPolygon (perimeter + holes)
+    /// @param polygon Polygon with potential holes
+    /// @param errorString Output: description of first invalid coordinate
+    /// @param polygonIndex Optional index for error messages (default -1 = omit)
+    /// @return true if all coordinates are valid
+    bool validateGeoPolygonCoordinates(const QGeoPolygon &polygon, QString &errorString,
+                                       int polygonIndex = -1);
+
+    /// Validate coordinates for a list of QGeoPolygons
+    /// @param polygons List of polygons with potential holes
+    /// @param errorString Output: description of first invalid coordinate
+    /// @return true if all coordinates are valid
+    bool validateGeoPolygonListCoordinates(const QList<QGeoPolygon> &polygons,
+                                           QString &errorString);
+
+    // ========================================================================
+    // Coordinate Parsing (consolidated from format-specific helpers)
+    // ========================================================================
+
+    /// Parse a KML-style coordinate string: "lon,lat[,alt]"
+    /// @param str Single coordinate string (e.g., "-122.5,37.8,100")
+    /// @param[out] coord Parsed coordinate
+    /// @param[out] errorString Error message if parsing fails
+    /// @param normalizeOutOfRange If true, normalize out-of-range values instead of failing
+    /// @return true if parsing succeeded
+    bool parseKmlCoordinate(const QString &str, QGeoCoordinate &coord,
+                           QString &errorString, bool normalizeOutOfRange = true);
+
+    /// Parse a list of KML-style coordinates: "lon,lat[,alt] lon,lat[,alt] ..."
+    /// @param str Space-separated coordinate string
+    /// @param[out] coords Parsed coordinates
+    /// @param[out] errorString Error message if parsing fails
+    /// @param normalizeOutOfRange If true, normalize out-of-range values
+    /// @return true if all coordinates parsed successfully
+    bool parseKmlCoordinateList(const QString &str, QList<QGeoCoordinate> &coords,
+                                QString &errorString, bool normalizeOutOfRange = true);
+
+    /// Parse a WKT-style coordinate string: "x y [z]" (x=lon, y=lat, z=alt)
+    /// @param str Single coordinate string (e.g., "-122.5 37.8 100")
+    /// @param[out] coord Parsed coordinate
+    /// @param[out] errorString Error message if parsing fails
+    /// @param normalizeOutOfRange If true, normalize out-of-range values
+    /// @return true if parsing succeeded
+    bool parseWktCoordinate(const QString &str, QGeoCoordinate &coord,
+                           QString &errorString, bool normalizeOutOfRange = true);
+
+    /// Parse a list of WKT-style coordinates: "x y [z], x y [z], ..."
+    /// @param str Comma-separated coordinate string
+    /// @param[out] coords Parsed coordinates
+    /// @param[out] errorString Error message if parsing fails
+    /// @param normalizeOutOfRange If true, normalize out-of-range values
+    /// @return true if all coordinates parsed successfully
+    bool parseWktCoordinateList(const QString &str, QList<QGeoCoordinate> &coords,
+                               QString &errorString, bool normalizeOutOfRange = true);
+
+    /// Format a coordinate as KML-style string: "lon,lat[,alt]"
+    /// @param coord Coordinate to format
+    /// @param includeAltitude Include altitude in output (if coordinate has valid altitude)
+    /// @param precision Decimal places for lat/lon (default 8, ~1mm precision)
+    /// @return Formatted string
+    QString formatKmlCoordinate(const QGeoCoordinate &coord, bool includeAltitude = true,
+                               int precision = 8);
+
+    /// Format coordinates as KML-style string: "lon,lat[,alt] lon,lat[,alt] ..."
+    QString formatKmlCoordinateList(const QList<QGeoCoordinate> &coords,
+                                   bool includeAltitude = true, int precision = 8);
+
+    /// Format a coordinate as WKT-style string: "x y [z]"
+    /// @param coord Coordinate to format
+    /// @param includeAltitude Include altitude in output
+    /// @param precision Decimal places (default 8)
+    /// @return Formatted string
+    QString formatWktCoordinate(const QGeoCoordinate &coord, bool includeAltitude = true,
+                               int precision = 8);
+
+    /// Format coordinates as WKT-style string: "x y [z], x y [z], ..."
+    QString formatWktCoordinateList(const QList<QGeoCoordinate> &coords,
+                                   bool includeAltitude = true, int precision = 8);
+
+    // ========================================================================
+    // Polygon Processing Utilities
+    // ========================================================================
+
+    /// Process a polygon with holes: filter vertices, validate, ensure proper winding
+    /// @param outerRing Outer ring vertices (modified in place)
+    /// @param holes Hole vertex lists (modified in place)
+    /// @param filterMeters Vertex filter distance (0 to disable)
+    /// @param minVertices Minimum vertices required after filtering
+    /// @return true if polygon is valid after processing
+    bool processPolygonWithHoles(QList<QGeoCoordinate> &outerRing,
+                                 QList<QList<QGeoCoordinate>> &holes,
+                                 double filterMeters = 0.0,
+                                 int minVertices = kMinPolygonVertices);
+
+    /// Check if any coordinate in a list has a valid (non-NaN) altitude
+    /// @param coords Coordinates to check
+    /// @return true if at least one coordinate has valid altitude
+    bool hasAnyAltitude(const QList<QGeoCoordinate> &coords);
+
+    /// Check if any coordinate in multiple lists has a valid altitude
+    /// @param coordLists List of coordinate lists to check
+    /// @return true if at least one coordinate has valid altitude
+    bool hasAnyAltitude(const QList<QList<QGeoCoordinate>> &coordLists);
 
     // ========================================================================
     // UTM Batch Conversion

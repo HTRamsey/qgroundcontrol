@@ -2,12 +2,9 @@
 #include "KMLPlanDomDocument.h"
 #include "MissionController.h"
 #include "PlanExporter.h"
-#include "QGCZip.h"
 
-#include <QtCore/QDir>
 #include <QtCore/QFile>
-#include <QtCore/QTemporaryDir>
-#include <QtCore/QTextStream>
+#include <private/qzipwriter_p.h>
 
 KmzPlanExporter::KmzPlanExporter(QObject* parent)
     : PlanExporter(parent)
@@ -47,28 +44,20 @@ bool KmzPlanExporter::exportToFile(const QString& filename,
 
     deleteParent->deleteLater();
 
-    // Create KMZ (zip) file with doc.kml inside using QGCZip
-    QTemporaryDir tempDir;
-    if (!tempDir.isValid()) {
-        errorString = tr("Failed to create temporary directory");
+    // Create KMZ (zip) file with doc.kml inside
+    QZipWriter zipWriter(filename);
+    if (zipWriter.status() != QZipWriter::NoError) {
+        errorString = tr("Failed to create KMZ file");
         return false;
     }
 
-    // Write doc.kml to temp directory (standard name for KMZ main file)
-    const QString kmlPath = tempDir.filePath(QStringLiteral("doc.kml"));
-    QFile kmlFile(kmlPath);
-    if (!kmlFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-        errorString = tr("Cannot create temporary KML file: %1").arg(kmlFile.errorString());
-        return false;
-    }
-    kmlFile.write(kmlContent.toUtf8());
-    kmlFile.close();
+    zipWriter.addFile(QStringLiteral("doc.kml"), kmlContent.toUtf8());
 
-    // Zip the temp directory to create the KMZ file
-    if (!QGCZip::zipDirectory(tempDir.path(), filename)) {
-        errorString = tr("Failed to create KMZ archive");
+    if (zipWriter.status() != QZipWriter::NoError) {
+        errorString = tr("Failed to write KML data to KMZ");
         return false;
     }
 
+    zipWriter.close();
     return true;
 }

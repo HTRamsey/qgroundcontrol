@@ -5,10 +5,14 @@
 
 target_sources(${CMAKE_PROJECT_NAME}
     PRIVATE
+        GeoFileIO.cc
+        GeoFileIO.h
         GeoFormatRegistry.cc
         GeoFormatRegistry.h
         GeoJsonHelper.cc
         GeoJsonHelper.h
+        GeoValidation.cc
+        GeoValidation.h
         GeoPackageHelper.cc
         GeoPackageHelper.h
         GeoUtilities.cc
@@ -35,6 +39,8 @@ target_sources(${CMAKE_PROJECT_NAME}
         WKBHelper.h
         WKTHelper.cc
         WKTHelper.h
+        XsdValidator.cc
+        XsdValidator.h
 )
 
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})

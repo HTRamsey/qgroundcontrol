@@ -1,11 +1,15 @@
 #include "GeoUtilities.h"
 #include "QGCGeo.h"
+#include "QGCLoggingCategory.h"
 
 #include <QtCore/QObject>
+#include <QtCore/QRegularExpression>
 #include <QtGui/QVector3D>
 #include <algorithm>
 #include <cmath>
 #include <random>
+
+QGC_LOGGING_CATEGORY(GeoUtilitiesLog, "Utilities.Geo.GeoUtilities")
 
 namespace GeoUtilities
 {
@@ -184,6 +188,36 @@ bool removeClosingVertex(QList<QGeoCoordinate> &coords)
     }
 
     return false;
+}
+
+bool ensureClosingVertex(QList<QGeoCoordinate> &coords, double thresholdMeters)
+{
+    if (coords.size() < 3) {
+        return false;  // Not a valid polygon
+    }
+
+    const QGeoCoordinate &first = coords.first();
+    const QGeoCoordinate &last = coords.last();
+
+    // Check if already closed (exact match)
+    if (first.latitude() == last.latitude() && first.longitude() == last.longitude()) {
+        return false;
+    }
+
+    // Check fuzzy compare for floating point precision
+    if (qFuzzyCompare(first.latitude(), last.latitude()) &&
+        qFuzzyCompare(first.longitude(), last.longitude())) {
+        return false;
+    }
+
+    // Check distance threshold
+    if (first.distanceTo(last) < thresholdMeters) {
+        return false;  // Close enough, considered already closed
+    }
+
+    // Add closing vertex
+    coords.append(first);
+    return true;
 }
 
 bool ensureClockwise(QList<QGeoCoordinate> &coords)
@@ -432,6 +466,323 @@ bool validateCoordinates(const QList<QGeoCoordinate> &coords, QString &errorStri
         }
     }
     return true;
+}
+
+bool validatePolygonListCoordinates(const QList<QList<QGeoCoordinate>> &polygons,
+                                    QString &errorString)
+{
+    for (int i = 0; i < polygons.size(); ++i) {
+        QString validationError;
+        if (!validateCoordinates(polygons[i], validationError)) {
+            errorString = QObject::tr("Polygon %1: %2").arg(i + 1).arg(validationError);
+            return false;
+        }
+    }
+    return true;
+}
+
+bool validateGeoPolygonCoordinates(const QGeoPolygon &polygon, QString &errorString,
+                                   int polygonIndex)
+{
+    QString validationError;
+    const QString prefix = (polygonIndex >= 0)
+        ? QObject::tr("Polygon %1 ").arg(polygonIndex + 1)
+        : QString();
+
+    // Validate perimeter
+    if (!validateCoordinates(polygon.perimeter(), validationError)) {
+        errorString = prefix + QObject::tr("perimeter: %1").arg(validationError);
+        return false;
+    }
+
+    // Validate holes
+    for (int h = 0; h < polygon.holesCount(); ++h) {
+        if (!validateCoordinates(polygon.holePath(h), validationError)) {
+            errorString = prefix + QObject::tr("hole %1: %2").arg(h + 1).arg(validationError);
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool validateGeoPolygonListCoordinates(const QList<QGeoPolygon> &polygons,
+                                       QString &errorString)
+{
+    for (int i = 0; i < polygons.size(); ++i) {
+        if (!validateGeoPolygonCoordinates(polygons[i], errorString, i)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// ============================================================================
+// Coordinate Parsing
+// ============================================================================
+
+bool parseKmlCoordinate(const QString &str, QGeoCoordinate &coord,
+                       QString &errorString, bool normalizeOutOfRange)
+{
+    const QStringList values = str.trimmed().split(QLatin1Char(','));
+    if (values.size() < 2) {
+        errorString = QObject::tr("Invalid coordinate format (expected lon,lat[,alt]): '%1'").arg(str);
+        return false;
+    }
+
+    bool lonOk = false;
+    bool latOk = false;
+    double lon = values[0].toDouble(&lonOk);
+    double lat = values[1].toDouble(&latOk);
+
+    if (!lonOk || !latOk) {
+        errorString = QObject::tr("Failed to parse coordinate values: '%1'").arg(str);
+        return false;
+    }
+
+    // Validate or normalize
+    if (lat < -90.0 || lat > 90.0) {
+        if (normalizeOutOfRange) {
+            qCWarning(GeoUtilitiesLog) << "Latitude out of range, clamping:" << lat << "in:" << str;
+            lat = normalizeLatitude(lat);
+        } else {
+            errorString = QObject::tr("Latitude out of range [-90, 90]: %1").arg(lat);
+            return false;
+        }
+    }
+
+    if (lon < -180.0 || lon > 180.0) {
+        if (normalizeOutOfRange) {
+            qCWarning(GeoUtilitiesLog) << "Longitude out of range, wrapping:" << lon << "in:" << str;
+            lon = normalizeLongitude(lon);
+        } else {
+            errorString = QObject::tr("Longitude out of range [-180, 180]: %1").arg(lon);
+            return false;
+        }
+    }
+
+    coord.setLatitude(lat);
+    coord.setLongitude(lon);
+
+    // Optional altitude
+    if (values.size() >= 3) {
+        bool altOk = false;
+        const double alt = values[2].toDouble(&altOk);
+        if (altOk && isValidAltitude(alt)) {
+            coord.setAltitude(alt);
+        }
+    }
+
+    return true;
+}
+
+bool parseKmlCoordinateList(const QString &str, QList<QGeoCoordinate> &coords,
+                            QString &errorString, bool normalizeOutOfRange)
+{
+    coords.clear();
+    const QStringList groups = str.simplified().split(QLatin1Char(' '), Qt::SkipEmptyParts);
+
+    for (int i = 0; i < groups.size(); ++i) {
+        QGeoCoordinate coord;
+        QString parseError;
+        if (!parseKmlCoordinate(groups[i], coord, parseError, normalizeOutOfRange)) {
+            errorString = QObject::tr("Coordinate %1: %2").arg(i + 1).arg(parseError);
+            coords.clear();
+            return false;
+        }
+        coords.append(coord);
+    }
+
+    return true;
+}
+
+bool parseWktCoordinate(const QString &str, QGeoCoordinate &coord,
+                       QString &errorString, bool normalizeOutOfRange)
+{
+    const QStringList values = str.trimmed().split(QRegularExpression(QStringLiteral("\\s+")),
+                                                    Qt::SkipEmptyParts);
+    if (values.size() < 2) {
+        errorString = QObject::tr("Invalid coordinate format (expected x y [z]): '%1'").arg(str);
+        return false;
+    }
+
+    bool xOk = false;
+    bool yOk = false;
+    double lon = values[0].toDouble(&xOk);  // x = longitude
+    double lat = values[1].toDouble(&yOk);  // y = latitude
+
+    if (!xOk || !yOk) {
+        errorString = QObject::tr("Failed to parse coordinate values: '%1'").arg(str);
+        return false;
+    }
+
+    // Validate or normalize
+    if (lat < -90.0 || lat > 90.0) {
+        if (normalizeOutOfRange) {
+            lat = normalizeLatitude(lat);
+        } else {
+            errorString = QObject::tr("Latitude out of range [-90, 90]: %1").arg(lat);
+            return false;
+        }
+    }
+
+    if (lon < -180.0 || lon > 180.0) {
+        if (normalizeOutOfRange) {
+            lon = normalizeLongitude(lon);
+        } else {
+            errorString = QObject::tr("Longitude out of range [-180, 180]: %1").arg(lon);
+            return false;
+        }
+    }
+
+    coord.setLatitude(lat);
+    coord.setLongitude(lon);
+
+    // Optional Z (altitude)
+    if (values.size() >= 3) {
+        bool zOk = false;
+        const double alt = values[2].toDouble(&zOk);
+        if (zOk && isValidAltitude(alt)) {
+            coord.setAltitude(alt);
+        }
+    }
+
+    return true;
+}
+
+bool parseWktCoordinateList(const QString &str, QList<QGeoCoordinate> &coords,
+                           QString &errorString, bool normalizeOutOfRange)
+{
+    coords.clear();
+    const QStringList groups = str.split(QLatin1Char(','), Qt::SkipEmptyParts);
+
+    for (int i = 0; i < groups.size(); ++i) {
+        QGeoCoordinate coord;
+        QString parseError;
+        if (!parseWktCoordinate(groups[i], coord, parseError, normalizeOutOfRange)) {
+            errorString = QObject::tr("Coordinate %1: %2").arg(i + 1).arg(parseError);
+            coords.clear();
+            return false;
+        }
+        coords.append(coord);
+    }
+
+    return true;
+}
+
+QString formatKmlCoordinate(const QGeoCoordinate &coord, bool includeAltitude, int precision)
+{
+    QString result = QStringLiteral("%1,%2")
+        .arg(coord.longitude(), 0, 'f', precision)
+        .arg(coord.latitude(), 0, 'f', precision);
+
+    if (includeAltitude && !std::isnan(coord.altitude())) {
+        result += QStringLiteral(",%1").arg(coord.altitude(), 0, 'f', 2);
+    }
+
+    return result;
+}
+
+QString formatKmlCoordinateList(const QList<QGeoCoordinate> &coords,
+                               bool includeAltitude, int precision)
+{
+    QStringList parts;
+    parts.reserve(coords.size());
+    for (const auto &coord : coords) {
+        parts.append(formatKmlCoordinate(coord, includeAltitude, precision));
+    }
+    return parts.join(QLatin1Char(' '));
+}
+
+QString formatWktCoordinate(const QGeoCoordinate &coord, bool includeAltitude, int precision)
+{
+    QString result = QStringLiteral("%1 %2")
+        .arg(coord.longitude(), 0, 'f', precision)
+        .arg(coord.latitude(), 0, 'f', precision);
+
+    if (includeAltitude && !std::isnan(coord.altitude())) {
+        result += QStringLiteral(" %1").arg(coord.altitude(), 0, 'f', 2);
+    }
+
+    return result;
+}
+
+QString formatWktCoordinateList(const QList<QGeoCoordinate> &coords,
+                               bool includeAltitude, int precision)
+{
+    QStringList parts;
+    parts.reserve(coords.size());
+    for (const auto &coord : coords) {
+        parts.append(formatWktCoordinate(coord, includeAltitude, precision));
+    }
+    return parts.join(QStringLiteral(", "));
+}
+
+// ============================================================================
+// Polygon Processing Utilities
+// ============================================================================
+
+bool processPolygonWithHoles(QList<QGeoCoordinate> &outerRing,
+                             QList<QList<QGeoCoordinate>> &holes,
+                             double filterMeters, int minVertices)
+{
+    // Remove closing vertex if present
+    removeClosingVertex(outerRing);
+
+    // Filter vertices if requested
+    if (filterMeters > 0.0 && outerRing.size() > minVertices) {
+        outerRing = simplifyDouglasPeucker(outerRing, filterMeters);
+    }
+
+    // Validate minimum vertices
+    if (outerRing.size() < minVertices) {
+        return false;
+    }
+
+    // Ensure clockwise winding for outer ring
+    ensureClockwise(outerRing);
+
+    // Process holes
+    for (int i = holes.size() - 1; i >= 0; --i) {
+        removeClosingVertex(holes[i]);
+
+        if (filterMeters > 0.0 && holes[i].size() > minVertices) {
+            holes[i] = simplifyDouglasPeucker(holes[i], filterMeters);
+        }
+
+        // Remove invalid holes
+        if (holes[i].size() < minVertices) {
+            holes.removeAt(i);
+            continue;
+        }
+
+        // Ensure counter-clockwise winding for holes (opposite of outer)
+        if (isClockwise(holes[i])) {
+            reverseVertices(holes[i]);
+        }
+    }
+
+    return true;
+}
+
+bool hasAnyAltitude(const QList<QGeoCoordinate> &coords)
+{
+    for (const auto &coord : coords) {
+        if (!std::isnan(coord.altitude())) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool hasAnyAltitude(const QList<QList<QGeoCoordinate>> &coordLists)
+{
+    for (const auto &coords : coordLists) {
+        if (hasAnyAltitude(coords)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // ============================================================================

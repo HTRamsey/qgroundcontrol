@@ -1,4 +1,5 @@
 #include "SHPFileHelper.h"
+#include "GeoFileIO.h"
 #include "GeoUtilities.h"
 #include "QGCGeo.h"
 #include "QGCLoggingCategory.h"
@@ -13,8 +14,7 @@
 QGC_LOGGING_CATEGORY(SHPFileHelperLog, "Utilities.Geo.SHPFileHelper")
 
 namespace {
-    constexpr const char *_errorPrefix = QT_TR_NOOP("SHP file load failed. %1");
-    constexpr const char *_saveErrorPrefix = QT_TR_NOOP("SHP file save failed. %1");
+    constexpr const char *kFormatName = "SHP";
 
     // WGS84 PRJ file content - standard projection for GPS coordinates
     constexpr const char *_wgs84PrjContent =
@@ -26,33 +26,13 @@ namespace {
         const QString prjFilename = shpFile.left(shpFile.length() - 4) + QStringLiteral(".prj");
         QFile prjFile(prjFilename);
         if (!prjFile.open(QIODevice::WriteOnly | QIODevice::Text)) {
-            errorString = QString(_saveErrorPrefix).arg(
+            errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),
                 QObject::tr("Unable to create PRJ file: %1").arg(prjFile.errorString()));
             return false;
         }
         QTextStream stream(&prjFile);
         stream << _wgs84PrjContent;
         return true;
-    }
-
-    bool hasAnyAltitude(const QList<QGeoCoordinate> &coords)
-    {
-        for (const QGeoCoordinate &coord : coords) {
-            if (!qIsNaN(coord.altitude())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    bool hasAnyAltitude(const QList<QList<QGeoCoordinate>> &coordLists)
-    {
-        for (const QList<QGeoCoordinate> &coords : coordLists) {
-            if (hasAnyAltitude(coords)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     // Create validation callback for SHP coordinate logging
@@ -207,19 +187,19 @@ bool SHPFileHelper::_validateSHPFiles(const QString &shpFile, int *utmZone, bool
     errorString.clear();
 
     if (!shpFile.endsWith(QStringLiteral(".shp"), Qt::CaseInsensitive)) {
-        errorString = QString(_errorPrefix).arg(QString(QT_TRANSLATE_NOOP("SHP", "File is not a .shp file: %1")).arg(shpFile));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QString(QT_TRANSLATE_NOOP("SHP", "File is not a .shp file: %1")).arg(shpFile));
         return false;
     }
 
     const QString prjFilename = shpFile.left(shpFile.length() - 4) + QStringLiteral(".prj");
     QFile prjFile(prjFilename);
     if (!prjFile.exists()) {
-        errorString = QString(_errorPrefix).arg(QString(QT_TRANSLATE_NOOP("SHP", "File not found: %1")).arg(prjFilename));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QString(QT_TRANSLATE_NOOP("SHP", "File not found: %1")).arg(prjFilename));
         return false;
     }
 
     if (!prjFile.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        errorString = QString(_errorPrefix).arg(QObject::tr("PRJ file open failed: %1").arg(prjFile.errorString()));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QObject::tr("PRJ file open failed: %1").arg(prjFile.errorString()));
         return false;
     }
 
@@ -241,7 +221,7 @@ bool SHPFileHelper::_validateSHPFiles(const QString &shpFile, int *utmZone, bool
         }
 
         if (*utmZone == 0) {
-            errorString = QString(_errorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "UTM projection is not in supported format. Must be PROJCS[\"WGS_1984_UTM_Zone_##N/S"));
+            errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QT_TRANSLATE_NOOP("SHP", "UTM projection is not in supported format. Must be PROJCS[\"WGS_1984_UTM_Zone_##N/S"));
         }
     } else {
         // Extract projection name from WKT for error reporting
@@ -254,11 +234,11 @@ bool SHPFileHelper::_validateSHPFiles(const QString &shpFile, int *utmZone, bool
         }
 
         if (!projectionName.isEmpty()) {
-            errorString = QString(_errorPrefix).arg(
+            errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),
                 QString(QT_TRANSLATE_NOOP("SHP", "Unsupported projection: %1. Supported projections are: WGS84 (GEOGCS[\"GCS_WGS_1984\"]) and UTM (PROJCS[\"WGS_1984_UTM_Zone_##N/S\"]). Convert your shapefile to WGS84 using QGIS or ogr2ogr."))
                 .arg(projectionName));
         } else {
-            errorString = QString(_errorPrefix).arg(
+            errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),
                 QT_TRANSLATE_NOOP("SHP", "Unable to parse projection from PRJ file. Supported projections are: WGS84 (GEOGCS[\"GCS_WGS_1984\"]) and UTM (PROJCS[\"WGS_1984_UTM_Zone_##N/S\"])."));
         }
     }
@@ -280,7 +260,7 @@ SHPHandle SHPFileHelper::_loadShape(const QString &shpFile, int *utmZone, bool *
 
     SHPHandle shpHandle = SHPOpenLL(shpFile.toUtf8().constData(), "rb", &sHooks);
     if (shpHandle == nullptr) {
-        errorString = QString(_errorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "SHPOpen failed."));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QT_TRANSLATE_NOOP("SHP", "SHPOpen failed."));
     }
 
     return shpHandle;
@@ -303,7 +283,7 @@ ShapeFileHelper::ShapeType SHPFileHelper::determineShapeType(const QString &shpF
         SHPGetInfo(shpHandle, &cEntities, &type, nullptr, nullptr);
         qCDebug(SHPFileHelperLog) << "SHPGetInfo" << shpHandle << cEntities << type;
         if (cEntities < 1) {
-            errorString = QString(_errorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "No entities found."));
+            errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QT_TRANSLATE_NOOP("SHP", "No entities found."));
         } else if (type == SHPT_POLYGON || type == SHPT_POLYGONZ) {
             shapeType = ShapeType::Polygon;
         } else if (type == SHPT_ARC || type == SHPT_ARCZ) {
@@ -311,7 +291,7 @@ ShapeFileHelper::ShapeType SHPFileHelper::determineShapeType(const QString &shpF
         } else if (type == SHPT_POINT || type == SHPT_POINTZ) {
             shapeType = ShapeType::Point;
         } else {
-            errorString = QString(_errorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "No supported types found."));
+            errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QT_TRANSLATE_NOOP("SHP", "No supported types found."));
         }
     }
 
@@ -381,7 +361,7 @@ bool SHPFileHelper::loadPolygonsFromFile(const QString &shpFile, QList<QList<QGe
     int cEntities, shapeType;
     SHPGetInfo(shpHandle, &cEntities, &shapeType, nullptr, nullptr);
     if (shapeType != SHPT_POLYGON && shapeType != SHPT_POLYGONZ) {
-        errorString = QString(_errorPrefix).arg(QObject::tr("File contains %1, expected Polygon.").arg(SHPTypeName(shapeType)));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QObject::tr("File contains %1, expected Polygon.").arg(SHPTypeName(shapeType)));
         return false;
     }
 
@@ -443,7 +423,7 @@ bool SHPFileHelper::loadPolygonsFromFile(const QString &shpFile, QList<QList<QGe
     }
 
     if (polygons.isEmpty()) {
-        errorString = QString(_errorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "No valid polygons found."));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QT_TRANSLATE_NOOP("SHP", "No valid polygons found."));
         return false;
     }
 
@@ -481,7 +461,7 @@ bool SHPFileHelper::loadPolygonsWithHolesFromFile(const QString &shpFile, QList<
     int cEntities, shapeType;
     SHPGetInfo(shpHandle, &cEntities, &shapeType, nullptr, nullptr);
     if (shapeType != SHPT_POLYGON && shapeType != SHPT_POLYGONZ) {
-        errorString = QString(_errorPrefix).arg(QObject::tr("File contains %1, expected Polygon.").arg(SHPTypeName(shapeType)));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QObject::tr("File contains %1, expected Polygon.").arg(SHPTypeName(shapeType)));
         return false;
     }
 
@@ -577,7 +557,7 @@ bool SHPFileHelper::loadPolygonsWithHolesFromFile(const QString &shpFile, QList<
     }
 
     if (polygons.isEmpty()) {
-        errorString = QString(_errorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "No valid polygons found."));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QT_TRANSLATE_NOOP("SHP", "No valid polygons found."));
         return false;
     }
 
@@ -605,7 +585,7 @@ bool SHPFileHelper::loadPolylinesFromFile(const QString &shpFile, QList<QList<QG
     int cEntities, shapeType;
     SHPGetInfo(shpHandle, &cEntities, &shapeType, nullptr, nullptr);
     if (shapeType != SHPT_ARC && shapeType != SHPT_ARCZ) {
-        errorString = QString(_errorPrefix).arg(QObject::tr("File contains %1, expected Arc.").arg(SHPTypeName(shapeType)));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QObject::tr("File contains %1, expected Arc.").arg(SHPTypeName(shapeType)));
         return false;
     }
 
@@ -663,7 +643,7 @@ bool SHPFileHelper::loadPolylinesFromFile(const QString &shpFile, QList<QList<QG
     }
 
     if (polylines.isEmpty()) {
-        errorString = QString(_errorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "No valid polylines found."));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QT_TRANSLATE_NOOP("SHP", "No valid polylines found."));
         return false;
     }
 
@@ -691,7 +671,7 @@ bool SHPFileHelper::loadPointsFromFile(const QString &shpFile, QList<QGeoCoordin
     int cEntities, shapeType;
     SHPGetInfo(shpHandle, &cEntities, &shapeType, nullptr, nullptr);
     if (shapeType != SHPT_POINT && shapeType != SHPT_POINTZ) {
-        errorString = QString(_errorPrefix).arg(QObject::tr("File contains %1, expected Point.").arg(SHPTypeName(shapeType)));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QObject::tr("File contains %1, expected Point.").arg(SHPTypeName(shapeType)));
         return false;
     }
 
@@ -739,7 +719,7 @@ bool SHPFileHelper::loadPointsFromFile(const QString &shpFile, QList<QGeoCoordin
     }
 
     if (points.isEmpty()) {
-        errorString = QString(_errorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "No valid points found."));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QT_TRANSLATE_NOOP("SHP", "No valid points found."));
         return false;
     }
 
@@ -760,27 +740,24 @@ bool SHPFileHelper::savePolygonsToFile(const QString &shpFile, const QList<QList
     errorString.clear();
 
     if (polygons.isEmpty()) {
-        errorString = QString(_saveErrorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "No polygons to save."));
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),QT_TRANSLATE_NOOP("SHP", "No polygons to save."));
         return false;
     }
 
     // Validate all coordinates before saving
-    for (int i = 0; i < polygons.size(); i++) {
-        QString validationError;
-        if (!GeoUtilities::validateCoordinates(polygons[i], validationError)) {
-            errorString = QString(_saveErrorPrefix).arg(
-                QObject::tr("Polygon %1: %2").arg(i + 1).arg(validationError));
-            return false;
-        }
+    QString validationError;
+    if (!GeoUtilities::validatePolygonListCoordinates(polygons, validationError)) {
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName), validationError);
+        return false;
     }
 
     // Check if any coordinate has altitude - use PolygonZ if so
-    const bool useZ = hasAnyAltitude(polygons);
+    const bool useZ = GeoUtilities::hasAnyAltitude(polygons);
     const int shapeType = useZ ? SHPT_POLYGONZ : SHPT_POLYGON;
 
     SHPHandle shpHandle = SHPCreate(shpFile.toUtf8().constData(), shapeType);
     if (shpHandle == nullptr) {
-        errorString = QString(_saveErrorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "Unable to create SHP file."));
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),QT_TRANSLATE_NOOP("SHP", "Unable to create SHP file."));
         return false;
     }
 
@@ -864,36 +841,26 @@ bool SHPFileHelper::savePolygonsWithHolesToFile(const QString &shpFile, const QL
     errorString.clear();
 
     if (polygons.isEmpty()) {
-        errorString = QString(_saveErrorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "No polygons to save."));
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),QT_TRANSLATE_NOOP("SHP", "No polygons to save."));
         return false;
     }
 
     // Validate all coordinates before saving
-    for (int i = 0; i < polygons.size(); i++) {
-        QString validationError;
-        if (!GeoUtilities::validateCoordinates(polygons[i].perimeter(), validationError)) {
-            errorString = QString(_saveErrorPrefix).arg(
-                QObject::tr("Polygon %1 perimeter: %2").arg(i + 1).arg(validationError));
-            return false;
-        }
-        for (int h = 0; h < polygons[i].holesCount(); h++) {
-            if (!GeoUtilities::validateCoordinates(polygons[i].holePath(h), validationError)) {
-                errorString = QString(_saveErrorPrefix).arg(
-                    QObject::tr("Polygon %1 hole %2: %3").arg(i + 1).arg(h + 1).arg(validationError));
-                return false;
-            }
-        }
+    QString validationError;
+    if (!GeoUtilities::validateGeoPolygonListCoordinates(polygons, validationError)) {
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName), validationError);
+        return false;
     }
 
     // Check if any coordinate has altitude - use PolygonZ if so
     bool useZ = false;
     for (const QGeoPolygon &poly : polygons) {
-        if (hasAnyAltitude(poly.perimeter())) {
+        if (GeoUtilities::hasAnyAltitude(poly.perimeter())) {
             useZ = true;
             break;
         }
         for (int h = 0; h < poly.holesCount(); h++) {
-            if (hasAnyAltitude(poly.holePath(h))) {
+            if (GeoUtilities::hasAnyAltitude(poly.holePath(h))) {
                 useZ = true;
                 break;
             }
@@ -904,7 +871,7 @@ bool SHPFileHelper::savePolygonsWithHolesToFile(const QString &shpFile, const QL
 
     SHPHandle shpHandle = SHPCreate(shpFile.toUtf8().constData(), shapeType);
     if (shpHandle == nullptr) {
-        errorString = QString(_saveErrorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "Unable to create SHP file."));
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),QT_TRANSLATE_NOOP("SHP", "Unable to create SHP file."));
         return false;
     }
 
@@ -1026,27 +993,24 @@ bool SHPFileHelper::savePolylinesToFile(const QString &shpFile, const QList<QLis
     errorString.clear();
 
     if (polylines.isEmpty()) {
-        errorString = QString(_saveErrorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "No polylines to save."));
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),QT_TRANSLATE_NOOP("SHP", "No polylines to save."));
         return false;
     }
 
     // Validate all coordinates before saving
-    for (int i = 0; i < polylines.size(); i++) {
-        QString validationError;
-        if (!GeoUtilities::validateCoordinates(polylines[i], validationError)) {
-            errorString = QString(_saveErrorPrefix).arg(
-                QObject::tr("Polyline %1: %2").arg(i + 1).arg(validationError));
-            return false;
-        }
+    QString validationError;
+    if (!GeoUtilities::validatePolygonListCoordinates(polylines, validationError)) {
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName), validationError);
+        return false;
     }
 
     // Check if any coordinate has altitude - use ArcZ if so
-    const bool useZ = hasAnyAltitude(polylines);
+    const bool useZ = GeoUtilities::hasAnyAltitude(polylines);
     const int shapeType = useZ ? SHPT_ARCZ : SHPT_ARC;
 
     SHPHandle shpHandle = SHPCreate(shpFile.toUtf8().constData(), shapeType);
     if (shpHandle == nullptr) {
-        errorString = QString(_saveErrorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "Unable to create SHP file."));
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),QT_TRANSLATE_NOOP("SHP", "Unable to create SHP file."));
         return false;
     }
 
@@ -1114,24 +1078,24 @@ bool SHPFileHelper::savePointsToFile(const QString &shpFile, const QList<QGeoCoo
     errorString.clear();
 
     if (points.isEmpty()) {
-        errorString = QString(_saveErrorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "No points to save."));
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),QT_TRANSLATE_NOOP("SHP", "No points to save."));
         return false;
     }
 
     // Validate all coordinates before saving
     QString validationError;
     if (!GeoUtilities::validateCoordinates(points, validationError)) {
-        errorString = QString(_saveErrorPrefix).arg(validationError);
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),validationError);
         return false;
     }
 
     // Check if any coordinate has altitude - use PointZ if so
-    const bool useZ = hasAnyAltitude(points);
+    const bool useZ = GeoUtilities::hasAnyAltitude(points);
     const int shapeType = useZ ? SHPT_POINTZ : SHPT_POINT;
 
     SHPHandle shpHandle = SHPCreate(shpFile.toUtf8().constData(), shapeType);
     if (shpHandle == nullptr) {
-        errorString = QString(_saveErrorPrefix).arg(QT_TRANSLATE_NOOP("SHP", "Unable to create SHP file."));
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),QT_TRANSLATE_NOOP("SHP", "Unable to create SHP file."));
         return false;
     }
 

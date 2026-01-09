@@ -1,4 +1,5 @@
 #include "GPXHelper.h"
+#include "GeoFileIO.h"
 #include "GeoUtilities.h"
 #include "GPXSchemaValidator.h"
 #include "QGCLoggingCategory.h"
@@ -10,55 +11,10 @@
 QGC_LOGGING_CATEGORY(GPXHelperLog, "Utilities.Geo.GPXHelper")
 
 namespace {
-    constexpr const char *_errorPrefix = QT_TR_NOOP("GPX file load failed. %1");
-    constexpr const char *_saveErrorPrefix = QT_TR_NOOP("GPX file save failed. %1");
+    constexpr const char *kFormatName = "GPX";
+    constexpr const char *kGpxNamespace = "http://www.topografix.com/GPX/1/1";
+    constexpr const char *kGpxSchemaLocation = "http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd";
 
-    constexpr const char *_gpxNamespace = "http://www.topografix.com/GPX/1/1";
-    constexpr const char *_gpxSchemaLocation = "http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd";
-
-    bool openFileForRead(const QString &filePath, QFile &file, QString &errorString)
-    {
-        file.setFileName(filePath);
-        if (!file.exists()) {
-            errorString = QString(_errorPrefix).arg(QObject::tr("File not found: %1").arg(filePath));
-            return false;
-        }
-        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            errorString = QString(_errorPrefix).arg(QObject::tr("Unable to open file: %1").arg(file.errorString()));
-            return false;
-        }
-        return true;
-    }
-
-    bool openFileForWrite(const QString &filePath, QFile &file, QString &errorString)
-    {
-        file.setFileName(filePath);
-        if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-            errorString = QString(_saveErrorPrefix).arg(QObject::tr("Unable to open file for writing: %1").arg(file.errorString()));
-            return false;
-        }
-        return true;
-    }
-
-    bool closeFileAndCheck(QFile &file, QXmlStreamWriter &xml, QString &errorString)
-    {
-        // Check for XML writer errors
-        if (xml.hasError()) {
-            errorString = QString(_saveErrorPrefix).arg(QObject::tr("XML write error"));
-            file.close();
-            return false;
-        }
-
-        file.close();
-        if (file.error() != QFileDevice::NoError) {
-            errorString = QString(_saveErrorPrefix).arg(
-                QObject::tr("File close error: %1").arg(file.errorString()));
-            return false;
-        }
-        return true;
-    }
-
-    // Validate saved file in debug builds
     void validateSavedFile([[maybe_unused]] const QString &filePath)
     {
 #ifndef NDEBUG
@@ -184,15 +140,13 @@ namespace {
 
     void writeGpxHeader(QXmlStreamWriter &xml, const QString &creator = QStringLiteral("QGroundControl"))
     {
-        xml.setAutoFormatting(true);
-        xml.setAutoFormattingIndent(2);
         xml.writeStartDocument();
         xml.writeStartElement(QStringLiteral("gpx"));
         xml.writeAttribute(QStringLiteral("version"), QStringLiteral("1.1"));
         xml.writeAttribute(QStringLiteral("creator"), creator);
-        xml.writeDefaultNamespace(QString::fromLatin1(_gpxNamespace));
+        xml.writeDefaultNamespace(QString::fromLatin1(kGpxNamespace));
         xml.writeAttribute(QStringLiteral("xmlns:xsi"), QStringLiteral("http://www.w3.org/2001/XMLSchema-instance"));
-        xml.writeAttribute(QStringLiteral("xsi:schemaLocation"), QString::fromLatin1(_gpxSchemaLocation));
+        xml.writeAttribute(QStringLiteral("xsi:schemaLocation"), QString::fromLatin1(kGpxSchemaLocation));
     }
 
     void writePoint(QXmlStreamWriter &xml, const QString &elementName, const QGeoCoordinate &coord, const QString &name = QString())
@@ -252,12 +206,13 @@ namespace {
 
     bool parseGPXFile(const QString &filePath, GPXData &data, QString &errorString)
     {
-        QFile file;
-        if (!openFileForRead(filePath, file, errorString)) {
+        auto streamResult = GeoFileIO::openXmlStreamForRead(filePath, QString::fromLatin1(kFormatName));
+        if (!streamResult.success) {
+            errorString = streamResult.error;
             return false;
         }
 
-        QXmlStreamReader xml(&file);
+        QXmlStreamReader &xml = *streamResult.reader;
 
         while (!xml.atEnd() && !xml.hasError()) {
             const QXmlStreamReader::TokenType token = xml.readNext();
@@ -281,9 +236,10 @@ namespace {
         }
 
         if (xml.hasError()) {
-            errorString = QString(_errorPrefix).arg(QObject::tr("XML parse error at line %1: %2")
-                .arg(xml.lineNumber())
-                .arg(xml.errorString()));
+            errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),
+                QObject::tr("XML parse error at line %1: %2")
+                    .arg(xml.lineNumber())
+                    .arg(xml.errorString()));
             return false;
         }
 
@@ -320,7 +276,8 @@ ShapeFileHelper::ShapeType determineShapeType(const QString &filePath, QString &
         return ShapeFileHelper::ShapeType::Point;
     }
 
-    errorString = QString(_errorPrefix).arg(QObject::tr("No geometry found in GPX file"));
+    errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),
+        QObject::tr("No geometry found in GPX file"));
     return ShapeFileHelper::ShapeType::Error;
 }
 
@@ -365,7 +322,7 @@ bool loadPolygonFromFile(const QString &filePath, QList<QGeoCoordinate> &vertice
         }
     }
 
-    errorString = QString(_errorPrefix).arg(QObject::tr("No closed polygon found in GPX file"));
+    errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QObject::tr("No closed polygon found in GPX file"));
     return false;
 }
 
@@ -405,7 +362,7 @@ bool loadPolygonsFromFile(const QString &filePath, QList<QList<QGeoCoordinate>> 
     }
 
     if (polygons.isEmpty()) {
-        errorString = QString(_errorPrefix).arg(QObject::tr("No closed polygons found in GPX file"));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QObject::tr("No closed polygons found in GPX file"));
         return false;
     }
 
@@ -433,7 +390,7 @@ bool loadPolylineFromFile(const QString &filePath, QList<QGeoCoordinate> &coords
         return true;
     }
 
-    errorString = QString(_errorPrefix).arg(QObject::tr("No routes or tracks found in GPX file"));
+    errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QObject::tr("No routes or tracks found in GPX file"));
     return false;
 }
 
@@ -461,7 +418,7 @@ bool loadPolylinesFromFile(const QString &filePath, QList<QList<QGeoCoordinate>>
     }
 
     if (polylines.isEmpty()) {
-        errorString = QString(_errorPrefix).arg(QObject::tr("No routes or tracks found in GPX file"));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QObject::tr("No routes or tracks found in GPX file"));
         return false;
     }
 
@@ -480,7 +437,7 @@ bool loadPointsFromFile(const QString &filePath, QList<QGeoCoordinate> &points, 
     points = data.waypoints;
 
     if (points.isEmpty()) {
-        errorString = QString(_errorPrefix).arg(QObject::tr("No waypoints found in GPX file"));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QObject::tr("No waypoints found in GPX file"));
         return false;
     }
 
@@ -490,35 +447,34 @@ bool loadPointsFromFile(const QString &filePath, QList<QGeoCoordinate> &points, 
 bool savePolygonToFile(const QString &filePath, const QList<QGeoCoordinate> &vertices, QString &errorString)
 {
     if (vertices.count() < GeoUtilities::kMinPolygonVertices) {
-        errorString = QString(_saveErrorPrefix).arg(QObject::tr("Polygon must have at least 3 vertices"));
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),QObject::tr("Polygon must have at least 3 vertices"));
         return false;
     }
 
     // Validate all coordinates before saving
     QString validationError;
     if (!GeoUtilities::validateCoordinates(vertices, validationError)) {
-        errorString = QString(_saveErrorPrefix).arg(validationError);
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),validationError);
         return false;
     }
 
-    QFile file;
-    if (!openFileForWrite(filePath, file, errorString)) {
+    auto streamResult = GeoFileIO::openXmlStreamForWrite(filePath, QString::fromLatin1(kFormatName));
+    if (!streamResult.success) {
+        errorString = streamResult.error;
         return false;
     }
 
-    QXmlStreamWriter xml(&file);
+    QXmlStreamWriter &xml = *streamResult.writer;
     writeGpxHeader(xml);
 
     QList<QGeoCoordinate> closedVertices = vertices;
-    if (closedVertices.first().distanceTo(closedVertices.last()) >= GeoUtilities::kPolygonClosureThresholdMeters) {
-        closedVertices.append(closedVertices.first());
-    }
+    GeoUtilities::ensureClosingVertex(closedVertices);
 
     writeRoute(xml, closedVertices, QStringLiteral("Polygon"));
 
     xml.writeEndElement();
     xml.writeEndDocument();
-    if (!closeFileAndCheck(file, xml, errorString)) {
+    if (!GeoFileIO::closeXmlStream(streamResult, QString::fromLatin1(kFormatName), errorString)) {
         return false;
     }
 
@@ -529,26 +485,24 @@ bool savePolygonToFile(const QString &filePath, const QList<QGeoCoordinate> &ver
 bool savePolygonsToFile(const QString &filePath, const QList<QList<QGeoCoordinate>> &polygons, QString &errorString)
 {
     if (polygons.isEmpty()) {
-        errorString = QString(_saveErrorPrefix).arg(QObject::tr("No polygons to save"));
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),QObject::tr("No polygons to save"));
         return false;
     }
 
     // Validate all coordinates before saving
-    for (int i = 0; i < polygons.size(); i++) {
-        QString validationError;
-        if (!GeoUtilities::validateCoordinates(polygons[i], validationError)) {
-            errorString = QString(_saveErrorPrefix).arg(
-                QObject::tr("Polygon %1: %2").arg(i + 1).arg(validationError));
-            return false;
-        }
-    }
-
-    QFile file;
-    if (!openFileForWrite(filePath, file, errorString)) {
+    QString validationError;
+    if (!GeoUtilities::validatePolygonListCoordinates(polygons, validationError)) {
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName), validationError);
         return false;
     }
 
-    QXmlStreamWriter xml(&file);
+    auto streamResult = GeoFileIO::openXmlStreamForWrite(filePath, QString::fromLatin1(kFormatName));
+    if (!streamResult.success) {
+        errorString = streamResult.error;
+        return false;
+    }
+
+    QXmlStreamWriter &xml = *streamResult.writer;
     writeGpxHeader(xml);
 
     int index = 1;
@@ -558,16 +512,14 @@ bool savePolygonsToFile(const QString &filePath, const QList<QList<QGeoCoordinat
         }
 
         QList<QGeoCoordinate> closedVertices = vertices;
-        if (closedVertices.first().distanceTo(closedVertices.last()) >= GeoUtilities::kPolygonClosureThresholdMeters) {
-            closedVertices.append(closedVertices.first());
-        }
+        GeoUtilities::ensureClosingVertex(closedVertices);
 
         writeRoute(xml, closedVertices, QStringLiteral("Polygon %1").arg(index++));
     }
 
     xml.writeEndElement();
     xml.writeEndDocument();
-    if (!closeFileAndCheck(file, xml, errorString)) {
+    if (!GeoFileIO::closeXmlStream(streamResult, QString::fromLatin1(kFormatName), errorString)) {
         return false;
     }
 
@@ -578,30 +530,31 @@ bool savePolygonsToFile(const QString &filePath, const QList<QList<QGeoCoordinat
 bool savePolylineToFile(const QString &filePath, const QList<QGeoCoordinate> &coords, QString &errorString)
 {
     if (coords.count() < GeoUtilities::kMinPolylineVertices) {
-        errorString = QString(_saveErrorPrefix).arg(QObject::tr("Polyline must have at least 2 points"));
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName), QObject::tr("Polyline must have at least 2 points"));
         return false;
     }
 
     // Validate all coordinates before saving
     QString validationError;
     if (!GeoUtilities::validateCoordinates(coords, validationError)) {
-        errorString = QString(_saveErrorPrefix).arg(validationError);
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName), validationError);
         return false;
     }
 
-    QFile file;
-    if (!openFileForWrite(filePath, file, errorString)) {
+    auto streamResult = GeoFileIO::openXmlStreamForWrite(filePath, QString::fromLatin1(kFormatName));
+    if (!streamResult.success) {
+        errorString = streamResult.error;
         return false;
     }
 
-    QXmlStreamWriter xml(&file);
+    QXmlStreamWriter &xml = *streamResult.writer;
     writeGpxHeader(xml);
 
     writeRoute(xml, coords, QStringLiteral("Route"));
 
     xml.writeEndElement();
     xml.writeEndDocument();
-    if (!closeFileAndCheck(file, xml, errorString)) {
+    if (!GeoFileIO::closeXmlStream(streamResult, QString::fromLatin1(kFormatName), errorString)) {
         return false;
     }
 
@@ -612,7 +565,7 @@ bool savePolylineToFile(const QString &filePath, const QList<QGeoCoordinate> &co
 bool savePolylinesToFile(const QString &filePath, const QList<QList<QGeoCoordinate>> &polylines, QString &errorString)
 {
     if (polylines.isEmpty()) {
-        errorString = QString(_saveErrorPrefix).arg(QObject::tr("No polylines to save"));
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),QObject::tr("No polylines to save"));
         return false;
     }
 
@@ -620,18 +573,19 @@ bool savePolylinesToFile(const QString &filePath, const QList<QList<QGeoCoordina
     for (int i = 0; i < polylines.size(); i++) {
         QString validationError;
         if (!GeoUtilities::validateCoordinates(polylines[i], validationError)) {
-            errorString = QString(_saveErrorPrefix).arg(
+            errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),
                 QObject::tr("Polyline %1: %2").arg(i + 1).arg(validationError));
             return false;
         }
     }
 
-    QFile file;
-    if (!openFileForWrite(filePath, file, errorString)) {
+    auto streamResult = GeoFileIO::openXmlStreamForWrite(filePath, QString::fromLatin1(kFormatName));
+    if (!streamResult.success) {
+        errorString = streamResult.error;
         return false;
     }
 
-    QXmlStreamWriter xml(&file);
+    QXmlStreamWriter &xml = *streamResult.writer;
     writeGpxHeader(xml);
 
     int index = 1;
@@ -643,7 +597,7 @@ bool savePolylinesToFile(const QString &filePath, const QList<QList<QGeoCoordina
 
     xml.writeEndElement();
     xml.writeEndDocument();
-    if (!closeFileAndCheck(file, xml, errorString)) {
+    if (!GeoFileIO::closeXmlStream(streamResult, QString::fromLatin1(kFormatName), errorString)) {
         return false;
     }
 
@@ -654,23 +608,24 @@ bool savePolylinesToFile(const QString &filePath, const QList<QList<QGeoCoordina
 bool savePointsToFile(const QString &filePath, const QList<QGeoCoordinate> &points, QString &errorString)
 {
     if (points.isEmpty()) {
-        errorString = QString(_saveErrorPrefix).arg(QObject::tr("No points to save"));
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName), QObject::tr("No points to save"));
         return false;
     }
 
     // Validate all coordinates before saving
     QString validationError;
     if (!GeoUtilities::validateCoordinates(points, validationError)) {
-        errorString = QString(_saveErrorPrefix).arg(validationError);
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName), validationError);
         return false;
     }
 
-    QFile file;
-    if (!openFileForWrite(filePath, file, errorString)) {
+    auto streamResult = GeoFileIO::openXmlStreamForWrite(filePath, QString::fromLatin1(kFormatName));
+    if (!streamResult.success) {
+        errorString = streamResult.error;
         return false;
     }
 
-    QXmlStreamWriter xml(&file);
+    QXmlStreamWriter &xml = *streamResult.writer;
     writeGpxHeader(xml);
 
     int index = 1;
@@ -680,7 +635,7 @@ bool savePointsToFile(const QString &filePath, const QList<QGeoCoordinate> &poin
 
     xml.writeEndElement();
     xml.writeEndDocument();
-    if (!closeFileAndCheck(file, xml, errorString)) {
+    if (!GeoFileIO::closeXmlStream(streamResult, QString::fromLatin1(kFormatName), errorString)) {
         return false;
     }
 
@@ -691,30 +646,31 @@ bool savePointsToFile(const QString &filePath, const QList<QGeoCoordinate> &poin
 bool saveTrackToFile(const QString &filePath, const QList<QGeoCoordinate> &coords, QString &errorString)
 {
     if (coords.count() < GeoUtilities::kMinPolylineVertices) {
-        errorString = QString(_saveErrorPrefix).arg(QObject::tr("Track must have at least 2 points"));
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName), QObject::tr("Track must have at least 2 points"));
         return false;
     }
 
     // Validate all coordinates before saving
     QString validationError;
     if (!GeoUtilities::validateCoordinates(coords, validationError)) {
-        errorString = QString(_saveErrorPrefix).arg(validationError);
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName), validationError);
         return false;
     }
 
-    QFile file;
-    if (!openFileForWrite(filePath, file, errorString)) {
+    auto streamResult = GeoFileIO::openXmlStreamForWrite(filePath, QString::fromLatin1(kFormatName));
+    if (!streamResult.success) {
+        errorString = streamResult.error;
         return false;
     }
 
-    QXmlStreamWriter xml(&file);
+    QXmlStreamWriter &xml = *streamResult.writer;
     writeGpxHeader(xml);
 
     writeTrack(xml, coords, QStringLiteral("Track"));
 
     xml.writeEndElement();
     xml.writeEndDocument();
-    if (!closeFileAndCheck(file, xml, errorString)) {
+    if (!GeoFileIO::closeXmlStream(streamResult, QString::fromLatin1(kFormatName), errorString)) {
         return false;
     }
 
@@ -725,7 +681,7 @@ bool saveTrackToFile(const QString &filePath, const QList<QGeoCoordinate> &coord
 bool saveTracksToFile(const QString &filePath, const QList<QList<QGeoCoordinate>> &tracks, QString &errorString)
 {
     if (tracks.isEmpty()) {
-        errorString = QString(_saveErrorPrefix).arg(QObject::tr("No tracks to save"));
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName), QObject::tr("No tracks to save"));
         return false;
     }
 
@@ -733,18 +689,19 @@ bool saveTracksToFile(const QString &filePath, const QList<QList<QGeoCoordinate>
     for (int i = 0; i < tracks.size(); i++) {
         QString validationError;
         if (!GeoUtilities::validateCoordinates(tracks[i], validationError)) {
-            errorString = QString(_saveErrorPrefix).arg(
+            errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),
                 QObject::tr("Track %1: %2").arg(i + 1).arg(validationError));
             return false;
         }
     }
 
-    QFile file;
-    if (!openFileForWrite(filePath, file, errorString)) {
+    auto streamResult = GeoFileIO::openXmlStreamForWrite(filePath, QString::fromLatin1(kFormatName));
+    if (!streamResult.success) {
+        errorString = streamResult.error;
         return false;
     }
 
-    QXmlStreamWriter xml(&file);
+    QXmlStreamWriter &xml = *streamResult.writer;
     writeGpxHeader(xml);
 
     int index = 1;
@@ -756,7 +713,7 @@ bool saveTracksToFile(const QString &filePath, const QList<QList<QGeoCoordinate>
 
     xml.writeEndElement();
     xml.writeEndDocument();
-    if (!closeFileAndCheck(file, xml, errorString)) {
+    if (!GeoFileIO::closeXmlStream(streamResult, QString::fromLatin1(kFormatName), errorString)) {
         return false;
     }
 

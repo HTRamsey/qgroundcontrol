@@ -1,17 +1,14 @@
 #include "WKTHelper.h"
+#include "GeoFileIO.h"
 #include "GeoUtilities.h"
 
-#include <QtCore/QFile>
 #include <QtCore/QRegularExpression>
-#include <QtCore/QTextStream>
 #include <cmath>
 
 Q_LOGGING_CATEGORY(WKTHelperLog, "Utilities.Geo.WKTHelper")
 
 namespace {
-    constexpr const char *kParseErrorPrefix = QT_TR_NOOP("WKT parse failed. %1");
-    constexpr const char *kLoadErrorPrefix = QT_TR_NOOP("WKT file load failed. %1");
-    constexpr const char *kSaveErrorPrefix = QT_TR_NOOP("WKT file save failed. %1");
+    constexpr const char *kFormatName = "WKT";
 
     // Regex patterns for WKT geometry types
     static const QRegularExpression kGeometryTypeRx(
@@ -63,7 +60,7 @@ bool WKTHelper::parseCoordinateList(const QString &coordStr, QList<QGeoCoordinat
         const QStringList values = part.trimmed().split(QRegularExpression(QStringLiteral("\\s+")));
 
         if (values.size() < 2) {
-            errorString = QString(kParseErrorPrefix).arg(
+            errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),
                 QStringLiteral("Invalid coordinate: %1").arg(part));
             return false;
         }
@@ -73,7 +70,7 @@ bool WKTHelper::parseCoordinateList(const QString &coordStr, QList<QGeoCoordinat
         const double y = values[1].toDouble(&okY);  // latitude
 
         if (!okX || !okY) {
-            errorString = QString(kParseErrorPrefix).arg(
+            errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),
                 QStringLiteral("Invalid coordinate values: %1").arg(part));
             return false;
         }
@@ -153,7 +150,7 @@ bool WKTHelper::parsePoint(const QString &wkt, QGeoCoordinate &coord, QString &e
 
     const QRegularExpressionMatch match = rx.match(wkt);
     if (!match.hasMatch()) {
-        errorString = QString(kParseErrorPrefix).arg(QStringLiteral("Invalid POINT format"));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QStringLiteral("Invalid POINT format"));
         return false;
     }
 
@@ -165,7 +162,7 @@ bool WKTHelper::parsePoint(const QString &wkt, QGeoCoordinate &coord, QString &e
     }
 
     if (coords.isEmpty()) {
-        errorString = QString(kParseErrorPrefix).arg(QStringLiteral("No coordinates in POINT"));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QStringLiteral("No coordinates in POINT"));
         return false;
     }
 
@@ -181,7 +178,7 @@ bool WKTHelper::parseMultiPoint(const QString &wkt, QList<QGeoCoordinate> &point
 
     const QRegularExpressionMatch match = rx.match(wkt);
     if (!match.hasMatch()) {
-        errorString = QString(kParseErrorPrefix).arg(QStringLiteral("Invalid MULTIPOINT format"));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QStringLiteral("Invalid MULTIPOINT format"));
         return false;
     }
 
@@ -226,7 +223,7 @@ bool WKTHelper::parseLineString(const QString &wkt, QList<QGeoCoordinate> &coord
 
     const QRegularExpressionMatch match = rx.match(wkt);
     if (!match.hasMatch()) {
-        errorString = QString(kParseErrorPrefix).arg(QStringLiteral("Invalid LINESTRING format"));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QStringLiteral("Invalid LINESTRING format"));
         return false;
     }
 
@@ -242,7 +239,7 @@ bool WKTHelper::parseMultiLineString(const QString &wkt, QList<QList<QGeoCoordin
 
     const QRegularExpressionMatch match = rx.match(wkt);
     if (!match.hasMatch()) {
-        errorString = QString(kParseErrorPrefix).arg(QStringLiteral("Invalid MULTILINESTRING format"));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QStringLiteral("Invalid MULTILINESTRING format"));
         return false;
     }
 
@@ -275,7 +272,7 @@ bool WKTHelper::parsePolygon(const QString &wkt, QList<QGeoCoordinate> &vertices
 
     const QRegularExpressionMatch match = rx.match(wkt);
     if (!match.hasMatch()) {
-        errorString = QString(kParseErrorPrefix).arg(QStringLiteral("Invalid POLYGON format"));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QStringLiteral("Invalid POLYGON format"));
         return false;
     }
 
@@ -291,7 +288,7 @@ bool WKTHelper::parsePolygonWithHoles(const QString &wkt, QGeoPolygon &polygon, 
 
     const QRegularExpressionMatch match = rx.match(wkt);
     if (!match.hasMatch()) {
-        errorString = QString(kParseErrorPrefix).arg(QStringLiteral("Invalid POLYGON format"));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QStringLiteral("Invalid POLYGON format"));
         return false;
     }
 
@@ -313,7 +310,7 @@ bool WKTHelper::parsePolygonWithHoles(const QString &wkt, QGeoPolygon &polygon, 
     }
 
     if (rings.isEmpty()) {
-        errorString = QString(kParseErrorPrefix).arg(QStringLiteral("No rings in POLYGON"));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QStringLiteral("No rings in POLYGON"));
         return false;
     }
 
@@ -336,7 +333,7 @@ bool WKTHelper::parseMultiPolygon(const QString &wkt, QList<QList<QGeoCoordinate
 
     const QRegularExpressionMatch match = rx.match(wkt);
     if (!match.hasMatch()) {
-        errorString = QString(kParseErrorPrefix).arg(QStringLiteral("Invalid MULTIPOLYGON format"));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QStringLiteral("Invalid MULTIPOLYGON format"));
         return false;
     }
 
@@ -369,7 +366,7 @@ bool WKTHelper::parseMultiPolygonWithHoles(const QString &wkt, QList<QGeoPolygon
 
     const QRegularExpressionMatch match = rx.match(wkt);
     if (!match.hasMatch()) {
-        errorString = QString(kParseErrorPrefix).arg(QStringLiteral("Invalid MULTIPOLYGON format"));
+        errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QStringLiteral("Invalid MULTIPOLYGON format"));
         return false;
     }
 
@@ -594,21 +591,17 @@ QString WKTHelper::toWKTMultiPolygon(const QList<QGeoPolygon> &polygons, bool in
 namespace {
     bool readWktFromFile(const QString &filePath, QString &wkt, QString &errorString)
     {
-        QFile file(filePath);
-        if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-            errorString = QString(kLoadErrorPrefix).arg(
-                QObject::tr("Unable to open file: %1").arg(filePath));
+        const auto textResult = GeoFileIO::loadText(filePath, QString::fromLatin1(kFormatName));
+        if (!textResult.success) {
+            errorString = textResult.error;
             qCWarning(WKTHelperLog) << errorString;
             return false;
         }
 
-        QTextStream stream(&file);
-        wkt = stream.readAll().trimmed();
-        file.close();
-
+        wkt = textResult.content.trimmed();
         if (wkt.isEmpty()) {
-            errorString = QString(kLoadErrorPrefix).arg(
-                QObject::tr("File is empty: %1").arg(filePath));
+            errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),
+                QObject::tr("File is empty"));
             qCWarning(WKTHelperLog) << errorString;
             return false;
         }
@@ -647,7 +640,7 @@ bool WKTHelper::loadPointsFromFile(const QString &filePath, QList<QGeoCoordinate
         return parseMultiPoint(wkt, points, errorString);
     }
 
-    errorString = QString(kLoadErrorPrefix).arg(QObject::tr("File does not contain point data"));
+    errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QObject::tr("File does not contain point data"));
     return false;
 }
 
@@ -684,7 +677,7 @@ bool WKTHelper::loadPolylinesFromFile(const QString &filePath, QList<QList<QGeoC
         return parseMultiLineString(wkt, polylines, errorString);
     }
 
-    errorString = QString(kLoadErrorPrefix).arg(QObject::tr("File does not contain polyline data"));
+    errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QObject::tr("File does not contain polyline data"));
     return false;
 }
 
@@ -721,7 +714,7 @@ bool WKTHelper::loadPolygonsFromFile(const QString &filePath, QList<QList<QGeoCo
         return parseMultiPolygon(wkt, polygons, errorString);
     }
 
-    errorString = QString(kLoadErrorPrefix).arg(QObject::tr("File does not contain polygon data"));
+    errorString = GeoFileIO::formatLoadError(QString::fromLatin1(kFormatName),QObject::tr("File does not contain polygon data"));
     return false;
 }
 
@@ -732,26 +725,15 @@ bool WKTHelper::loadPolygonsFromFile(const QString &filePath, QList<QList<QGeoCo
 namespace {
     bool writeWktToFile(const QString &filePath, const QString &wkt, QString &errorString)
     {
-        QFile file(filePath);
-        if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-            errorString = QString(kSaveErrorPrefix).arg(
-                QObject::tr("Unable to open file for writing: %1").arg(filePath));
-            qCWarning(WKTHelperLog) << errorString;
-            return false;
-        }
-
-        QTextStream stream(&file);
-        stream << wkt << '\n';
-        file.close();
-
-        return true;
+        return GeoFileIO::saveText(filePath, wkt + QLatin1Char('\n'),
+                                   QString::fromLatin1(kFormatName), errorString);
     }
 
     bool validateCoordinatesForSave(const QList<QGeoCoordinate> &coords, QString &errorString)
     {
         for (int i = 0; i < coords.size(); ++i) {
             if (!GeoUtilities::isValidCoordinate(coords[i])) {
-                errorString = QString(kSaveErrorPrefix).arg(
+                errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),
                     QObject::tr("Invalid coordinate at index %1").arg(i));
                 return false;
             }
@@ -764,7 +746,7 @@ bool WKTHelper::savePointToFile(const QString &filePath, const QGeoCoordinate &c
                                  QString &errorString, bool includeAltitude)
 {
     if (!GeoUtilities::isValidCoordinate(coord)) {
-        errorString = QString(kSaveErrorPrefix).arg(QObject::tr("Invalid coordinate"));
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),QObject::tr("Invalid coordinate"));
         return false;
     }
 
@@ -776,7 +758,7 @@ bool WKTHelper::savePointsToFile(const QString &filePath, const QList<QGeoCoordi
                                   QString &errorString, bool includeAltitude)
 {
     if (points.isEmpty()) {
-        errorString = QString(kSaveErrorPrefix).arg(QObject::tr("No points to save"));
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),QObject::tr("No points to save"));
         return false;
     }
 
@@ -792,7 +774,7 @@ bool WKTHelper::savePolylineToFile(const QString &filePath, const QList<QGeoCoor
                                     QString &errorString, bool includeAltitude)
 {
     if (coords.size() < GeoUtilities::kMinPolylineVertices) {
-        errorString = QString(kSaveErrorPrefix).arg(
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),
             QObject::tr("Polyline requires at least %1 points").arg(GeoUtilities::kMinPolylineVertices));
         return false;
     }
@@ -809,13 +791,13 @@ bool WKTHelper::savePolylinesToFile(const QString &filePath, const QList<QList<Q
                                      QString &errorString, bool includeAltitude)
 {
     if (polylines.isEmpty()) {
-        errorString = QString(kSaveErrorPrefix).arg(QObject::tr("No polylines to save"));
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),QObject::tr("No polylines to save"));
         return false;
     }
 
     for (int i = 0; i < polylines.size(); ++i) {
         if (polylines[i].size() < GeoUtilities::kMinPolylineVertices) {
-            errorString = QString(kSaveErrorPrefix).arg(
+            errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),
                 QObject::tr("Polyline %1 requires at least %2 points").arg(i + 1).arg(GeoUtilities::kMinPolylineVertices));
             return false;
         }
@@ -832,7 +814,7 @@ bool WKTHelper::savePolygonToFile(const QString &filePath, const QList<QGeoCoord
                                    QString &errorString, bool includeAltitude)
 {
     if (vertices.size() < GeoUtilities::kMinPolygonVertices) {
-        errorString = QString(kSaveErrorPrefix).arg(
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),
             QObject::tr("Polygon requires at least %1 vertices").arg(GeoUtilities::kMinPolygonVertices));
         return false;
     }
@@ -849,13 +831,13 @@ bool WKTHelper::savePolygonsToFile(const QString &filePath, const QList<QList<QG
                                     QString &errorString, bool includeAltitude)
 {
     if (polygons.isEmpty()) {
-        errorString = QString(kSaveErrorPrefix).arg(QObject::tr("No polygons to save"));
+        errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),QObject::tr("No polygons to save"));
         return false;
     }
 
     for (int i = 0; i < polygons.size(); ++i) {
         if (polygons[i].size() < GeoUtilities::kMinPolygonVertices) {
-            errorString = QString(kSaveErrorPrefix).arg(
+            errorString = GeoFileIO::formatSaveError(QString::fromLatin1(kFormatName),
                 QObject::tr("Polygon %1 requires at least %2 vertices").arg(i + 1).arg(GeoUtilities::kMinPolygonVertices));
             return false;
         }

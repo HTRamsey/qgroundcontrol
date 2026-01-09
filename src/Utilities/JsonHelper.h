@@ -1,10 +1,12 @@
 #pragma once
 
-#include <QtCore/QLoggingCategory>
+#include <QtCore/QJsonArray>
 #include <QtCore/QJsonObject>
+#include <QtCore/QLoggingCategory>
 #include <QtCore/QVariantList>
 #include <QtPositioning/QGeoCoordinate>
 
+class QmlObjectListModel;
 class QTranslator;
 
 Q_DECLARE_LOGGING_CATEGORY(JsonHelperLog)
@@ -127,6 +129,12 @@ namespace JsonHelper
 
     /// Returns NaN if the value is null, or if not, the double value
     double possibleNaNJsonValue(const QJsonValue &value);
+
+    /// Loads a polygon from a GeoJSON coordinate array into a QmlObjectListModel
+    bool loadPolygon(const QJsonArray& polygonArray, QmlObjectListModel& list, QObject* parent, QString& errorString);
+
+    /// Saves a polygon from a QmlObjectListModel to a JSON array
+    void savePolygon(const QmlObjectListModel& list, QJsonArray& polygonArray);
 
     constexpr const char *jsonVersionKey = "version";
     constexpr const char *jsonFileTypeKey = "fileType";

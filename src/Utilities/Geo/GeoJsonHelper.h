@@ -102,4 +102,9 @@ namespace GeoJsonHelper
     void saveGeoJsonCoordinateArray(const QList<QGeoCoordinate> &coordinates,
                                     bool writeAltitude,
                                     QJsonValue &jsonValue);
+
+    /// Create a GeoJSON ring array from coordinates (closes ring if needed)
+    /// @param coords Polygon ring coordinates
+    /// @return QJsonArray of [lon, lat, alt] arrays with closing vertex
+    QJsonArray coordinatesToJsonRing(const QList<QGeoCoordinate> &coords);
 }
