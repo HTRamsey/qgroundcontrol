@@ -1,12 +1,14 @@
 #pragma once
 
+#include "QGCCache.h"
 #include "TerrainQueryInterface.h"
 
 #include <QtCore/QLoggingCategory>
-#include <QtCore/QMutex>
 #include <QtCore/QObject>
 #include <QtCore/QQueue>
 #include <QtPositioning/QGeoCoordinate>
+
+#include <memory>
 
 class TerrainTile;
 class QNetworkAccessManager;
@@ -60,8 +62,9 @@ private:
     QQueue<QueuedRequestInfo_t> _requestQueue;
     TerrainQuery::State _state = TerrainQuery::State::Idle;
 
-    QMutex _tilesMutex;
-    QHash<QString, TerrainTile*> _tiles;
+    // Thread-safe LRU cache for terrain tiles (max 500 tiles, no TTL - terrain data doesn't expire)
+    // Using shared_ptr ensures proper cleanup when entries are evicted
+    QGCCache<QString, std::shared_ptr<TerrainTile>> _tiles{500, 0};
 
     QNetworkAccessManager *_networkManager = nullptr;
 };

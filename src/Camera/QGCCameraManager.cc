@@ -662,14 +662,12 @@ void QGCCameraManager::_toggleVideoRecording()
 
 void QGCCameraManager::_stepZoom(int direction)
 {
-    if (_lastZoomChange.elapsed() > 40) {
-        _lastZoomChange.start();
+    _zoomThrottler.call([this, direction]() {
         qCDebug(CameraManagerLog) << "Step Camera Zoom" << direction;
-        MavlinkCameraControl *pCamera = currentCameraInstance();
-        if (pCamera) {
+        if (MavlinkCameraControl *pCamera = currentCameraInstance()) {
             pCamera->stepZoom(direction);
         }
-    }
+    });
 }
 
 void QGCCameraManager::_startZoom(int direction)
@@ -692,8 +690,7 @@ void QGCCameraManager::_stopZoom()
 
 void QGCCameraManager::_stepCamera(int direction)
 {
-    if (_lastCameraChange.elapsed() > 1000) {
-        _lastCameraChange.start();
+    _cameraThrottler.call([this, direction]() {
         qCDebug(CameraManagerLog) << "Step Camera" << direction;
         int camera = _currentCameraIndex + direction;
         if (camera < 0) {
@@ -702,15 +699,13 @@ void QGCCameraManager::_stepCamera(int direction)
             camera = 0;
         }
         setCurrentCamera(camera);
-    }
+    });
 }
 
 void QGCCameraManager::_stepStream(int direction)
 {
-    if (_lastCameraChange.elapsed() > 1000) {
-        _lastCameraChange.start();
-        MavlinkCameraControl *pCamera = currentCameraInstance();
-        if (pCamera) {
+    _cameraThrottler.call([this, direction]() {
+        if (MavlinkCameraControl *pCamera = currentCameraInstance()) {
             qCDebug(CameraManagerLog) << "Step Camera Stream" << direction;
             int stream = pCamera->currentStream() + direction;
             if (stream < 0) {
@@ -720,7 +715,7 @@ void QGCCameraManager::_stepStream(int direction)
             }
             pCamera->setCurrentStream(stream);
         }
-    }
+    });
 }
 
 const QVariantList &QGCCameraManager::cameraList() const

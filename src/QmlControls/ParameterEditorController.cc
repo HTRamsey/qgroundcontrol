@@ -138,14 +138,11 @@ ParameterEditorController::ParameterEditorController(QObject *parent)
 
     _buildLists();
 
-    _searchTimer.setSingleShot(true);
-    _searchTimer.setInterval(300);
-
     connect(this, &ParameterEditorController::currentCategoryChanged,   this, &ParameterEditorController::_currentCategoryChanged);
     connect(this, &ParameterEditorController::currentGroupChanged,      this, &ParameterEditorController::_currentGroupChanged);
-    connect(this, &ParameterEditorController::searchTextChanged,        this, &ParameterEditorController::_searchTextChanged);
-    connect(this, &ParameterEditorController::showModifiedOnlyChanged,  this, &ParameterEditorController::_searchTextChanged);
-    connect(&_searchTimer, &QTimer::timeout,                            this, &ParameterEditorController::_performSearch);
+    connect(this, &ParameterEditorController::searchTextChanged,        &_searchDebouncer, qOverload<>(&QGCDebouncer::call));
+    connect(this, &ParameterEditorController::showModifiedOnlyChanged,  &_searchDebouncer, qOverload<>(&QGCDebouncer::call));
+    connect(&_searchDebouncer, &QGCDebouncer::triggered,                this, &ParameterEditorController::_performSearch);
     connect(_parameterMgr, &ParameterManager::factAdded,                this, &ParameterEditorController::_factAdded);
 
     ParameterEditorCategory* category = _categories.count() ? _categories.value<ParameterEditorCategory*>(0) : nullptr;
@@ -458,11 +455,6 @@ bool ParameterEditorController::_shouldShow(Fact* fact) const
     }
 
     return fact->defaultValueAvailable() && !fact->valueEqualsDefault();
-}
-
-void ParameterEditorController::_searchTextChanged(void)
-{
-    _searchTimer.start();
 }
 
 void ParameterEditorController::_performSearch(void)

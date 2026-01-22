@@ -42,7 +42,7 @@ TerrainTileManager::TerrainTileManager(QObject *parent)
 
 TerrainTileManager::~TerrainTileManager()
 {
-    qDeleteAll(_tiles);
+    _tiles.clear();  // shared_ptr handles deletion automatically
 
     qCDebug(TerrainTileManagerLog) << this;
 }
@@ -371,35 +371,32 @@ void TerrainTileManager::_terrainDone()
 
 void TerrainTileManager::_cacheTile(const QByteArray &data, const QString &hash)
 {
-    TerrainTile* const terrainTile = new TerrainTile(data);
+    auto terrainTile = std::make_shared<TerrainTile>(data);
     if (!terrainTile->isValid()) {
-        delete terrainTile;
         qCWarning(TerrainTileManagerLog) << "Received invalid tile";
         return;
     }
 
-    QMutexLocker locker(&_tilesMutex);
+    // QGCCache is thread-safe and handles LRU eviction automatically
     if (!_tiles.contains(hash)) {
-        (void) _tiles.insert(hash, terrainTile);
-    } else {
-        delete terrainTile;
+        _tiles.insert(hash, terrainTile);
     }
 }
 
 TerrainTile *TerrainTileManager::_getCachedTile(const QString &hash)
 {
-    QMutexLocker locker(&_tilesMutex);
-
-    if (!_tiles.contains(hash)) {
+    // QGCCache is thread-safe, no mutex needed
+    auto tile = _tiles.get(hash);
+    if (!tile.has_value()) {
         return nullptr;
     }
 
-    TerrainTile* const tile = _tiles[hash];
-    if (!tile->isValid()) {
+    TerrainTile* rawTile = tile.value().get();
+    if (!rawTile->isValid()) {
         return nullptr;
     }
 
-    return tile;
+    return rawTile;
 }
 
 void TerrainTileManager::_processCarpetResults(const QList<double> &altitudes, int gridSizeLat, int gridSizeLon,

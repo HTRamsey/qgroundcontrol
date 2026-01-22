@@ -60,16 +60,23 @@ endif()
 target_include_directories(${CMAKE_PROJECT_NAME}
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
+        Async
         Compression
+        Data
         FileSystem
+        Network
+        Telemetry
 )
 
 # ============================================================================
 # Utility Subdirectories
 # ============================================================================
 
+add_subdirectory(Async)
 add_subdirectory(Audio)
 add_subdirectory(Compression)
+add_subdirectory(Data)
 add_subdirectory(Geo)
 add_subdirectory(Network)
 add_subdirectory(StateMachine)
+add_subdirectory(Telemetry)

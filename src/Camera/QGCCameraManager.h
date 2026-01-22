@@ -10,6 +10,7 @@
 #include <QtQmlIntegration/QtQmlIntegration>
 
 #include "MAVLinkLib.h"
+#include "QGCDebouncer.h"
 #include "QmlObjectListModel.h"
 #include "Vehicle.h"
 
@@ -133,8 +134,8 @@ private:
     QmlObjectListModel _cameras;
     QStringList _cameraLabels;
     int _currentCameraIndex = 0;
-    QElapsedTimer _lastZoomChange;
-    QElapsedTimer _lastCameraChange;
+    QGCThrottler _zoomThrottler{40};      // 40ms = max ~25Hz for zoom steps
+    QGCThrottler _cameraThrottler{1000};  // 1000ms = max 1Hz for camera/stream switching
     QTimer _camerasLostHeartbeatTimer;
     QMap<QString, CameraStruct*> _cameraInfoRequest;
     static QVariantList _cameraList;

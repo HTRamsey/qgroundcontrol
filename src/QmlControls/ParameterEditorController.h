@@ -7,6 +7,7 @@
 #include "FactPanelController.h"
 #include "QmlObjectListModel.h"
 #include "FactMetaData.h"
+#include "QGCDebouncer.h"
 
 Q_DECLARE_LOGGING_CATEGORY(ParameterEditorControllerLog)
 
@@ -166,7 +167,6 @@ signals:
 private slots:
     void _currentCategoryChanged(void);
     void _currentGroupChanged   (void);
-    void _searchTextChanged     (void);
     void _buildLists            (void);
     void _buildListsForComponent(int compId);
     void _factAdded             (int compId, Fact* fact);
@@ -178,7 +178,7 @@ private:
 private:
     ParameterManager*           _parameterMgr           = nullptr;
     QString                     _searchText;
-    QTimer                      _searchTimer;
+    QGCDebouncer                _searchDebouncer{300};  // 300ms debounce for search input
     ParameterEditorCategory*    _currentCategory        = nullptr;
     ParameterEditorGroup*       _currentGroup           = nullptr;
     bool                        _showModifiedOnly       = false;
