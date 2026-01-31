@@ -1,7 +1,7 @@
 #include "CameraCalcTest.h"
 #include "CameraCalc.h"
 #include "PlanMasterController.h"
-#include "MultiSignalSpyV2.h"
+#include "MultiSignalSpy.h"
 
 #include <QtTest/QTest>
 
@@ -20,14 +20,12 @@ void CameraCalcTest::init(void)
     _cameraCalc->setCameraBrand(CameraCalc::canonicalCustomCameraName());
     _cameraCalc->setDirty(false);
 
-    _multiSpy = new MultiSignalSpyV2();
+    _multiSpy = new MultiSignalSpy();
     QVERIFY(_multiSpy->init(_cameraCalc));
 }
 
 void CameraCalcTest::cleanup(void)
 {
-    UnitTest::cleanup();
-
     delete _masterController;
     delete _cameraCalc;
     delete _multiSpy;
@@ -35,13 +33,12 @@ void CameraCalcTest::cleanup(void)
     _masterController   = nullptr;
     _cameraCalc         = nullptr;
     _multiSpy           = nullptr;
+
+    UnitTest::cleanup();
 }
 
 void CameraCalcTest::_testDirty(void)
 {
-    const char* dirtyChangedSignal  = "dirtyChanged";
-    auto        dirtyChangedMask    = _multiSpy->signalNameToMask(dirtyChangedSignal);
-
     QVERIFY(!_cameraCalc->dirty());
     _cameraCalc->setDirty(false);
     QVERIFY(!_cameraCalc->dirty());
@@ -49,13 +46,13 @@ void CameraCalcTest::_testDirty(void)
 
     _cameraCalc->setDirty(true);
     QVERIFY(_cameraCalc->dirty());
-    QVERIFY(_multiSpy->checkOnlySignalByMask(dirtyChangedMask));
-    QVERIFY(_multiSpy->pullBoolFromSignal(dirtyChangedSignal));
+    QVERIFY(_multiSpy->checkOnlySignal("dirtyChanged"));
+    QVERIFY(_multiSpy->pullBoolFromSignal("dirtyChanged"));
     _multiSpy->clearAllSignals();
 
     _cameraCalc->setDirty(false);
     QVERIFY(!_cameraCalc->dirty());
-    QVERIFY(_multiSpy->checkOnlySignalByMask(dirtyChangedMask));
+    QVERIFY(_multiSpy->checkOnlySignal("dirtyChanged"));
     _multiSpy->clearAllSignals();
 
     // These facts should set dirty when changed
@@ -75,7 +72,7 @@ void CameraCalcTest::_testDirty(void)
         } else {
             fact->setRawValue(fact->rawValue().toDouble() + 1);
         }
-        QVERIFY(_multiSpy->checkSignalByMask(dirtyChangedMask));
+        QVERIFY(_multiSpy->checkSignal("dirtyChanged"));
         _cameraCalc->setDirty(false);
         _multiSpy->clearAllSignals();
     }

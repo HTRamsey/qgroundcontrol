@@ -27,18 +27,6 @@ private slots:
 private:
     void _createSpy(SpeedSection* speedSection, MultiSignalSpy** speedSpy);
 
-    enum {
-        specifyFlightSpeedChangedIndex = 0,
-        maxSignalIndex,
-    };
-
-    enum {
-        specifyFlightSpeedChangedMask = 1 << specifyFlightSpeedChangedIndex
-    };
-
-    static const size_t cSpeedSignals = maxSignalIndex;
-    const char*         rgSpeedSignals[cSpeedSignals];
-
     MultiSignalSpy* _spySpeed;
     MultiSignalSpy* _spySection;
     SpeedSection*   _speedSection;

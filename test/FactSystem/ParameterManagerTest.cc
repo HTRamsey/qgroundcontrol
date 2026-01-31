@@ -60,14 +60,14 @@ void ParameterManagerTest::_noFailure(void)
 
 void ParameterManagerTest::_requestListMissingParamSuccess(void)
 {
-    _noFailureWorker(MockConfiguration::FailMissingParamOnInitialReqest);
+    _noFailureWorker(MockConfiguration::FailMissingParamOnInitialRequest);
 }
 
 // Test no response to param_request_list
 void ParameterManagerTest::_requestListNoResponse(void)
 {
     Q_ASSERT(!_mockLink);
-    _mockLink = MockLink::startPX4MockLink(false, MockConfiguration::FailParamNoReponseToRequestList);
+    _mockLink = MockLink::startPX4MockLink(false, MockConfiguration::FailParamNoResponseToRequestList);
 
     MultiVehicleManager* vehicleMgr = MultiVehicleManager::instance();
     QVERIFY(vehicleMgr);

@@ -96,7 +96,7 @@ void RequestMessageTest::_duplicateCommand(void)
     // We should then observe that the command is no longer pending and may send again.
     testCase.resultHandlerCalled = false;
     testCase.expectedFailureCode = Vehicle::RequestMessageFailureCommandNotAcked;
-    auto timeout = Vehicle::_mavCommandMaxRetryCount * (Vehicle::_mavCommandResponseCheckTimeoutMSecs + Vehicle::_mavCommandAckTimeoutMSecs);
+    auto timeout = Vehicle::_mavCommandMaxRetryCount * (Vehicle::_mavCommandResponseCheckTimeoutMSecs() + Vehicle::_mavCommandAckTimeoutMSecs());
     QVERIFY(QTest::qWaitFor([&]() { return testCase.resultHandlerCalled; }, timeout));
     QVERIFY(false == vehicle->isMavCommandPending(MAV_COMP_ID_AUTOPILOT1, MAV_CMD_REQUEST_MESSAGE));
 }

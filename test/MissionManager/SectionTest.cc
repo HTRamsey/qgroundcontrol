@@ -16,11 +16,6 @@ void SectionTest::init(void)
 {
     VisualMissionItemTest::init();
 
-    rgSectionSignals[availableChangedIndex] =           SIGNAL(availableChanged(bool));
-    rgSectionSignals[settingsSpecifiedChangedIndex] =   SIGNAL(settingsSpecifiedChanged(bool));
-    rgSectionSignals[dirtyChangedIndex] =               SIGNAL(dirtyChanged(bool));
-    rgSectionSignals[itemCountChangedIndex] =           SIGNAL(itemCountChanged(int));
-
     MissionItem missionItem(1,              // sequence number
                             MAV_CMD_NAV_WAYPOINT,
                             MAV_FRAME_GLOBAL_RELATIVE_ALT,
@@ -46,7 +41,7 @@ void SectionTest::_createSpy(Section* section, MultiSignalSpy** sectionSpy)
 {
     *sectionSpy = nullptr;
     MultiSignalSpy* spy = new MultiSignalSpy();
-    QCOMPARE(spy->init(section, rgSectionSignals, cSectionSignals), true);
+    QCOMPARE(spy->init(section), true);
     *sectionSpy = spy;
 }
 

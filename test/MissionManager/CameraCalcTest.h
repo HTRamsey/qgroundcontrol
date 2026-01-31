@@ -2,7 +2,7 @@
 
 #include "UnitTest.h"
 
-class MultiSignalSpyV2;
+class MultiSignalSpy;
 class CameraCalc;
 class PlanMasterController;
 
@@ -25,6 +25,6 @@ private slots:
 private:
     PlanMasterController*   _masterController   = nullptr;
     Vehicle*                _controllerVehicle  = nullptr;
-    MultiSignalSpyV2*       _multiSpy           = nullptr;
+    MultiSignalSpy*         _multiSpy           = nullptr;
     CameraCalc*             _cameraCalc         = nullptr;
 };

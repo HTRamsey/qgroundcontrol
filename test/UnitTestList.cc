@@ -2,6 +2,11 @@
 #include "UnitTest.h"
 #include "QGCLoggingCategory.h"
 
+#include <QtCore/QElapsedTimer>
+#include <QtCore/QSet>
+
+QGC_LOGGING_CATEGORY(UnitTestListLog, "Test.UnitTestList")
+
 // ADSB
 #include "ADSBTest.h"
 
@@ -71,6 +76,9 @@
 #include "TerrainQueryTest.h"
 #include "TerrainTileTest.h"
 
+// UnitTestFramework
+#include "MultiSignalSpyTest.h"
+
 // UI
 
 // Utilities
@@ -87,6 +95,12 @@
 #include "QGCFileWatcherTest.h"
 // Geo
 #include "GeoTest.h"
+// Platform
+#include "PlatformTest.h"
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
+#include "RunGuardTest.h"
+#include "SignalHandlerTest.h"
+#endif
 // Shape
 #include "ShapeTest.h"
 
@@ -108,8 +122,17 @@
 // #include "SendMavCommandTest.h"
 // #include "TCPLinkTest.h"
 
-int QGCUnitTest::runTests(bool stress, const QStringList& unitTests)
+namespace {
+
+/// Registers all unit tests. Called once at startup.
+void registerAllTests()
 {
+    static bool registered = false;
+    if (registered) {
+        return;
+    }
+    registered = true;
+
     // ADSB
     UT_REGISTER_TEST(ADSBTest)
 
@@ -120,9 +143,6 @@ int QGCUnitTest::runTests(bool stress, const QStringList& unitTests)
     UT_REGISTER_TEST(LogDownloadTest)
     UT_REGISTER_TEST(PX4LogParserTest)
     UT_REGISTER_TEST(ULogParserTest)
-
-    // AutoPilotPlugins
-    // UT_REGISTER_TEST(RadioConfigTest)
 
     // Camera
     UT_REGISTER_TEST(QGCCameraManagerTest)
@@ -169,35 +189,41 @@ int QGCUnitTest::runTests(bool stress, const QStringList& unitTests)
     UT_REGISTER_TEST(TransectStyleComplexItemTest)
     // UT_REGISTER_TEST(VisualMissionItemTest)
 
-    // qgcunittest
-
-    // QmlControls
-
     // Terrain
     UT_REGISTER_TEST(TerrainQueryTest)
     UT_REGISTER_TEST(TerrainTileTest)
 
-    // UI
+    // UnitTestFramework
+    UT_REGISTER_TEST(MultiSignalSpyTest)
 
-    // Utilities
-    // Audio
+    // Utilities - Audio
     UT_REGISTER_TEST(AudioOutputTest)
-    // Compression
+
+    // Utilities - Compression
     UT_REGISTER_TEST(QGCArchiveModelTest)
     UT_REGISTER_TEST(QGCCompressionTest)
     UT_REGISTER_TEST(QGCStreamingDecompressionTest)
-    // FileSystem
+
+    // Utilities - FileSystem
     UT_REGISTER_TEST(QGCArchiveWatcherTest)
     UT_REGISTER_TEST(QGCFileDownloadTest)
     UT_REGISTER_TEST(QGCFileHelperTest)
     UT_REGISTER_TEST(QGCFileWatcherTest)
-    // Geo
+
+    // Utilities - Geo
     UT_REGISTER_TEST(GeoTest)
-    // Shape
+
+    // Utilities - Platform
+    UT_REGISTER_TEST(PlatformTest)
+#if !defined(Q_OS_ANDROID) && !defined(Q_OS_IOS)
+    UT_REGISTER_TEST(RunGuardTest)
+    UT_REGISTER_TEST(SignalHandlerTest)
+#endif
+
+    // Utilities - Shape
     UT_REGISTER_TEST(ShapeTest)
 
     // Vehicle
-    // Components
     UT_REGISTER_TEST(ComponentInformationCacheTest)
     UT_REGISTER_TEST(ComponentInformationTranslationTest)
     UT_REGISTER_TEST(FTPManagerTest)
@@ -207,26 +233,47 @@ int QGCUnitTest::runTests(bool stress, const QStringList& unitTests)
     // UT_REGISTER_TEST(SendMavCommandWithHandlerTest)
     // UT_REGISTER_TEST(SendMavCommandWithSignalingTest)
     UT_REGISTER_TEST(VehicleLinkManagerTest)
+}
 
-    // Missing
-    // UT_REGISTER_TEST(FlightGearUnitTest)
-    // UT_REGISTER_TEST(LinkManagerTest)
-    // UT_REGISTER_TEST(SendMavCommandTest)
-    // UT_REGISTER_TEST(TCPLinkTest)
+} // anonymous namespace
 
+namespace QGCUnitTest {
+
+int runTests(bool stress, const QStringList& unitTests, const QString& outputFile)
+{
+    registerAllTests();
+
+    if (unitTests.isEmpty()) {
+        qCWarning(UnitTestListLog) << "No tests specified";
+        return -1;
+    }
+
+    // Validate all test names before running
+    const QStringList invalid = validateTestNames(unitTests);
+    if (!invalid.isEmpty()) {
+        qCWarning(UnitTestListLog) << "Unknown test(s):" << invalid.join(", ");
+        qCWarning(UnitTestListLog) << "Available tests:" << UnitTest::registeredTests().join(", ");
+        return -static_cast<int>(invalid.size());
+    }
+
+    const int iterations = stress ? kStressIterations : 1;
     int result = 0;
-    for (int i=0; i < (stress ? 20 : 1); i++) {
+
+    for (int i = 0; i < iterations; ++i) {
         int failures = 0;
-        for (const QString& test: unitTests) {
-            // Run the test
-            failures += UnitTest::run(test);
+
+        for (const QString& test : unitTests) {
+            failures += UnitTest::run(test, outputFile);
         }
 
         if (failures == 0) {
-            qDebug() << "ALL TESTS PASSED";
-            result = 0;
+            if (stress) {
+                qCDebug(UnitTestListLog).noquote() << QString("ALL TESTS PASSED (iteration %1/%2)").arg(i + 1).arg(iterations);
+            } else {
+                qCDebug(UnitTestListLog) << "ALL TESTS PASSED";
+            }
         } else {
-            qWarning() << failures << "TESTS FAILED!";
+            qCWarning(UnitTestListLog) << failures << "TESTS FAILED!";
             result = -failures;
             break;
         }
@@ -234,3 +281,83 @@ int QGCUnitTest::runTests(bool stress, const QStringList& unitTests)
 
     return result;
 }
+
+QStringList registeredTestNames()
+{
+    registerAllTests();
+    return UnitTest::registeredTests();
+}
+
+int registeredTestCount()
+{
+    registerAllTests();
+    return UnitTest::testCount();
+}
+
+bool isTestRegistered(const QString& testName)
+{
+    registerAllTests();
+    return UnitTest::registeredTests().contains(testName);
+}
+
+QStringList validateTestNames(const QStringList& testNames)
+{
+    registerAllTests();
+    const QStringList registered = UnitTest::registeredTests();
+
+    // Use QSet for O(1) lookup instead of O(n) QStringList::contains()
+    const QSet<QString> registeredSet(registered.cbegin(), registered.cend());
+
+    QStringList invalid;
+    invalid.reserve(testNames.size());
+
+    for (const QString& name : testNames) {
+        if (!registeredSet.contains(name)) {
+            invalid.append(name);
+        }
+    }
+
+    return invalid;
+}
+
+int handleTestOptions(const QGCCommandLineParser::CommandLineParseResult& args)
+{
+    if (args.listTests) {
+        const QStringList tests = registeredTestNames();
+        qCInfo(UnitTestListLog) << "Available unit tests:" << tests.count();
+        for (const QString& test : tests) {
+            qInfo().noquote() << "  " << test;
+        }
+        return 0;
+    }
+
+    if (args.runningUnitTests) {
+        const int testCount = args.unitTests.isEmpty()
+            ? registeredTestCount()
+            : args.unitTests.count();
+        qCInfo(UnitTestListLog).noquote() << QString("Running %1 unit test(s)...").arg(testCount);
+
+        QElapsedTimer timer;
+        timer.start();
+
+        const int exitCode = runTests(
+            args.stressUnitTests,
+            args.unitTests,
+            args.unitTestOutput.value_or(QString())
+        );
+
+        const qint64 elapsed = timer.elapsed();
+        if (exitCode == 0) {
+            qCInfo(UnitTestListLog).noquote() << QString("All %1 test(s) passed in %2 ms")
+                .arg(testCount).arg(elapsed);
+        } else {
+            qCWarning(UnitTestListLog).noquote() << QString("%1 test(s) failed (ran in %2 ms)")
+                .arg(-exitCode).arg(elapsed);
+        }
+        return exitCode;
+    }
+
+    return 0;
+}
+
+} // namespace QGCUnitTest

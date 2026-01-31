@@ -39,37 +39,8 @@ private:
 #endif
     void _setupVisualItemSignals(VisualMissionItem* visualItem);
 
-    // MissiomItems signals
-
-    enum {
-        coordinateChangedSignalIndex = 0,
-        visualItemMaxSignalIndex
-    };
-
-    enum {
-        coordinateChangedSignalMask =   1 << coordinateChangedSignalIndex,
-        visualItemMaxSignalMask =       1 << visualItemMaxSignalIndex,
-    };
-
-    // MissionController signals
-
-    enum {
-        visualItemsChangedSignalIndex = 0,
-        missionControllerMaxSignalIndex
-    };
-
-    enum {
-        visualItemsChangedSignalMask =                 1 << visualItemsChangedSignalIndex,
-    };
-
     MultiSignalSpy*         _multiSpyMissionController  = nullptr;
     MultiSignalSpy*         _multiSpyMissionItem        = nullptr;
     PlanMasterController*   _masterController           = nullptr;
     MissionController*      _missionController          = nullptr;
-
-    static const size_t _cVisualItemSignals = visualItemMaxSignalIndex;
-    static const size_t _cMissionControllerSignals = missionControllerMaxSignalIndex;
-
-    const char*         _rgMissionControllerSignals[_cMissionControllerSignals];
-    const char*         _rgVisualItemSignals[_cVisualItemSignals];
 };

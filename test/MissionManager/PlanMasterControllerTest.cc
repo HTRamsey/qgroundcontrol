@@ -1,5 +1,5 @@
 #include "PlanMasterControllerTest.h"
-#include "MultiSignalSpyV2.h"
+#include "MultiSignalSpy.h"
 #include "MissionManager.h"
 #include "PlanMasterController.h"
 #include "Vehicle.h"
@@ -41,21 +41,21 @@ void PlanMasterControllerTest::_testActiveVehicleChanged(void) {
 
     // spyMissionManager emulates a subscriber that should not be disconnected when
     // the active vehicle changes
-    MultiSignalSpyV2 spyMissionManager;
+    MultiSignalSpy spyMissionManager;
     spyMissionManager.init(outgoingManagerVehicle->missionManager());
-    MultiSignalSpyV2 spyMasterController;
+    MultiSignalSpy spyMasterController;
     spyMasterController.init(_masterController);
 
     // Since MissionManager works with actual vehicles (which we don't have in the test cycle)
     // we have to be a bit creative emulating a signal emitted by a MissionManager.
     emit outgoingManagerVehicle->missionManager()->error(0,"");
-    auto missionManagerErrorSignalMask = spyMissionManager.signalNameToMask("error");
+    auto missionManagerErrorSignalMask = spyMissionManager.mask("error");
     QVERIFY(spyMissionManager.checkOnlySignalByMask(missionManagerErrorSignalMask));
     spyMissionManager.clearSignal("error");
     QVERIFY(spyMissionManager.checkNoSignals());
 
     _connectMockLink(MAV_AUTOPILOT_PX4);
-    auto masterControllerMgrVehicleChanged = spyMasterController.signalNameToMask("managerVehicleChanged");
+    auto masterControllerMgrVehicleChanged = spyMasterController.mask("managerVehicleChanged");
     QVERIFY(spyMasterController.checkSignalByMask(masterControllerMgrVehicleChanged));
 
     emit outgoingManagerVehicle->missionManager()->error(0,"");

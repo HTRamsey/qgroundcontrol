@@ -27,28 +27,6 @@ private slots:
 private:
     void _validateItem(LandingComplexItem* actualItem, LandingComplexItem* expectedItem);
 
-    enum {
-        finalApproachCoordinateChangedIndex = 0,
-        slopeStartCoordinateChangedIndex,
-        landingCoordinateChangedIndex,
-        landingCoordSetChangedIndex,
-        altitudesAreRelativeChangedIndex,
-        _updateFlightPathSegmentsSignalIndex,
-        maxSignalIndex,
-    };
-
-    enum {
-        finalApproachCoordinateChangedMask      = 1 << finalApproachCoordinateChangedIndex,
-        slopeStartCoordinateChangedMask         = 1 << slopeStartCoordinateChangedIndex,
-        landingCoordinateChangedMask            = 1 << landingCoordinateChangedIndex,
-        landingCoordSetChangedMask              = 1 << landingCoordSetChangedIndex,
-        altitudesAreRelativeChangedMask         = 1 << altitudesAreRelativeChangedIndex,
-        _updateFlightPathSegmentsSignalMask     = 1 << _updateFlightPathSegmentsSignalIndex,
-    };
-
-    static const size_t cSignals = maxSignalIndex;
-    const char*         rgSignals[cSignals];
-
     LandingComplexItem* _item                   = nullptr;
     MultiSignalSpy*     _multiSpy               = nullptr;
     MultiSignalSpy*     _viMultiSpy             = nullptr;

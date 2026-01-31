@@ -46,24 +46,6 @@ private:
     void _validateItemScan(SimpleMissionItem* validItem);
     void _resetSection(void);
 
-    enum {
-        specifyGimbalChangedIndex = 0,
-        specifiedGimbalYawChangedIndex,
-        specifiedGimbalPitchChangedIndex,
-        specifyCameraModeChangedIndex,
-        maxSignalIndex,
-    };
-
-    enum {
-        specifyGimbalChangedMask =          1 << specifyGimbalChangedIndex,
-        specifiedGimbalYawChangedMask =     1 << specifiedGimbalYawChangedIndex,
-        specifiedGimbalPitchChangedMask =   1 << specifiedGimbalPitchChangedIndex,
-        specifyCameraModeChangedMask =      1 << specifyCameraModeChangedIndex,
-    };
-
-    static const size_t cCameraSignals = maxSignalIndex;
-    const char*         rgCameraSignals[cCameraSignals];
-
     MultiSignalSpy*     _spyCamera;
     MultiSignalSpy*     _spySection;
     CameraSection*      _cameraSection;

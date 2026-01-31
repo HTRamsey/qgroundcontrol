@@ -29,30 +29,6 @@ private slots:
     void _testAltitudePropogation   (void);
 
 private:
-    enum {
-        commandChangedIndex = 0,
-        altitudeModeChangedIndex,
-        friendlyEditAllowedChangedIndex,
-        headingDegreesChangedIndex,
-        rawEditChangedIndex,
-        cameraSectionChangedIndex,
-        speedSectionChangedIndex,
-        maxSignalIndex,
-    };
-
-    enum {
-        commandChangedMask =                        1 << commandChangedIndex,
-        altitudeModeChangedMask =                  1 << altitudeModeChangedIndex,
-        friendlyEditAllowedChangedMask =            1 << friendlyEditAllowedChangedIndex,
-        headingDegreesChangedMask =                 1 << headingDegreesChangedIndex,
-        rawEditChangedMask =                        1 << rawEditChangedIndex,
-        cameraSectionChangedMask =                  1 << cameraSectionChangedIndex,
-        speedSectionChangedMask =                   1 << speedSectionChangedIndex,
-    };
-
-    static const size_t cSimpleItemSignals = maxSignalIndex;
-    const char*         rgSimpleItemSignals[cSimpleItemSignals];
-
     void _testEditorFactsWorker (QGCMAVLink::VehicleClass_t vehicleClass, QGCMAVLink::VehicleClass_t vtolMode);
     bool _classMatch            (QGCMAVLink::VehicleClass_t vehicleClass, QGCMAVLink::VehicleClass_t testClass);
 

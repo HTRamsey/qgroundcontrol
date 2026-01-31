@@ -17,15 +17,13 @@ void StructureScanComplexItemTest::init(void)
 {
     UnitTest::init();
 
-    _rgSignals[dirtyChangedIndex] = SIGNAL(dirtyChanged(bool));
-
     _masterController = new PlanMasterController(this);
     _structureScanItem = new StructureScanComplexItem(_masterController, false /* flyView */, QString() /* kmlFile */);
     _structureScanItem->setDirty(false);
 
     _multiSpy = new MultiSignalSpy();
     Q_CHECK_PTR(_multiSpy);
-    QCOMPARE(_multiSpy->init(_structureScanItem, _rgSignals, _cSignals), true);
+    QCOMPARE(_multiSpy->init(_structureScanItem), true);
 }
 
 void StructureScanComplexItemTest::cleanup(void)
@@ -49,14 +47,14 @@ void StructureScanComplexItemTest::_testDirty(void)
 
     _structureScanItem->setDirty(true);
     QVERIFY(_structureScanItem->dirty());
-    QVERIFY(_multiSpy->checkOnlySignalByMask(dirtyChangedMask));
-    QVERIFY(_multiSpy->pullBoolFromSignalIndex(dirtyChangedIndex));
+    QVERIFY(_multiSpy->checkOnlySignal("dirtyChanged"));
+    QVERIFY(_multiSpy->pullBoolFromSignal("dirtyChanged"));
     _multiSpy->clearAllSignals();
 
     _structureScanItem->setDirty(false);
     QVERIFY(!_structureScanItem->dirty());
-    QVERIFY(_multiSpy->checkOnlySignalByMask(dirtyChangedMask));
-    QVERIFY(!_multiSpy->pullBoolFromSignalIndex(dirtyChangedIndex));
+    QVERIFY(_multiSpy->checkOnlySignal("dirtyChanged"));
+    QVERIFY(!_multiSpy->pullBoolFromSignal("dirtyChanged"));
     _multiSpy->clearAllSignals();
 
     // These facts should set dirty when changed
@@ -70,8 +68,8 @@ void StructureScanComplexItemTest::_testDirty(void)
         } else {
             fact->setRawValue(fact->rawValue().toDouble() + 1);
         }
-        QVERIFY(_multiSpy->checkSignalByMask(dirtyChangedMask));
-        QVERIFY(_multiSpy->pullBoolFromSignalIndex(dirtyChangedIndex));
+        QVERIFY(_multiSpy->checkSignal("dirtyChanged"));
+        QVERIFY(_multiSpy->pullBoolFromSignal("dirtyChanged"));
         _structureScanItem->setDirty(false);
         _multiSpy->clearAllSignals();
     }

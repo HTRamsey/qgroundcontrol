@@ -26,18 +26,6 @@ private:
     void _initItem(void);
     void _validateItem(StructureScanComplexItem* item);
 
-    enum {
-        dirtyChangedIndex,
-        maxSignalIndex
-    };
-
-    enum {
-        dirtyChangedMask = 1 << dirtyChangedIndex
-    };
-
-    static const size_t _cSignals = maxSignalIndex;
-    const char*         _rgSignals[_cSignals];
-
     PlanMasterController*       _masterController =     nullptr;
     MultiSignalSpy*             _multiSpy =             nullptr;
     StructureScanComplexItem*   _structureScanItem =    nullptr;

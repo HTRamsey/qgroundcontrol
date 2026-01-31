@@ -2,7 +2,7 @@
 
 #include "UnitTest.h"
 
-class MultiSignalSpyV2;
+class MultiSignalSpy;
 class QGCMapPolyline;
 class QmlObjectListModel;
 class QTemporaryDir;
@@ -24,16 +24,8 @@ private slots:
 private:
     QString _copyRes(const QTemporaryDir &tmpDir, const QString &name);
 
-    MultiSignalSpyV2 *_multiSpyPolyline = nullptr;
-    int _countChangedMask = 0;
-    int _pathChangedMask = 0;
-    int _dirtyChangedMask = 0;
-    int _clearedMask = 0;
-    int _isEmptyChangedMask = 0;
-    int _isValidChangedMask = 0;
-    MultiSignalSpyV2 *_multiSpyModel = nullptr;
-    int _modelCountChangedMask = 0;
-    int _modelDirtyChangedMask = 0;
+    MultiSignalSpy *_multiSpyPolyline = nullptr;
+    MultiSignalSpy *_multiSpyModel = nullptr;
     QGCMapPolyline *_mapPolyline = nullptr;
     QmlObjectListModel *_pathModel = nullptr;
     const QList<QGeoCoordinate> _linePoints = {

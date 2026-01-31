@@ -3,7 +3,7 @@
 #include "LinkManager.h"
 #include "MultiVehicleManager.h"
 #include "Vehicle.h"
-#include "MultiSignalSpyV2.h"
+#include "MultiSignalSpy.h"
 
 #include <QtTest/QTest>
 #include <QtTest/QSignalSpy>
@@ -159,14 +159,14 @@ void VehicleLinkManagerTest::_multiLinkSingleVehicleTest()
     QVERIFY(rgStatus[0].isEmpty());
     QVERIFY(rgStatus[1].isEmpty());
 
-    MultiSignalSpyV2 multiSpy;
+    MultiSignalSpy multiSpy;
     QVERIFY(multiSpy.init(vehicleLinkManager));
 
     // Comm lost on 2: 1 is primary, 2 is secondary so comm loss/regain on 2 should only update status text
 
     pMockLink2->setCommLost(true);
-    QCOMPARE(multiSpy.waitForSignal (_linkStatusesChangedSignalName, VehicleLinkManager::_heartbeatMaxElpasedMSecs * 2), true);
-    QVERIFY(multiSpy.checkOnlySignalByMask(multiSpy.signalNameToMask(_linkStatusesChangedSignalName)));
+    QCOMPARE(multiSpy.waitForSignal(_linkStatusesChangedSignalName, VehicleLinkManager::_heartbeatMaxElpasedMSecs * 2), true);
+    QVERIFY(multiSpy.checkOnlySignal(_linkStatusesChangedSignalName));
 
     rgStatus = vehicleLinkManager->linkStatuses();
     QCOMPARE(rgStatus.count(), 2);
@@ -176,8 +176,8 @@ void VehicleLinkManagerTest::_multiLinkSingleVehicleTest()
     multiSpy.clearAllSignals();
 
     pMockLink2->setCommLost(false);
-    QCOMPARE(multiSpy.waitForSignal (_linkStatusesChangedSignalName, VehicleLinkManager::_heartbeatMaxElpasedMSecs * 2), true);
-    QVERIFY(multiSpy.checkOnlySignalByMask(multiSpy.signalNameToMask(_linkStatusesChangedSignalName)));
+    QCOMPARE(multiSpy.waitForSignal(_linkStatusesChangedSignalName, VehicleLinkManager::_heartbeatMaxElpasedMSecs * 2), true);
+    QVERIFY(multiSpy.checkOnlySignal(_linkStatusesChangedSignalName));
 
     rgStatus = vehicleLinkManager->linkStatuses();
     QCOMPARE(rgStatus.count(), 2);
@@ -189,9 +189,8 @@ void VehicleLinkManagerTest::_multiLinkSingleVehicleTest()
     // Comm loss on 1: 1 is primary so should trigger switch of primary to 2
 
     pMockLink1->setCommLost(true);
-    QCOMPARE(multiSpy.waitForSignal (_primaryLinkChangedSignalName, VehicleLinkManager::_heartbeatMaxElpasedMSecs * 2), true);
-    const quint32 signalMask = multiSpy.signalNameToMask(_primaryLinkChangedSignalName) | multiSpy.signalNameToMask(_linkStatusesChangedSignalName);
-    QVERIFY(multiSpy.checkOnlySignalByMask(signalMask));
+    QCOMPARE(multiSpy.waitForSignal(_primaryLinkChangedSignalName, VehicleLinkManager::_heartbeatMaxElpasedMSecs * 2), true);
+    QVERIFY(multiSpy.checkOnlySignalByMask(multiSpy.mask(_primaryLinkChangedSignalName, _linkStatusesChangedSignalName)));
     QCOMPARE(pMockLink2,vehicleLinkManager->primaryLink().lock().get());
 
     rgStatus = vehicleLinkManager->linkStatuses();
@@ -204,8 +203,8 @@ void VehicleLinkManagerTest::_multiLinkSingleVehicleTest()
     // Comm regained on 1 should leave 2 as primary and only update status
 
     pMockLink1->setCommLost(false);
-    QCOMPARE(multiSpy.waitForSignal (_linkStatusesChangedSignalName, VehicleLinkManager::_heartbeatMaxElpasedMSecs * 2),    true);
-    QVERIFY(multiSpy.checkOnlySignalByMask(multiSpy.signalNameToMask(_linkStatusesChangedSignalName)));
+    QCOMPARE(multiSpy.waitForSignal(_linkStatusesChangedSignalName, VehicleLinkManager::_heartbeatMaxElpasedMSecs * 2), true);
+    QVERIFY(multiSpy.checkOnlySignal(_linkStatusesChangedSignalName));
     QCOMPARE(pMockLink2, vehicleLinkManager->primaryLink().lock().get());
 
     rgStatus = vehicleLinkManager->linkStatuses();
@@ -261,7 +260,7 @@ void VehicleLinkManagerTest::_highLatencyLinkTest()
     QVERIFY(vehicle);
     QVERIFY(vehicleLinkManager);
 
-    MultiSignalSpyV2 multiSpyVLM;
+    MultiSignalSpy multiSpyVLM;
     QVERIFY(multiSpyVLM.init(vehicleLinkManager));
 
     // Addition of second non high latency link should:

@@ -21,10 +21,6 @@ CameraSectionTest::CameraSectionTest(void)
     , _validCameraVideoModeItem         (nullptr)
     , _validCameraSurveyPhotoModeItem   (nullptr)
 {
-    rgCameraSignals[specifyGimbalChangedIndex] =        SIGNAL(specifyGimbalChanged(bool));
-    rgCameraSignals[specifiedGimbalYawChangedIndex] =   SIGNAL(specifiedGimbalYawChanged(double));
-    rgCameraSignals[specifiedGimbalPitchChangedIndex] = SIGNAL(specifiedGimbalPitchChanged(double));
-    rgCameraSignals[specifyCameraModeChangedIndex] =    SIGNAL(specifyCameraModeChanged(bool));
 }
 
 void CameraSectionTest::init(void)
@@ -153,7 +149,7 @@ void CameraSectionTest::_createSpy(CameraSection* cameraSection, MultiSignalSpy*
 {
     *cameraSpy = nullptr;
     MultiSignalSpy* spy = new MultiSignalSpy();
-    QCOMPARE(spy->init(cameraSection, rgCameraSignals, cCameraSignals), true);
+    QCOMPARE(spy->init(cameraSection), true);
     *cameraSpy = spy;
 }
 
@@ -192,25 +188,25 @@ void CameraSectionTest::_testDirty(void)
     // Check for no duplicate dirty signalling on change
 
     _cameraSection->setSpecifyGimbal(!_cameraSection->specifyGimbal());
-    QVERIFY(_spySection->checkSignalByMask(dirtyChangedMask));
-    QCOMPARE(_spySection->pullBoolFromSignalIndex(dirtyChangedIndex), true);
+    QVERIFY(_spySection->checkSignal("dirtyChanged"));
+    QCOMPARE(_spySection->pullBoolFromSignal("dirtyChanged"), true);
     QCOMPARE(_cameraSection->dirty(), true);
     _spySection->clearAllSignals();
 
     _cameraSection->setSpecifyGimbal(!_cameraSection->specifyGimbal());
-    QVERIFY(_spySection->checkNoSignalByMask(dirtyChangedMask));
+    QVERIFY(_spySection->checkNoSignal("dirtyChanged"));
     QCOMPARE(_cameraSection->dirty(), true);
     _cameraSection->setDirty(false);
     _spySection->clearAllSignals();
 
     _cameraSection->setSpecifyCameraMode(!_cameraSection->specifyCameraMode());
-    QVERIFY(_spySection->checkSignalByMask(dirtyChangedMask));
-    QCOMPARE(_spySection->pullBoolFromSignalIndex(dirtyChangedIndex), true);
+    QVERIFY(_spySection->checkSignal("dirtyChanged"));
+    QCOMPARE(_spySection->pullBoolFromSignal("dirtyChanged"), true);
     QCOMPARE(_cameraSection->dirty(), true);
     _spySection->clearAllSignals();
 
     _cameraSection->setSpecifyCameraMode(!_cameraSection->specifyCameraMode());
-    QVERIFY(_spySection->checkNoSignalByMask(dirtyChangedMask));
+    QVERIFY(_spySection->checkNoSignal("dirtyChanged"));
     QCOMPARE(_cameraSection->dirty(), true);
     _cameraSection->setDirty(false);
     _spySection->clearAllSignals();
@@ -221,7 +217,7 @@ void CameraSectionTest::_testDirty(void)
     _spySection->clearAllSignals();
     _cameraSection->gimbalPitch()->setRawValue(_cameraSection->gimbalPitch()->rawValue().toDouble() + 1);
     _cameraSection->gimbalYaw()->setRawValue(_cameraSection->gimbalYaw()->rawValue().toDouble() + 1);
-    QVERIFY(_spySection->checkNoSignalByMask(dirtyChangedMask));
+    QVERIFY(_spySection->checkNoSignal("dirtyChanged"));
     QCOMPARE(_cameraSection->dirty(), false);
 
     // dirty SHOULD change if pitch or yaw is changed while specifyGimbal IS set
@@ -229,12 +225,12 @@ void CameraSectionTest::_testDirty(void)
     _cameraSection->setDirty(false);
     _spySection->clearAllSignals();
     _cameraSection->gimbalPitch()->setRawValue(_cameraSection->gimbalPitch()->rawValue().toDouble() + 1);
-    QVERIFY(_spySection->checkSignalByMask(dirtyChangedMask));
+    QVERIFY(_spySection->checkSignal("dirtyChanged"));
     QCOMPARE(_cameraSection->dirty(), true);
     _cameraSection->setDirty(false);
     _spySection->clearAllSignals();
     _cameraSection->gimbalYaw()->setRawValue(_cameraSection->gimbalYaw()->rawValue().toDouble() + 1);
-    QVERIFY(_spySection->checkSignalByMask(dirtyChangedMask));
+    QVERIFY(_spySection->checkSignal("dirtyChanged"));
     QCOMPARE(_cameraSection->dirty(), true);
     _cameraSection->setDirty(false);
     _spySection->clearAllSignals();
@@ -242,29 +238,29 @@ void CameraSectionTest::_testDirty(void)
     // Check the remaining items that should set dirty bit
 
     _cameraSection->cameraAction()->setRawValue(_cameraSection->cameraAction()->rawValue().toInt() + 1);
-    QVERIFY(_spySection->checkSignalByMask(dirtyChangedMask));
-    QCOMPARE(_spySection->pullBoolFromSignalIndex(dirtyChangedIndex), true);
+    QVERIFY(_spySection->checkSignal("dirtyChanged"));
+    QCOMPARE(_spySection->pullBoolFromSignal("dirtyChanged"), true);
     QCOMPARE(_cameraSection->dirty(), true);
     _cameraSection->setDirty(false);
     _spySection->clearAllSignals();
 
     _cameraSection->cameraPhotoIntervalTime()->setRawValue(_cameraSection->cameraPhotoIntervalTime()->rawValue().toInt() + 1);
-    QVERIFY(_spySection->checkSignalByMask(dirtyChangedMask));
-    QCOMPARE(_spySection->pullBoolFromSignalIndex(dirtyChangedIndex), true);
+    QVERIFY(_spySection->checkSignal("dirtyChanged"));
+    QCOMPARE(_spySection->pullBoolFromSignal("dirtyChanged"), true);
     QCOMPARE(_cameraSection->dirty(), true);
     _cameraSection->setDirty(false);
     _spySection->clearAllSignals();
 
     _cameraSection->cameraPhotoIntervalDistance()->setRawValue(_cameraSection->cameraPhotoIntervalDistance()->rawValue().toDouble() + 1);
-    QVERIFY(_spySection->checkSignalByMask(dirtyChangedMask));
-    QCOMPARE(_spySection->pullBoolFromSignalIndex(dirtyChangedIndex), true);
+    QVERIFY(_spySection->checkSignal("dirtyChanged"));
+    QCOMPARE(_spySection->pullBoolFromSignal("dirtyChanged"), true);
     QCOMPARE(_cameraSection->dirty(), true);
     _cameraSection->setDirty(false);
     _spySection->clearAllSignals();
 
     _cameraSection->cameraMode()->setRawValue(_cameraSection->cameraMode()->rawValue().toInt() == 0 ? 1 : 0);
-    QVERIFY(_spySection->checkSignalByMask(dirtyChangedMask));
-    QCOMPARE(_spySection->pullBoolFromSignalIndex(dirtyChangedIndex), true);
+    QVERIFY(_spySection->checkSignal("dirtyChanged"));
+    QCOMPARE(_spySection->pullBoolFromSignal("dirtyChanged"), true);
     QCOMPARE(_cameraSection->dirty(), true);
     _cameraSection->setDirty(false);
     _spySection->clearAllSignals();
@@ -282,40 +278,40 @@ void CameraSectionTest::_testSettingsAvailable(void)
     _cameraSection->setSpecifyGimbal(true);
     QCOMPARE(_cameraSection->specifyGimbal(), true);
     QCOMPARE(_cameraSection->settingsSpecified(), true);
-    QVERIFY(_spyCamera->checkSignalByMask(specifyGimbalChangedMask));
-    QCOMPARE(_spyCamera->pullBoolFromSignalIndex(specifyGimbalChangedIndex), true);
-    QVERIFY(_spySection->checkSignalByMask(settingsSpecifiedChangedMask));
-    QCOMPARE(_spySection->pullBoolFromSignalIndex(settingsSpecifiedChangedIndex), true);
+    QVERIFY(_spyCamera->checkSignal("specifyGimbalChanged"));
+    QCOMPARE(_spyCamera->pullBoolFromSignal("specifyGimbalChanged"), true);
+    QVERIFY(_spySection->checkSignal("settingsSpecifiedChanged"));
+    QCOMPARE(_spySection->pullBoolFromSignal("settingsSpecifiedChanged"), true);
     _spySection->clearAllSignals();
     _spyCamera->clearAllSignals();
 
     _cameraSection->setSpecifyGimbal(false);
     QCOMPARE(_cameraSection->specifyGimbal(), false);
     QCOMPARE(_cameraSection->settingsSpecified(), false);
-    QVERIFY(_spyCamera->checkSignalByMask(specifyGimbalChangedMask));
-    QCOMPARE(_spyCamera->pullBoolFromSignalIndex(specifyGimbalChangedIndex), false);
-    QVERIFY(_spySection->checkSignalByMask(settingsSpecifiedChangedMask));
-    QCOMPARE(_spySection->pullBoolFromSignalIndex(settingsSpecifiedChangedIndex), false);
+    QVERIFY(_spyCamera->checkSignal("specifyGimbalChanged"));
+    QCOMPARE(_spyCamera->pullBoolFromSignal("specifyGimbalChanged"), false);
+    QVERIFY(_spySection->checkSignal("settingsSpecifiedChanged"));
+    QCOMPARE(_spySection->pullBoolFromSignal("settingsSpecifiedChanged"), false);
     _spySection->clearAllSignals();
     _spyCamera->clearAllSignals();
 
     _cameraSection->setSpecifyCameraMode(true);
     QCOMPARE(_cameraSection->specifyCameraMode(), true);
     QCOMPARE(_cameraSection->settingsSpecified(), true);
-    QVERIFY(_spyCamera->checkSignalByMask(specifyCameraModeChangedMask));
-    QCOMPARE(_spyCamera->pullBoolFromSignalIndex(specifyCameraModeChangedIndex), true);
-    QVERIFY(_spySection->checkSignalByMask(settingsSpecifiedChangedMask));
-    QCOMPARE(_spySection->pullBoolFromSignalIndex(settingsSpecifiedChangedIndex), true);
+    QVERIFY(_spyCamera->checkSignal("specifyCameraModeChanged"));
+    QCOMPARE(_spyCamera->pullBoolFromSignal("specifyCameraModeChanged"), true);
+    QVERIFY(_spySection->checkSignal("settingsSpecifiedChanged"));
+    QCOMPARE(_spySection->pullBoolFromSignal("settingsSpecifiedChanged"), true);
     _spySection->clearAllSignals();
     _spyCamera->clearAllSignals();
 
     _cameraSection->setSpecifyCameraMode(false);
     QCOMPARE(_cameraSection->specifyCameraMode(), false);
     QCOMPARE(_cameraSection->settingsSpecified(), false);
-    QVERIFY(_spyCamera->checkSignalByMask(specifyCameraModeChangedMask));
-    QCOMPARE(_spyCamera->pullBoolFromSignalIndex(specifyCameraModeChangedIndex), false);
-    QVERIFY(_spySection->checkSignalByMask(settingsSpecifiedChangedMask));
-    QCOMPARE(_spySection->pullBoolFromSignalIndex(settingsSpecifiedChangedIndex), false);
+    QVERIFY(_spyCamera->checkSignal("specifyCameraModeChanged"));
+    QCOMPARE(_spyCamera->pullBoolFromSignal("specifyCameraModeChanged"), false);
+    QVERIFY(_spySection->checkSignal("settingsSpecifiedChanged"));
+    QCOMPARE(_spySection->pullBoolFromSignal("settingsSpecifiedChanged"), false);
     _spySection->clearAllSignals();
     _spyCamera->clearAllSignals();
 
@@ -324,16 +320,16 @@ void CameraSectionTest::_testSettingsAvailable(void)
     _cameraSection->cameraAction()->setRawValue(CameraSection::TakePhotosIntervalTime);
     QVERIFY(_cameraSection->cameraAction()->rawValue().toInt() == CameraSection::TakePhotosIntervalTime);
     QCOMPARE(_cameraSection->settingsSpecified(), true);
-    QVERIFY(_spySection->checkSignalByMask(settingsSpecifiedChangedMask));
-    QCOMPARE(_spySection->pullBoolFromSignalIndex(settingsSpecifiedChangedIndex), true);
+    QVERIFY(_spySection->checkSignal("settingsSpecifiedChanged"));
+    QCOMPARE(_spySection->pullBoolFromSignal("settingsSpecifiedChanged"), true);
     _spySection->clearAllSignals();
     _spyCamera->clearAllSignals();
 
     _cameraSection->cameraAction()->setRawValue(CameraSection::CameraActionNone);
     QVERIFY(_cameraSection->cameraAction()->rawValue().toInt() == CameraSection::CameraActionNone);
     QCOMPARE(_cameraSection->settingsSpecified(), false);
-    QVERIFY(_spySection->checkSignalByMask(settingsSpecifiedChangedMask));
-    QCOMPARE(_spySection->pullBoolFromSignalIndex(settingsSpecifiedChangedIndex), false);
+    QVERIFY(_spySection->checkSignal("settingsSpecifiedChanged"));
+    QCOMPARE(_spySection->pullBoolFromSignal("settingsSpecifiedChanged"), false);
     _spySection->clearAllSignals();
     _spyCamera->clearAllSignals();
 
@@ -342,7 +338,7 @@ void CameraSectionTest::_testSettingsAvailable(void)
     _cameraSection->cameraAction()->setRawValue(CameraSection::TakePhotosIntervalTime);
     _cameraSection->cameraAction()->setRawValue(CameraSection::TakePhotosIntervalTime);
     _cameraSection->setSpecifyGimbal(true);
-    QVERIFY(_spySection->checkSignalByMask(settingsSpecifiedChangedMask));
+    QVERIFY(_spySection->checkSignal("settingsSpecifiedChanged"));
 }
 
 void CameraSectionTest::_checkAvailable(void)
@@ -374,43 +370,43 @@ void CameraSectionTest::_testItemCount(void)
 
     _cameraSection->setSpecifyGimbal(true);
     QCOMPARE(_cameraSection->itemCount(), 1);
-    QVERIFY(_spySection->checkSignalByMask(itemCountChangedMask));
-    QCOMPARE(_spySection->pullIntFromSignalIndex(itemCountChangedIndex), 1);
+    QVERIFY(_spySection->checkSignal("itemCountChanged"));
+    QCOMPARE(_spySection->pullIntFromSignal("itemCountChanged"), 1);
     _spySection->clearAllSignals();
     _spyCamera->clearAllSignals();
 
     _cameraSection->setSpecifyGimbal(false);
     QCOMPARE(_cameraSection->itemCount(), 0);
-    QVERIFY(_spySection->checkSignalByMask(itemCountChangedMask));
-    QCOMPARE(_spySection->pullIntFromSignalIndex(itemCountChangedIndex), 0);
+    QVERIFY(_spySection->checkSignal("itemCountChanged"));
+    QCOMPARE(_spySection->pullIntFromSignal("itemCountChanged"), 0);
     _spySection->clearAllSignals();
     _spyCamera->clearAllSignals();
 
     _cameraSection->setSpecifyCameraMode(true);
     QCOMPARE(_cameraSection->itemCount(), 1);
-    QVERIFY(_spySection->checkSignalByMask(itemCountChangedMask));
-    QCOMPARE(_spySection->pullIntFromSignalIndex(itemCountChangedIndex), 1);
+    QVERIFY(_spySection->checkSignal("itemCountChanged"));
+    QCOMPARE(_spySection->pullIntFromSignal("itemCountChanged"), 1);
     _spySection->clearAllSignals();
     _spyCamera->clearAllSignals();
 
     _cameraSection->setSpecifyCameraMode(false);
     QCOMPARE(_cameraSection->itemCount(), 0);
-    QVERIFY(_spySection->checkSignalByMask(itemCountChangedMask));
-    QCOMPARE(_spySection->pullIntFromSignalIndex(itemCountChangedIndex), 0);
+    QVERIFY(_spySection->checkSignal("itemCountChanged"));
+    QCOMPARE(_spySection->pullIntFromSignal("itemCountChanged"), 0);
     _spySection->clearAllSignals();
     _spyCamera->clearAllSignals();
 
     _cameraSection->setSpecifyGimbal(true);
     _cameraSection->setSpecifyCameraMode(true);
     QCOMPARE(_cameraSection->itemCount(), 2);
-    QVERIFY(_spySection->checkSignalsByMask(itemCountChangedMask));
+    QVERIFY(_spySection->checkSignal("itemCountChanged"));
     _spySection->clearAllSignals();
     _spyCamera->clearAllSignals();
 
     _cameraSection->setSpecifyGimbal(false);
     _cameraSection->setSpecifyCameraMode(false);
     QCOMPARE(_cameraSection->itemCount(), 0);
-    QVERIFY(_spySection->checkSignalsByMask(itemCountChangedMask));
+    QVERIFY(_spySection->checkSignal("itemCountChanged"));
     _spySection->clearAllSignals();
     _spyCamera->clearAllSignals();
 
@@ -430,8 +426,8 @@ void CameraSectionTest::_testItemCount(void)
         // Set to new action
         _cameraSection->cameraAction()->setRawValue(cameraAction);
         QCOMPARE(_cameraSection->itemCount(), 1);
-        QVERIFY(_spySection->checkSignalByMask(itemCountChangedMask));
-        QCOMPARE(_spySection->pullIntFromSignalIndex(itemCountChangedIndex), 1);
+        QVERIFY(_spySection->checkSignal("itemCountChanged"));
+        QCOMPARE(_spySection->pullIntFromSignal("itemCountChanged"), 1);
         _spySection->clearAllSignals();
         _spyCamera->clearAllSignals();
     }
@@ -449,8 +445,8 @@ void CameraSectionTest::_testItemCount(void)
     _spyCamera->clearAllSignals();
     _cameraSection->cameraAction()->setRawValue(CameraSection::TakePhotosIntervalTime);
     QCOMPARE(_cameraSection->itemCount(), 2);
-    QVERIFY(_spySection->checkSignalsByMask(itemCountChangedMask));
-    QCOMPARE(_spySection->pullIntFromSignalIndex(itemCountChangedIndex), 2);
+    QVERIFY(_spySection->checkSignal("itemCountChanged"));
+    QCOMPARE(_spySection->pullIntFromSignal("itemCountChanged"), 2);
     _spySection->clearAllSignals();
     _spyCamera->clearAllSignals();
 }
@@ -1115,18 +1111,18 @@ void CameraSectionTest::_testSpecifiedGimbalValuesChanged(void)
     _cameraSection->setSpecifyGimbal(false);
     _spyCamera->clearAllSignals();
     _cameraSection->gimbalYaw()->setRawValue(_cameraSection->gimbalYaw()->rawValue().toDouble() + 1);
-    QVERIFY(_spyCamera->checkNoSignalByMask(specifiedGimbalYawChangedMask));
+    QVERIFY(_spyCamera->checkNoSignal("specifiedGimbalYawChanged"));
     _cameraSection->gimbalPitch()->setRawValue(_cameraSection->gimbalPitch()->rawValue().toDouble() + 1);
-    QVERIFY(_spyCamera->checkNoSignalByMask(specifiedGimbalPitchChangedMask));
+    QVERIFY(_spyCamera->checkNoSignal("specifiedGimbalPitchChanged"));
 
     // specifiedGimbal[Yaw|Pitch]Changed SHOULD signal if values are changed when specifyGimbal IS set
     _cameraSection->setSpecifyGimbal(true);
     _spyCamera->clearAllSignals();
     _cameraSection->gimbalYaw()->setRawValue(_cameraSection->gimbalYaw()->rawValue().toDouble() + 1);
-    QVERIFY(_spyCamera->checkSignalByMask(specifiedGimbalYawChangedMask));
+    QVERIFY(_spyCamera->checkSignal("specifiedGimbalYawChanged"));
     _spyCamera->clearAllSignals();
     _cameraSection->gimbalPitch()->setRawValue(_cameraSection->gimbalPitch()->rawValue().toDouble() + 1);
-    QVERIFY(_spyCamera->checkSignalByMask(specifiedGimbalPitchChangedMask));
+    QVERIFY(_spyCamera->checkSignal("specifiedGimbalPitchChanged"));
 }
 
 SimpleMissionItem* CameraSectionTest::createValidStopVideoItem(PlanMasterController* masterController)

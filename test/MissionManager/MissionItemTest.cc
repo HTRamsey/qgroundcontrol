@@ -95,33 +95,16 @@ void MissionItemTest::_testSignals(void)
                             true,                               // autoContinue
                             true);                              // isCurrentItem
 
-    enum {
-        isCurrentItemChangedIndex = 0,
-        sequenceNumberChangedIndex,
-        maxSignalIndex
-    };
-
-    enum {
-        isCurrentItemChangedMask =          1 << isCurrentItemChangedIndex,
-        sequenceNumberChangedIndexMask =    1 << sequenceNumberChangedIndex
-    };
-
-    static const size_t cMissionItemSignals = maxSignalIndex;
-    const char*         rgMissionItemSignals[cMissionItemSignals];
-
-    rgMissionItemSignals[isCurrentItemChangedIndex] =   SIGNAL(isCurrentItemChanged(bool));
-    rgMissionItemSignals[sequenceNumberChangedIndex] =  SIGNAL(sequenceNumberChanged(int));
-
     MultiSignalSpy* multiSpyMissionItem = new MultiSignalSpy();
     Q_CHECK_PTR(multiSpyMissionItem);
-    QCOMPARE(multiSpyMissionItem->init(&missionItem, rgMissionItemSignals, cMissionItemSignals), true);
+    QCOMPARE(multiSpyMissionItem->init(&missionItem), true);
 
     // Validate isCurrentItemChanged signalling
     missionItem.setIsCurrentItem(true);
     QVERIFY(multiSpyMissionItem->checkNoSignals());
     missionItem.setIsCurrentItem(false);
-    QVERIFY(multiSpyMissionItem->checkOnlySignalByMask(isCurrentItemChangedMask));
-    QSignalSpy* spy = multiSpyMissionItem->getSpyByIndex(isCurrentItemChangedIndex);
+    QVERIFY(multiSpyMissionItem->checkOnlySignal(SIGNAL(isCurrentItemChanged(bool))));
+    QSignalSpy* spy = multiSpyMissionItem->spy(SIGNAL(isCurrentItemChanged(bool)));
     QList<QVariant> signalArgs = spy->takeFirst();
     QCOMPARE(signalArgs.count(), 1);
     QCOMPARE(signalArgs[0].toBool(), false);
@@ -132,8 +115,8 @@ void MissionItemTest::_testSignals(void)
     missionItem.setSequenceNumber(1);
     QVERIFY(multiSpyMissionItem->checkNoSignals());
     missionItem.setSequenceNumber(2);
-    QVERIFY(multiSpyMissionItem->checkOnlySignalByMask(sequenceNumberChangedIndexMask));
-    spy = multiSpyMissionItem->getSpyByIndex(sequenceNumberChangedIndex);
+    QVERIFY(multiSpyMissionItem->checkOnlySignal(SIGNAL(sequenceNumberChanged(int))));
+    spy = multiSpyMissionItem->spy(SIGNAL(sequenceNumberChanged(int)));
     signalArgs = spy->takeFirst();
     QCOMPARE(signalArgs.count(), 1);
     QCOMPARE(signalArgs[0].toInt(), 2);

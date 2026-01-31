@@ -27,19 +27,14 @@ void MissionControllerManagerTest::_initForFirmwareType(MAV_AUTOPILOT firmwareTy
     _missionManager = MultiVehicleManager::instance()->activeVehicle()->missionManager();
     QVERIFY(_missionManager);
 
-    _rgMissionManagerSignals[newMissionItemsAvailableSignalIndex] = SIGNAL(newMissionItemsAvailable(bool));
-    _rgMissionManagerSignals[sendCompleteSignalIndex] =             SIGNAL(sendComplete(bool));
-    _rgMissionManagerSignals[inProgressChangedSignalIndex] =        SIGNAL(inProgressChanged(bool));
-    _rgMissionManagerSignals[errorSignalIndex] =                    SIGNAL(error(int, const QString&));
-
     _multiSpyMissionManager = new MultiSignalSpy();
     Q_CHECK_PTR(_multiSpyMissionManager);
-    QCOMPARE(_multiSpyMissionManager->init(_missionManager, _rgMissionManagerSignals, _cMissionManagerSignals), true);
+    QCOMPARE(_multiSpyMissionManager->init(_missionManager), true);
 
     if (_missionManager->inProgress()) {
-        _multiSpyMissionManager->waitForSignalByIndex(newMissionItemsAvailableSignalIndex, _missionManagerSignalWaitTime);
-        _multiSpyMissionManager->waitForSignalByIndex(inProgressChangedSignalIndex, _missionManagerSignalWaitTime);
-        QCOMPARE(_multiSpyMissionManager->checkSignalByMask(newMissionItemsAvailableSignalMask | inProgressChangedSignalMask), true);
+        _multiSpyMissionManager->waitForSignal(SIGNAL(newMissionItemsAvailable(bool)), _missionManagerSignalWaitTime);
+        _multiSpyMissionManager->waitForSignal(SIGNAL(inProgressChanged(bool)), _missionManagerSignalWaitTime);
+        QCOMPARE(_multiSpyMissionManager->checkSignalsByMask(_multiSpyMissionManager->mask(SIGNAL(newMissionItemsAvailable(bool)), SIGNAL(inProgressChanged(bool)))), true);
     }
 
     QVERIFY(!_missionManager->inProgress());
@@ -51,5 +46,5 @@ void MissionControllerManagerTest::_initForFirmwareType(MAV_AUTOPILOT firmwareTy
 void MissionControllerManagerTest::_checkInProgressValues(bool inProgress)
 {
     QCOMPARE(_missionManager->inProgress(), inProgress);
-    QCOMPARE(_multiSpyMissionManager->pullBoolFromSignalIndex(inProgressChangedSignalIndex), inProgress);
+    QCOMPARE(_multiSpyMissionManager->pullBoolFromSignal(SIGNAL(inProgressChanged(bool))), inProgress);
 }

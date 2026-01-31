@@ -55,8 +55,8 @@ void FWLandingPatternTest::_testDirty(void)
 {
     _fwItem->setDirty(true);
     QVERIFY(_fwItem->dirty());
-    QVERIFY(_viSpy->checkOnlySignalByMask(dirtyChangedMask));
-    QVERIFY(_viSpy->pullBoolFromSignalIndex(dirtyChangedIndex));
+    QVERIFY(_viSpy->checkOnlySignal("dirtyChanged"));
+    QVERIFY(_viSpy->pullBoolFromSignal("dirtyChanged"));
     _fwItem->setDirty(false);
     _viSpy->clearAllSignals();
 
@@ -68,8 +68,8 @@ void FWLandingPatternTest::_testDirty(void)
         qDebug() << fact->name();
         QVERIFY(!_fwItem->dirty());
         changeFactValue(fact);
-        QVERIFY(_viSpy->checkSignalByMask(dirtyChangedMask));
-        QVERIFY(_viSpy->pullBoolFromSignalIndex(dirtyChangedIndex));
+        QVERIFY(_viSpy->checkSignal("dirtyChanged"));
+        QVERIFY(_viSpy->pullBoolFromSignal("dirtyChanged"));
         _fwItem->setDirty(false);
         _viSpy->clearAllSignals();
     }

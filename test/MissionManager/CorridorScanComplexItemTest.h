@@ -41,18 +41,6 @@ private:
     QList<MAV_CMD>  _createExpectedCommands(bool hasTurnaround, bool useConditionGate);
     void            _testItemGenerationWorker(bool imagesInTurnaround, bool hasTurnaround, bool useConditionGate, const QList<MAV_CMD>& expectedCommands);
 
-    enum {
-        corridorPolygonPathChangedIndex = 0,
-        maxCorridorPolygonSignalIndex
-    };
-
-    enum {
-        corridorPolygonPathChangedMask = 1 << corridorPolygonPathChangedIndex,
-    };
-
-    static const size_t _cCorridorPolygonSignals = maxCorridorPolygonSignalIndex;
-    const char*         _rgCorridorPolygonSignals[_cCorridorPolygonSignals];
-
     MultiSignalSpy*             _multiSpyCorridorPolygon =  nullptr;
     CorridorScanComplexItem*    _corridorItem =             nullptr;
     QList<QGeoCoordinate>       _polyLineVertices;

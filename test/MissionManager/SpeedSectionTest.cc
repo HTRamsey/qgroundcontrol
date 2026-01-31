@@ -18,8 +18,6 @@ void SpeedSectionTest::init(void)
 {
     SectionTest::init();
 
-    rgSpeedSignals[specifyFlightSpeedChangedIndex] = SIGNAL(specifyFlightSpeedChanged(bool));
-
     _speedSection = _simpleItem->speedSection();
     _createSpy(_speedSection, &_spySpeed);
     QVERIFY(_spySpeed);
@@ -38,7 +36,7 @@ void SpeedSectionTest::_createSpy(SpeedSection* speedSection, MultiSignalSpy** s
 {
     *speedSpy = nullptr;
     MultiSignalSpy* spy = new MultiSignalSpy();
-    QCOMPARE(spy->init(speedSection, rgSpeedSignals, cSpeedSignals), true);
+    QCOMPARE(spy->init(speedSection), true);
     *speedSpy = spy;
 }
 
@@ -54,19 +52,19 @@ void SpeedSectionTest::_testDirty(void)
 
     // Check for no duplicate dirty signalling on change
     _speedSection->setSpecifyFlightSpeed(!_speedSection->specifyFlightSpeed());
-    QVERIFY(_spySection->checkSignalByMask(dirtyChangedMask));
-    QCOMPARE(_spySection->pullBoolFromSignalIndex(dirtyChangedIndex), true);
+    QVERIFY(_spySection->checkSignal("dirtyChanged"));
+    QCOMPARE(_spySection->pullBoolFromSignal("dirtyChanged"), true);
     QCOMPARE(_speedSection->dirty(), true);
     _spySection->clearAllSignals();
     _speedSection->setSpecifyFlightSpeed(!_speedSection->specifyFlightSpeed());
-    QVERIFY(_spySection->checkNoSignalByMask(dirtyChangedMask));
+    QVERIFY(_spySection->checkNoSignal("dirtyChanged"));
     QCOMPARE(_speedSection->dirty(), true);
     _spySection->clearAllSignals();
 
     // Check that the dirty bit can be cleared
     _speedSection->setDirty(false);
-    QVERIFY(_spySection->checkSignalByMask(dirtyChangedMask));
-    QCOMPARE(_spySection->pullBoolFromSignalIndex(dirtyChangedIndex), false);
+    QVERIFY(_spySection->checkSignal("dirtyChanged"));
+    QCOMPARE(_spySection->pullBoolFromSignal("dirtyChanged"), false);
     QCOMPARE(_speedSection->dirty(), false);
     _spySection->clearAllSignals();
 
@@ -76,15 +74,15 @@ void SpeedSectionTest::_testDirty(void)
     _speedSection->setDirty(false);
     _spySection->clearAllSignals();
     _speedSection->flightSpeed()->setRawValue(_speedSection->flightSpeed()->rawValue().toDouble() + 1);
-    QVERIFY(_spySection->checkNoSignalByMask(dirtyChangedMask));
+    QVERIFY(_spySection->checkNoSignal("dirtyChanged"));
     QCOMPARE(_speedSection->dirty(), false);
 
     _speedSection->setSpecifyFlightSpeed(true);
     _speedSection->setDirty(false);
     _spySection->clearAllSignals();
     _speedSection->flightSpeed()->setRawValue(_speedSection->flightSpeed()->rawValue().toDouble() + 1);
-    QVERIFY(_spySection->checkSignalByMask(dirtyChangedMask));
-    QCOMPARE(_spySection->pullBoolFromSignalIndex(dirtyChangedIndex), true);
+    QVERIFY(_spySection->checkSignal("dirtyChanged"));
+    QCOMPARE(_spySection->pullBoolFromSignal("dirtyChanged"), true);
     QCOMPARE(_speedSection->dirty(), true);
 }
 
@@ -99,20 +97,20 @@ void SpeedSectionTest::_testSettingsAvailable(void)
     _speedSection->setSpecifyFlightSpeed(true);
     QCOMPARE(_speedSection->specifyFlightSpeed(), true);
     QCOMPARE(_speedSection->settingsSpecified(), true);
-    QVERIFY(_spySpeed->checkSignalByMask(specifyFlightSpeedChangedMask));
-    QCOMPARE(_spySpeed->pullBoolFromSignalIndex(specifyFlightSpeedChangedIndex), true);
-    QVERIFY(_spySection->checkSignalByMask(settingsSpecifiedChangedMask));
-    QCOMPARE(_spySection->pullBoolFromSignalIndex(settingsSpecifiedChangedIndex), true);
+    QVERIFY(_spySpeed->checkSignal("specifyFlightSpeedChanged"));
+    QCOMPARE(_spySpeed->pullBoolFromSignal("specifyFlightSpeedChanged"), true);
+    QVERIFY(_spySection->checkSignal("settingsSpecifiedChanged"));
+    QCOMPARE(_spySection->pullBoolFromSignal("settingsSpecifiedChanged"), true);
     _spySection->clearAllSignals();
     _spySpeed->clearAllSignals();
 
     _speedSection->setSpecifyFlightSpeed(false);
     QCOMPARE(_speedSection->specifyFlightSpeed(), false);
     QCOMPARE(_speedSection->settingsSpecified(), false);
-    QVERIFY(_spySpeed->checkSignalByMask(specifyFlightSpeedChangedMask));
-    QCOMPARE(_spySpeed->pullBoolFromSignalIndex(specifyFlightSpeedChangedIndex), false);
-    QVERIFY(_spySection->checkSignalByMask(settingsSpecifiedChangedMask));
-    QCOMPARE(_spySection->pullBoolFromSignalIndex(settingsSpecifiedChangedIndex), false);
+    QVERIFY(_spySpeed->checkSignal("specifyFlightSpeedChanged"));
+    QCOMPARE(_spySpeed->pullBoolFromSignal("specifyFlightSpeedChanged"), false);
+    QVERIFY(_spySection->checkSignal("settingsSpecifiedChanged"));
+    QCOMPARE(_spySection->pullBoolFromSignal("settingsSpecifiedChanged"), false);
     _spySection->clearAllSignals();
     _spySpeed->clearAllSignals();
 }
@@ -143,15 +141,15 @@ void SpeedSectionTest::_testItemCount(void)
 
     _speedSection->setSpecifyFlightSpeed(true);
     QCOMPARE(_speedSection->itemCount(), 1);
-    QVERIFY(_spySection->checkSignalByMask(itemCountChangedMask));
-    QCOMPARE(_spySection->pullIntFromSignalIndex(itemCountChangedIndex), 1);
+    QVERIFY(_spySection->checkSignal("itemCountChanged"));
+    QCOMPARE(_spySection->pullIntFromSignal("itemCountChanged"), 1);
     _spySection->clearAllSignals();
     _spySpeed->clearAllSignals();
 
     _speedSection->setSpecifyFlightSpeed(false);
     QCOMPARE(_speedSection->itemCount(), 0);
-    QVERIFY(_spySection->checkSignalByMask(itemCountChangedMask));
-    QCOMPARE(_spySection->pullIntFromSignalIndex(itemCountChangedIndex), 0);
+    QVERIFY(_spySection->checkSignal("itemCountChanged"));
+    QCOMPARE(_spySection->pullIntFromSignal("itemCountChanged"), 0);
     _spySection->clearAllSignals();
     _spySpeed->clearAllSignals();
 }
@@ -278,11 +276,11 @@ void SpeedSectionTest::_testSpecifiedFlightSpeedChanged(void)
     _speedSection->setSpecifyFlightSpeed(false);
     _spySpeed->clearAllSignals();
     _speedSection->flightSpeed()->setRawValue(_speedSection->flightSpeed()->rawValue().toDouble() + 1);
-    QVERIFY(_spySpeed->checkNoSignalByMask(specifiedFlightSpeedChangedMask));
+    QVERIFY(_spySpeed->checkNoSignal("specifyFlightSpeedChanged"));
 
     // specifiedFlightSpeedChanged SHOULD signal if flight speed is changed when specifyFlightSpeed IS set
     _speedSection->setSpecifyFlightSpeed(true);
     _spySpeed->clearAllSignals();
     _speedSection->flightSpeed()->setRawValue(_speedSection->flightSpeed()->rawValue().toDouble() + 1);
-    QVERIFY(_spySpeed->checkSignalByMask(specifiedFlightSpeedChangedMask));
+    QVERIFY(_spySpeed->checkSignal("specifyFlightSpeedChanged"));
 }

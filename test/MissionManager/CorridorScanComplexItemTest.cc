@@ -29,10 +29,8 @@ void CorridorScanComplexItemTest::init(void)
 
     _corridorItem->setDirty(false);
 
-    _rgCorridorPolygonSignals[corridorPolygonPathChangedIndex] = SIGNAL(pathChanged());
-
     _multiSpyCorridorPolygon = new MultiSignalSpy();
-    QCOMPARE(_multiSpyCorridorPolygon->init(_corridorItem->surveyAreaPolygon(), _rgCorridorPolygonSignals, _cCorridorPolygonSignals), true);
+    QCOMPARE(_multiSpyCorridorPolygon->init(_corridorItem->surveyAreaPolygon()), true);
 }
 
 void CorridorScanComplexItemTest::cleanup(void)
@@ -169,7 +167,7 @@ void CorridorScanComplexItemTest::_testPathChanges(void)
      vertex.setLatitude(vertex.latitude() + 0.01);
      _corridorItem->corridorPolyline()->adjustVertex(1, vertex);
     QTest::qWait(100); // Let event loop process so queued signals flow through
-     QVERIFY(_multiSpyCorridorPolygon->checkSignalsByMask(corridorPolygonPathChangedMask));
+     QVERIFY(_multiSpyCorridorPolygon->checkSignal("pathChanged"));
 }
 
 QList<MAV_CMD> CorridorScanComplexItemTest::_createExpectedCommands(bool hasTurnaround, bool useConditionGate)

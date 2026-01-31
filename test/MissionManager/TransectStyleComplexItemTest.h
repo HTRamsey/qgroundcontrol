@@ -6,7 +6,7 @@
 #include <QGeoCoordinate>
 
 class TestTransectStyleItem;
-class MultiSignalSpyV2;
+class MultiSignalSpy;
 class PlanMasterController;
 
 class TransectStyleComplexItemTest : public TransectStyleComplexItemTestBase
@@ -28,7 +28,7 @@ private slots:
     // void _testFollowTerrain     (void);
 
 private:
-    MultiSignalSpyV2*       _multiSpy =             nullptr;
+    MultiSignalSpy*         _multiSpy =             nullptr;
     TestTransectStyleItem*  _transectStyleItem =    nullptr;
 };
 

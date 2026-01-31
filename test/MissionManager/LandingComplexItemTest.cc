@@ -5,20 +5,23 @@
 #include "MultiSignalSpy.h"
 #include "CameraSection.h"
 #include "SimpleMissionItem.h"
+#include "QGC.h"
 
 #include <QtTest/QTest>
+
+namespace {
+    bool fuzzyCompareLatLon(const QGeoCoordinate &coord1, const QGeoCoordinate &coord2)
+    {
+        return QGC::fuzzyCompare(coord1.latitude(), coord2.latitude()) &&
+               QGC::fuzzyCompare(coord1.longitude(), coord2.longitude());
+    }
+}
 
 const char* SimpleLandingComplexItem::settingsGroup             = "SimpleLandingComplexItemUnitTest";
 const char* SimpleLandingComplexItem::jsonComplexItemTypeValue  = "utSimpleLandingPattern";
 
 LandingComplexItemTest::LandingComplexItemTest(void)
 {
-    rgSignals[finalApproachCoordinateChangedIndex]  = SIGNAL(finalApproachCoordinateChanged(QGeoCoordinate));
-    rgSignals[slopeStartCoordinateChangedIndex]     = SIGNAL(slopeStartCoordinateChanged(QGeoCoordinate));
-    rgSignals[landingCoordinateChangedIndex]        = SIGNAL(landingCoordinateChanged(QGeoCoordinate));
-    rgSignals[landingCoordSetChangedIndex]          = SIGNAL(landingCoordSetChanged(bool));
-    rgSignals[altitudesAreRelativeChangedIndex]     = SIGNAL(altitudesAreRelativeChanged(bool));
-    rgSignals[_updateFlightPathSegmentsSignalIndex] = SIGNAL(_updateFlightPathSegmentsSignal());
 }
 
 void LandingComplexItemTest::init(void)
@@ -36,7 +39,7 @@ void LandingComplexItemTest::init(void)
     VisualMissionItemTest::_createSpy(_item, &_viMultiSpy);
 
     _multiSpy = new MultiSignalSpy();
-    QCOMPARE(_multiSpy->init(_item, rgSignals, cSignals), true);
+    QCOMPARE(_multiSpy->init(_item), true);
 
     _validStopVideoItem     = CameraSectionTest::createValidStopTimeItem(_masterController);
     _validStopDistanceItem  = CameraSectionTest::createValidStopTimeItem(_masterController);
@@ -62,8 +65,8 @@ void LandingComplexItemTest::_testDirty(void)
     QVERIFY(!_item->dirty());
     _item->setDirty(true);
     QVERIFY(_item->dirty());
-    QVERIFY(_viMultiSpy->checkOnlySignalByMask(dirtyChangedMask));
-    QVERIFY(_viMultiSpy->pullBoolFromSignalIndex(dirtyChangedIndex));
+    QVERIFY(_viMultiSpy->checkOnlySignal("dirtyChanged"));
+    QVERIFY(_viMultiSpy->pullBoolFromSignal("dirtyChanged"));
     _item->setDirty(false);
     _viMultiSpy->clearAllSignals();
 
@@ -84,8 +87,8 @@ void LandingComplexItemTest::_testDirty(void)
         qDebug() << fact->name();
         QVERIFY(!_item->dirty());
         changeFactValue(fact);
-        QVERIFY(_viMultiSpy->checkSignalByMask(dirtyChangedMask));
-        QVERIFY(_viMultiSpy->pullBoolFromSignalIndex(dirtyChangedIndex));
+        QVERIFY(_viMultiSpy->checkSignal("dirtyChanged"));
+        QVERIFY(_viMultiSpy->pullBoolFromSignal("dirtyChanged"));
         _item->setDirty(false);
         _viMultiSpy->clearAllSignals();
     }
@@ -99,8 +102,8 @@ void LandingComplexItemTest::_testDirty(void)
         QVERIFY(!_item->dirty());
         QMetaProperty boolProp = metaObject->property(metaObject->indexOfProperty(boolName));
         QVERIFY(boolProp.write(_item, !boolProp.read(_item).toBool()));
-        QVERIFY(_viMultiSpy->checkSignalByMask(dirtyChangedMask));
-        QVERIFY(_viMultiSpy->pullBoolFromSignalIndex(dirtyChangedIndex));
+        QVERIFY(_viMultiSpy->checkSignal("dirtyChanged"));
+        QVERIFY(_viMultiSpy->pullBoolFromSignal("dirtyChanged"));
         _item->setDirty(false);
         _viMultiSpy->clearAllSignals();
     }
@@ -109,15 +112,15 @@ void LandingComplexItemTest::_testDirty(void)
 
     QVERIFY(!_item->dirty());
     _item->setFinalApproachCoordinate(changeCoordinateValue(_item->finalApproachCoordinate()));
-    QVERIFY(_viMultiSpy->checkSignalByMask(dirtyChangedMask));
-    QVERIFY(_viMultiSpy->pullBoolFromSignalIndex(dirtyChangedIndex));
+    QVERIFY(_viMultiSpy->checkSignal("dirtyChanged"));
+    QVERIFY(_viMultiSpy->pullBoolFromSignal("dirtyChanged"));
     _item->setDirty(false);
     _viMultiSpy->clearAllSignals();
 
     QVERIFY(!_item->dirty());
     _item->setLandingCoordinate(changeCoordinateValue(_item->landingCoordinate()));
-    QVERIFY(_viMultiSpy->checkSignalByMask(dirtyChangedMask));
-    QVERIFY(_viMultiSpy->pullBoolFromSignalIndex(dirtyChangedIndex));
+    QVERIFY(_viMultiSpy->checkSignal("dirtyChanged"));
+    QVERIFY(_viMultiSpy->pullBoolFromSignal("dirtyChanged"));
     _item->setDirty(false);
     _viMultiSpy->clearAllSignals();
 }

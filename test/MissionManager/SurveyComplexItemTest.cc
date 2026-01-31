@@ -7,13 +7,6 @@
 
 SurveyComplexItemTest::SurveyComplexItemTest(void)
 {
-    _rgSurveySignals[surveyVisualTransectPointsChangedIndex] =    SIGNAL(visualTransectPointsChanged());
-    _rgSurveySignals[surveyCameraShotsChangedIndex] =             SIGNAL(cameraShotsChanged());
-    _rgSurveySignals[surveyCoveredAreaChangedIndex] =             SIGNAL(coveredAreaChanged());
-    _rgSurveySignals[surveyTimeBetweenShotsChangedIndex] =        SIGNAL(timeBetweenShotsChanged());
-    _rgSurveySignals[surveyRefly90DegreesChangedIndex] =          SIGNAL(refly90DegreesChanged(bool));
-    _rgSurveySignals[surveyDirtyChangedIndex] =                   SIGNAL(dirtyChanged(bool));
-
     // We use a 100m by 100m square test polygon
     const double edgeDistance = 100;
     _polyVertices.append(QGeoCoordinate(47.633550640000003, -122.08982199));
@@ -50,7 +43,7 @@ void SurveyComplexItemTest::init(void)
 
     _multiSpy = new MultiSignalSpy();
     Q_CHECK_PTR(_multiSpy);
-    QCOMPARE(_multiSpy->init(_surveyItem, _rgSurveySignals, _cSurveySignals), true);
+    QCOMPARE(_multiSpy->init(_surveyItem), true);
 }
 
 void SurveyComplexItemTest::cleanup(void)
@@ -73,13 +66,13 @@ void SurveyComplexItemTest::_testDirty(void)
 
     _surveyItem->setDirty(true);
     QVERIFY(_surveyItem->dirty());
-    QVERIFY(_multiSpy->checkOnlySignalByMask(surveyDirtyChangedMask));
-    QVERIFY(_multiSpy->pullBoolFromSignalIndex(surveyDirtyChangedIndex));
+    QVERIFY(_multiSpy->checkOnlySignal("dirtyChanged"));
+    QVERIFY(_multiSpy->pullBoolFromSignal("dirtyChanged"));
     _multiSpy->clearAllSignals();
 
     _surveyItem->setDirty(false);
     QVERIFY(!_surveyItem->dirty());
-    QVERIFY(_multiSpy->checkOnlySignalByMask(surveyDirtyChangedMask));
+    QVERIFY(_multiSpy->checkOnlySignal("dirtyChanged"));
     _multiSpy->clearAllSignals();
 
     // These facts should set dirty when changed
@@ -93,8 +86,8 @@ void SurveyComplexItemTest::_testDirty(void)
         } else {
             fact->setRawValue(fact->rawValue().toDouble() + 1);
         }
-        QVERIFY(_multiSpy->checkSignalByMask(surveyDirtyChangedMask));
-        QVERIFY(_multiSpy->pullBoolFromSignalIndex(surveyDirtyChangedIndex));
+        QVERIFY(_multiSpy->checkSignal("dirtyChanged"));
+        QVERIFY(_multiSpy->pullBoolFromSignal("dirtyChanged"));
         _surveyItem->setDirty(false);
         _multiSpy->clearAllSignals();
     }

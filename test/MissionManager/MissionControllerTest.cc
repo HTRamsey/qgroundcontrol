@@ -33,12 +33,6 @@ void MissionControllerTest::_initForFirmwareType(MAV_AUTOPILOT firmwareType)
 {
     MissionControllerManagerTest::_initForFirmwareType(firmwareType);
 
-    // VisualMissionItem signals
-    _rgVisualItemSignals[coordinateChangedSignalIndex] = SIGNAL(coordinateChanged(const QGeoCoordinate&));
-
-    // MissionController signals
-    _rgMissionControllerSignals[visualItemsChangedSignalIndex] =    SIGNAL(visualItemsChanged());
-
     // Master controller pulls offline vehicle info from settings
     SettingsManager::instance()->appSettings()->offlineEditingFirmwareClass()->setRawValue(QGCMAVLink::firmwareClass(firmwareType));
     _masterController = new PlanMasterController(this);
@@ -47,12 +41,12 @@ void MissionControllerTest::_initForFirmwareType(MAV_AUTOPILOT firmwareType)
 
     _multiSpyMissionController = new MultiSignalSpy();
     Q_CHECK_PTR(_multiSpyMissionController);
-    QCOMPARE(_multiSpyMissionController->init(_missionController, _rgMissionControllerSignals, _cMissionControllerSignals), true);
+    QCOMPARE(_multiSpyMissionController->init(_missionController), true);
 
     _masterController->start();
 
     // All signals should some through on start
-    QCOMPARE(_multiSpyMissionController->checkOnlySignalsByMask(visualItemsChangedSignalMask), true);
+    QCOMPARE(_multiSpyMissionController->checkOnlySignal(SIGNAL(visualItemsChanged())), true);
     _multiSpyMissionController->clearAllSignals();
 
     QmlObjectListModel* visualItems = _missionController->visualItems();
@@ -140,7 +134,7 @@ void MissionControllerTest::_setupVisualItemSignals(VisualMissionItem* visualIte
 
     _multiSpyMissionItem = new MultiSignalSpy();
     Q_CHECK_PTR(_multiSpyMissionItem);
-    QCOMPARE(_multiSpyMissionItem->init(visualItem, _rgVisualItemSignals, _cVisualItemSignals), true);
+    QCOMPARE(_multiSpyMissionItem->init(visualItem), true);
 }
 
 void MissionControllerTest::_testGimbalRecalc(void)

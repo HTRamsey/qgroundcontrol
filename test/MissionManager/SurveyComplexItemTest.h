@@ -45,30 +45,6 @@ private:
     QList<MAV_CMD>  _createExpectedCommands(bool hasTurnaround, bool useConditionGate);
     void            _testItemGenerationWorker(bool imagesInTurnaround, bool hasTurnaround, bool useConditionGate, const QList<MAV_CMD>& expectedCommands);
 
-    // SurveyComplexItem signals
-
-    enum {
-        surveyVisualTransectPointsChangedIndex = 0,
-        surveyCameraShotsChangedIndex,
-        surveyCoveredAreaChangedIndex,
-        surveyTimeBetweenShotsChangedIndex,
-        surveyRefly90DegreesChangedIndex,
-        surveyDirtyChangedIndex,
-        surveyMaxSignalIndex
-    };
-
-    enum {
-        surveyVisualTransectPointsChangedMask = 1 << surveyVisualTransectPointsChangedIndex,
-        surveyCameraShotsChangedMask =          1 << surveyCameraShotsChangedIndex,
-        surveyCoveredAreaChangedMask =          1 << surveyCoveredAreaChangedIndex,
-        surveyTimeBetweenShotsChangedMask =     1 << surveyTimeBetweenShotsChangedIndex,
-        surveyRefly90DegreesChangedMask =       1 << surveyRefly90DegreesChangedIndex,
-        surveyDirtyChangedMask =                1 << surveyDirtyChangedIndex
-    };
-
-    static const size_t _cSurveySignals = surveyMaxSignalIndex;
-    const char*         _rgSurveySignals[_cSurveySignals];
-
     MultiSignalSpy*         _multiSpy =             nullptr;
     SurveyComplexItem*      _surveyItem =           nullptr;
     QGCMapPolygon*          _mapPolygon =           nullptr;

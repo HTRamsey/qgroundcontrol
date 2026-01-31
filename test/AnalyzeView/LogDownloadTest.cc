@@ -2,7 +2,7 @@
 #include "LogDownloadController.h"
 #include "LogEntry.h"
 #include "MockLink.h"
-#include "MultiSignalSpyV2.h"
+#include "MultiSignalSpy.h"
 #include "QmlObjectListModel.h"
 
 #include "MultiVehicleManager.h"
@@ -19,7 +19,7 @@ void LogDownloadTest::_downloadTest()
     _connectMockLink(MAV_AUTOPILOT_PX4);
 
     LogDownloadController *const controller = new LogDownloadController(this);
-    MultiSignalSpyV2 *multiSpyLogDownloadController = new MultiSignalSpyV2(this);
+    MultiSignalSpy *multiSpyLogDownloadController = new MultiSignalSpy(this);
     QVERIFY(multiSpyLogDownloadController->init(controller));
 
     controller->refresh();
