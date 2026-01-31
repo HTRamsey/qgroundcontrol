@@ -60,6 +60,13 @@ ParameterManager::~ParameterManager()
     qCDebug(ParameterManagerLog) << this;
 }
 
+void ParameterManager::setTestTimeouts(int initialRequestTimeoutMs, int waitingParamTimeoutMs)
+{
+    _initialRequestTimeoutTimer.setInterval(initialRequestTimeoutMs);
+    _waitingParamTimeoutTimer.setInterval(waitingParamTimeoutMs);
+    qCDebug(ParameterManagerLog) << "Test timeouts set: initial=" << initialRequestTimeoutMs << "ms, waiting=" << waitingParamTimeoutMs << "ms";
+}
+
 void ParameterManager::_updateProgressBar()
 {
     int waitingReadParamIndexCount = 0;
@@ -350,32 +357,32 @@ void ParameterManager::_mavlinkParamSet(int componentId, const QString &paramNam
     //      Refresh parameter from vehicle
     //      Notify user of failure
 
-    // Create states
+    // Create states using factory methods
     auto stateMachine = new QGCStateMachine(QStringLiteral("ParameterManager PARAM_SET"), vehicle(), this);
     auto sendParamSetState = new SendMavlinkMessageState(stateMachine, paramSetEncoder, kParamSetRetryCount);
-    auto incPendingWriteCountState = new FunctionState(QStringLiteral("ParameterManager increment pending write count"), stateMachine, [this]() {
+    auto incPendingWriteCountState = stateMachine->addFunctionState(QStringLiteral("Increment pending write count"), [this]() {
         _incrementPendingWriteCount();
     });
-    auto decPendingWriteCountState = new FunctionState(QStringLiteral("ParameterManager decrement pending write count"), stateMachine, [this]() {
+    auto decPendingWriteCountState = stateMachine->addFunctionState(QStringLiteral("Decrement pending write count"), [this]() {
         _decrementPendingWriteCount();
     });
-    auto retryDecPendingWriteCountState = new FunctionState(QStringLiteral("ParameterManager retry decrement pending write count"), stateMachine, [this]() {
+    auto retryDecPendingWriteCountState = stateMachine->addFunctionState(QStringLiteral("Retry decrement pending write count"), [this]() {
         _decrementPendingWriteCount();
     });
     auto waitAckState = new WaitForMavlinkMessageState(stateMachine, MAVLINK_MSG_ID_PARAM_VALUE, kWaitForParamValueAckMs, checkForCorrectParamValue);
-    auto paramRefreshState = new FunctionState(QStringLiteral("ParameterManager param refresh"), stateMachine, [this, componentId, paramName]() {
+    auto paramRefreshState = stateMachine->addFunctionState(QStringLiteral("Param refresh"), [this, componentId, paramName]() {
         refreshParameter(componentId, paramName);
     });
     auto userNotifyState = new ShowAppMessageState(stateMachine, QStringLiteral("Parameter write failed: param: %1 %2").arg(paramName).arg(_vehicleAndComponentString(componentId)));
-    auto logSuccessState = new FunctionState(QStringLiteral("ParameterManager log success"), stateMachine, [this, componentId, paramName]() {
+    auto logSuccessState = stateMachine->addFunctionState(QStringLiteral("Log success"), [this, componentId, paramName]() {
         qCDebug(ParameterManagerLog) << "Parameter write succeeded: param:" << paramName << _vehicleAndComponentString(componentId);
         emit _paramSetSuccess(componentId, paramName);
     });
-    auto logFailureState = new FunctionState(QStringLiteral("ParameterManager log failure"), stateMachine, [this, componentId, paramName]() {
+    auto logFailureState = stateMachine->addFunctionState(QStringLiteral("Log failure"), [this, componentId, paramName]() {
         qCDebug(ParameterManagerLog) << "Parameter write failed: param:" << paramName << _vehicleAndComponentString(componentId);
         emit _paramSetFailure(componentId, paramName);
     });
-    auto finalState = new QGCFinalState(stateMachine);
+    auto finalState = stateMachine->addFinalState();
 
     // Successful state machine transitions
     stateMachine->setInitialState(sendParamSetState);
@@ -809,20 +816,20 @@ void ParameterManager::_mavlinkParamRequestRead(int componentId, const QString &
     //  error:
     //      Notify user of failure
 
-    // Create states
+    // Create states using factory methods
     auto stateMachine = new QGCStateMachine(QStringLiteral("PARAM_REQUEST_READ"), vehicle(), this);
     auto sendParamRequestReadState = new SendMavlinkMessageState(stateMachine, paramRequestReadEncoder, kParamRequestReadRetryCount);
     auto waitAckState = new WaitForMavlinkMessageState(stateMachine, MAVLINK_MSG_ID_PARAM_VALUE, kWaitForParamValueAckMs, checkForCorrectParamValue);
     auto userNotifyState = new ShowAppMessageState(stateMachine, QStringLiteral("Parameter read failed: param: %1 %2").arg(paramName).arg(_vehicleAndComponentString(componentId)));
-    auto logSuccessState = new FunctionState(QStringLiteral("Log success"), stateMachine, [this, componentId, paramName, paramIndex]() {
+    auto logSuccessState = stateMachine->addFunctionState(QStringLiteral("Log success"), [this, componentId, paramName, paramIndex]() {
         qCDebug(ParameterManagerLog) << "PARAM_REQUEST_READ succeeded: name:" << paramName << "index" << paramIndex << _vehicleAndComponentString(componentId);
         emit _paramRequestReadSuccess(componentId, paramName, paramIndex);
     });
-    auto logFailureState = new FunctionState(QStringLiteral("Log failure"), stateMachine, [this, componentId, paramName, paramIndex]() {
+    auto logFailureState = stateMachine->addFunctionState(QStringLiteral("Log failure"), [this, componentId, paramName, paramIndex]() {
         qCDebug(ParameterManagerLog) << "PARAM_REQUEST_READ failed: param:" << paramName << "index" << paramIndex << _vehicleAndComponentString(componentId);
         emit _paramRequestReadFailure(componentId, paramName, paramIndex);
     });
-    auto finalState = new QGCFinalState(stateMachine);
+    auto finalState = stateMachine->addFinalState();
 
     // Successful state machine transitions
     stateMachine->setInitialState(sendParamRequestReadState);

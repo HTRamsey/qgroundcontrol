@@ -897,9 +897,6 @@ private slots:
     void _offlineCruiseSpeedSettingChanged  (QVariant value);
     void _offlineHoverSpeedSettingChanged   (QVariant value);
     void _prearmErrorTimeout                ();
-    void _firstMissionLoadComplete          ();
-    void _firstGeoFenceLoadComplete         ();
-    void _firstRallyPointLoadComplete       ();
     void _sendMavCommandResponseTimeoutCheck();
     void _clearCameraTriggerPoints          ();
     void _updateDistanceHeadingHome         ();

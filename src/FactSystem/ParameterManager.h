@@ -92,7 +92,12 @@ public:
     // These are public for creating unit tests
     static constexpr int kParamSetRetryCount = 2;                   ///< Number of retries for PARAM_SET
     static constexpr int kParamRequestReadRetryCount = 2;           ///< Number of retries for PARAM_REQUEST_READ
-    static constexpr int kWaitForParamValueAckMs = 1000;    ///< Time to wait for param value ack after set param
+    static constexpr int kWaitForParamValueAckMs = 1000;            ///< Time to wait for param value ack after set param
+    static constexpr int kInitialRequestTimeoutMsDefault = 5000;    ///< Default timeout for initial param request
+    static constexpr int kWaitingParamTimeoutMsDefault = 3000;      ///< Default timeout for waiting param
+
+    /// Set shorter timeouts for unit testing (call before vehicle connection)
+    void setTestTimeouts(int initialRequestTimeoutMs, int waitingParamTimeoutMs);
 
 signals:
     void parametersReadyChanged(bool parametersReady);

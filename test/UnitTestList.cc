@@ -63,7 +63,31 @@
 
 // qgcunittest
 #include "ComponentInformationCacheTest.h"
+#include "ComponentInformationManagerTest.h"
 #include "ComponentInformationTranslationTest.h"
+#include "RequestMetaDataTypeStateMachineTest.h"
+
+// StateMachine
+#include "QGCStateMachineTest.h"
+// StateMachine - States
+#include "FunctionStateTest.h"
+#include "DelayStateTest.h"
+#include "AsyncFunctionStateTest.h"
+#include "WaitForSignalStateTest.h"
+#include "ConditionalStateTest.h"
+#include "SkippableAsyncStateTest.h"
+#include "ParallelStateTest.h"
+#include "SubMachineStateTest.h"
+#include "QGCStateTest.h"
+#include "QGCFinalStateTest.h"
+#include "QGCHistoryStateTest.h"
+// StateMachine - Transitions
+#include "GuardedTransitionTest.h"
+#include "InternalTransitionTest.h"
+#include "MachineEventTransitionTest.h"
+#include "NamedEventTransitionTest.h"
+#include "SignalDataTransitionTest.h"
+#include "QGCSignalTransitionTest.h"
 
 // QmlControls
 
@@ -95,12 +119,13 @@
 #include "ComponentInformationCacheTest.h"
 #include "ComponentInformationTranslationTest.h"
 #include "FTPManagerTest.h"
-// #include "InitialConnectTest.h"
+#include "InitialConnectTest.h"
 #include "MAVLinkLogManagerTest.h"
-// #include "RequestMessageTest.h"
-// #include "SendMavCommandWithHandlerTest.h"
-// #include "SendMavCommandWithSignalingTest.h"
+// #include "RequestMessageTest.h"  // FIXME: Disabled - pre-existing test failures
+#include "SendMavCommandWithHandlerTest.h"
+#include "SendMavCommandWithSignallingTest.h"
 #include "VehicleLinkManagerTest.h"
+#include "VehicleTest.h"
 
 // Missing
 // #include "FlightGearUnitTest.h"
@@ -196,16 +221,41 @@ int QGCUnitTest::runTests(bool stress, const QStringList& unitTests)
     // Shape
     UT_REGISTER_TEST(ShapeTest)
 
+    // StateMachine
+    UT_REGISTER_TEST(QGCStateMachineTest)
+    // StateMachine - States
+    UT_REGISTER_TEST(FunctionStateTest)
+    UT_REGISTER_TEST(DelayStateTest)
+    UT_REGISTER_TEST(AsyncFunctionStateTest)
+    UT_REGISTER_TEST(WaitForSignalStateTest)
+    UT_REGISTER_TEST(ConditionalStateTest)
+    UT_REGISTER_TEST(SkippableAsyncStateTest)
+    UT_REGISTER_TEST(ParallelStateTest)
+    UT_REGISTER_TEST(SubMachineStateTest)
+    UT_REGISTER_TEST(QGCStateTest)
+    UT_REGISTER_TEST(QGCFinalStateTest)
+    UT_REGISTER_TEST(QGCHistoryStateTest)
+    // StateMachine - Transitions
+    UT_REGISTER_TEST(GuardedTransitionTest)
+    UT_REGISTER_TEST(InternalTransitionTest)
+    UT_REGISTER_TEST(MachineEventTransitionTest)
+    UT_REGISTER_TEST(NamedEventTransitionTest)
+    UT_REGISTER_TEST(SignalDataTransitionTest)
+    UT_REGISTER_TEST(QGCSignalTransitionTest)
+
     // Vehicle
     // Components
     UT_REGISTER_TEST(ComponentInformationCacheTest)
+    UT_REGISTER_TEST(ComponentInformationManagerTest)
     UT_REGISTER_TEST(ComponentInformationTranslationTest)
+    UT_REGISTER_TEST(RequestMetaDataTypeStateMachineTest)
     UT_REGISTER_TEST(FTPManagerTest)
-    // UT_REGISTER_TEST(InitialConnectTest)
+    UT_REGISTER_TEST(InitialConnectTest)
     UT_REGISTER_TEST(MAVLinkLogManagerTest)
-    // UT_REGISTER_TEST(RequestMessageTest)
-    // UT_REGISTER_TEST(SendMavCommandWithHandlerTest)
-    // UT_REGISTER_TEST(SendMavCommandWithSignalingTest)
+    // UT_REGISTER_TEST(RequestMessageTest)  // FIXME: Disabled - pre-existing test failures
+    UT_REGISTER_TEST(SendMavCommandWithHandlerTest)
+    UT_REGISTER_TEST(VehicleTest)
+    UT_REGISTER_TEST(SendMavCommandWithSignallingTest)
     UT_REGISTER_TEST(VehicleLinkManagerTest)
 
     // Missing
