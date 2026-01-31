@@ -5,7 +5,7 @@
 
 #include "QGCLoggingCategory.h"
 
-QGC_LOGGING_CATEGORY(CommandLineParserLog, "Utilities.QGCCommandLineParser")
+QGC_LOGGING_CATEGORY(QGCCommandLineParserLog, "Utilities.QGCCommandLineParser")
 
 namespace QGCCommandLineParser {
 
@@ -90,7 +90,7 @@ static QStringList normalizeArgs(const QStringList &args)
         }
     }
 
-    qCDebug(CommandLineParserLog) << "Normalized arguments:" << out;
+    qCDebug(QGCCommandLineParserLog) << "Normalized arguments:" << out;
     return out;
 }
 
@@ -227,7 +227,7 @@ CommandLineParseResult parseCommandLine()
             out.statusCode = CommandLineParseResult::Status::Error;
             out.errorString = QCoreApplication::translate("main",
                 "--unittest/--unittest-stress/--unittest-output/--list-tests options are only available in unittest builds.");
-            qCWarning(CommandLineParserLog) << out.errorString.value();
+            qCWarning(QGCCommandLineParserLog) << out.errorString.value();
             return out;
 #endif
         }
@@ -239,7 +239,7 @@ CommandLineParseResult parseCommandLine()
             out.statusCode = CommandLineParseResult::Status::Error;
             out.errorString = QCoreApplication::translate("main",
                 "--fake-mobile/--allow-multiple are not supported on mobile platforms.");
-            qCWarning(CommandLineParserLog) << out.errorString.value();
+            qCWarning(QGCCommandLineParserLog) << out.errorString.value();
             return out;
         }
 #endif
@@ -251,7 +251,7 @@ CommandLineParseResult parseCommandLine()
             out.statusCode = CommandLineParseResult::Status::Error;
             out.errorString = QCoreApplication::translate("main",
                 "--desktop/--no-windows-assert-ui are only supported on Windows.");
-            qCWarning(CommandLineParserLog) << out.errorString.value();
+            qCWarning(QGCCommandLineParserLog) << out.errorString.value();
             return out;
         }
 #endif
@@ -262,7 +262,7 @@ CommandLineParseResult parseCommandLine()
             out.statusCode = CommandLineParseResult::Status::Error;
             out.errorString = QCoreApplication::translate("main",
                 "--swrast is only supported on Windows and macOS.");
-            qCWarning(CommandLineParserLog) << out.errorString.value();
+            qCWarning(QGCCommandLineParserLog) << out.errorString.value();
             return out;
         }
 #endif
@@ -271,7 +271,7 @@ CommandLineParseResult parseCommandLine()
         out.statusCode = CommandLineParseResult::Status::Error;
         out.errorString = QCoreApplication::translate("main", "Unknown options: %1")
             .arg(out.unknownOptions.join(QLatin1String(", ")));
-        qCWarning(CommandLineParserLog) << out.errorString.value();
+        qCWarning(QGCCommandLineParserLog) << out.errorString.value();
         return out;
     }
 
@@ -281,7 +281,7 @@ CommandLineParseResult parseCommandLine()
         out.statusCode = CommandLineParseResult::Status::Error;
         out.errorString = QCoreApplication::translate("main", "Unexpected positional arguments: %1")
             .arg(out.positional.join(QLatin1String(", ")));
-        qCWarning(CommandLineParserLog) << out.errorString.value();
+        qCWarning(QGCCommandLineParserLog) << out.errorString.value();
         return out;
     }
 
@@ -307,18 +307,18 @@ CommandLineParseResult parseCommandLine()
             out.statusCode = CommandLineParseResult::Status::Error;
             out.errorString = QCoreApplication::translate("main", "Invalid System ID (must be 1-255): %1")
                 .arg(systemIdStr);
-            qCWarning(CommandLineParserLog) << out.errorString.value();
+            qCWarning(QGCCommandLineParserLog) << out.errorString.value();
             return out;
         }
         out.systemId = static_cast<quint8>(systemId);
-        qCDebug(CommandLineParserLog) << "System ID:" << systemId;
+        qCDebug(QGCCommandLineParserLog) << "System ID:" << systemId;
     }
 
     out.clearSettingsOptions = parser.isSet(clearSettingsOpt);
     out.clearCache = parser.isSet(clearCacheOpt);
     if (parser.isSet(loggingOpt)) {
         out.loggingOptions = parser.value(loggingOpt);
-        qCDebug(CommandLineParserLog) << "Logging options:" << out.loggingOptions.value();
+        qCDebug(QGCCommandLineParserLog) << "Logging options:" << out.loggingOptions.value();
     }
     out.logOutput = parser.isSet(logOutputOpt);
     out.simpleBootTest = parser.isSet(simpleBootOpt);
@@ -334,7 +334,7 @@ CommandLineParseResult parseCommandLine()
                 out.unitTests.append(val);
             }
         }
-        qCDebug(CommandLineParserLog) << "Unit tests:" << (out.unitTests.isEmpty() ? QStringLiteral("all") : out.unitTests.join(QLatin1String(", ")));
+        qCDebug(QGCCommandLineParserLog) << "Unit tests:" << (out.unitTests.isEmpty() ? QStringLiteral("all") : out.unitTests.join(QLatin1String(", ")));
     }
 
     if (parser.isSet(unittestStressOpt)) {
@@ -350,22 +350,22 @@ CommandLineParseResult parseCommandLine()
                 out.statusCode = CommandLineParseResult::Status::Error;
                 out.errorString = QCoreApplication::translate("main", "Invalid stress test count (must be > 0): %1")
                     .arg(stress);
-                qCWarning(CommandLineParserLog) << out.errorString.value();
+                qCWarning(QGCCommandLineParserLog) << out.errorString.value();
                 return out;
             }
             out.stressUnitTestsCount = count;
         }
-        qCDebug(CommandLineParserLog) << "Stress test iterations:" << out.stressUnitTestsCount;
+        qCDebug(QGCCommandLineParserLog) << "Stress test iterations:" << out.stressUnitTestsCount;
     }
 
     if (parser.isSet(unittestOutputOpt)) {
         out.unitTestOutput = parser.value(unittestOutputOpt);
-        qCDebug(CommandLineParserLog) << "Test output file:" << out.unitTestOutput.value();
+        qCDebug(QGCCommandLineParserLog) << "Test output file:" << out.unitTestOutput.value();
     }
 
     out.listTests = parser.isSet(listTestsOpt);
     if (out.listTests) {
-        qCDebug(CommandLineParserLog) << "List tests requested";
+        qCDebug(QGCCommandLineParserLog) << "List tests requested";
     }
 #endif
 
@@ -394,7 +394,7 @@ CommandLineParseResult parseCommandLine()
 #endif
 
     out.statusCode = CommandLineParseResult::Status::Ok;
-    qCDebug(CommandLineParserLog) << "Command line parsing completed successfully";
+    qCDebug(QGCCommandLineParserLog) << "Command line parsing completed successfully";
 
     return out;
 }

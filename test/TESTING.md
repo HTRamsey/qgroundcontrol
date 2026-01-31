@@ -60,9 +60,14 @@ add_qgc_test(MyIntegrationTest LABELS Integration SERIAL)
 MultiSignalSpy spy;
 spy.init(myObject);
 
-QVERIFY(spy.checkSignalByMask(1 << 0));  // First signal
-QVERIFY(spy.waitForSignalByIndex(0, 5000));
-spy.clearAll();
+// String-based API (recommended)
+QVERIFY(spy.checkSignal("valueChanged"));           // Emitted exactly once
+QVERIFY(spy.checkOnlySignal("valueChanged"));       // Only this signal fired
+QVERIFY(spy.waitForSignal("valueChanged", 5000));   // Wait with timeout
+spy.clearAllSignals();
+
+// Mask-based API for multiple signals
+QVERIFY(spy.checkSignalsByMask(spy.mask("signal1", "signal2")));
 ```
 
 ## Code Coverage

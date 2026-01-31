@@ -160,7 +160,7 @@ jobs:
         run: |
           export QT_QPA_PLATFORM=offscreen
           export QT_LOGGING_RULES="*=false"
-          ./Debug/QGroundControl --unittest --unittest-output:junit-results.xml || true
+          ./QGroundControl --unittest --unittest-output:junit-results.xml || true
         continue-on-error: true
 
       - name: Upload Test Results
