@@ -1,9 +1,9 @@
 #include "LogDownloadController.h"
 #include "AppSettings.h"
+#include "LogDownloadStateMachine.h"
 #include "LogEntry.h"
 #include "MAVLinkProtocol.h"
 #include "MultiVehicleManager.h"
-#include "ParameterManager.h"
 #include "QGCApplication.h"
 #include "QGCLoggingCategory.h"
 #include "QmlObjectListModel.h"
@@ -11,21 +11,22 @@
 #include "Vehicle.h"
 
 #include <QtCore/QApplicationStatic>
-#include <QtCore/QTimer>
 
 QGC_LOGGING_CATEGORY(LogDownloadControllerLog, "AnalyzeView.LogDownloadController")
 
 LogDownloadController::LogDownloadController(QObject *parent)
     : QObject(parent)
-    , _timer(new QTimer(this))
     , _logEntriesModel(new QmlObjectListModel(this))
 {
     qCDebug(LogDownloadControllerLog) << this;
 
-    (void) connect(MultiVehicleManager::instance(), &MultiVehicleManager::activeVehicleChanged, this, &LogDownloadController::_setActiveVehicle);
-    (void) connect(_timer, &QTimer::timeout, this, &LogDownloadController::_processDownload);
+    _stateMachine = new LogDownloadStateMachine(this, this);
 
-    _timer->setSingleShot(false);
+    (void) connect(MultiVehicleManager::instance(), &MultiVehicleManager::activeVehicleChanged, this, &LogDownloadController::_setActiveVehicle);
+
+    // Forward state machine signals
+    (void) connect(_stateMachine, &LogDownloadStateMachine::requestingListChanged, this, &LogDownloadController::requestingListChanged);
+    (void) connect(_stateMachine, &LogDownloadStateMachine::downloadingChanged, this, &LogDownloadController::downloadingLogsChanged);
 
     _setActiveVehicle(MultiVehicleManager::instance()->activeVehicle());
 }
@@ -35,26 +36,34 @@ LogDownloadController::~LogDownloadController()
     qCDebug(LogDownloadControllerLog) << this;
 }
 
-void LogDownloadController::download(const QString &path)
+bool LogDownloadController::_getRequestingList() const
 {
-    const QString dir = path.isEmpty() ? SettingsManager::instance()->appSettings()->logSavePath() : path;
-    _downloadToDirectory(dir);
+    return _stateMachine->isRequestingList();
 }
 
-void LogDownloadController::_downloadToDirectory(const QString &dir)
+bool LogDownloadController::_getDownloadingLogs() const
 {
-    _receivedAllEntries();
+    return _stateMachine->isDownloading();
+}
 
-    _downloadData.reset();
+void LogDownloadController::refresh()
+{
+    _logEntriesModel->clearAndDeleteContents();
+    _stateMachine->startListRequest();
+}
 
-    _downloadPath = dir;
-    if (_downloadPath.isEmpty()) {
+void LogDownloadController::download(const QString &path)
+{
+    QString dir = path.isEmpty() ? SettingsManager::instance()->appSettings()->logSavePath() : path;
+    if (dir.isEmpty()) {
         return;
     }
 
-    if (!_downloadPath.endsWith(QDir::separator())) {
-        _downloadPath += QDir::separator();
+    if (!dir.endsWith(QDir::separator())) {
+        dir += QDir::separator();
     }
+
+    _downloadPath = dir;
 
     QGCLogEntry *const log = _getNextSelected();
     if (log) {
@@ -462,8 +471,7 @@ QGCLogEntry *LogDownloadController::_getNextSelected() const
 
 void LogDownloadController::cancel()
 {
-    _requestLogEnd();
-    _receivedAllEntries();
+    _stateMachine->cancel();
 
     if (_downloadData) {
         _downloadData->entry->setStatus(QStringLiteral("Canceled"));
@@ -475,27 +483,6 @@ void LogDownloadController::cancel()
     }
 
     _resetSelection(true);
-    _setDownloading(false);
-}
-
-void LogDownloadController::_resetSelection(bool canceled)
-{
-    const int num_logs = _logEntriesModel->count();
-    for (int i = 0; i < num_logs; i++) {
-        QGCLogEntry *const entry = _logEntriesModel->value<QGCLogEntry*>(i);
-        if (!entry) {
-            continue;
-        }
-
-        if (entry->selected()) {
-            if (canceled) {
-                entry->setStatus(tr("Canceled"));
-            }
-            entry->setSelected(false);
-        }
-    }
-
-    emit selectionChanged();
 }
 
 void LogDownloadController::eraseAll()
@@ -529,119 +516,89 @@ void LogDownloadController::eraseAll()
     refresh();
 }
 
-void LogDownloadController::_requestLogList(uint32_t start, uint32_t end)
+void LogDownloadController::_setActiveVehicle(Vehicle *vehicle)
 {
-    if (!_vehicle) {
-        qCWarning(LogDownloadControllerLog) << "Vehicle Unavailable";
+    if (vehicle == _vehicle) {
         return;
     }
 
-    SharedLinkInterfacePtr sharedLink = _vehicle->vehicleLinkManager()->primaryLink().lock();
-    if (!sharedLink) {
-        qCWarning(LogDownloadControllerLog) << "Link Unavailable";
-        return;
+    if (_vehicle) {
+        _logEntriesModel->clearAndDeleteContents();
+        (void) disconnect(_vehicle, &Vehicle::logEntry, this, &LogDownloadController::_logEntry);
+        (void) disconnect(_vehicle, &Vehicle::logData,  this, &LogDownloadController::_logData);
     }
 
-    mavlink_message_t msg{};
-    (void) mavlink_msg_log_request_list_pack_chan(
-        MAVLinkProtocol::instance()->getSystemId(),
-        MAVLinkProtocol::getComponentId(),
-        sharedLink->mavlinkChannel(),
-        &msg,
-        _vehicle->id(),
-        _vehicle->defaultComponentId(),
-        start,
-        end
-    );
+    _vehicle = vehicle;
 
-    if (!_vehicle->sendMessageOnLinkThreadSafe(sharedLink.get(), msg)) {
-        qCWarning(LogDownloadControllerLog) << "Failed to send";
-        return;
-    }
-
-    qCDebug(LogDownloadControllerLog) << "Request log entry list (" << start << "through" << end << ")";
-    _setListing(true);
-    _timer->start(kRequestLogListTimeoutMs);
-}
-
-void LogDownloadController::_requestLogData(uint16_t id, uint32_t offset, uint32_t count, int retryCount)
-{
-    if (!_vehicle) {
-        qCWarning(LogDownloadControllerLog) << "Vehicle Unavailable";
-        return;
-    }
-
-    SharedLinkInterfacePtr sharedLink = _vehicle->vehicleLinkManager()->primaryLink().lock();
-    if (!sharedLink) {
-        qCWarning(LogDownloadControllerLog) << "Link Unavailable";
-        return;
-    }
-
-    id += _apmOffset;
-    qCDebug(LogDownloadControllerLog) << "Request log data (id:" << id << "offset:" << offset << "size:" << count << "retryCount" << retryCount << ")";
-
-    mavlink_message_t msg{};
-    (void) mavlink_msg_log_request_data_pack_chan(
-        MAVLinkProtocol::instance()->getSystemId(),
-        MAVLinkProtocol::getComponentId(),
-        sharedLink->mavlinkChannel(),
-        &msg,
-        _vehicle->id(),
-        _vehicle->defaultComponentId(),
-        id,
-        offset,
-        count
-    );
-
-    if (!_vehicle->sendMessageOnLinkThreadSafe(sharedLink.get(), msg)) {
-        qCWarning(LogDownloadControllerLog) << "Failed to send";
+    if (_vehicle) {
+        (void) connect(_vehicle, &Vehicle::logEntry, this, &LogDownloadController::_logEntry);
+        (void) connect(_vehicle, &Vehicle::logData,  this, &LogDownloadController::_logData);
     }
 }
 
-void LogDownloadController::_requestLogEnd()
+void LogDownloadController::_logEntry(uint32_t time_utc, uint32_t size, uint16_t id, uint16_t num_logs, uint16_t last_log_num)
 {
-    if (!_vehicle) {
-        qCWarning(LogDownloadControllerLog) << "Vehicle Unavailable";
+    Q_UNUSED(last_log_num);
+    _stateMachine->handleLogEntry(time_utc, size, id, num_logs);
+}
+
+void LogDownloadController::_logData(uint32_t ofs, uint16_t id, uint8_t count, const uint8_t *data)
+{
+    _stateMachine->handleLogData(ofs, id, count, data);
+}
+
+QGCLogEntry *LogDownloadController::_getNextSelected() const
+{
+    const int numLogs = _logEntriesModel->count();
+    for (int i = 0; i < numLogs; i++) {
+        QGCLogEntry *const entry = _logEntriesModel->value<QGCLogEntry*>(i);
+        if (!entry) {
+            continue;
+        }
+
+        if (entry->selected()) {
+           return entry;
+        }
+    }
+
+    return nullptr;
+}
+
+void LogDownloadController::_resetSelection(bool canceled)
+{
+    const int num_logs = _logEntriesModel->count();
+    for (int i = 0; i < num_logs; i++) {
+        QGCLogEntry *const entry = _logEntriesModel->value<QGCLogEntry*>(i);
+        if (!entry) {
+            continue;
+        }
+
+        if (entry->selected()) {
+            if (canceled) {
+                entry->setStatus(tr("Canceled"));
+            }
+            entry->setSelected(false);
+        }
+    }
+
+    emit selectionChanged();
+}
+
+void LogDownloadController::_updateDataRate()
+{
+    if (!_downloadData || _downloadData->elapsed.elapsed() < kGUIRateMs) {
         return;
     }
 
-    SharedLinkInterfacePtr sharedLink = _vehicle->vehicleLinkManager()->primaryLink().lock();
-    if (!sharedLink) {
-        qCWarning(LogDownloadControllerLog) << "Link Unavailable";
-        return;
-    }
+    const qreal rate = _downloadData->rate_bytes / (_downloadData->elapsed.elapsed() / 1000.0);
+    _downloadData->rate_avg = (_downloadData->rate_avg * 0.95) + (rate * 0.05);
+    _downloadData->rate_bytes = 0;
 
-    mavlink_message_t msg{};
-    (void) mavlink_msg_log_request_end_pack_chan(
-        MAVLinkProtocol::instance()->getSystemId(),
-        MAVLinkProtocol::getComponentId(),
-        sharedLink->mavlinkChannel(),
-        &msg,
-        _vehicle->id(),
-        _vehicle->defaultComponentId()
-    );
+    const QString status = QStringLiteral("%1 (%2/s)").arg(qgcApp()->bigSizeToString(_downloadData->written),
+                                                           qgcApp()->bigSizeToString(_downloadData->rate_avg));
 
-    if (!_vehicle->sendMessageOnLinkThreadSafe(sharedLink.get(), msg)) {
-        qCWarning(LogDownloadControllerLog) << "Failed to send";
-    }
-}
-
-void LogDownloadController::_setDownloading(bool active)
-{
-    if (_downloadingLogs != active) {
-        _downloadingLogs = active;
-        _vehicle->vehicleLinkManager()->setCommunicationLostEnabled(!active);
-        emit downloadingLogsChanged();
-    }
-}
-
-void LogDownloadController::_setListing(bool active)
-{
-    if (_requestingLogEntries != active) {
-        _requestingLogEntries = active;
-        _vehicle->vehicleLinkManager()->setCommunicationLostEnabled(!active);
-        emit requestingListChanged();
-    }
+    _downloadData->entry->setStatus(status);
+    _downloadData->elapsed.start();
 }
 
 void LogDownloadController::setCompressLogs(bool compress)

@@ -1,4 +1,5 @@
 #include "RemoteControlCalibrationController.h"
+#include "RCCalibrationStateMachine.h"
 #include "Fact.h"
 #include "ParameterManager.h"
 #include "QGCApplication.h"
@@ -312,30 +313,32 @@ void RemoteControlCalibrationController::start()
     _readStoredCalibrationValues();
 }
 
-const RemoteControlCalibrationController::StateMachineEntry &RemoteControlCalibrationController::_getStateMachineEntry(int step) const
+RemoteControlCalibrationController::StateMachineStepFunction RemoteControlCalibrationController::_currentStepFunction() const
 {
-    if (step < 0 || step >= _stateMachine.size()) {
-        qCWarning(RemoteControlCalibrationControllerLog) << "Bad step value" << step;
-        step = 0;
+    if (!_stateMachine->isCalibrating()) {
+        return StateMachineStepStickNeutral;
     }
 
-    return _stateMachine[step];
-}
+    QString stateName = _stateMachine->currentStateName();
+    if (stateName == "StickNeutral") return StateMachineStepStickNeutral;
+    if (stateName == "ThrottleUp") return StateMachineStepThrottleUp;
+    if (stateName == "ThrottleDown") return StateMachineStepThrottleDown;
+    if (stateName == "YawRight") return StateMachineStepYawRight;
+    if (stateName == "YawLeft") return StateMachineStepYawLeft;
+    if (stateName == "RollRight") return StateMachineStepRollRight;
+    if (stateName == "RollLeft") return StateMachineStepRollLeft;
+    if (stateName == "PitchUp") return StateMachineStepPitchUp;
+    if (stateName == "PitchDown") return StateMachineStepPitchDown;
+    if (stateName == "PitchCenter") return StateMachineStepPitchCenter;
+    if (stateName == "SwitchMinMax") return StateMachineStepSwitchMinMax;
+    if (stateName == "Complete") return StateMachineStepComplete;
 
-void RemoteControlCalibrationController::_advanceState()
-{
-    _currentStep++;
-    if (_currentStep >= _stateMachine.size()) {
-        _stopCalibration();
-        return;
-    }
-
-    _setupCurrentState();
+    return StateMachineStepStickNeutral;
 }
 
 void RemoteControlCalibrationController::_setupCurrentState()
 {
-    auto state = _getStateMachineEntry(_currentStep);
+    StateMachineStepFunction stepFunction = _currentStepFunction();
 
     // If the stick function for this step is not enabled, skip to next step
     if (state.stickFunction != stickFunctionMax && !_stickFunctionEnabled(state.stickFunction)) {
@@ -354,8 +357,8 @@ void RemoteControlCalibrationController::_setupCurrentState()
 
     BothSticksDisplayPositions defaultPositions = { _stickDisplayPositionCentered, _stickDisplayPositionCentered };
     BothSticksDisplayPositions bothStickPositions = _centeredThrottle
-        ? _bothStickDisplayPositionThrottleCenteredMap.value(state.stepFunction).value(_transmitterMode, defaultPositions)
-        : _bothStickDisplayPositionThrottleDownMap.value(state.stepFunction).value(_transmitterMode, defaultPositions);
+        ? _bothStickDisplayPositionThrottleCenteredMap.value(stepFunction).value(_transmitterMode, defaultPositions)
+        : _bothStickDisplayPositionThrottleDownMap.value(stepFunction).value(_transmitterMode, defaultPositions);
 
     QString msg = _stepFunctionToMsgStringMap.value(state.stepFunction, QString());
     if (state.stepFunction == StateMachineStepExtensionHighHorz || state.stepFunction == StateMachineStepExtensionHighVert ||
@@ -381,12 +384,11 @@ void RemoteControlCalibrationController::_setupCurrentState()
                                bothStickPositions.rightStick.horizontal, bothStickPositions.rightStick.vertical };
     emit stickDisplayPositionsChanged();
 
-    _stickDetectChannel = _chanMax;
-    _stickDetectSettleStarted = false;
-
-    _saveCurrentRawValues();
-
-    _nextButton->setEnabled(state.nextButtonFn != nullptr);
+    // Enable next button only for states that have a next button action
+    bool hasNextButton = (stepFunction == StateMachineStepStickNeutral ||
+                          stepFunction == StateMachineStepSwitchMinMax ||
+                          stepFunction == StateMachineStepComplete);
+    _nextButton->setEnabled(hasNextButton);
 }
 
 void RemoteControlCalibrationController::rawChannelValuesChanged(QVector<int> channelValues)
@@ -451,23 +453,21 @@ void RemoteControlCalibrationController::rawChannelValuesChanged(QVector<int> ch
             }
         }
 
-        if (_currentStep == -1) {
+        if (!_stateMachine->isCalibrating()) {
             if (_chanCount != channelCount) {
                 _chanCount = channelCount;
                 emit channelCountChanged(_chanCount);
             }
         } else {
-            auto state = _getStateMachineEntry(_currentStep);
-            if (state.channelInputFn) {
-                (this->*state.channelInputFn)(state.stickFunction, channel, channelValue);
-            }
+            // Forward to state machine for processing
+            _stateMachine->processChannelInput(channel, channelValue);
         }
     }
 }
 
 void RemoteControlCalibrationController::nextButtonClicked()
 {
-    if (_currentStep == -1) {
+    if (!_stateMachine->isCalibrating()) {
         // Need to have enough channels
         if (_chanCount < _chanMinimum) {
             qgcApp()->showAppMessage(QStringLiteral("Detected %1 channels. To operate vehicle, you need at least %2 channels.").arg(_chanCount).arg(_chanMinimum));
@@ -475,10 +475,7 @@ void RemoteControlCalibrationController::nextButtonClicked()
         }
         _startCalibration();
     } else {
-        auto state = _getStateMachineEntry(_currentStep);
-        if (state.nextButtonFn) {
-            (this->*state.nextButtonFn)();
-        }
+        _stateMachine->nextButtonPressed();
     }
 }
 
@@ -772,16 +769,10 @@ void RemoteControlCalibrationController::_startCalibration()
 
     _resetInternalCalibrationValues();
 
-    if (!_calibrating) {
-        _calibrating = true;
-        emit calibratingChanged(true);
-    }
-
     _nextButton->setProperty("text", tr("Next"));
     _cancelButton->setEnabled(true);
 
-    _currentStep = 0;
-    _setupCurrentState();
+    _stateMachine->startCalibration();
 }
 
 void RemoteControlCalibrationController::_setSingleStickDisplay(bool singleStickDisplay)
@@ -794,8 +785,6 @@ void RemoteControlCalibrationController::_setSingleStickDisplay(bool singleStick
 
 void RemoteControlCalibrationController::_stopCalibration()
 {
-    _currentStep = -1;
-
     if (_vehicle) {
         _readStoredCalibrationValues();
     }

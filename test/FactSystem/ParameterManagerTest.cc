@@ -56,9 +56,7 @@ void ParameterManagerTest::_noFailureWorker(MockConfiguration::FailureMode_t fai
     QCOMPARE(arguments.count(), 1);
     QCOMPARE(arguments.at(0).toBool(), true);
     // Progress should have been set back to 0
-    arguments = spyProgress.takeLast();
-    QCOMPARE(arguments.count(), 1);
-    QCOMPARE(arguments.at(0).toFloat(), 0.0f);
+    QCOMPARE(spyProgress.takeLast().at(0).toFloat(), 0.0f);
 }
 
 void ParameterManagerTest::_noFailure()
@@ -208,31 +206,23 @@ void ParameterManagerTest::_setParamWithFailureMode(MockLink::ParamSetFailureMod
                                                                        : std::numeric_limits<double>::infinity();
     const double step = 0.1;
     auto adjustedValue = [&](double candidate) -> double {
-        if (candidate > maxValue) {
-            candidate = originalDouble - step;
-        }
-        if (candidate < minValue) {
-            candidate = originalDouble + step;
-        }
-        if (qFuzzyCompare(candidate + 1.0, originalDouble + 1.0)) {
-            candidate = originalDouble + (step * 2.0);
-        }
-        if (candidate > maxValue) {
-            candidate = originalDouble - (step * 2.0);
-        }
-        if (candidate < minValue) {
-            candidate = originalDouble;
-        }
+        if (candidate > maxValue) candidate = originalDouble - step;
+        if (candidate < minValue) candidate = originalDouble + step;
+        if (qFuzzyCompare(candidate + 1.0, originalDouble + 1.0)) candidate = originalDouble + (step * 2.0);
+        if (candidate > maxValue) candidate = originalDouble - (step * 2.0);
+        if (candidate < minValue) candidate = originalDouble;
         return candidate;
     };
     const double newValueDouble = adjustedValue(originalDouble + step);
     QVERIFY(!qFuzzyCompare(newValueDouble + 1.0, originalDouble + 1.0));
     const QVariant newValue(newValueDouble);
     QSignalSpy pendingSpy(paramManager, &ParameterManager::pendingWritesChanged);
-    QVERIFY(pendingSpy.isValid());
     QSignalSpy paramSetSuccessSpy(paramManager, &ParameterManager::_paramSetSuccess);
-    QVERIFY(paramSetSuccessSpy.isValid());
     QSignalSpy paramSetFailureSpy(paramManager, &ParameterManager::_paramSetFailure);
+
+    QVERIFY(rawValueChangedSpy.isValid());
+    QVERIFY(pendingSpy.isValid());
+    QVERIFY(paramSetSuccessSpy.isValid());
     QVERIFY(paramSetFailureSpy.isValid());
     fact->setRawValue(newValue);
     // We should see pendingWrites go to true and then back to false
@@ -307,23 +297,24 @@ void ParameterManagerTest::_setParamWithFailureMode(MockLink::ParamSetFailureMod
     _disconnectMockLink();
 }
 
+// FTP-based parameter tests (currently disabled - need MockLinkFTP work)
 #if 0
 void ParameterManagerTest::_FTPnoFailure()
 {
     Q_ASSERT(!_mockLink);
     _mockLink = MockLink::startAPMArduPlaneMockLink(false /* sendStatusText */, false /* enableCamera */, false /* enableGimbal */, MockConfiguration::FailParamNoReponseToRequestList);
     _mockLink->mockLinkFTP()->enableBinParamFile(true);
+
     MultiVehicleManager* vehicleMgr = MultiVehicleManager::instance();
     QVERIFY(vehicleMgr);
     // Wait for the Vehicle to get created
-    QSignalSpy spyVehicle(vehicleMgr, SIGNAL(activeVehicleAvailableChanged(bool)));
-    // When param load is complete we get the param ready signal
-    QSignalSpy spyParamsReady(vehicleMgr, SIGNAL(parameterReadyVehicleAvailableChanged(bool)));
-    QCOMPARE(spyVehicle.wait(5000), true);
+    QSignalSpy spyVehicle(vehicleMgr, &MultiVehicleManager::activeVehicleAvailableChanged);
+    QSignalSpy spyParamsReady(vehicleMgr, &MultiVehicleManager::parameterReadyVehicleAvailableChanged);
+
+    QVERIFY(spyVehicle.wait(5000));
     QCOMPARE(spyVehicle.count(), 1);
-    QList<QVariant> arguments = spyVehicle.takeFirst();
-    QCOMPARE(arguments.count(), 1);
-    QCOMPARE(arguments.at(0).toBool(), true);
+    QCOMPARE(spyVehicle.takeFirst().at(0).toBool(), true);
+
     Vehicle* vehicle = vehicleMgr->activeVehicle();
     QVERIFY(vehicle);
     spyParamsReady.wait(5000);
@@ -335,15 +326,13 @@ void ParameterManagerTest::_FTPnoFailure()
     // is so fast that I cannot connect to the loadprogress early enough.
     QSignalSpy spyProgress(vehicle->parameterManager(), SIGNAL(loadProgressChanged(float)));
     vehicle->parameterManager()->refreshAllParameters();
-    spyParamsReady.wait(5000);
+
+    QVERIFY(spyParamsReady.wait(5000));
     QVERIFY(spyProgress.count() > 1);
-    arguments = spyProgress.takeFirst();
-    QCOMPARE(arguments.count(), 1);
-    QVERIFY(arguments.at(0).toFloat() > 0.0f);
+    QVERIFY(spyProgress.takeFirst().at(0).toFloat() > 0.0f);
+
     // Progress should have been set back to 0
-    arguments = spyProgress.takeLast();
-    QCOMPARE(arguments.count(), 1);
-    QCOMPARE(arguments.at(0).toFloat(), 0.0f);
+    QCOMPARE(spyProgress.takeLast().at(0).toFloat(), 0.0f);
 }
 
 void ParameterManagerTest::_FTPChangeParam()
@@ -351,17 +340,17 @@ void ParameterManagerTest::_FTPChangeParam()
     Q_ASSERT(!_mockLink);
     _mockLink = MockLink::startAPMArduPlaneMockLink(false /* sendStatusText */, false /* enableCamera */, false /* enableGimbal */, MockConfiguration::FailParamNoReponseToRequestList);
     _mockLink->mockLinkFTP()->enableBinParamFile(true);
+
     MultiVehicleManager* vehicleMgr = MultiVehicleManager::instance();
     QVERIFY(vehicleMgr);
     // Wait for the Vehicle to get created
-    QSignalSpy spyVehicle(vehicleMgr, SIGNAL(activeVehicleAvailableChanged(bool)));
-    // When param load is complete we get the param ready signal
-    QSignalSpy spyParamsReady(vehicleMgr, SIGNAL(parameterReadyVehicleAvailableChanged(bool)));
-    QCOMPARE(spyVehicle.wait(5000), true);
+    QSignalSpy spyVehicle(vehicleMgr, &MultiVehicleManager::activeVehicleAvailableChanged);
+    QSignalSpy spyParamsReady(vehicleMgr, &MultiVehicleManager::parameterReadyVehicleAvailableChanged);
+
+    QVERIFY(spyVehicle.wait(5000));
     QCOMPARE(spyVehicle.count(), 1);
-    QList<QVariant> arguments = spyVehicle.takeFirst();
-    QCOMPARE(arguments.count(), 1);
-    QCOMPARE(arguments.at(0).toBool(), true);
+    QCOMPARE(spyVehicle.takeFirst().at(0).toBool(), true);
+
     Vehicle* vehicle = vehicleMgr->activeVehicle();
     QVERIFY(vehicle);
     if (spyParamsReady.count() == 0)
@@ -371,27 +360,27 @@ void ParameterManagerTest::_FTPChangeParam()
     QCOMPARE(arguments.count(), 1);
     QCOMPARE(arguments.at(0).toBool(), true);
     // Now try to change a parameter and check the progress
-    QSignalSpy spyProgress(vehicle->parameterManager(), SIGNAL(loadProgressChanged(float)));
+    QSignalSpy spyProgress(vehicle->parameterManager(), &ParameterManager::loadProgressChanged);
     Fact* fact = vehicle->parameterManager()->getParameter(MAV_COMP_ID_AUTOPILOT1, "THR_MIN");
     QVERIFY(fact);
-    float value = fact->rawValue().toFloat();
-    QCOMPARE(value, 0.0);
-    float testvalue = 0.87f;
-    QVariant sendv = testvalue;
-    fact->setRawValue(sendv); // This should trigger a parameter upload to the vehicle
-    /* That should set the progress to 0.5 and then back to 0 */
-    spyProgress.wait(1000);
-    if (spyProgress.count() < 2)
-        spyProgress.wait(1000);
+
+    const float value = fact->rawValue().toFloat();
+    QCOMPARE(value, 0.0f);
+
+    constexpr float testValue = 0.87f;
+    fact->setRawValue(QVariant(testValue));
+
+    // Should set the progress to 0.5 and then back to 0
+    QVERIFY(spyProgress.wait(1000));
+    if (spyProgress.count() < 2) {
+        QVERIFY(spyProgress.wait(1000));
+    }
     QCOMPARE(spyProgress.count(), 2);
     arguments = spyProgress.takeFirst();
     QCOMPARE(arguments.count(), 1);
     QVERIFY(arguments.at(0).toFloat() > 0.4f);
     // Progress should have been set back to 0
-    Q_ASSERT(!spyProgress.empty());
-    arguments = spyProgress.takeLast();
-    QCOMPARE(arguments.count(), 1);
-    QCOMPARE(arguments.at(0).toFloat(), 0.0f);
+    QCOMPARE(spyProgress.takeLast().at(0).toFloat(), 0.0f);
 }
 #endif
 

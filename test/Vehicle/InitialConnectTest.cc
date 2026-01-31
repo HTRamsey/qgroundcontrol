@@ -16,6 +16,7 @@
 #include "Vehicle.h"
 
 #include <QtTest/QTest>
+#include <QtStateMachine/QStateMachine>
 
 void InitialConnectTest::init()
 {
@@ -67,6 +68,11 @@ void InitialConnectTest::_boardVendorProductId()
     auto mockConfig = std::make_shared<MockConfiguration>(QString{"MockLink"});
     const uint16_t mockVendor = 1234;
     const uint16_t mockProduct = 5678;
+
+    // Create properly configured MockConfiguration
+    auto* mockConfig = new MockConfiguration(QStringLiteral("VendorProductTest"));
+    mockConfig->setFirmwareType(MAV_AUTOPILOT_PX4);
+    mockConfig->setVehicleType(MAV_TYPE_QUADROTOR);
     mockConfig->setBoardVendorProduct(mockVendor, mockProduct);
     SharedLinkConfigurationPtr linkConfig = mockConfig;
     LinkManager::instance()->createConnectedLink(linkConfig);

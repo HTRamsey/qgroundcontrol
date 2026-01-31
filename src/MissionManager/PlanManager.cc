@@ -1,4 +1,5 @@
 #include "PlanManager.h"
+#include "PlanManagerStateMachine.h"
 #include "Vehicle.h"
 #include "FirmwarePlugin.h"
 #include "MAVLinkProtocol.h"
@@ -9,47 +10,24 @@
 QGC_LOGGING_CATEGORY(PlanManagerLog, "PlanManager.PlanManager")
 
 PlanManager::PlanManager(Vehicle* vehicle, MAV_MISSION_TYPE planType)
-    : QObject                   (vehicle)
-    , _vehicle                  (vehicle)
-    , _planType                 (planType)
-    , _ackTimeoutTimer          (nullptr)
-    , _expectedAck              (AckNone)
-    , _transactionInProgress    (TransactionNone)
-    , _resumeMission            (false)
-    , _lastMissionRequest       (-1)
-    , _missionItemCountToRead   (-1)
-    , _currentMissionIndex      (-1)
-    , _lastCurrentIndex         (-1)
+    : QObject   (vehicle)
+    , _vehicle  (vehicle)
+    , _planType (planType)
 {
-    _ackTimeoutTimer = new QTimer(this);
-    _ackTimeoutTimer->setSingleShot(true);
+    _stateMachine = new PlanManagerStateMachine(this, this);
 
-    connect(_ackTimeoutTimer, &QTimer::timeout, this, &PlanManager::_ackTimeout);
+    connect(_stateMachine, &PlanManagerStateMachine::readComplete, this, &PlanManager::_onReadComplete);
+    connect(_stateMachine, &PlanManagerStateMachine::writeComplete, this, &PlanManager::_onWriteComplete);
+    connect(_stateMachine, &PlanManagerStateMachine::removeAllComplete, this, &PlanManager::_onRemoveAllComplete);
+    connect(_stateMachine, &PlanManagerStateMachine::progressChanged, this, &PlanManager::progressPctChanged);
+    connect(_stateMachine, &PlanManagerStateMachine::errorOccurred, this, &PlanManager::error);
+    connect(_stateMachine, &PlanManagerStateMachine::transactionComplete, this, [this]() {
+        emit inProgressChanged(inProgress());
+    });
 }
 
 PlanManager::~PlanManager()
 {
-
-}
-
-void PlanManager::_writeMissionItemsWorker(void)
-{
-    _lastMissionRequest = -1;
-
-    emit progressPctChanged(0);
-
-    qCDebug(PlanManagerLog) << QStringLiteral("writeMissionItems %1 count:").arg(_planTypeString()) << _writeMissionItems.count();
-
-    // Prime write list
-    _itemIndicesToWrite.clear();
-    for (int i=0; i<_writeMissionItems.count(); i++) {
-        _itemIndicesToWrite << i;
-    }
-
-    _retryCount = 0;
-    _setTransactionInProgress(TransactionWrite);
-    _connectToMavlink();
-    _writeMissionCount();
 }
 
 
@@ -64,20 +42,22 @@ void PlanManager::writeMissionItems(const QList<MissionItem*>& missionItems)
         return;
     }
 
-    _clearAndDeleteWriteMissionItems();
+    qCDebug(PlanManagerLog) << QStringLiteral("writeMissionItems %1 count:").arg(_planTypeString()) << missionItems.count();
+
+    QList<MissionItem*> itemsToWrite;
 
     bool skipFirstItem = _planType == MAV_MISSION_TYPE_MISSION && !_vehicle->firmwarePlugin()->sendHomePositionToVehicle();
 
     if (skipFirstItem && missionItems.count() > 0) {
-        // First item is not going to be moved to _writeMissionItems, free it now.
+        // First item is not going to be written, free it now.
         delete missionItems[0];
     }
 
     int firstIndex = skipFirstItem ? 1 : 0;
 
-    for (int i=firstIndex; i<missionItems.count(); i++) {
+    for (int i = firstIndex; i < missionItems.count(); i++) {
         MissionItem* item = missionItems[i];
-        _writeMissionItems.append(item); // PlanManager takes control of passed MissionItem
+        itemsToWrite.append(item);
 
         item->setIsCurrentItem(i == firstIndex);
 
@@ -85,38 +65,14 @@ void PlanManager::writeMissionItems(const QList<MissionItem*>& missionItems)
             // Home is in sequence 0, remainder of items start at sequence 1
             item->setSequenceNumber(item->sequenceNumber() - 1);
             if (item->command() == MAV_CMD_DO_JUMP) {
-                item->setParam1((int)item->param1() - 1);
+                item->setParam1(static_cast<int>(item->param1()) - 1);
             }
         }
     }
 
-    _writeMissionItemsWorker();
-}
-
-/// This begins the write sequence with the vehicle. This may be called during a retry.
-void PlanManager::_writeMissionCount(void)
-{
-    qCDebug(PlanManagerLog) << QStringLiteral("_writeMissionCount %1 count:_retryCount").arg(_planTypeString()) << _writeMissionItems.count() << _retryCount;
-
-    SharedLinkInterfacePtr sharedLink = _vehicle->vehicleLinkManager()->primaryLink().lock();
-    if (sharedLink) {
-        mavlink_message_t       message;
-
-        mavlink_msg_mission_count_pack_chan(
-            MAVLinkProtocol::instance()->getSystemId(),
-            MAVLinkProtocol::getComponentId(),
-            sharedLink->mavlinkChannel(),
-            &message,
-            _vehicle->id(),
-            MAV_COMP_ID_AUTOPILOT1,
-            _writeMissionItems.count(),
-            _planType,
-            0
-        );
-
-        _vehicle->sendMessageOnLinkThreadSafe(sharedLink.get(), message);
-    }
-    _startAckTimeout(AckMissionRequest);
+    _connectToMavlink();
+    emit inProgressChanged(true);
+    _stateMachine->startWrite(itemsToWrite);
 }
 
 void PlanManager::loadFromVehicle(void)
@@ -132,10 +88,9 @@ void PlanManager::loadFromVehicle(void)
         return;
     }
 
-    _retryCount = 0;
-    _setTransactionInProgress(TransactionRead);
     _connectToMavlink();
-    _requestList();
+    emit inProgressChanged(true);
+    _stateMachine->startRead();
 }
 
 /// Internal call to request list of mission items. May be called during a retry sequence.
@@ -642,24 +597,7 @@ void PlanManager::_handleMissionAck(const mavlink_message_t& message)
 /// Called when a new mavlink message for out vehicle is received
 void PlanManager::_mavlinkMessageReceived(const mavlink_message_t& message)
 {
-    switch (message.msgid) {
-    case MAVLINK_MSG_ID_MISSION_COUNT:
-        _handleMissionCount(message);
-        break;
-
-    case MAVLINK_MSG_ID_MISSION_ITEM_INT:
-        _handleMissionItem(message);
-        break;
-
-    case MAVLINK_MSG_ID_MISSION_REQUEST:
-    case MAVLINK_MSG_ID_MISSION_REQUEST_INT:
-        _handleMissionRequest(message);
-        break;
-
-    case MAVLINK_MSG_ID_MISSION_ACK:
-        _handleMissionAck(message);
-        break;
-    }
+    _stateMachine->handleMessage(message);
 }
 
 void PlanManager::_sendError(ErrorCode_t errorCode, const QString& errorMsg)
@@ -669,24 +607,6 @@ void PlanManager::_sendError(ErrorCode_t errorCode, const QString& errorMsg)
     emit error(errorCode, errorMsg);
 }
 
-QString PlanManager::_ackTypeToString(AckType_t ackType)
-{
-    switch (ackType) {
-    case AckNone:
-        return QString("No Ack");
-    case AckMissionCount:
-        return QString("MISSION_COUNT");
-    case AckMissionItem:
-        return QString("MISSION_ITEM");
-    case AckMissionRequest:
-        return QString("MISSION_REQUEST");
-    case AckGuidedItem:
-        return QString("Guided Mode Item");
-    default:
-        qWarning(PlanManagerLog) << QStringLiteral("Fell off end of switch statement %1").arg(_planTypeString());
-        return QString("QGC Internal Error");
-    }
-}
 
 QString PlanManager::_lastMissionReqestString(MAV_MISSION_RESULT result)
 {
@@ -801,55 +721,24 @@ QString PlanManager::_missionResultToString(MAV_MISSION_RESULT result)
     return error;
 }
 
-void PlanManager::_finishTransaction(bool success, bool apmGuidedItemWrite)
+bool PlanManager::inProgress(void) const
 {
-    emit progressPctChanged(1);
+    return _stateMachine->inProgress();
+}
+
+void PlanManager::_onReadComplete(bool success)
+{
     _disconnectFromMavlink();
 
-    _itemIndicesToRead.clear();
-    _itemIndicesToWrite.clear();
-
-    // First thing we do is clear the transaction. This way inProgesss is off when we signal transaction complete.
-    TransactionType_t currentTransactionType = _transactionInProgress;
-    _setTransactionInProgress(TransactionNone);
-
-    switch (currentTransactionType) {
-    case TransactionRead:
-        if (!success) {
-            // Read from vehicle failed, clear partial list
-            _clearAndDeleteMissionItems();
-        }
-        emit newMissionItemsAvailable(false);
-        break;
-    case TransactionWrite:
-        // No need to do anything for ArduPilot guided go to waypoint write
-        if (!apmGuidedItemWrite) {
-            if (success) {
-                // Write succeeded, update internal list to be current
-                if (_planType == MAV_MISSION_TYPE_MISSION) {
-                    _currentMissionIndex = -1;
-                    _lastCurrentIndex = -1;
-                    emit currentIndexChanged(-1);
-                    emit lastCurrentIndexChanged(-1);
-                }
-                _clearAndDeleteMissionItems();
-                for (int i=0; i<_writeMissionItems.count(); i++) {
-                    _missionItems.append(_writeMissionItems[i]);
-                }
-                _writeMissionItems.clear();
-            } else {
-                // Write failed, throw out the write list
-                _clearAndDeleteWriteMissionItems();
-            }
-            emit sendComplete(!success /* error */);
-        }
-        break;
-    case TransactionRemoveAll:
-        emit removeAllComplete(!success /* error */);
-        break;
-    default:
-        break;
+    if (success) {
+        // Transfer items from state machine to our list (take ownership)
+        _clearAndDeleteMissionItems();
+        _missionItems = _stateMachine->takeMissionItems();
+    } else {
+        _clearAndDeleteMissionItems();
     }
+
+    emit newMissionItemsAvailable(false);
 
     if (_resumeMission) {
         _resumeMission = false;
@@ -861,33 +750,51 @@ void PlanManager::_finishTransaction(bool success, bool apmGuidedItemWrite)
     }
 }
 
-bool PlanManager::inProgress(void) const
+void PlanManager::_onWriteComplete(bool success)
 {
-    return _transactionInProgress != TransactionNone;
+    _disconnectFromMavlink();
+
+    if (success) {
+        // Write succeeded, update internal list to be current
+        if (_planType == MAV_MISSION_TYPE_MISSION) {
+            _currentMissionIndex = -1;
+            _lastCurrentIndex = -1;
+            emit currentIndexChanged(-1);
+            emit lastCurrentIndexChanged(-1);
+        }
+        _clearAndDeleteMissionItems();
+        // Take ownership of written items
+        _missionItems = _stateMachine->takeWriteMissionItems();
+        _writeMissionItems.clear();
+    } else {
+        _clearAndDeleteWriteMissionItems();
+    }
+
+    emit sendComplete(!success /* error */);
+
+    if (_resumeMission) {
+        _resumeMission = false;
+        if (success) {
+            emit resumeMissionReady();
+        } else {
+            emit resumeMissionUploadFail();
+        }
+    }
 }
 
-void PlanManager::_removeAllWorker(void)
+void PlanManager::_onRemoveAllComplete(bool success)
 {
-    qCDebug(PlanManagerLog) << "_removeAllWorker";
+    _disconnectFromMavlink();
+    emit removeAllComplete(!success /* error */);
 
-    emit progressPctChanged(0);
-
-    _connectToMavlink();
-
-    SharedLinkInterfacePtr sharedLink = _vehicle->vehicleLinkManager()->primaryLink().lock();
-    if (sharedLink) {
-        mavlink_message_t       message;
-
-        mavlink_msg_mission_clear_all_pack_chan(MAVLinkProtocol::instance()->getSystemId(),
-                                                MAVLinkProtocol::getComponentId(),
-                                                sharedLink->mavlinkChannel(),
-                                                &message,
-                                                _vehicle->id(),
-                                                MAV_COMP_ID_AUTOPILOT1,
-                                                _planType);
-        _vehicle->sendMessageOnLinkThreadSafe(sharedLink.get(), message);
+    if (_resumeMission) {
+        _resumeMission = false;
+        if (success) {
+            emit resumeMissionReady();
+        } else {
+            emit resumeMissionUploadFail();
+        }
     }
-    _startAckTimeout(AckMissionClearAll);
 }
 
 void PlanManager::removeAll(void)
@@ -907,10 +814,9 @@ void PlanManager::removeAll(void)
         emit lastCurrentIndexChanged(-1);
     }
 
-    _retryCount = 0;
-    _setTransactionInProgress(TransactionRemoveAll);
-
-    _removeAllWorker();
+    _connectToMavlink();
+    emit inProgressChanged(true);
+    _stateMachine->startRemoveAll();
 }
 
 void PlanManager::_clearAndDeleteMissionItems(void)
@@ -957,11 +863,3 @@ QString PlanManager::_planTypeString(void)
     }
 }
 
-void PlanManager::_setTransactionInProgress(TransactionType_t type)
-{
-    if (_transactionInProgress  != type) {
-        qCDebug(PlanManagerLog) << "_setTransactionInProgress" << _planTypeString() << type;
-        _transactionInProgress = type;
-        emit inProgressChanged(inProgress());
-    }
-}
