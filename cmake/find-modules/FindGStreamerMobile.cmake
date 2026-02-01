@@ -436,6 +436,18 @@ if (GSTREAMER_IS_MOBILE)
         )
     endif()
 
+    # Allow multiple definitions for Android static linking
+    # This is needed because plugin .a files may be linked twice:
+    # once with --whole-archive (to export registration symbols) and
+    # once via GStreamer::plugin target dependencies
+    if(ANDROID)
+        target_link_options(
+            GStreamerMobile
+            PRIVATE
+                "-Wl,--allow-multiple-definition"
+        )
+    endif()
+
     if (ANDROID)
         # Collect all Java-based initializer classes
         set(GSTREAMER_PLUGINS_CLASSES)
@@ -628,24 +640,19 @@ foreach(_gst_PLUGIN IN LISTS _gst_plugins)
     set(GStreamerMobile_${_gst_PLUGIN}_FOUND "${GStreamer_${_gst_PLUGIN}_FOUND}")
 
     if (GStreamer_${_gst_PLUGIN}_FOUND)
-        # Get the static library path from the target if available
-        if(ANDROID AND TARGET GStreamer::${_gst_PLUGIN})
-            get_target_property(_plugin_libs GStreamer::${_gst_PLUGIN} INTERFACE_LINK_LIBRARIES)
-            if(_plugin_libs)
-                foreach(_lib IN LISTS _plugin_libs)
-                    # Only apply --whole-archive to actual plugin .a files in gstreamer-1.0 directory
-                    # This ensures symbols like gst_amc_jni_set_java_vm are exported
-                    # Do NOT apply to core GStreamer libs (*-1.0.a) as they're already linked above
-                    if(_lib MATCHES "/gstreamer-1\\.0/libgst[^/]+\\.a$" AND EXISTS "${_lib}")
-                        target_link_libraries(GStreamerMobile PRIVATE
-                            "-Wl,--whole-archive,${_lib},--no-whole-archive"
-                        )
-                    elseif(NOT _lib MATCHES "^-" AND NOT _lib MATCHES "-1\\.0\\.a$")
-                        # Link other dependencies normally, skip core libs already linked
-                        target_link_libraries(GStreamerMobile PRIVATE "${_lib}")
-                    endif()
-                endforeach()
-            else()
+        if(ANDROID)
+            # On Android, we need to link the actual plugin .a file with --whole-archive
+            # to ensure plugin registration symbols (like gst_amc_jni_set_java_vm) are exported.
+            # The plugin .a is located at: GStreamer_ROOT_DIR/lib/gstreamer-1.0/libgst<plugin>.a
+            set(_plugin_lib_path "${GStreamer_ROOT_DIR}/lib/gstreamer-1.0/libgst${_gst_PLUGIN}.a")
+            if(EXISTS "${_plugin_lib_path}")
+                target_link_libraries(GStreamerMobile PRIVATE
+                    "-Wl,--whole-archive,${_plugin_lib_path},--no-whole-archive"
+                )
+            endif()
+            # Link the plugin target for additional dependencies (compile options, includes, etc.)
+            # The actual libraries will be resolved via INTERFACE_LINK_LIBRARIES
+            if(TARGET GStreamer::${_gst_PLUGIN})
                 target_link_libraries(GStreamerMobile PRIVATE GStreamer::${_gst_PLUGIN})
             endif()
         else()
