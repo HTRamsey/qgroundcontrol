@@ -234,6 +234,8 @@ find_package(PkgConfig REQUIRED)
 
 # GStreamer's pkg-config modules are a MUST -- but we'll test them below
 pkg_check_modules(PC_GStreamer gstreamer-1.0 ${GStreamer_EXTRA_DEPS})
+message(STATUS "FindGStreamer: PC_GStreamer_FOUND='${PC_GStreamer_FOUND}' PC_GStreamer_VERSION='${PC_GStreamer_VERSION}'")
+message(STATUS "FindGStreamer: GStreamer_EXTRA_DEPS='${GStreamer_EXTRA_DEPS}'")
 # Simulate the list that'll be wholearchive'd.
 # Unfortunately, this uses an option only available with pkgconf.
 # set(_old_pkg_config_executable "${PKG_CONFIG_EXECUTABLE}")
@@ -242,6 +244,7 @@ pkg_check_modules(PC_GStreamer gstreamer-1.0 ${GStreamer_EXTRA_DEPS})
 # set(PKG_CONFIG_EXECUTABLE "${_old_pkg_config_executable}")
 
 set(GStreamer_VERSION "${PC_GStreamer_VERSION}")
+message(STATUS "FindGStreamer: GStreamer_VERSION='${GStreamer_VERSION}'")
 
 # Test validity of the paths
 # NOTE: only paths that must be considered are those provided by pkg-config
