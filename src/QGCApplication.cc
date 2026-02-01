@@ -17,7 +17,7 @@
 
 #include <QtCore/private/qthread_p.h>
 
-#include "QGCLogging.h"
+#include "LogManager.h"
 #include "AudioOutput.h"
 #include "FollowMe.h"
 #include "JoystickManager.h"
@@ -134,8 +134,8 @@ QGCApplication::QGCApplication(int &argc, char *argv[], const QGCCommandLinePars
         parameter.remove();
     }
 
-    // Set up our logging filters
-    QGCLoggingCategoryManager::instance()->setFilterRulesFromSettings(loggingOptions);
+    // Install our logging category filter
+    QGCLoggingCategoryManager::instance()->installFilter(loggingOptions);
 
     // We need to set language as early as possible prior to loading on JSON files.
     setLanguage();

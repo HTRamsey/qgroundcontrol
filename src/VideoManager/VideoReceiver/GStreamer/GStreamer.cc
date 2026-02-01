@@ -15,7 +15,7 @@
 
 QGC_LOGGING_CATEGORY(GStreamerLog, "Video.GStreamer")
 QGC_LOGGING_CATEGORY(GStreamerDecoderRanksLog, "Video.GStreamerDecoderRanks")
-QGC_LOGGING_CATEGORY_ON(GStreamerAPILog, "Video.GStreamerAPI")
+QGC_LOGGING_CATEGORY(GStreamerAPILog, "Video.GStreamerAPI", QtInfoMsg)
 
 // TODO: Clean These up with Macros or CMake
 G_BEGIN_DECLS

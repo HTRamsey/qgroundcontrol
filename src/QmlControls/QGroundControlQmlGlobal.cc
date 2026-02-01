@@ -348,12 +348,12 @@ QmlObjectListModel *QGroundControlQmlGlobal::flatLoggingCategoriesModel()
 
 void QGroundControlQmlGlobal::setCategoryLoggingOn(const QString &category, bool enable)
 {
-    QGCLoggingCategoryManager::instance()->setCategoryLoggingOn(category, enable);
+    QGCLoggingCategoryManager::instance()->setCategoryEnabled(category, enable);
 }
 
 bool QGroundControlQmlGlobal::categoryLoggingOn(const QString &category)
 {
-    return QGCLoggingCategoryManager::categoryLoggingOn(category);
+    return QGCLoggingCategoryManager::instance()->isCategoryEnabled(category);
 }
 
 void QGroundControlQmlGlobal::disableAllLoggingCategories()

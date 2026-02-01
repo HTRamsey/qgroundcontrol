@@ -1,5 +1,5 @@
 #include "QGCCorePlugin.h"
-#include "QGCLogging.h"
+#include "LogManager.h"
 #include "AppSettings.h"
 #include "MavlinkSettings.h"
 #include "FactMetaData.h"
@@ -254,7 +254,8 @@ QQmlApplicationEngine *QGCCorePlugin::createQmlApplicationEngine(QObject *parent
     QQmlApplicationEngine *const qmlEngine = new QQmlApplicationEngine(parent);
     qmlEngine->addImportPath(QStringLiteral("qrc:/qml"));
     qmlEngine->rootContext()->setContextProperty(QStringLiteral("joystickManager"), JoystickManager::instance());
-    qmlEngine->rootContext()->setContextProperty(QStringLiteral("debugMessageModel"), QGCLogging::instance());
+    qmlEngine->rootContext()->setContextProperty(QStringLiteral("qgcLogging"), LogManager::instance());
+    qmlEngine->rootContext()->setContextProperty(QStringLiteral("debugMessageModel"), LogManager::instance()->model());
     return qmlEngine;
 }
 

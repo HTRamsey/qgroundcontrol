@@ -963,4 +963,47 @@ QByteArray extractFileDataFromDevice(QIODevice* device, const QString& fileName)
     return result;
 }
 
+// ============================================================================
+// Simple Zlib Compression
+// ============================================================================
+
+QByteArray compressData(const QByteArray& data, int level)
+{
+    clearError();
+
+    level = qBound(1, level, 9);
+
+    if (data.isEmpty()) {
+        return {};
+    }
+
+    const QByteArray compressed = qCompress(data, level);
+    if (compressed.isEmpty()) {
+        setError(Error::IoError, QStringLiteral("Compression failed"));
+        return {};
+    }
+
+    qCDebug(QGCCompressionLog) << "Compressed" << data.size() << "bytes to" << compressed.size() << "bytes";
+    return compressed;
+}
+
+QByteArray decompressZlib(const QByteArray& data)
+{
+    clearError();
+
+    if (data.isEmpty()) {
+        return {};
+    }
+
+    const QByteArray decompressed = qUncompress(data);
+    if (decompressed.isEmpty() && !data.isEmpty()) {
+        setError(Error::IoError, QStringLiteral("Decompression failed - data may be corrupt or not zlib format"));
+        qCWarning(QGCCompressionLog) << "Failed to decompress zlib data";
+        return {};
+    }
+
+    qCDebug(QGCCompressionLog) << "Decompressed" << data.size() << "bytes to" << decompressed.size() << "bytes";
+    return decompressed;
+}
+
 }  // namespace QGCCompression
