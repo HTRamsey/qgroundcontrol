@@ -436,14 +436,16 @@ if (GSTREAMER_IS_MOBILE)
         )
     endif()
 
-    # Allow multiple definitions for Android static linking
-    # This is needed because plugin .a files may be linked twice:
-    # once with --whole-archive (to export registration symbols) and
-    # once via GStreamer::plugin target dependencies
+    # Android-specific linker options for static GStreamer plugins
     if(ANDROID)
         target_link_options(
             GStreamerMobile
             PRIVATE
+                # Export all symbols from the shared library so they can be used
+                # by the main application (e.g., gst_amc_jni_set_java_vm)
+                "-Wl,--export-dynamic"
+                # Allow multiple definitions for static linking - plugin .a files
+                # may be linked twice (via --whole-archive and via dependencies)
                 "-Wl,--allow-multiple-definition"
         )
     endif()
