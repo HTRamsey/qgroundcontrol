@@ -98,7 +98,10 @@ if (ca_certificates IN_LIST GStreamerMobile_FIND_COMPONENTS)
 endif()
 
 if (ANDROID)
-    list(APPEND GStreamer_EXTRA_DEPS zlib)
+    # Android requires additional static library dependencies for GLib
+    # gmodule-2.0: GLib module loading (g_module_open, g_module_symbol, etc.)
+    # These libraries may not be pulled in automatically via pkg-config on static builds
+    list(APPEND GStreamer_EXTRA_DEPS zlib gmodule-2.0)
 endif()
 
 # Prepare Android hotfixes for x264
@@ -392,6 +395,19 @@ if (GSTREAMER_IS_MOBILE)
         PRIVATE
             GStreamer::deps
     )
+
+    # Android requires explicit linking of pcre2 library (used by GLib regex)
+    # This library may not be pulled in automatically via pkg-config on static builds
+    if(ANDROID)
+        find_library(PCRE2_8_LIBRARY
+            NAMES pcre2-8 libpcre2-8
+            PATHS "${GStreamer_ROOT_DIR}/lib"
+            NO_DEFAULT_PATH
+        )
+        if(PCRE2_8_LIBRARY)
+            target_link_libraries(GStreamerMobile PRIVATE "${PCRE2_8_LIBRARY}")
+        endif()
+    endif()
 
     target_link_options(
         GStreamerMobile
