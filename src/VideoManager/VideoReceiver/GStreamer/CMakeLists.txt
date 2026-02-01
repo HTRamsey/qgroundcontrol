@@ -11,15 +11,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE VideoItemStub.h)
 # ============================================================================
 
 if(QGC_ENABLE_GST_VIDEOSTREAMING)
-    if(NOT MACOS)
-        # NOTE: Using FindGStreamer.cmake is currently bypassed on macOS
-        # Using hardwired framework path as a workaround until FindGStreamer works on macOS
-        find_package(GStreamer
-            REQUIRED
-            COMPONENTS Core Base Video Gl GlPrototypes Rtsp
-            OPTIONAL_COMPONENTS GlEgl GlWayland GlX11
-        )
-    endif()
+    find_package(GStreamerQGC REQUIRED)
 
     # Build GStreamer Qt6 QML GL plugin
     add_subdirectory(gstqml6gl)
@@ -52,21 +44,23 @@ if(TARGET gstqml6gl)
 
     # ============================================================================
     # Platform-Specific GStreamer Installation
+    # Note: Android/iOS use static linking via FindGStreamerMobile.cmake
     # ============================================================================
 
     if(LINUX)
         # ----------------------------------------------------------------------------
         # Linux: Install GStreamer Plugins and Libraries
         # ----------------------------------------------------------------------------
-        install(
-            DIRECTORY
-                "${GSTREAMER_PLUGIN_PATH}"
-                "${GSTREAMER_LIB_PATH}/gio"
-            DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-            FILES_MATCHING
-                PATTERN "*.so"
-                PATTERN "*.so.*"
-            PATTERN "*/include" EXCLUDE
+        gstreamer_install_plugins(
+            SOURCE_DIR "${GSTREAMER_PLUGIN_PATH}"
+            DEST_DIR "${CMAKE_INSTALL_LIBDIR}/gstreamer-1.0"
+            EXTENSION "so"
+            PREFIX "libgst"
+        )
+        gstreamer_install_gio_modules(
+            SOURCE_DIR "${GSTREAMER_LIB_PATH}/gio/modules"
+            DEST_DIR "${CMAKE_INSTALL_LIBDIR}/gio/modules"
+            EXTENSION "so"
         )
         install(
             DIRECTORY "${GSTREAMER_LIB_PATH}/gstreamer1.0"
@@ -82,23 +76,21 @@ if(TARGET gstqml6gl)
         # ----------------------------------------------------------------------------
         # Windows: Install GStreamer DLLs and Plugins
         # ----------------------------------------------------------------------------
-        install(
-            DIRECTORY "${GStreamer_ROOT_DIR}/bin/"
-            DESTINATION "${CMAKE_INSTALL_BINDIR}"
-            FILES_MATCHING
-                PATTERN "*.dll"
+        gstreamer_install_libs(
+            SOURCE_DIR "${GStreamer_ROOT_DIR}/bin"
+            DEST_DIR "${CMAKE_INSTALL_BINDIR}"
+            EXTENSION "dll"
         )
-        install(
-            DIRECTORY "${GSTREAMER_LIB_PATH}/gio/modules/"
-            DESTINATION "${CMAKE_INSTALL_LIBDIR}/gio/modules"
-            FILES_MATCHING
-                PATTERN "*.dll"
+        gstreamer_install_gio_modules(
+            SOURCE_DIR "${GSTREAMER_LIB_PATH}/gio/modules"
+            DEST_DIR "${CMAKE_INSTALL_LIBDIR}/gio/modules"
+            EXTENSION "dll"
         )
-        install(
-            DIRECTORY "${GSTREAMER_PLUGIN_PATH}/"
-            DESTINATION "${CMAKE_INSTALL_LIBDIR}/gstreamer-1.0"
-            FILES_MATCHING
-                PATTERN "*.dll"
+        gstreamer_install_plugins(
+            SOURCE_DIR "${GSTREAMER_PLUGIN_PATH}"
+            DEST_DIR "${CMAKE_INSTALL_LIBDIR}/gstreamer-1.0"
+            EXTENSION "dll"
+            PREFIX "gst"
         )
         install(
             DIRECTORY "${GStreamer_ROOT_DIR}/libexec/gstreamer-1.0/"
@@ -112,9 +104,12 @@ if(TARGET gstqml6gl)
         )
     elseif(MACOS)
         # ----------------------------------------------------------------------------
-        # macOS: Install GStreamer Framework
+        # macOS: Install GStreamer Framework with size optimization
         # ----------------------------------------------------------------------------
         if(GSTREAMER_FRAMEWORK)
+            set(_macos_fw_dest "${CMAKE_INSTALL_PREFIX}/${CMAKE_PROJECT_NAME}.app/Contents/Frameworks/GStreamer.framework")
+
+            # Install framework structure excluding plugins (will be filtered separately)
             install(
                 DIRECTORY "${GSTREAMER_FRAMEWORK}"
                 DESTINATION "${CMAKE_INSTALL_PREFIX}/${CMAKE_PROJECT_NAME}.app/Contents/Frameworks"
@@ -127,6 +122,24 @@ if(TARGET gstqml6gl)
                 PATTERN "*/include" EXCLUDE
                 PATTERN "*/pkgconfig" EXCLUDE
                 PATTERN "*/share" EXCLUDE
+                # Exclude plugins and GIO modules - will install filtered versions
+                PATTERN "*/gstreamer-1.0" EXCLUDE
+                PATTERN "*/gio/modules" EXCLUDE
+            )
+
+            # Install filtered plugins
+            gstreamer_install_plugins(
+                SOURCE_DIR "${GSTREAMER_PLUGIN_PATH}"
+                DEST_DIR "${_macos_fw_dest}/Versions/1.0/lib/gstreamer-1.0"
+                EXTENSION "dylib"
+                PREFIX "libgst"
+            )
+
+            # Install filtered GIO modules
+            gstreamer_install_gio_modules(
+                SOURCE_DIR "${GSTREAMER_LIB_PATH}/gio/modules"
+                DEST_DIR "${_macos_fw_dest}/Versions/1.0/lib/gio/modules"
+                EXTENSION "dylib"
             )
         endif()
     endif()

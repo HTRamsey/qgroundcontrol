@@ -13,7 +13,54 @@
 
 #include <gst/gst.h>
 
+#ifdef Q_OS_ANDROID
+extern "C" void gst_android_setup_environment();
+#endif
+
+// Declare logging category early so GLib handlers can use it
 QGC_LOGGING_CATEGORY(GStreamerLog, "Video.GStreamer")
+
+namespace {
+
+// GLib log handlers to redirect to Qt's logging system
+void glib_print_handler(const gchar *string)
+{
+    qCInfo(GStreamerLog) << string;
+}
+
+void glib_printerr_handler(const gchar *string)
+{
+    qCWarning(GStreamerLog) << string;
+}
+
+void glib_log_handler(const gchar *log_domain, GLogLevelFlags log_level,
+                      const gchar *message, gpointer user_data)
+{
+    Q_UNUSED(user_data);
+    const QString domain = log_domain ? QString::fromUtf8(log_domain) : QStringLiteral("GLib");
+    const QString msg = QString::fromUtf8(message);
+
+    switch (log_level & G_LOG_LEVEL_MASK) {
+    case G_LOG_LEVEL_ERROR:
+    case G_LOG_LEVEL_CRITICAL:
+        qCCritical(GStreamerLog) << domain << msg;
+        break;
+    case G_LOG_LEVEL_WARNING:
+        qCWarning(GStreamerLog) << domain << msg;
+        break;
+    case G_LOG_LEVEL_MESSAGE:
+    case G_LOG_LEVEL_INFO:
+        qCInfo(GStreamerLog) << domain << msg;
+        break;
+    case G_LOG_LEVEL_DEBUG:
+    default:
+        qCDebug(GStreamerLog) << domain << msg;
+        break;
+    }
+}
+
+} // anonymous namespace
+
 QGC_LOGGING_CATEGORY(GStreamerDecoderRanksLog, "Video.GStreamerDecoderRanks")
 QGC_LOGGING_CATEGORY_ON(GStreamerAPILog, "Video.GStreamerAPI")
 
@@ -171,7 +218,16 @@ void _setGstEnvVars()
     const QString appDir = QCoreApplication::applicationDirPath();
     qCDebug(GStreamerLog) << "App Directory:" << appDir;
 
-#if defined(Q_OS_MACOS) && defined(QGC_GST_MACOS_FRAMEWORK)
+    // Redirect GLib logging to Qt's logging system (cross-platform)
+    g_set_print_handler(glib_print_handler);
+    g_set_printerr_handler(glib_printerr_handler);
+    g_log_set_default_handler(glib_log_handler, nullptr);
+
+#if defined(Q_OS_ANDROID)
+    // Set up GStreamer environment variables for Android
+    // This configures paths for registry cache, temp files, SSL certs, etc.
+    gst_android_setup_environment();
+#elif defined(Q_OS_MACOS) && defined(QGC_GST_MACOS_FRAMEWORK)
     const QString frameworkDir = QDir(appDir).filePath("../Frameworks/GStreamer.framework");
     const QString rootDir = QDir(frameworkDir).filePath("Versions/1.0");
     const QString libDir = QDir(rootDir).filePath("../lib");

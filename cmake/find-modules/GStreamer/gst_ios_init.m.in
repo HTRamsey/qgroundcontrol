@@ -1,34 +1,33 @@
+/*
+ * GStreamer iOS Initialization
+ * Auto-generated from template by CMake configure_file()
+ *
+ * Based on GStreamer cerbero: data/xcode/templates/ios/GStreamer Base.xctemplate/gst_ios_init.m
+ * SPDX-License-Identifier: LGPL-2.1-or-later
+ */
+
+#import <Foundation/Foundation.h>
 #include <gst/gst.h>
 #include <gio/gio.h>
-#include <Foundation/Foundation.h>
+
+#define GST_G_IO_MODULE_DECLARE(name) \
+extern void G_PASTE(g_io_, G_PASTE(name, _load)) (gpointer module)
+
+#define GST_G_IO_MODULE_LOAD(name) \
+G_PASTE(g_io_, G_PASTE(name, _load)) (NULL)
 
 /* Declaration of static plugins */
- @PLUGINS_DECLARATION@
+@PLUGINS_DECLARATION@
 
 /* Declaration of static gio modules */
- @G_IO_MODULES_DECLARE@
+@G_IO_MODULES_DECLARE@
 
-#ifdef GSTREAMER_INCLUDE_CA_CERTIFICATES
-static void
-gst_ios_load_certificates (const gchar *resources_dir)
+/* This is called by gst_init() to register static plugins */
+void
+gst_init_static_plugins (void)
 {
-  gchar *ca_certificates;
-
-  ca_certificates = g_build_filename (resources_dir, "ssl", "certs", "ca-certificates.crt", NULL);
-  g_setenv ("CA_CERTIFICATES", ca_certificates, TRUE);
-
-  if (ca_certificates) {
-    GTlsBackend *backend = g_tls_backend_get_default ();
-    if (backend) {
-      GTlsDatabase *db = g_tls_file_database_new (ca_certificates, NULL);
-      if (db)
-        g_tls_backend_set_default_database (backend, db);
-    }
-  }
-  g_free (ca_certificates);
+@PLUGINS_REGISTRATION@
 }
-
-#endif
 
 void
 gst_ios_init (void)
@@ -44,6 +43,7 @@ gst_ios_init (void)
   const gchar *tmp_dir = [tmp UTF8String];
   const gchar *cache_dir = [cache UTF8String];
   const gchar *docs_dir = [docs UTF8String];
+  gchar *ca_certificates;
 
   g_setenv ("TMP", tmp_dir, TRUE);
   g_setenv ("TEMP", tmp_dir, TRUE);
@@ -58,15 +58,24 @@ gst_ios_init (void)
   g_setenv ("XDG_DATA_HOME", resources_dir, TRUE);
   g_setenv ("FONTCONFIG_PATH", resources_dir, TRUE);
 
+  ca_certificates = g_build_filename (resources_dir, "ssl", "certs", "ca-certificates.crt", NULL);
+
+  /* Load GIO modules */
   @G_IO_MODULES_LOAD@
 
-#ifdef GSTREAMER_INCLUDE_CA_CERTIFICATES
-  gst_ios_load_certificates (resources_dir);
-#endif
+  /* Set up TLS certificates if the bundle exists */
+  if (ca_certificates && g_file_test (ca_certificates, G_FILE_TEST_EXISTS)) {
+    g_setenv ("CA_CERTIFICATES", ca_certificates, TRUE);
+    GTlsBackend *backend = g_tls_backend_get_default ();
+    if (backend) {
+      GTlsDatabase *db = g_tls_file_database_new (ca_certificates, NULL);
+      if (db)
+        g_tls_backend_set_default_database (backend, db);
+    }
+  }
+  g_free (ca_certificates);
 
   gst_init (NULL, NULL);
-
-  @PLUGINS_REGISTRATION@
 
   /* Lower the ranks of filesrc and giosrc so iosavassetsrc is
    * tried first in gst_element_make_from_uri() for file:// */

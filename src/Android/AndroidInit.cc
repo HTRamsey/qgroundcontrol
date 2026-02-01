@@ -7,20 +7,82 @@
 #include <QtCore/QJniEnvironment>
 #include <QtCore/QJniObject>
 #include <QtCore/QLoggingCategory>
+#include <QtCore/QStandardPaths>
+#include <QtCore/QDir>
 
-QGC_LOGGING_CATEGORY(AndroidInitLog, "qgc.android.androidinit");
+QGC_LOGGING_CATEGORY(AndroidInitLog, "Android.AndroidInit");
 
 static jobject _context = nullptr;
 static jobject _class_loader = nullptr;
+static JavaVM *_java_vm = nullptr;
 
 #ifdef QGC_GST_STREAMING
 extern "C"
 {
     extern void gst_amc_jni_set_java_vm(JavaVM *java_vm);
 
+    // GStreamer Android helper functions
+    // These are called by GStreamer's androidmedia plugins
+    jobject gst_android_get_application_context(void)
+    {
+        return _context;
+    }
+
     jobject gst_android_get_application_class_loader(void)
     {
         return _class_loader;
+    }
+
+    JavaVM *gst_android_get_java_vm(void)
+    {
+        return _java_vm;
+    }
+}
+
+// Set up GStreamer environment variables for Android
+// This replicates what gst_android_init() does in the GStreamer template
+extern "C" void gst_android_setup_environment()
+{
+    // Get application directories using Qt
+    const QString cacheDir = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
+    const QString dataDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+
+    if (!cacheDir.isEmpty()) {
+        qputenv("TMP", cacheDir.toUtf8());
+        qputenv("TEMP", cacheDir.toUtf8());
+        qputenv("TMPDIR", cacheDir.toUtf8());
+        qputenv("XDG_RUNTIME_DIR", cacheDir.toUtf8());
+        qputenv("XDG_CACHE_HOME", cacheDir.toUtf8());
+
+        // GStreamer registry cache
+        const QString registry = cacheDir + QStringLiteral("/gstreamer-registry.bin");
+        qputenv("GST_REGISTRY", registry.toUtf8());
+        qputenv("GST_REGISTRY_REUSE_PLUGIN_SCANNER", "no");
+
+        qCDebug(AndroidInitLog) << "GStreamer cache dir:" << cacheDir;
+    }
+
+    if (!dataDir.isEmpty()) {
+        qputenv("HOME", dataDir.toUtf8());
+        qputenv("XDG_DATA_DIRS", dataDir.toUtf8());
+        qputenv("XDG_CONFIG_DIRS", dataDir.toUtf8());
+        qputenv("XDG_CONFIG_HOME", dataDir.toUtf8());
+        qputenv("XDG_DATA_HOME", dataDir.toUtf8());
+
+        // Fontconfig path (if fonts are deployed)
+        const QString fontconfigDir = dataDir + QStringLiteral("/fontconfig");
+        if (QDir(fontconfigDir).exists()) {
+            qputenv("FONTCONFIG_PATH", fontconfigDir.toUtf8());
+        }
+
+        // SSL certificates (if deployed)
+        const QString certsFile = dataDir + QStringLiteral("/ssl/certs/ca-certificates.crt");
+        if (QFile::exists(certsFile)) {
+            qputenv("CA_CERTIFICATES", certsFile.toUtf8());
+            qCDebug(AndroidInitLog) << "GStreamer CA certificates:" << certsFile;
+        }
+
+        qCDebug(AndroidInitLog) << "GStreamer data dir:" << dataDir;
     }
 }
 #endif
@@ -87,6 +149,9 @@ jint JNI_OnLoad(JavaVM *vm, void *reserved)
     Q_UNUSED(reserved);
 
     qCDebug(AndroidInitLog) << Q_FUNC_INFO;
+
+    // Store JavaVM for GStreamer helper function
+    _java_vm = vm;
 
     JNIEnv *env;
     if (vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {

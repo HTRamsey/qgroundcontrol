@@ -119,9 +119,10 @@ if(ANDROID)
         set(GStreamer_JAVA_SRC_DIR ${GSTREAMER_JAVA_SRC_DIR})
     elseif(NOT DEFINED GStreamer_JAVA_SRC_DIR)
         set(GStreamer_JAVA_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src/")
-    else()
+    elseif(NOT IS_ABSOLUTE "${GStreamer_JAVA_SRC_DIR}")
         # Gradle does not let us access the root of the subproject
         # so we implement the ndk-build assumption ourselves
+        # Only prepend relative path if GStreamer_JAVA_SRC_DIR is not absolute
         set(GStreamer_JAVA_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../${GStreamer_JAVA_SRC_DIR}")
     endif()
 
@@ -147,8 +148,8 @@ if(ANDROID)
         set(GStreamer_ASSETS_DIR "${GSTREAMER_ASSETS_DIR}")
     elseif(NOT DEFINED GStreamer_ASSETS_DIR)
         set(GStreamer_ASSETS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src/assets/")
-    else()
-        # Same as above
+    elseif(NOT IS_ABSOLUTE "${GStreamer_ASSETS_DIR}")
+        # Only prepend relative path if GStreamer_ASSETS_DIR is not absolute
         set(GStreamer_ASSETS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../${GStreamer_ASSETS_DIR}")
     endif()
 
@@ -158,12 +159,12 @@ if(ANDROID)
         set(GStreamer_NDK_BUILD_PATH  "${GStreamer_ROOT}/share/gst-android/ndk-build/")
     endif()
 elseif(IOS)
-    if(NOT DEFINED GStreamer_ASSETS_DIR AND DEFINED GStreamer_ASSETS_DIR)
-        set(GStreamer_ASSETS_DIR ${GStreamer_ASSETS_DIR})
+    if(NOT DEFINED GStreamer_ASSETS_DIR AND DEFINED GSTREAMER_ASSETS_DIR)
+        set(GStreamer_ASSETS_DIR ${GSTREAMER_ASSETS_DIR})
     elseif(NOT DEFINED GStreamer_ASSETS_DIR)
         set(GStreamer_ASSETS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/assets")
-    else()
-        # Same as above
+    elseif(NOT IS_ABSOLUTE "${GStreamer_ASSETS_DIR}")
+        # Only prepend relative path if GStreamer_ASSETS_DIR is not absolute
         set(GStreamer_ASSETS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../${GStreamer_ASSETS_DIR}")
     endif()
 endif()
@@ -281,6 +282,15 @@ if (GSTREAMER_IS_MOBILE AND (NOT TARGET GStreamer::mobile))
             SHARED
                 "${GStreamer_Mobile_MODULE_NAME}.c"
         )
+
+        # If the application provides its own JNI_OnLoad and GStreamer helper functions,
+        # set GStreamer_Mobile_NO_JNI_WRAPPER to TRUE to avoid duplicate symbol errors.
+        if (GStreamer_Mobile_NO_JNI_WRAPPER)
+            target_compile_definitions(GStreamerMobile
+                PRIVATE
+                    GSTREAMER_ANDROID_NO_JNI_WRAPPER
+            )
+        endif()
     else()
         add_library(GStreamerMobile SHARED)
         enable_language(OBJC OBJCXX)
@@ -466,6 +476,22 @@ if (GSTREAMER_IS_MOBILE)
         add_library(GStreamer::gio_modules INTERFACE IMPORTED)
 
         _gst_apply_link_libraries(OFF G_IO_MODULES_LIBS G_IO_MODULES_PATH GStreamer::gio_modules)
+
+        # If using openssl GIO module, we need to link OpenSSL libraries
+        # The GIO openssl module depends on libssl and libcrypto
+        if ("openssl" IN_LIST G_IO_MODULES)
+            # Add GStreamer lib directories to search path (following reference implementation pattern)
+            target_link_directories(GStreamer::gio_modules INTERFACE
+                ${GStreamer_ROOT_DIR}/lib
+                ${GStreamer_ROOT_DIR}/lib/gstreamer-1.0
+            )
+            # Link OpenSSL libraries by name (will be found via link directories)
+            target_link_libraries(GStreamer::gio_modules INTERFACE
+                ssl
+                crypto
+            )
+        endif()
+
         target_link_libraries(
             GStreamerMobile
             PRIVATE

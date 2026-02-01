@@ -5,32 +5,7 @@
 
 qt_add_library(gstqml6gl STATIC)
 
-# ----------------------------------------------------------------------------
-# Platform-Specific GStreamer Linking
-# ----------------------------------------------------------------------------
-if(MACOS)
-    # macOS uses framework path directly (FindGStreamer.cmake bypassed)
-    find_library(GSTREAMER_FRAMEWORK GStreamer)
-    set(GST_REQUIRED_FRAMEWORK_VERSION ${QGC_CONFIG_GSTREAMER_VERSION})
-    set(GST_PLUGINS_VERSION ${GST_REQUIRED_FRAMEWORK_VERSION})
-    set(GSTREAMER_FRAMEWORK_PATH "/Library/Frameworks/GStreamer.framework")
-    if(NOT EXISTS "${GSTREAMER_FRAMEWORK_PATH}")
-        message(FATAL_ERROR "GStreamer.framework not found at ${GSTREAMER_FRAMEWORK_PATH}. Install GStreamer using tools/setup/install-dependencies-osx.sh script")
-    endif()
-    target_link_libraries(gstqml6gl PUBLIC "$<LINK_LIBRARY:FRAMEWORK,${GSTREAMER_FRAMEWORK_PATH}>")
-    target_include_directories(gstqml6gl PUBLIC "${GSTREAMER_FRAMEWORK_PATH}/Headers")
-    # Verify correct framework version
-    execute_process(
-        COMMAND defaults read "${GSTREAMER_FRAMEWORK_PATH}/Versions/1.0/Resources/Info.plist" CFBundleShortVersionString
-        OUTPUT_VARIABLE GST_INSTALLED_FRAMEWORK_VERSION
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-    if(NOT GST_INSTALLED_FRAMEWORK_VERSION STREQUAL GST_REQUIRED_FRAMEWORK_VERSION)
-        message(FATAL_ERROR "GStreamer.framework version (${GST_INSTALLED_FRAMEWORK_VERSION}) does not match required framework version (${GST_REQUIRED_FRAMEWORK_VERSION}). Please install the correct version using tools/setup/install-dependencies-osx.sh script")
-    endif()
-else()
-    target_link_libraries(gstqml6gl PUBLIC GStreamer::GStreamer)
-endif()
+target_link_libraries(gstqml6gl PUBLIC GStreamer::GStreamer)
 
 # TODO: Skip custom build if system gstreamer1.0-qt6 plugin is found
 # if(GST_PLUGIN_qml6_FOUND)
@@ -41,37 +16,54 @@ endif()
 # GStreamer Good Plugins Integration
 # ============================================================================
 
+message(STATUS "gstqml6gl: GStreamer_VERSION = '${GStreamer_VERSION}'")
+
 if(GStreamer_VERSION VERSION_GREATER_EQUAL "1.22")
-    # Use Latest Revisions for each minor version: 1.20.7, 1.22.12, 1.24.13, 1.26.6
+    # Get recommended stable version for this GStreamer release
     string(REPLACE "." ";" GST_VERSION_LIST "${GStreamer_VERSION}")
     list(GET GST_VERSION_LIST 0 GST_VERSION_MAJOR)
     list(GET GST_VERSION_LIST 1 GST_VERSION_MINOR)
-    list(GET GST_VERSION_LIST 2 GST_VERSION_PATCH)
 
-    if(GST_VERSION_MINOR EQUAL 20)
-        set(GST_VERSION_PATCH 7)
-    elseif(GST_VERSION_MINOR EQUAL 22)
-        set(GST_VERSION_PATCH 12)
-    elseif(GST_VERSION_MINOR EQUAL 24)
-        set(GST_VERSION_PATCH 13)
-    elseif(GST_VERSION_MINOR EQUAL 26)
-        set(GST_VERSION_PATCH 6)
-    endif()
+    # Use centralized version mapping from GStreamerConfig.cmake
+    gstreamer_get_recommended_version(${GST_VERSION_MAJOR} ${GST_VERSION_MINOR} GST_PLUGINS_VERSION)
 
-    set(GST_PLUGINS_VERSION ${GST_VERSION_MAJOR}.${GST_VERSION_MINOR}.${GST_VERSION_PATCH})
+    # Try gst-plugins-good tarball first
+    # https://gitlab.freedesktop.org/gstreamer/gstreamer/-/tree/${GST_PLUGINS_VERSION}/subprojects/gst-plugins-good/ext/qt6
+    gstreamer_get_package_url(good_plugins ${GST_PLUGINS_VERSION} _gst_good_plugins_url)
 
-    # Download GStreamer good plugins for Qt6 support
     CPMAddPackage(
         NAME gstreamer_good_plugins
         VERSION ${GST_PLUGINS_VERSION}
-        URL https://gstreamer.freedesktop.org/src/gst-plugins-good/gst-plugins-good-${GST_PLUGINS_VERSION}.tar.xz
-        # TODO: Add URL_HASH for verification
-        # URL_HASH https://gstreamer.freedesktop.org/src/gst-plugins-good/gst-plugins-good-${GST_PLUGINS_VERSION}.tar.xz.sha256sum
+        URL ${_gst_good_plugins_url}
     )
-    set(QGC_GST_QT6_PLUGIN_PATH "${gstreamer_good_plugins_SOURCE_DIR}/ext/qt6")
+
+    if(gstreamer_good_plugins_SOURCE_DIR AND EXISTS "${gstreamer_good_plugins_SOURCE_DIR}/ext/qt6")
+        set(QGC_GST_QT6_PLUGIN_PATH "${gstreamer_good_plugins_SOURCE_DIR}/ext/qt6")
+        message(STATUS "gstqml6gl: Using downloaded gst-plugins-good Qt6 sources")
+    else()
+        message(STATUS "gstqml6gl: gst-plugins-good SOURCE_DIR='${gstreamer_good_plugins_SOURCE_DIR}'")
+        # Fallback: Try GStreamer monorepo from GitLab
+        message(STATUS "gst-plugins-good not available, trying GStreamer monorepo...")
+        gstreamer_get_package_url(monorepo ${GST_PLUGINS_VERSION} _gst_monorepo_url)
+
+        CPMAddPackage(
+            NAME gstreamer_monorepo
+            VERSION ${GST_PLUGINS_VERSION}
+            URL ${_gst_monorepo_url}
+        )
+
+        if(gstreamer_monorepo_SOURCE_DIR AND EXISTS "${gstreamer_monorepo_SOURCE_DIR}/subprojects/gst-plugins-good/ext/qt6")
+            set(QGC_GST_QT6_PLUGIN_PATH "${gstreamer_monorepo_SOURCE_DIR}/subprojects/gst-plugins-good/ext/qt6")
+        else()
+            message(FATAL_ERROR "Failed to download GStreamer Qt6 plugins from both sources")
+        endif()
+    endif()
 else()
+    message(STATUS "gstqml6gl: GStreamer < 1.22, using local Qt6 fallback sources")
     set(QGC_GST_QT6_PLUGIN_PATH "${CMAKE_CURRENT_SOURCE_DIR}/qt6")
 endif()
+
+message(STATUS "gstqml6gl: QGC_GST_QT6_PLUGIN_PATH = ${QGC_GST_QT6_PLUGIN_PATH}")
 
 # ============================================================================
 # Source Code Patching
@@ -137,8 +129,8 @@ if(EXISTS "${QGC_GST_QT6_PLUGIN_PATH}/resources.qrc")
     )
 
     if(EXISTS "${QGC_GST_QT6_PLUGIN_PATH}/YUV_BIPLANAR.frag")
-        LIST(APPEND SHADERS "${QGC_GST_QT6_PLUGIN_PATH}/YUV_BIPLANAR.frag")
-        LIST(APPEND OUTPUTS "YUV_BIPLANAR.frag.qsb")
+        list(APPEND SHADERS "${QGC_GST_QT6_PLUGIN_PATH}/YUV_BIPLANAR.frag")
+        list(APPEND OUTPUTS "YUV_BIPLANAR.frag.qsb")
     endif()
 
     # Compile shaders for different GLSL versions

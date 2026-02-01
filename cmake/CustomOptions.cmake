@@ -73,6 +73,10 @@ option(QGC_ENABLE_GST_VIDEOSTREAMING "Enable GStreamer video backend" ON)
 cmake_dependent_option(QGC_CUSTOM_GST_PACKAGE "Use QGC-provided GStreamer packages" OFF "QGC_ENABLE_GST_VIDEOSTREAMING" OFF)
 option(QGC_ENABLE_QT_VIDEOSTREAMING "Enable QtMultimedia video backend" OFF)
 
+# GStreamer plugin exclusion list - uncomment to override defaults
+# Set to empty string "" to disable all exclusions and install all plugins
+# set(QGC_GSTREAMER_EXCLUDED_PLUGINS "" CACHE STRING "GStreamer plugins to exclude from installation")
+
 # ============================================================================
 # MAVLink Configuration
 # ============================================================================
