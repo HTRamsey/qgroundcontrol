@@ -396,30 +396,8 @@ if (GSTREAMER_IS_MOBILE)
             GStreamer::deps
     )
 
-    # Android requires explicit linking of pcre2 library (used by GLib regex)
-    # This library may not be pulled in automatically via pkg-config on static builds
-    if(ANDROID)
-        # Try to find pcre2-8 static library in GStreamer SDK
-        set(_pcre2_lib "${GStreamer_ROOT_DIR}/lib/libpcre2-8.a")
-        message(STATUS "FindGStreamerMobile: Looking for pcre2 at: ${_pcre2_lib}")
-        if(EXISTS "${_pcre2_lib}")
-            message(STATUS "FindGStreamerMobile: Found pcre2, linking...")
-            target_link_libraries(GStreamerMobile PRIVATE "${_pcre2_lib}")
-        else()
-            # Fallback: try find_library
-            find_library(PCRE2_8_LIBRARY
-                NAMES pcre2-8 libpcre2-8
-                PATHS "${GStreamer_ROOT_DIR}/lib"
-                NO_DEFAULT_PATH
-            )
-            if(PCRE2_8_LIBRARY)
-                message(STATUS "FindGStreamerMobile: Found pcre2 via find_library: ${PCRE2_8_LIBRARY}")
-                target_link_libraries(GStreamerMobile PRIVATE "${PCRE2_8_LIBRARY}")
-            else()
-                message(WARNING "FindGStreamerMobile: pcre2-8 library not found at ${GStreamer_ROOT_DIR}/lib")
-            endif()
-        endif()
-    endif()
+    # Note: pcre2 is now linked through the --whole-archive plugin linking below
+    # Do not add explicit pcre2 linking here to avoid duplicate symbol errors
 
     target_link_options(
         GStreamerMobile
