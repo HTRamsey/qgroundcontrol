@@ -633,13 +633,15 @@ foreach(_gst_PLUGIN IN LISTS _gst_plugins)
             get_target_property(_plugin_libs GStreamer::${_gst_PLUGIN} INTERFACE_LINK_LIBRARIES)
             if(_plugin_libs)
                 foreach(_lib IN LISTS _plugin_libs)
-                    # Link static libraries with --whole-archive to ensure all symbols are exported
-                    # This is needed for symbols like gst_amc_jni_set_java_vm
-                    if(_lib MATCHES "\\.(a|lib)$" AND EXISTS "${_lib}")
+                    # Only apply --whole-archive to actual plugin .a files in gstreamer-1.0 directory
+                    # This ensures symbols like gst_amc_jni_set_java_vm are exported
+                    # Do NOT apply to core GStreamer libs (*-1.0.a) as they're already linked above
+                    if(_lib MATCHES "/gstreamer-1\\.0/libgst[^/]+\\.a$" AND EXISTS "${_lib}")
                         target_link_libraries(GStreamerMobile PRIVATE
                             "-Wl,--whole-archive,${_lib},--no-whole-archive"
                         )
-                    elseif(NOT _lib MATCHES "^-")
+                    elseif(NOT _lib MATCHES "^-" AND NOT _lib MATCHES "-1\\.0\\.a$")
+                        # Link other dependencies normally, skip core libs already linked
                         target_link_libraries(GStreamerMobile PRIVATE "${_lib}")
                     endif()
                 endforeach()
