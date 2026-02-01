@@ -399,13 +399,25 @@ if (GSTREAMER_IS_MOBILE)
     # Android requires explicit linking of pcre2 library (used by GLib regex)
     # This library may not be pulled in automatically via pkg-config on static builds
     if(ANDROID)
-        find_library(PCRE2_8_LIBRARY
-            NAMES pcre2-8 libpcre2-8
-            PATHS "${GStreamer_ROOT_DIR}/lib"
-            NO_DEFAULT_PATH
-        )
-        if(PCRE2_8_LIBRARY)
-            target_link_libraries(GStreamerMobile PRIVATE "${PCRE2_8_LIBRARY}")
+        # Try to find pcre2-8 static library in GStreamer SDK
+        set(_pcre2_lib "${GStreamer_ROOT_DIR}/lib/libpcre2-8.a")
+        message(STATUS "FindGStreamerMobile: Looking for pcre2 at: ${_pcre2_lib}")
+        if(EXISTS "${_pcre2_lib}")
+            message(STATUS "FindGStreamerMobile: Found pcre2, linking...")
+            target_link_libraries(GStreamerMobile PRIVATE "${_pcre2_lib}")
+        else()
+            # Fallback: try find_library
+            find_library(PCRE2_8_LIBRARY
+                NAMES pcre2-8 libpcre2-8
+                PATHS "${GStreamer_ROOT_DIR}/lib"
+                NO_DEFAULT_PATH
+            )
+            if(PCRE2_8_LIBRARY)
+                message(STATUS "FindGStreamerMobile: Found pcre2 via find_library: ${PCRE2_8_LIBRARY}")
+                target_link_libraries(GStreamerMobile PRIVATE "${PCRE2_8_LIBRARY}")
+            else()
+                message(WARNING "FindGStreamerMobile: pcre2-8 library not found at ${GStreamer_ROOT_DIR}/lib")
+            endif()
         endif()
     endif()
 
@@ -636,11 +648,31 @@ foreach(_gst_PLUGIN IN LISTS _gst_plugins)
     set(GStreamerMobile_${_gst_PLUGIN}_FOUND "${GStreamer_${_gst_PLUGIN}_FOUND}")
 
     if (GStreamer_${_gst_PLUGIN}_FOUND)
-        target_link_libraries(
-            GStreamerMobile
-            PRIVATE
-                GStreamer::${_gst_PLUGIN}
-        )
+        # Get the static library path from the target if available
+        if(ANDROID AND TARGET GStreamer::${_gst_PLUGIN})
+            get_target_property(_plugin_libs GStreamer::${_gst_PLUGIN} INTERFACE_LINK_LIBRARIES)
+            if(_plugin_libs)
+                foreach(_lib IN LISTS _plugin_libs)
+                    # Link static libraries with --whole-archive to ensure all symbols are exported
+                    # This is needed for symbols like gst_amc_jni_set_java_vm
+                    if(_lib MATCHES "\\.(a|lib)$" AND EXISTS "${_lib}")
+                        target_link_libraries(GStreamerMobile PRIVATE
+                            "-Wl,--whole-archive,${_lib},--no-whole-archive"
+                        )
+                    elseif(NOT _lib MATCHES "^-")
+                        target_link_libraries(GStreamerMobile PRIVATE "${_lib}")
+                    endif()
+                endforeach()
+            else()
+                target_link_libraries(GStreamerMobile PRIVATE GStreamer::${_gst_PLUGIN})
+            endif()
+        else()
+            target_link_libraries(
+                GStreamerMobile
+                PRIVATE
+                    GStreamer::${_gst_PLUGIN}
+            )
+        endif()
     endif()
 endforeach()
 # FIXME: CMake does not tolerate interpolation of REQUIRED_VARS
