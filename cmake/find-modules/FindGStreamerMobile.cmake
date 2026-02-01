@@ -427,9 +427,11 @@ if (GSTREAMER_IS_MOBILE)
             $<TARGET_PROPERTY:GStreamer::GStreamer,INTERFACE_LINK_OPTIONS>
     )
 
+    # Include directories need to be PUBLIC so they're used both for compiling
+    # this library and propagated to consumers
     target_include_directories(
         GStreamerMobile
-        INTERFACE
+        PUBLIC
             $<TARGET_PROPERTY:GStreamer::GStreamer,INTERFACE_INCLUDE_DIRECTORIES>
     )
 
