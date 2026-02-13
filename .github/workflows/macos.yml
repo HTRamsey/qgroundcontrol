@@ -42,13 +42,55 @@ permissions:
   actions: read
 
 jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    # Skip path filtering for tags, manual triggers, and workflow_call
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || github.event_name == 'merge_group'
+    outputs:
+      src: ${{ steps.detect.outputs.src }}
+      tests: ${{ steps.detect.outputs.tests }}
+      ci: ${{ steps.detect.outputs.ci }}
+    steps:
+      - name: Detect Changes
+        id: detect
+        uses: ./.github/actions/detect-changes
+        with:
+          platform: macos
+
+  setup:
+    name: Setup Matrix
+    runs-on: ubuntu-latest
+    needs: changes
+    # Run if: source/tests/ci changed, OR not a filtered event (tags, manual, workflow_call)
+    if: |
+      always() &&
+      (needs.changes.result == 'skipped' ||
+       needs.changes.outputs.src == 'true' ||
+       needs.changes.outputs.tests == 'true' ||
+       needs.changes.outputs.ci == 'true')
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix }}
+      timeout_minutes: ${{ steps.generate.outputs.timeout_minutes }}
+    steps:
+      - name: Generate Matrix
+        id: generate
+        uses: ./.github/actions/generate-matrix
+        with:
+          platform: macos
+          build-type: ${{ inputs.build_type }}
+
   build:
-    runs-on: macos-15
-    timeout-minutes: 120
+    name: Build ${{ matrix.name }} ${{ matrix.build_type }}
+    needs: [changes, setup]
+    if: always() && needs.setup.result == 'success'
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: ${{ fromJSON(needs.setup.outputs.timeout_minutes) }}
 
     strategy:
+      fail-fast: false
       matrix:
-        build_type: ${{ inputs.build_type && fromJSON(format('["{0}"]', inputs.build_type)) || fromJSON('["Release"]') }}
+        include: ${{ fromJSON(needs.setup.outputs.matrix) }}
 
     defaults:
       run:
@@ -60,7 +102,7 @@ jobs:
         with:
           egress-policy: audit
 
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v6
         with:
           submodules: recursive
@@ -80,7 +122,7 @@ jobs:
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: ${{ steps.config.outputs.xcode_version }}
+          xcode-version: ${{ steps.build-setup.outputs.xcode_version }}
 
       - name: Install Dependencies (include GStreamer)
         env:
@@ -112,8 +154,10 @@ jobs:
               -DQGC_MACOS_SIGN_WITH_IDENTITY=${{ github.event_name != 'pull_request' && 'ON' || 'OFF' }}
 
       - name: Build
-        working-directory: ${{ runner.temp }}/build
-        run: cmake --build . --target all --config ${{ matrix.build_type }} --parallel
+        uses: ./.github/actions/cmake-build
+        with:
+          build-dir: ${{ runner.temp }}/build
+          build-type: ${{ matrix.build_type }}
 
       - name: Sanity check dev build executable
         working-directory: ${{ runner.temp }}/build/${{ matrix.build_type }}/QGroundControl.app/Contents/MacOS
@@ -145,14 +189,19 @@ jobs:
           fi
 
       - name: Sanity check DMG executable
-        working-directory: /Volumes/QGroundControl/QGroundControl.app/Contents/MacOS
-        run: ./QGroundControl --simple-boot-test
-
-      - name: Attest Build Provenance
-        if: matrix.build_type == 'Release' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: actions/attest-build-provenance@v3
+        uses: ./.github/actions/verify-executable
         with:
-          subject-path: '${{ runner.temp }}/build/QGroundControl.dmg'
+          binary-path: QGroundControl
+          type: dmg
+          working-dir: /Volumes/QGroundControl/QGroundControl.app/Contents/MacOS
+
+      - name: Attest Build with SBOM
+        if: matrix.build_type == 'Release'
+        uses: ./.github/actions/attest-sbom
+        with:
+          subject-path: ${{ runner.temp }}/build/QGroundControl.dmg
+          subject-name: ${{ matrix.package }}
+          scan-path: ${{ runner.temp }}/build
 
       - name: Upload Build File
         if: matrix.build_type == 'Release'

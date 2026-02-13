@@ -28,8 +28,8 @@ jobs:
         uses: actions/checkout@v6
         with:
           sparse-checkout: |
-            .github/actions/download-all-artifacts
-            .github/actions/collect-artifact-sizes
+            .github/scripts/check_sizes.py
+            .github/scripts/build_results.py
           sparse-checkout-cone-mode: false
 
       - name: Get PR number
@@ -41,13 +41,11 @@ jobs:
             if (run.pull_requests && run.pull_requests.length > 0) {
               return run.pull_requests[0].number;
             }
-            // For fork PRs, run.pull_requests is empty. Use head_repository owner.
-            const headOwner = run.head_repository?.owner?.login || context.repo.owner;
             const prs = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
-              head: `${headOwner}:${run.head_branch}`
+              head: `${context.repo.owner}:${run.head_branch}`
             });
             return prs.data.length > 0 ? prs.data[0].number : null;
 
@@ -154,19 +152,14 @@ jobs:
             core.setOutput('precommit_conclusion', preCommit.conclusion);
             core.setOutput('precommit_run_id', preCommitRun ? String(preCommitRun.id) : '');
 
-      - name: Collect artifact sizes
+      - name: Download artifacts from triggering workflow
         if: steps.pr.outputs.result != 'null'
-        uses: ./.github/actions/collect-artifact-sizes
-        with:
-          head-sha: ${{ github.event.workflow_run.head_sha }}
-          output-file: pr-sizes.json
-
-      - name: Download artifacts from all platform workflows
-        if: steps.pr.outputs.result != 'null'
+        uses: actions/download-artifact@v7
         continue-on-error: true
-        uses: ./.github/actions/download-all-artifacts
         with:
+          run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: artifacts
 
       - name: Download pre-commit results artifact
         if: steps.pr.outputs.result != 'null' && steps.builds.outputs.precommit_run_id != ''
@@ -196,16 +189,29 @@ jobs:
           path: baseline-coverage.xml
           key: coverage-baseline-latest
 
+      - name: Generate artifact sizes
+        if: steps.pr.outputs.result != 'null'
+        run: |
+          python3 .github/scripts/check_sizes.py artifacts/ --json --output pr-sizes.json 2>/dev/null || true
+
       - name: Generate combined report
         if: steps.pr.outputs.result != 'null'
         run: |
-          cat > comment.md << 'HEADER'
-          ## Build Results
+          args=(
+            --artifacts-dir artifacts/
+            --output comment.md
+          )
 
-          ### Platform Status
+          # Add builds table (escape for shell)
+          BUILDS_TABLE='${{ steps.builds.outputs.table }}'
+          BUILDS_SUMMARY='${{ steps.builds.outputs.summary }}'
+          [[ -n "$BUILDS_TABLE" ]] && args+=(--builds-table "$BUILDS_TABLE")
+          [[ -n "$BUILDS_SUMMARY" ]] && args+=(--builds-summary "$BUILDS_SUMMARY")
 
-          ${{ steps.builds.outputs.table }}
-          **${{ steps.builds.outputs.summary }}**
+          # Add baselines if available
+          [[ -f "pr-sizes.json" ]] && args+=(--pr-sizes pr-sizes.json)
+          [[ -f "baseline-sizes.json" ]] && args+=(--baseline-sizes baseline-sizes.json)
+          [[ -f "baseline-coverage.xml" ]] && args+=(--baseline-coverage baseline-coverage.xml)
 
           ### Pre-commit
 
@@ -429,6 +435,7 @@ jobs:
             cat sizes-section.md >> comment.md
           fi
 
+          # Add footer
           echo "" >> comment.md
           echo "---" >> comment.md
           echo "<sub>Updated: $(date -u '+%Y-%m-%d %H:%M:%S UTC') • Triggered by: ${{ github.event.workflow_run.name }}</sub>" >> comment.md
@@ -461,29 +468,30 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          sparse-checkout: |
-            .github/actions/download-all-artifacts
-            .github/actions/collect-artifact-sizes
+          sparse-checkout: .github/scripts/check_sizes.py
           sparse-checkout-cone-mode: false
 
-      - name: Download artifacts from all platform workflows
+      - name: Download artifacts
+        uses: actions/download-artifact@v7
         continue-on-error: true
-        uses: ./.github/actions/download-all-artifacts
         with:
+          run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: artifacts
 
-      - name: Collect artifact sizes
-        id: sizes
-        uses: ./.github/actions/collect-artifact-sizes
-        with:
-          head-sha: ${{ github.event.workflow_run.head_sha }}
-          output-file: baseline-sizes.json
+      - name: Save artifact sizes baseline
+        run: |
+          python3 .github/scripts/check_sizes.py artifacts/ --json --output sizes.json 2>/dev/null || true
+          if [[ -f "sizes.json" ]]; then
+            echo "Saving artifact sizes baseline"
+            cat sizes.json
+          fi
 
       - name: Cache artifact sizes
-        if: hashFiles('baseline-sizes.json') != ''
+        if: hashFiles('sizes.json') != ''
         uses: actions/cache/save@v5
         with:
-          path: baseline-sizes.json
+          path: sizes.json
           key: artifact-sizes-baseline-${{ github.run_id }}
 
       - name: Delete stale artifact sizes baseline cache
@@ -493,10 +501,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Cache artifact sizes as latest
-        if: hashFiles('baseline-sizes.json') != ''
+        if: hashFiles('sizes.json') != ''
         uses: actions/cache/save@v5
         with:
-          path: baseline-sizes.json
+          path: sizes.json
           key: artifact-sizes-baseline-latest
 
       - name: Copy coverage to baseline path

@@ -132,6 +132,8 @@ docs/.vitepress/dist/
 # Python
 *.pyc
 __pycache__/
+.pytest_cache/
+.venv/
 
 # ------------------------------------------------------------------------------
 # Runtime & Logs
@@ -163,6 +165,9 @@ Qt*-linux*.tar.*
 
 # Pre-commit hooks
 .ruff_cache/
+
+# Puppeteer (browser automation)
+logs/
 
 # Vale prose linter (downloaded via `vale sync`)
 .github/styles/

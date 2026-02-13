@@ -23,6 +23,11 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
       - name: Install gh-actions-cache
         run: |
           if ! gh extension list | awk '{print $1}' | grep -qx 'actions/gh-actions-cache'; then

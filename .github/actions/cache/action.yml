@@ -56,9 +56,13 @@ runs:
           CCACHE_MAX_SIZE=$(awk -F'=' '/^max_size[[:space:]]*=/{gsub(/[[:space:]]/,"",$2); print $2; exit}' "$CCACHE_CONF_PATH")
           CCACHE_MAX_SIZE="${CCACHE_MAX_SIZE:-2G}"
         else
-          echo "Warning: ccache config not found at $CCACHE_CONF_PATH, using default max_size" >&2
+          arch="x86_64"
         fi
-        echo "max_size=${CCACHE_MAX_SIZE}" >> "$GITHUB_OUTPUT"
+
+        python3 "${{ github.workspace }}/.github/scripts/install_ccache.py" \
+          --arch "$arch" \
+          --config "${{ github.workspace }}/tools/configs/ccache.conf" \
+          --output-only
 
     - name: Cache ccache binary (Linux)
       if: runner.os == 'Linux'
@@ -83,14 +87,15 @@ runs:
         sudo cp "ccache-${CCACHE_VERSION}-linux-${CCACHE_ARCH}/ccache" /usr/local/bin/ccache
         sudo chmod +x /usr/local/bin/ccache
 
-    - name: Setup sccache (Windows x64 only)
-      if: runner.os == 'Windows' && inputs.target != 'android' && inputs.host != 'windows_arm64'
+    # Note: sccache doesn't have ARM64 Windows binaries, skip for native ARM64 builds
+    - name: Setup sccache (Windows x64)
+      if: runner.os == 'Windows' && inputs.target != 'android' && inputs.target != 'win64_msvc2022_arm64'
       uses: mozilla-actions/sccache-action@v0.0.9
       with:
         version: ${{ steps.ccache-config.outputs.sccache_version }}
 
-    - run: echo "SCCACHE_GHA_ENABLED=${{ inputs.save-cache == 'true' && 'true' || 'false' }}" >> "$GITHUB_ENV"
-      if: runner.os == 'Windows' && inputs.target != 'android' && inputs.host != 'windows_arm64'
+    - run: echo "SCCACHE_GHA_ENABLED=true" >> "$GITHUB_ENV"
+      if: runner.os == 'Windows' && inputs.target != 'android' && inputs.target != 'win64_msvc2022_arm64'
       shell: bash
 
     - name: Install ccache (Windows ARM64)

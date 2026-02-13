@@ -1,14 +1,14 @@
 # QGroundControl Coding Style Examples
 
-This directory contains example files demonstrating QGroundControl coding conventions.
+Example files demonstrating QGroundControl coding conventions.
 
-## Files
+| File | Shows |
+|------|-------|
+| `CodingStyle.h` | Header conventions (includes, naming, Qt6 macros) |
+| `CodingStyle.cc` | Implementation conventions (logging, C++20, error handling) |
+| `CodingStyle.qml` | QML conventions (imports, property order, signals) |
 
-| File | Description |
-|------|-------------|
-| `CodingStyle.h` | Header file conventions |
-| `CodingStyle.cc` | Implementation file conventions |
-| `CodingStyle.qml` | QML file conventions |
+**Full guide:** [CODING_STYLE.md](../../CODING_STYLE.md)
 
 ## Key Conventions Demonstrated
 

@@ -1,6 +1,18 @@
 name: AWS Upload
 description: Upload release artifacts to AWS S3 and invalidate CloudFront cache
 
+# OIDC Migration Guide:
+# ====================
+# This action supports both OIDC (recommended) and static credentials.
+# OIDC is preferred as it uses short-lived tokens instead of long-lived secrets.
+#
+# To enable OIDC:
+#
+# 1. AWS Setup (one-time, requires IAM admin):
+#    - Create OIDC provider: https://token.actions.githubusercontent.com
+#    - Create IAM role with trust policy for repo:mavlink/qgroundcontrol:*
+#    - Attach S3/CloudFront permissions to the role
+
 inputs:
   artifact_name:
     description: Artifact filename to upload
