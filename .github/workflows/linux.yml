@@ -96,7 +96,7 @@ jobs:
           save-cache: ${{ github.event_name != 'pull_request' }}
 
       - name: Install Dependencies
-        run: python3 ./tools/setup/install_dependencies.py --platform debian
+        uses: ./.github/actions/install-dependencies
 
       - name: Initialize CodeQL
         if: matrix.build_type == 'Debug'
@@ -106,16 +106,19 @@ jobs:
           config-file: ./.github/codeql/codeql-config.yml
 
       - name: Configure
-        working-directory: ${{ runner.temp }}/build
-        run: ${{ env.QT_ROOT_DIR }}/bin/qt-cmake -S ${{ github.workspace }} -B . -G Ninja
-              -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-              -DQGC_BUILD_TESTING=${{ matrix.build_type == 'Debug' && 'ON' || 'OFF' }}
-              -DQGC_ENABLE_COVERAGE=${{ matrix.build_type == 'Debug' && 'ON' || 'OFF' }}
-              -DQGC_STABLE_BUILD=${{ (github.ref_type == 'tag' || contains(github.ref, 'Stable')) && 'ON' || 'OFF' }}
+        uses: ./.github/actions/cmake-configure
+        with:
+          build-dir: ${{ runner.temp }}/build
+          build-type: ${{ matrix.build_type }}
+          testing: ${{ matrix.build_type == 'Debug' && 'true' || 'false' }}
+          coverage: ${{ matrix.build_type == 'Debug' && 'true' || 'false' }}
+          stable: ${{ (github.ref_type == 'tag' || contains(github.ref, 'Stable')) && 'true' || 'false' }}
 
       - name: Build
-        working-directory: ${{ runner.temp }}/build
-        run: cmake --build . --target all --config ${{ matrix.build_type }} --parallel
+        uses: ./.github/actions/cmake-build
+        with:
+          build-dir: ${{ runner.temp }}/build
+          build-type: ${{ matrix.build_type }}
 
       - name: Perform CodeQL Analysis
         if: matrix.build_type == 'Debug'
@@ -209,8 +212,9 @@ jobs:
 
       - name: Verify Executable
         if: matrix.build_type == 'Release'
-        working-directory: ${{ runner.temp }}/build/${{ matrix.build_type }}
-        run: xvfb-run -a ./QGroundControl --simple-boot-test
+        uses: ./.github/actions/verify-executable
+        with:
+          binary-path: ${{ runner.temp }}/build/${{ matrix.build_type }}/QGroundControl
 
       - name: Create AppImage
         working-directory: ${{ runner.temp }}/build
@@ -218,8 +222,10 @@ jobs:
 
       - name: Verify AppImage
         if: matrix.build_type == 'Release'
-        working-directory: ${{ runner.temp }}/build
-        run: xvfb-run -a ./${{ matrix.package }}.AppImage --simple-boot-test
+        uses: ./.github/actions/verify-executable
+        with:
+          binary-path: ${{ runner.temp }}/build/${{ matrix.package }}.AppImage
+          type: appimage
 
       - name: Attest Build with SBOM
         if: matrix.build_type == 'Release'
@@ -263,46 +269,31 @@ jobs:
           fetch-depth: 1
           fetch-tags: true
 
-      - name: Get build config
-        id: config
-        uses: ./.github/actions/build-config
-
-      - name: Initial Setup
-        uses: ./.github/actions/common
+      - name: Build Setup
+        uses: ./.github/actions/build-setup
+        with:
+          qt-host: linux
+          qt-arch: linux_gcc_64
+          build-type: Debug
+          save-cache: ${{ github.event_name != 'pull_request' }}
 
       - name: Install Dependencies
         uses: ./.github/actions/install-dependencies
 
-      - name: Setup Caching
-        uses: ./.github/actions/cache
-        with:
-          host: linux
-          target: linux_gcc_64
-          build-type: Debug
-          cpm-modules: ${{ runner.temp }}/build/cpm_modules
-          save-cache: ${{ github.event_name != 'pull_request' }}
-
-      - name: Install Qt for Linux
-        uses: ./.github/actions/qt-install
-        with:
-          version: ${{ steps.config.outputs.qt_version }}
-          host: linux
-          arch: linux_gcc_64
-          modules: ${{ steps.config.outputs.qt_modules }}
-
       - name: Configure (ASan+UBSan)
-        working-directory: ${{ runner.temp }}/build
-        run: ${{ env.QT_ROOT_DIR }}/bin/qt-cmake -S ${{ github.workspace }} -B . -G Ninja
-              -DCMAKE_BUILD_TYPE=Debug
-              -DQGC_BUILD_TESTING=ON
-              -DQGC_ENABLE_COVERAGE=OFF
-              -DQGC_ENABLE_ASAN=ON
-              -DQGC_ENABLE_UBSAN=ON
-              -DQGC_STABLE_BUILD=${{ (github.ref_type == 'tag' || contains(github.ref, 'Stable')) && 'ON' || 'OFF' }}
+        uses: ./.github/actions/cmake-configure
+        with:
+          build-dir: ${{ runner.temp }}/build
+          build-type: Debug
+          testing: 'true'
+          stable: ${{ (github.ref_type == 'tag' || contains(github.ref, 'Stable')) && 'true' || 'false' }}
+          extra-args: -DQGC_ENABLE_ASAN=ON -DQGC_ENABLE_UBSAN=ON
 
       - name: Build (ASan+UBSan)
-        working-directory: ${{ runner.temp }}/build
-        run: cmake --build . --target all --config Debug --parallel
+        uses: ./.github/actions/cmake-build
+        with:
+          build-dir: ${{ runner.temp }}/build
+          build-type: Debug
 
       - name: Run Unit Tests (ASan+UBSan)
         uses: ./.github/actions/run-unit-tests
