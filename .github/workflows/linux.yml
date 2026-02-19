@@ -83,7 +83,6 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v6
         with:
-          submodules: recursive
           fetch-depth: 0
           fetch-tags: true
 
@@ -127,88 +126,13 @@ jobs:
         with:
           category: "/language:c-cpp"
 
-      - name: Run Unit Tests
+      - name: Upload Debug Build Artifacts
         if: matrix.build_type == 'Debug'
-        uses: ./.github/actions/run-unit-tests
-        with:
-          build-dir: ${{ runner.temp }}/build
-          junit-output: junit-results-linux-${{ matrix.arch }}.xml
-          ctest-output: test-output-linux-${{ matrix.arch }}.txt
-          include-labels: 'Unit|Integration'
-          exclude-labels: 'Flaky|Network'
-          parallel: '1'
-
-      - name: Analyze Unit Test Durations
-        if: matrix.build_type == 'Debug' && always()
-        uses: ./.github/actions/test-duration-report
-        with:
-          junit-path: ${{ runner.temp }}/build/junit-results-linux-${{ matrix.arch }}.xml
-          baseline-path: ${{ github.workspace }}/.github/test-duration-baseline.json
-          report-json-path: ${{ runner.temp }}/build/test-duration-linux-${{ matrix.arch }}.json
-          top-n: '20'
-          slow-threshold-seconds: '60'
-          regression-factor: '1.5'
-          min-delta-seconds: '5'
-          fail-on-regression: 'false'
-
-      - name: Report Test Results
-        if: matrix.build_type == 'Debug' && always()
-        uses: ./.github/actions/test-report
-        with:
-          name: Unit Tests (${{ matrix.arch }})
-          build-dir: ${{ runner.temp }}/build
-          junit-file: junit-results-linux-${{ matrix.arch }}.xml
-          output-file: test-output-linux-${{ matrix.arch }}.txt
-          artifact-name: test-results-${{ matrix.arch }}
-          retention-days: 7
-          trunk-org-slug: ${{ vars.TRUNK_ORG_SLUG }}
-          trunk-token: ${{ secrets.TRUNK_TOKEN }}
-
-      - name: Upload Duration Report
-        if: matrix.build_type == 'Debug' && always()
         uses: actions/upload-artifact@v6
         with:
-          name: test-duration-${{ matrix.arch }}
-          path: ${{ runner.temp }}/build/test-duration-linux-${{ matrix.arch }}.json
-          retention-days: 7
-
-      - name: Coverage Report
-        if: matrix.build_type == 'Debug'
-        uses: ./.github/actions/coverage
-        with:
-          build-dir: ${{ runner.temp }}/build
-
-      - name: Verify Coverage Thresholds
-        if: matrix.build_type == 'Debug'
-        working-directory: ${{ runner.temp }}/build
-        run: |
-          python3 - <<'PY'
-          import sys
-          import xml.etree.ElementTree as ET
-          from pathlib import Path
-
-          if not Path("coverage.xml").exists():
-              print("::warning::coverage.xml not found, skipping threshold check")
-              sys.exit(0)
-
-          tree = ET.parse("coverage.xml")
-          cov = tree.getroot()
-          line_rate = float(cov.get("line-rate", 0)) * 100
-          branch_rate = float(cov.get("branch-rate", 0)) * 100
-
-          print(f"Line coverage: {line_rate:.1f}% (threshold: 30%)")
-          print(f"Branch coverage: {branch_rate:.1f}% (threshold: 20%)")
-
-          failed = False
-          if line_rate < 30:
-              print(f"::error::Line coverage {line_rate:.1f}% is below 30% threshold")
-              failed = True
-          if branch_rate < 20:
-              print(f"::error::Branch coverage {branch_rate:.1f}% is below 20% threshold")
-              failed = True
-
-          sys.exit(1 if failed else 0)
-          PY
+          name: debug-build-${{ matrix.arch }}
+          path: ${{ runner.temp }}/build
+          retention-days: 1
 
       - name: Verify Executable
         if: matrix.build_type == 'Release'
@@ -246,6 +170,172 @@ jobs:
           aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws_distribution_id: ${{ secrets.AWS_DISTRIBUTION_ID }}
 
+  test:
+    name: Test linux_gcc_64 Debug
+    needs: build
+    if: ${{ !cancelled() && needs.build.result == 'success' && (github.event_name != 'workflow_dispatch' || inputs.build_type == 'Debug') }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
+      - name: Checkout repo
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Get build config
+        id: config
+        uses: ./.github/actions/build-config
+
+      - name: Install Dependencies
+        uses: ./.github/actions/install-dependencies
+
+      - name: Install Qt for Linux
+        uses: ./.github/actions/qt-install
+        with:
+          host: linux
+          arch: linux_gcc_64
+          version: ${{ steps.config.outputs.qt_version }}
+          modules: ${{ steps.config.outputs.qt_modules }}
+
+      - name: Download Debug Build
+        uses: actions/download-artifact@v6
+        with:
+          name: debug-build-linux_gcc_64
+          path: ${{ runner.temp }}/build
+
+      - name: Run Unit Tests
+        uses: ./.github/actions/run-unit-tests
+        with:
+          build-dir: ${{ runner.temp }}/build
+          junit-output: junit-results-linux-linux_gcc_64.xml
+          ctest-output: test-output-linux-linux_gcc_64.txt
+          include-labels: 'Unit|Integration'
+          exclude-labels: 'Flaky|Network'
+          parallel: '1'
+
+      - name: Analyze Unit Test Durations
+        if: always()
+        uses: ./.github/actions/test-duration-report
+        with:
+          junit-path: ${{ runner.temp }}/build/junit-results-linux-linux_gcc_64.xml
+          baseline-path: ${{ github.workspace }}/.github/test-duration-baseline.json
+          report-json-path: ${{ runner.temp }}/build/test-duration-linux-linux_gcc_64.json
+          top-n: '20'
+          slow-threshold-seconds: '60'
+          regression-factor: '1.5'
+          min-delta-seconds: '5'
+          fail-on-regression: 'false'
+
+      - name: Report Test Results
+        if: always()
+        uses: ./.github/actions/test-report
+        with:
+          name: Unit Tests (linux_gcc_64)
+          build-dir: ${{ runner.temp }}/build
+          junit-file: junit-results-linux-linux_gcc_64.xml
+          output-file: test-output-linux-linux_gcc_64.txt
+          artifact-name: test-results-linux_gcc_64
+          retention-days: 7
+          trunk-org-slug: ${{ vars.TRUNK_ORG_SLUG }}
+          trunk-token: ${{ secrets.TRUNK_TOKEN }}
+
+      - name: Upload Duration Report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: test-duration-linux_gcc_64
+          path: ${{ runner.temp }}/build/test-duration-linux-linux_gcc_64.json
+          retention-days: 7
+
+  coverage:
+    name: Coverage linux_gcc_64 Debug
+    needs: build
+    if: ${{ !cancelled() && needs.build.result == 'success' && (github.event_name != 'workflow_dispatch' || inputs.build_type == 'Debug') }}
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Harden Runner
+        uses: step-security/harden-runner@v2
+        with:
+          egress-policy: audit
+
+      - name: Checkout repo
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Get build config
+        id: config
+        uses: ./.github/actions/build-config
+
+      - name: Install Dependencies
+        uses: ./.github/actions/install-dependencies
+
+      - name: Install Qt for Linux
+        uses: ./.github/actions/qt-install
+        with:
+          host: linux
+          arch: linux_gcc_64
+          version: ${{ steps.config.outputs.qt_version }}
+          modules: ${{ steps.config.outputs.qt_modules }}
+
+      - name: Download Debug Build
+        uses: actions/download-artifact@v6
+        with:
+          name: debug-build-linux_gcc_64
+          path: ${{ runner.temp }}/build
+
+      - name: Coverage Report
+        uses: ./.github/actions/coverage
+        with:
+          build-dir: ${{ runner.temp }}/build
+
+      - name: Verify Coverage Thresholds
+        working-directory: ${{ runner.temp }}/build
+        run: |
+          python3 - <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          if not Path("coverage.xml").exists():
+              print("::warning::coverage.xml not found, skipping threshold check")
+              sys.exit(0)
+
+          tree = ET.parse("coverage.xml")
+          cov = tree.getroot()
+          line_rate = float(cov.get("line-rate", 0)) * 100
+          branch_rate = float(cov.get("branch-rate", 0)) * 100
+
+          print(f"Line coverage: {line_rate:.1f}% (threshold: 30%)")
+          print(f"Branch coverage: {branch_rate:.1f}% (threshold: 20%)")
+
+          failed = False
+          if line_rate < 30:
+              print(f"::error::Line coverage {line_rate:.1f}% is below 30% threshold")
+              failed = True
+          if branch_rate < 20:
+              print(f"::error::Branch coverage {branch_rate:.1f}% is below 20% threshold")
+              failed = True
+
+          sys.exit(1 if failed else 0)
+          PY
+
   sanitizers:
     name: Sanitizers linux_gcc_64 Debug (ASan+UBSan)
     if: github.event_name != 'workflow_dispatch' || inputs.build_type == 'Debug'
@@ -265,7 +355,6 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v6
         with:
-          submodules: recursive
           fetch-depth: 1
           fetch-tags: true
 

@@ -81,10 +81,12 @@ jobs:
             .github/build-config.json
             .github/scripts
             tools/setup/install_python.py
+            tools/setup/install_dependencies.py
             tools/setup/read_config.py
             tools/setup/build-gstreamer.py
             tools/tests/test_build_gstreamer.py
             tools/tests/test_install_python.py
+            tools/tests/test_install_dependencies.py
             tools/tests/test_read_config.py
           sparse-checkout-cone-mode: false
 
@@ -99,5 +101,6 @@ jobs:
           pytest -q \
             tools/tests/test_build_gstreamer.py \
             tools/tests/test_install_python.py \
+            tools/tests/test_install_dependencies.py \
             tools/tests/test_read_config.py \
             .github/scripts/tests

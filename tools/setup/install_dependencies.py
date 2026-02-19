@@ -302,6 +302,7 @@ def add_to_path(path_entry: str) -> None:
 
 def download_file(url: str, dest: Path, dry_run: bool = False) -> bool:
     """Download a file from a URL."""
+    import urllib.error
     import urllib.request
 
     if dry_run:
@@ -311,7 +312,7 @@ def download_file(url: str, dest: Path, dry_run: bool = False) -> bool:
     try:
         urllib.request.urlretrieve(url, str(dest))
         return True
-    except Exception as e:
+    except (urllib.error.URLError, OSError) as e:
         print(f"Failed to download {url}: {e}", file=sys.stderr)
         return False
 
