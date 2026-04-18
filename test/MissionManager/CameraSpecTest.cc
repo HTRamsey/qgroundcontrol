@@ -204,7 +204,9 @@ void CameraSpecTest::_testAssignmentCopiesAllFacts()
 
     // Self-assignment must be safe and leave values unchanged.
     const double beforeSensorWidth = source.sensorWidth()->rawValue().toDouble();
-    source = source;
+    // Route through a reference to suppress -Wself-assign-overloaded while still exercising operator=.
+    CameraSpec &sourceRef = source;
+    source = sourceRef;
     QCOMPARE(source.sensorWidth()->rawValue().toDouble(), beforeSensorWidth);
 }
 
