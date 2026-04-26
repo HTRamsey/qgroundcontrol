@@ -30,16 +30,16 @@ bool PowerComponent::requiresSetup(void) const
 
 bool PowerComponent::setupComplete(void) const
 {
-    if (!_vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, "BAT1_SOURCE") ||
-        !_vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, "BAT1_V_CHARGED") ||
-        !_vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, "BAT1_V_EMPTY") ||
-        !_vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, "BAT1_N_CELLS")) {
+    if (!_vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, "BAT1_SOURCE") ||
+        !_vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, "BAT1_V_CHARGED") ||
+        !_vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, "BAT1_V_EMPTY") ||
+        !_vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, "BAT1_N_CELLS")) {
         return true;
     }
-    return _vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, "BAT1_SOURCE")->rawValue().toInt() == -1 ||
-        (_vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, "BAT1_V_CHARGED")->rawValue().toFloat() != 0.0f &&
-        _vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, "BAT1_V_EMPTY")->rawValue().toFloat() != 0.0f &&
-        _vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, "BAT1_N_CELLS")->rawValue().toInt() != 0);
+    return _vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, "BAT1_SOURCE").rawValue().toInt() == -1 ||
+        (_vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, "BAT1_V_CHARGED").rawValue().toFloat() != 0.0f &&
+        _vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, "BAT1_V_EMPTY").rawValue().toFloat() != 0.0f &&
+        _vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, "BAT1_N_CELLS").rawValue().toInt() != 0);
 }
 
 QStringList PowerComponent::setupCompleteChangedTriggerList(void) const

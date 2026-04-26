@@ -32,8 +32,8 @@ FactPanelController::~FactPanelController()
 
 void FactPanelController::_reportMissingParameter(int componentId, const QString &name) const
 {
-    if (componentId == ParameterManager::defaultComponentId) {
-        componentId = _vehicle->defaultComponentId();
+    if (componentId == ParameterManager::anyComponentId) {
+        componentId = _vehicle->primaryComponentId();
     }
 
     qgcApp()->reportMissingParameter(componentId, name);

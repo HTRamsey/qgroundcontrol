@@ -40,7 +40,7 @@ void MissionManager::writeArduPilotGuidedMissionItem(const QGeoCoordinate& gotoC
 
         memset(&missionItem, 0, sizeof(missionItem));
         missionItem.target_system =     _vehicle->id();
-        missionItem.target_component =  _vehicle->defaultComponentId();
+        missionItem.target_component =  _vehicle->primaryComponentId();
         missionItem.seq =               0;
         missionItem.command =           MAV_CMD_NAV_WAYPOINT;
         missionItem.param1 =            0;

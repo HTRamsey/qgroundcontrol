@@ -48,9 +48,9 @@ QStringList VehicleComponent::sections() const
     for (const auto &filter : _repeatFilters) {
         bool hasDisabled = false;
         for (int i = 0; i < filter.sectionNames.size(); i++) {
-            if (!pm->parameterExists(ParameterManager::defaultComponentId, filter.paramNames[i]))
+            if (!pm->parameterExists(ParameterManager::anyComponentId, filter.paramNames[i]))
                 continue;
-            if (pm->getParameter(ParameterManager::defaultComponentId, filter.paramNames[i])->rawValue().toInt() == filter.disabledValue) {
+            if (pm->requireParameter(ParameterManager::anyComponentId, filter.paramNames[i]).rawValue().toInt() == filter.disabledValue) {
                 result.removeAll(filter.sectionNames[i]);
                 hasDisabled = true;
             }
@@ -166,7 +166,7 @@ void VehicleComponent::_ensureSectionsCached() const
                 };
                 for (int i = 0; i < 16; i++) {
                     const QString probeParam = battPrefix(i) + probePostfix;
-                    if (!_vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, probeParam))
+                    if (!_vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, probeParam))
                         break;
                     count++;
                 }
@@ -192,7 +192,7 @@ void VehicleComponent::_ensureSectionsCached() const
                 for (int i = startIndex; ; i++) {
                     const QString idx = (firstOmits && i == startIndex) ? QString() : QString::number(i);
                     const QString probeParam = paramPrefix + idx + probePostfix;
-                    if (!_vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, probeParam))
+                    if (!_vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, probeParam))
                         break;
                     count++;
                 }
@@ -258,8 +258,8 @@ void VehicleComponent::setupTriggerSignals()
 {
     // Watch for changed on trigger list params
     for (const QString &paramName: setupCompleteChangedTriggerList()) {
-        if (_vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, paramName)) {
-            Fact *const fact = _vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, paramName);
+        if (_vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, paramName)) {
+            Fact *const fact = _vehicle->parameterManager()->getParameter(ParameterManager::anyComponentId, paramName);
             (void) connect(fact, &Fact::valueChanged, this, &VehicleComponent::_triggerUpdated);
         }
     }
@@ -268,8 +268,8 @@ void VehicleComponent::setupTriggerSignals()
     _ensureSectionsCached();
     for (const auto &filter : _repeatFilters) {
         for (const QString &paramName : filter.paramNames) {
-            if (_vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, paramName)) {
-                Fact *const fact = _vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, paramName);
+            if (_vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, paramName)) {
+                Fact *const fact = _vehicle->parameterManager()->getParameter(ParameterManager::anyComponentId, paramName);
                 (void) connect(fact, &Fact::valueChanged, this, &VehicleComponent::sectionsChanged);
             }
         }

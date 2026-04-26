@@ -61,7 +61,7 @@ void TerrainQueryCoordinator::_doSetHomeTerrainReceived(bool success, QList<doub
             && terrainAltitude <= kSetHomeTerrainAltMax
             && terrainAltitude >= kSetHomeTerrainAltMin) {
             _vehicle->sendMavCommand(
-                _vehicle->defaultComponentId(),
+                _vehicle->primaryComponentId(),
                 MAV_CMD_DO_SET_HOME,
                 true, // show error if fails
                 0,
@@ -136,7 +136,7 @@ void TerrainQueryCoordinator::sendROICommand(const QGeoCoordinate& coord, MAV_FR
 {
     if (_vehicle->capabilityBits() & MAV_PROTOCOL_CAPABILITY_COMMAND_INT) {
         _vehicle->sendMavCommandInt(
-            _vehicle->defaultComponentId(),
+            _vehicle->primaryComponentId(),
             MAV_CMD_DO_SET_ROI_LOCATION,
             frame,
             true,                           // show error if fails
@@ -149,7 +149,7 @@ void TerrainQueryCoordinator::sendROICommand(const QGeoCoordinate& coord, MAV_FR
             altitude);
     } else {
         _vehicle->sendMavCommand(
-            _vehicle->defaultComponentId(),
+            _vehicle->primaryComponentId(),
             MAV_CMD_DO_SET_ROI_LOCATION,
             true,                           // show error if fails
             static_cast<float>(qQNaN()),

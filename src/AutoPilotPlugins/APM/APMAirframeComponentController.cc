@@ -21,8 +21,8 @@ QGC_LOGGING_CATEGORY(APMAirframeComponentControllerLog, "AutoPilotPlugins.APMAir
 
 APMAirframeComponentController::APMAirframeComponentController(QObject *parent)
     : FactPanelController(parent)
-    , _frameClassFact(getParameterFact(ParameterManager::defaultComponentId, QStringLiteral("FRAME_CLASS"), false /* reportMissing */))
-    , _frameTypeFact(getParameterFact(ParameterManager::defaultComponentId, QStringLiteral("FRAME_TYPE"), false /* reportMissing */))
+    , _frameClassFact(getParameterFact(ParameterManager::anyComponentId, QStringLiteral("FRAME_CLASS"), false /* reportMissing */))
+    , _frameTypeFact(getParameterFact(ParameterManager::anyComponentId, QStringLiteral("FRAME_TYPE"), false /* reportMissing */))
     , _frameClassModel(new QmlObjectListModel(this))
 {
     // qCDebug(APMAirframeComponentControllerLog) << Q_FUNC_INFO << this;
@@ -87,8 +87,9 @@ void APMAirframeComponentController::_loadParametersFromDownloadFile(const QStri
 
         const QStringList aux = line.split(',');
         if (parameterExists(-1, aux.at(0))) {
-            Fact *const param = getParameterFact(-1, aux.at(0));
-            param->setRawValue(QVariant::fromValue(aux.at(1)));
+            if (Fact *const param = getParameterFact(-1, aux.at(0))) {
+                param->setRawValue(QVariant::fromValue(aux.at(1)));
+            }
         }
     }
     QGuiApplication::restoreOverrideCursor();

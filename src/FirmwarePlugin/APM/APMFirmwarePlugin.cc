@@ -5,6 +5,7 @@
 #include "QGCApplication.h"
 #include "MissionManager.h"
 #include "ParameterManager.h"
+#include "ParameterMavlinkCodec.h"
 #include "SettingsManager.h"
 #include "MavlinkSettings.h"
 #include "PlanViewSettings.h"
@@ -129,43 +130,21 @@ void APMFirmwarePlugin::_handleIncomingParamValue(Vehicle *vehicle, mavlink_mess
 {
     Q_UNUSED(vehicle);
 
-    mavlink_param_value_t paramValue;
-    mavlink_param_union_t paramUnion;
-
-    (void) memset(&paramValue, 0, sizeof(paramValue));
-
     // APM stack passes all parameter values in mavlink_param_union_t.param_float no matter what
-    // type they are. Fix that up to correct usage.
-
+    // type they are — re-encode into MAVLink-spec union bits.
+    mavlink_param_value_t paramValue{};
     mavlink_msg_param_value_decode(message, &paramValue);
 
-    switch (paramValue.param_type) {
-    case MAV_PARAM_TYPE_UINT8:
-        paramUnion.param_uint8 = static_cast<uint8_t>(paramValue.param_value);
-        break;
-    case MAV_PARAM_TYPE_INT8:
-        paramUnion.param_int8  = static_cast<int8_t>(paramValue.param_value);
-        break;
-    case MAV_PARAM_TYPE_UINT16:
-        paramUnion.param_uint16 = static_cast<uint16_t>(paramValue.param_value);
-        break;
-    case MAV_PARAM_TYPE_INT16:
-        paramUnion.param_int16 = static_cast<int16_t>(paramValue.param_value);
-        break;
-    case MAV_PARAM_TYPE_UINT32:
-        paramUnion.param_uint32 = static_cast<uint32_t>(paramValue.param_value);
-        break;
-    case MAV_PARAM_TYPE_INT32:
-        paramUnion.param_int32 = static_cast<int32_t>(paramValue.param_value);
-        break;
-    case MAV_PARAM_TYPE_REAL32:
-        paramUnion.param_float = paramValue.param_value;
-        break;
-    default:
-        qCCritical(APMFirmwarePluginLog) << "Invalid/Unsupported data type used in parameter:" << paramValue.param_type;
+    const FactMetaData::ValueType_t factType =
+        ParameterMavlinkCodec::mavTypeToFactType(static_cast<MAV_PARAM_TYPE>(paramValue.param_type));
+    const std::optional<mavlink_param_union_t> paramUnion =
+        ParameterMavlinkCodec::fillUnion(factType, QVariant(paramValue.param_value));
+    if (!paramUnion) {
+        qCCritical(APMFirmwarePluginLog) << "Failed to re-encode APM param" << paramValue.param_id
+                                         << "type" << paramValue.param_type;
+        return;
     }
-
-    paramValue.param_value = paramUnion.param_float;
+    paramValue.param_value = paramUnion->param_float;
 
     // Re-Encoding is always done using mavlink 1.0
     const uint8_t channel = _reencodeMavlinkChannel();
@@ -186,14 +165,9 @@ void APMFirmwarePlugin::_handleIncomingParamValue(Vehicle *vehicle, mavlink_mess
 
 void APMFirmwarePlugin::_handleOutgoingParamSetThreadSafe(Vehicle* /*vehicle*/, LinkInterface *outgoingLink, mavlink_message_t *message)
 {
-    mavlink_param_set_t paramSet;
-    mavlink_param_union_t paramUnion;
-
-    (void) memset(&paramSet, 0, sizeof(paramSet));
-
-    // APM stack passes all parameter values in mavlink_param_union_t.param_float no matter what
-    // type they are. Fix it back to the wrong way on the way out.
-
+    // APM stack expects parameter values in mavlink_param_union_t.param_float regardless of type
+    // (the wire-spec inverse — re-pack the typed bits back into a value-as-float literal).
+    mavlink_param_set_t paramSet{};
     mavlink_msg_param_set_decode(message, &paramSet);
 
     if (!_ardupilotComponentMap[paramSet.target_system][paramSet.target_component]) {
@@ -201,33 +175,16 @@ void APMFirmwarePlugin::_handleOutgoingParamSetThreadSafe(Vehicle* /*vehicle*/, 
         return;
     }
 
+    mavlink_param_union_t paramUnion{};
     paramUnion.param_float = paramSet.param_value;
-
-    switch (paramSet.param_type) {
-    case MAV_PARAM_TYPE_UINT8:
-        paramSet.param_value = paramUnion.param_uint8;
-        break;
-    case MAV_PARAM_TYPE_INT8:
-        paramSet.param_value = paramUnion.param_int8;
-        break;
-    case MAV_PARAM_TYPE_UINT16:
-        paramSet.param_value = paramUnion.param_uint16;
-        break;
-    case MAV_PARAM_TYPE_INT16:
-        paramSet.param_value = paramUnion.param_int16;
-        break;
-    case MAV_PARAM_TYPE_UINT32:
-        paramSet.param_value = paramUnion.param_uint32;
-        break;
-    case MAV_PARAM_TYPE_INT32:
-        paramSet.param_value = paramUnion.param_int32;
-        break;
-    case MAV_PARAM_TYPE_REAL32:
-        // Already in param_float
-        break;
-    default:
-        qCCritical(APMFirmwarePluginLog) << "Invalid/Unsupported data type used in parameter:" << paramSet.param_type;
+    paramUnion.type = paramSet.param_type;
+    const std::optional<QVariant> decoded = ParameterMavlinkCodec::unionToVariant(paramUnion);
+    if (!decoded) {
+        qCCritical(APMFirmwarePluginLog) << "Failed to re-encode APM param-set" << paramSet.param_id
+                                         << "type" << paramSet.param_type;
+        return;
     }
+    paramSet.param_value = decoded->toFloat();
 
     _adjustOutgoingMavlinkMutex.lock();
     mavlink_msg_param_set_encode_chan(
@@ -605,8 +562,8 @@ QString APMFirmwarePlugin::getHobbsMeter(Vehicle* vehicle) const
 {
     uint64_t hobbsTimeSeconds = 0;
 
-    if (vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, "STAT_FLTTIME")) {
-        Fact *const factFltTime = vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, "STAT_FLTTIME");
+    if (vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, "STAT_FLTTIME")) {
+        Fact *const factFltTime = vehicle->parameterManager()->getParameter(ParameterManager::anyComponentId, "STAT_FLTTIME");
         hobbsTimeSeconds = static_cast<uint64_t>(factFltTime->rawValue().toUInt());
         qCDebug(APMFirmwarePluginLog) << "Hobbs Meter raw Ardupilot(s):" << "(" <<  hobbsTimeSeconds << ")";
     }
@@ -621,8 +578,8 @@ QString APMFirmwarePlugin::getHobbsMeter(Vehicle* vehicle) const
 
 bool APMFirmwarePlugin::hasGripper(const Vehicle *vehicle) const
 {
-    if (vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, "GRIP_ENABLE")) {
-        const bool _hasGripper = ((vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, QStringLiteral("GRIP_ENABLE"))->rawValue().toInt()) == 1);
+    if (vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, "GRIP_ENABLE")) {
+        const bool _hasGripper = ((vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, QStringLiteral("GRIP_ENABLE")).rawValue().toInt()) == 1);
         return _hasGripper;
     }
     return false;
@@ -811,7 +768,7 @@ bool APMFirmwarePlugin::guidedModeGotoLocation(Vehicle *vehicle, const QGeoCoord
 
             vehicle->sendMavCommandIntWithHandler(
                 &handlerInfo,
-                vehicle->defaultComponentId(),
+                vehicle->primaryComponentId(),
                 MAV_CMD_DO_REPOSITION,
                 MAV_FRAME_GLOBAL,
                 -1.0f,
@@ -870,7 +827,7 @@ void APMFirmwarePlugin::guidedModeChangeAltitude(Vehicle *vehicle, double altitu
         (void) memset(&cmd, 0, sizeof(cmd));
 
         cmd.target_system = static_cast<uint8_t>(vehicle->id());
-        cmd.target_component = static_cast<uint8_t>(vehicle->defaultComponentId());
+        cmd.target_component = static_cast<uint8_t>(vehicle->primaryComponentId());
         cmd.coordinate_frame = MAV_FRAME_LOCAL_OFFSET_NED;
         cmd.type_mask = 0xFFF8; // Only x/y/z valid
         cmd.x = 0.0f;
@@ -893,8 +850,8 @@ bool APMFirmwarePlugin::mulirotorSpeedLimitsAvailable(Vehicle *vehicle) const
 {
     // Use noremap. to bypass remap and check for specific parameter names directly,
     // since the old and new parameters have different units.
-    return vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, QStringLiteral("noremap.WP_SPD"))
-        || vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, QStringLiteral("noremap.WPNAV_SPEED"));
+    return vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, QStringLiteral("noremap.WP_SPD"))
+        || vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, QStringLiteral("noremap.WPNAV_SPEED"));
 }
 
 double APMFirmwarePlugin::maximumHorizontalSpeedMultirotorMetersSecond(Vehicle *vehicle) const
@@ -903,13 +860,13 @@ double APMFirmwarePlugin::maximumHorizontalSpeedMultirotorMetersSecond(Vehicle *
     // since the old and new parameters have different units.
 
     // 4.7+: WP_SPD is in m/s
-    if (vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, QStringLiteral("noremap.WP_SPD"))) {
-        return vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, QStringLiteral("noremap.WP_SPD"))->rawValue().toDouble();
+    if (vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, QStringLiteral("noremap.WP_SPD"))) {
+        return vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, QStringLiteral("noremap.WP_SPD")).rawValue().toDouble();
     }
 
     // pre-4.7: WPNAV_SPEED is in cm/s
-    if (vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, QStringLiteral("noremap.WPNAV_SPEED"))) {
-        return vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, QStringLiteral("noremap.WPNAV_SPEED"))->rawValue().toDouble() * 0.01;
+    if (vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, QStringLiteral("noremap.WPNAV_SPEED"))) {
+        return vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, QStringLiteral("noremap.WPNAV_SPEED")).rawValue().toDouble() * 0.01;
     }
 
     return FirmwarePlugin::maximumHorizontalSpeedMultirotorMetersSecond(vehicle);
@@ -918,7 +875,7 @@ double APMFirmwarePlugin::maximumHorizontalSpeedMultirotorMetersSecond(Vehicle *
 void APMFirmwarePlugin::guidedModeChangeGroundSpeedMetersSecond(Vehicle *vehicle, double groundspeed) const
 {
     vehicle->sendMavCommand(
-        vehicle->defaultComponentId(),
+        vehicle->primaryComponentId(),
         MAV_CMD_DO_CHANGE_SPEED,
         true,                               // show error is fails
         1,                                  // 0: airspeed, 1: groundspeed
@@ -956,12 +913,12 @@ void APMFirmwarePlugin::guidedModeChangeHeading(Vehicle *vehicle, const QGeoCoor
 
     float maxYawRate = 0.f;
     static const QString maxYawRateParam = QStringLiteral("ATC_RATE_Y_MAX");
-    if (vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, maxYawRateParam)) {
-        maxYawRate = vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, maxYawRateParam)->rawValue().toFloat();
+    if (vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, maxYawRateParam)) {
+        maxYawRate = vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, maxYawRateParam).rawValue().toFloat();
     }
 
     vehicle->sendMavCommand(
-        vehicle->defaultComponentId(),
+        vehicle->primaryComponentId(),
         MAV_CMD_CONDITION_YAW,
         true,
         diff,
@@ -980,21 +937,21 @@ double APMFirmwarePlugin::minimumTakeoffAltitudeMeters(Vehicle* vehicle) const
 
     if (vehicle->vtol()) {
         // 4.7+: Q_PILOT_TKO_ALT_M (meters)
-        if (vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, QStringLiteral("noremap.Q_PILOT_TKO_ALT_M"))) {
-            minTakeoffAlt = vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, QStringLiteral("noremap.Q_PILOT_TKO_ALT_M"))->rawValue().toDouble();
-        } else if (vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, QStringLiteral("noremap.Q_PILOT_TKOFF_ALT"))) {
+        if (vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, QStringLiteral("noremap.Q_PILOT_TKO_ALT_M"))) {
+            minTakeoffAlt = vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, QStringLiteral("noremap.Q_PILOT_TKO_ALT_M")).rawValue().toDouble();
+        } else if (vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, QStringLiteral("noremap.Q_PILOT_TKOFF_ALT"))) {
             // pre-4.7: Q_PILOT_TKOFF_ALT (centimeters)
-            minTakeoffAlt = vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, QStringLiteral("noremap.Q_PILOT_TKOFF_ALT"))->rawValue().toDouble() / 100.0;
-        } else if (vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, QStringLiteral("Q_RTL_ALT"))) {
-            minTakeoffAlt = vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, QStringLiteral("Q_RTL_ALT"))->rawValue().toDouble();
+            minTakeoffAlt = vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, QStringLiteral("noremap.Q_PILOT_TKOFF_ALT")).rawValue().toDouble() / 100.0;
+        } else if (vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, QStringLiteral("Q_RTL_ALT"))) {
+            minTakeoffAlt = vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, QStringLiteral("Q_RTL_ALT")).rawValue().toDouble();
         }
     } else {
         // 4.7+: PILOT_TKO_ALT_M (meters)
-        if (vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, QStringLiteral("noremap.PILOT_TKO_ALT_M"))) {
-            minTakeoffAlt = vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, QStringLiteral("noremap.PILOT_TKO_ALT_M"))->rawValue().toDouble();
-        } else if (vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, QStringLiteral("noremap.PILOT_TKOFF_ALT"))) {
+        if (vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, QStringLiteral("noremap.PILOT_TKO_ALT_M"))) {
+            minTakeoffAlt = vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, QStringLiteral("noremap.PILOT_TKO_ALT_M")).rawValue().toDouble();
+        } else if (vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, QStringLiteral("noremap.PILOT_TKOFF_ALT"))) {
             // pre-4.7: PILOT_TKOFF_ALT (centimeters)
-            minTakeoffAlt = vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, QStringLiteral("noremap.PILOT_TKOFF_ALT"))->rawValue().toDouble() / 100.0;
+            minTakeoffAlt = vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, QStringLiteral("noremap.PILOT_TKOFF_ALT")).rawValue().toDouble() / 100.0;
         }
     }
 
@@ -1034,7 +991,7 @@ bool APMFirmwarePlugin::_guidedModeTakeoff(Vehicle *vehicle, double altitudeRel)
     }
 
     vehicle->sendMavCommand(
-        vehicle->defaultComponentId(),
+        vehicle->primaryComponentId(),
         MAV_CMD_NAV_TAKEOFF,
         true, // show error
         0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f,
@@ -1098,7 +1055,7 @@ void APMFirmwarePlugin::startMission(Vehicle *vehicle) const
 
     // For non aircraft vehicles, we would be in guided mode, so we need to send the mission start command
     if (!vehicle->fixedWing()) {
-        vehicle->sendMavCommand(vehicle->defaultComponentId(), MAV_CMD_MISSION_START, true /*show error */);
+        vehicle->sendMavCommand(vehicle->primaryComponentId(), MAV_CMD_MISSION_START, true /*show error */);
     }
 }
 
@@ -1240,8 +1197,8 @@ double APMFirmwarePlugin::maximumEquivalentAirspeed(Vehicle *vehicle) const
 {
     const QString airspeedMax("AIRSPEED_MAX");
 
-    if (vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, airspeedMax)) {
-        return vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, airspeedMax)->rawValue().toDouble();
+    if (vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, airspeedMax)) {
+        return vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, airspeedMax).rawValue().toDouble();
     }
 
     return FirmwarePlugin::maximumEquivalentAirspeed(vehicle);
@@ -1251,8 +1208,8 @@ double APMFirmwarePlugin::minimumEquivalentAirspeed(Vehicle *vehicle) const
 {
     const QString airspeedMin("AIRSPEED_MIN");
 
-    if (vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, airspeedMin)) {
-        return vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, airspeedMin)->rawValue().toDouble();
+    if (vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, airspeedMin)) {
+        return vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, airspeedMin).rawValue().toDouble();
     }
 
     return FirmwarePlugin::minimumEquivalentAirspeed(vehicle);
@@ -1260,14 +1217,14 @@ double APMFirmwarePlugin::minimumEquivalentAirspeed(Vehicle *vehicle) const
 
 bool APMFirmwarePlugin::fixedWingAirSpeedLimitsAvailable(Vehicle *vehicle) const
 {
-    return vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, "AIRSPEED_MIN") &&
-           vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, "AIRSPEED_MAX");
+    return vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, "AIRSPEED_MIN") &&
+           vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, "AIRSPEED_MAX");
 }
 
 void APMFirmwarePlugin::guidedModeChangeEquivalentAirspeedMetersSecond(Vehicle *vehicle, double airspeed_equiv) const
 {
     vehicle->sendMavCommand(
-        vehicle->defaultComponentId(),
+        vehicle->primaryComponentId(),
         MAV_CMD_DO_CHANGE_SPEED,
         true,                                 // show error is fails
         0,                                    // 0: airspeed, 1: groundspeed
@@ -1285,8 +1242,8 @@ void APMFirmwarePlugin::_setBaroGndTemp(Vehicle* vehicle, qreal temp)
 
     const QString bareGndTemp("BARO_GND_TEMP");
 
-    if (vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, bareGndTemp)) {
-        Fact* const param = vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, bareGndTemp);
+    if (vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, bareGndTemp)) {
+        Fact* const param = vehicle->parameterManager()->getParameter(ParameterManager::anyComponentId, bareGndTemp);
         param->setRawValue(temp);
     }
 }
@@ -1299,8 +1256,8 @@ void APMFirmwarePlugin::_setBaroAltOffset(Vehicle* vehicle, qreal offset)
 
     const QString baroAltOffset("BARO_ALT_OFFSET");
 
-    if (vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, baroAltOffset)) {
-        Fact* const param = vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, baroAltOffset);
+    if (vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, baroAltOffset)) {
+        Fact* const param = vehicle->parameterManager()->getParameter(ParameterManager::anyComponentId, baroAltOffset);
         param->setRawValue(offset);
     }
 }

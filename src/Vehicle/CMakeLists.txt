@@ -52,4 +52,5 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_
 add_subdirectory(Actuators)
 add_subdirectory(ComponentInformation)
 add_subdirectory(FactGroups)
+add_subdirectory(Parameters)
 add_subdirectory(VehicleSetup)

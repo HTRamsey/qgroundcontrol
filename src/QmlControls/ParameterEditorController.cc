@@ -1,36 +1,32 @@
-#include "QmlObjectListModel.h"
 #include "ParameterEditorController.h"
+
 #include "AppMessages.h"
-#include "ParameterManager.h"
 #include "AppSettings.h"
+#include "ParameterManager.h"
+#include "ParameterMavlinkCodec.h"
+#include "QGCFileHelper.h"
+#include "QGCLoggingCategory.h"
+#include "QmlObjectListModel.h"
 #include "SettingsManager.h"
 #include "Vehicle.h"
-#include "QGCLoggingCategory.h"
 
 QGC_LOGGING_CATEGORY(ParameterEditorControllerLog, "QMLControls.ParameterEditorController")
 
-ParameterTableModel::ParameterTableModel(QObject* parent)
-    : QAbstractTableModel(parent)
-{
+ParameterTableModel::ParameterTableModel(QObject* parent) : QAbstractTableModel(parent) {}
 
-}
-
-ParameterTableModel::~ParameterTableModel()
-{
-
-}
+ParameterTableModel::~ParameterTableModel() {}
 
 int ParameterTableModel::rowCount(const QModelIndex& /*parent*/) const
 {
     return _tableData.count();
 }
 
-int ParameterTableModel::columnCount(const QModelIndex & /*parent*/) const
+int ParameterTableModel::columnCount(const QModelIndex& /*parent*/) const
 {
     return _tableViewColCount;
 }
 
-QVariant ParameterTableModel::data(const QModelIndex &index, int role) const
+QVariant ParameterTableModel::data(const QModelIndex& index, int role) const
 {
     if (!index.isValid()) {
         return QVariant();
@@ -60,20 +56,22 @@ QVariant ParameterTableModel::headerData(int section, Qt::Orientation orientatio
     }
 
     switch (section) {
-    case FavColumn:         return tr("Fav");
-    case NameColumn:        return tr("Name");
-    case ValueColumn:       return tr("Value");
-    case DescriptionColumn: return tr("Description");
-    default:                return QVariant();
+        case FavColumn:
+            return tr("Fav");
+        case NameColumn:
+            return tr("Name");
+        case ValueColumn:
+            return tr("Value");
+        case DescriptionColumn:
+            return tr("Description");
+        default:
+            return QVariant();
     }
 }
 
 QHash<int, QByteArray> ParameterTableModel::roleNames() const
 {
-    return {
-        {Qt::DisplayRole, "display"},
-        {FactRole, "fact"}
-    };
+    return {{Qt::DisplayRole, "display"}, {FactRole, "fact"}};
 }
 
 void ParameterTableModel::clear()
@@ -143,16 +141,10 @@ Fact* ParameterTableModel::factAt(int row) const
     return _tableData[row][ValueColumn].value<Fact*>();
 }
 
+ParameterEditorGroup::ParameterEditorGroup(QObject* parent) : QObject(parent) {}
 
-ParameterEditorGroup::ParameterEditorGroup(QObject* parent)
-    : QObject(parent)
-{
-
-}
-
-ParameterEditorController::ParameterEditorController(QObject *parent)
-    : FactPanelController(parent)
-    , _parameterMgr(_vehicle->parameterManager())
+ParameterEditorController::ParameterEditorController(QObject* parent)
+    : FactPanelController(parent), _parameterMgr(_vehicle->parameterManager())
 {
     // qCDebug(ParameterEditorControllerLog) << Q_FUNC_INFO << this;
 
@@ -183,8 +175,8 @@ ParameterEditorController::~ParameterEditorController()
 
 void ParameterEditorController::_buildListsForComponent(int compId)
 {
-    for (const QString& factName: _parameterMgr->parameterNames(compId)) {
-        Fact* fact = _parameterMgr->getParameter(compId, factName);
+    for (const QString& factName : _parameterMgr->parameterNames(compId)) {
+        Fact* const fact = &_parameterMgr->requireParameter(compId, factName);
 
         if (_hideReadOnly && fact->readOnly()) {
             continue;
@@ -194,8 +186,8 @@ void ParameterEditorController::_buildListsForComponent(int compId)
         if (_mapCategoryName2Category.contains(fact->category())) {
             category = _mapCategoryName2Category[fact->category()];
         } else {
-            category        = new ParameterEditorCategory(this);
-            category->name  = fact->category();
+            category = new ParameterEditorCategory(this);
+            category->name = fact->category();
             _mapCategoryName2Category[fact->category()] = category;
             _categories.append(category);
         }
@@ -204,9 +196,9 @@ void ParameterEditorController::_buildListsForComponent(int compId)
         if (category->mapGroupName2Group.contains(fact->group())) {
             group = category->mapGroupName2Group[fact->group()];
         } else {
-            group               = new ParameterEditorGroup(this);
-            group->componentId  = compId;
-            group->name         = fact->group();
+            group = new ParameterEditorGroup(this);
+            group->componentId = compId;
+            group->name = fact->group();
             category->mapGroupName2Group[fact->group()] = group;
             category->groups.append(group);
         }
@@ -228,7 +220,7 @@ void ParameterEditorController::_buildLists(void)
     _buildListsForComponent(MAV_COMP_ID_AUTOPILOT1);
 
     // "Standard" category should always be first
-    for (int i=0; i<_categories.count(); i++) {
+    for (int i = 0; i < _categories.count(); i++) {
         ParameterEditorCategory* category = _categories.value<ParameterEditorCategory*>(i);
         if (category->name == "Standard" && i != 0) {
             _categories.removeAt(i);
@@ -238,7 +230,7 @@ void ParameterEditorController::_buildLists(void)
     }
 
     // Default category should always be last
-    for (int i=0; i<_categories.count(); i++) {
+    for (int i = 0; i < _categories.count(); i++) {
         ParameterEditorCategory* category = _categories.value<ParameterEditorCategory*>(i);
         if (category->name == FactMetaData::kDefaultCategory) {
             if (i != _categories.count() - 1) {
@@ -250,16 +242,16 @@ void ParameterEditorController::_buildLists(void)
     }
 
     // Now add other random components
-    for (int compId: _parameterMgr->componentIds()) {
+    for (int compId : _parameterMgr->componentIds()) {
         if (compId != MAV_COMP_ID_AUTOPILOT1) {
             _buildListsForComponent(compId);
         }
     }
 
     // Default group should always be last
-    for (int i=0; i<_categories.count(); i++) {
+    for (int i = 0; i < _categories.count(); i++) {
         ParameterEditorCategory* category = _categories.value<ParameterEditorCategory*>(i);
-        for (int j=0; j<category->groups.count(); j++) {
+        for (int j = 0; j < category->groups.count(); j++) {
             ParameterEditorGroup* group = category->groups.value<ParameterEditorGroup*>(j);
             if (group->name == FactMetaData::kDefaultGroup) {
                 if (j != _categories.count() - 1) {
@@ -278,19 +270,19 @@ void ParameterEditorController::_factAdded(int compId, Fact* fact)
         return;
     }
 
-    bool                        inserted = false;
-    ParameterEditorCategory*    category = nullptr;
+    bool inserted = false;
+    ParameterEditorCategory* category = nullptr;
 
     if (_mapCategoryName2Category.contains(fact->category())) {
         category = _mapCategoryName2Category[fact->category()];
     } else {
-        category        = new ParameterEditorCategory(this);
-        category->name  = fact->category();
+        category = new ParameterEditorCategory(this);
+        category->name = fact->category();
         _mapCategoryName2Category[fact->category()] = category;
 
         // Insert in sorted order
         inserted = false;
-        for (int i=0; i<_categories.count(); i++) {
+        for (int i = 0; i < _categories.count(); i++) {
             if (_categories.value<ParameterEditorCategory*>(i)->name > category->name) {
                 _categories.insert(i, category);
                 inserted = true;
@@ -306,15 +298,15 @@ void ParameterEditorController::_factAdded(int compId, Fact* fact)
     if (category->mapGroupName2Group.contains(fact->group())) {
         group = category->mapGroupName2Group[fact->group()];
     } else {
-        group               = new ParameterEditorGroup(this);
-        group->componentId  = compId;
-        group->name         = fact->group();
+        group = new ParameterEditorGroup(this);
+        group->componentId = compId;
+        group->name = fact->group();
         category->mapGroupName2Group[fact->group()] = group;
 
         // Insert in sorted order
         QmlObjectListModel& groups = category->groups;
         inserted = false;
-        for (int i=0; i<groups.count(); i++) {
+        for (int i = 0; i < groups.count(); i++) {
             if (groups.value<ParameterEditorGroup*>(i)->name > group->name) {
                 groups.insert(i, group);
                 inserted = true;
@@ -328,7 +320,7 @@ void ParameterEditorController::_factAdded(int compId, Fact* fact)
 
     // Insert in sorted order
     auto& facts = group->facts;
-    for (int i=0; i<facts.rowCount(); i++) {
+    for (int i = 0; i < facts.rowCount(); i++) {
         if (facts.factAt(i)->name() > fact->name()) {
             facts.insert(i, fact);
             return;
@@ -345,16 +337,13 @@ void ParameterEditorController::saveToFile(const QString& filename)
             parameterFilename += QString(".%1").arg(AppSettings::parameterFileExtension);
         }
 
-        QFile file(parameterFilename);
-
-        if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
-            QGC::showAppMessage(tr("Unable to create file: %1").arg(parameterFilename));
-            return;
-        }
-
-        QTextStream stream(&file);
+        QByteArray buffer;
+        QTextStream stream(&buffer, QIODevice::WriteOnly | QIODevice::Text);
         _parameterMgr->writeParametersToStream(stream);
-        file.close();
+        stream.flush();
+        if (stream.status() != QTextStream::Ok || !QGCFileHelper::atomicWrite(parameterFilename, buffer)) {
+            QGC::showAppMessage(tr("Unable to save file: %1").arg(parameterFilename));
+        }
     }
 }
 
@@ -370,15 +359,15 @@ void ParameterEditorController::clearDiff(void)
 
 void ParameterEditorController::sendDiff(void)
 {
-    for (int i=0; i<_diffList.count(); i++) {
+    for (int i = 0; i < _diffList.count(); i++) {
         ParameterEditorDiff* paramDiff = _diffList.value<ParameterEditorDiff*>(i);
 
         if (paramDiff->load) {
             if (paramDiff->noVehicleValue) {
-                _parameterMgr->_mavlinkParamSet(paramDiff->componentId, paramDiff->name, paramDiff->valueType, paramDiff->fileValueVar);
+                _parameterMgr->mavlinkParamSet(paramDiff->componentId, paramDiff->name, paramDiff->valueType,
+                                                paramDiff->fileValueVar);
             } else {
-                Fact* fact = _parameterMgr->getParameter(paramDiff->componentId, paramDiff->name);
-                fact->setRawValue(paramDiff->fileValueVar);
+                _parameterMgr->requireParameter(paramDiff->componentId, paramDiff->name).setRawValue(paramDiff->fileValueVar);
             }
         }
     }
@@ -403,16 +392,16 @@ bool ParameterEditorController::buildDiffFromFile(const QString& filename)
         if (!line.startsWith("#")) {
             QStringList wpParams = line.split("\t");
             if (wpParams.size() == 5) {
-                int         vehicleId       = wpParams.at(0).toInt();
-                int         componentId     = wpParams.at(1).toInt();
-                QString     paramName       = wpParams.at(2);
-                QString     fileValueStr    = wpParams.at(3);
-                int         mavParamType    = wpParams.at(4).toInt();
-                QString     vehicleValueStr;
-                QString     units;
-                QVariant    fileValueVar    = fileValueStr;
-                bool        noVehicleValue   = false;
-                bool        readOnly         = false;
+                int vehicleId = wpParams.at(0).toInt();
+                int componentId = wpParams.at(1).toInt();
+                QString paramName = wpParams.at(2);
+                QString fileValueStr = wpParams.at(3);
+                int mavParamType = wpParams.at(4).toInt();
+                QString vehicleValueStr;
+                QString units;
+                QVariant fileValueVar = fileValueStr;
+                bool noVehicleValue = false;
+                bool readOnly = false;
 
                 if (_vehicle->id() != vehicleId) {
                     _diffOtherVehicle = true;
@@ -424,9 +413,10 @@ bool ParameterEditorController::buildDiffFromFile(const QString& filename)
                 }
 
                 if (_parameterMgr->parameterExists(componentId, paramName)) {
-                    Fact*           vehicleFact         = _parameterMgr->getParameter(componentId, paramName);
-                    FactMetaData*   vehicleFactMetaData = vehicleFact->metaData();
-                    Fact*           fileFact            = new Fact(vehicleFact->componentId(), vehicleFact->name(), vehicleFact->type(), this);
+                    Fact* vehicleFact = _parameterMgr->getParameter(componentId, paramName);
+                    FactMetaData* vehicleFactMetaData = vehicleFact->metaData();
+                    Fact* fileFact =
+                        new Fact(vehicleFact->componentId(), vehicleFact->name(), vehicleFact->type(), this);
 
                     // Turn off reboot messaging before setting value in fileFact
                     bool vehicleRebootRequired = vehicleFactMetaData->vehicleRebootRequired();
@@ -439,10 +429,10 @@ bool ParameterEditorController::buildDiffFromFile(const QString& filename)
                     if (vehicleFact->rawValue() == fileFact->rawValue()) {
                         continue;
                     }
-                    fileValueStr    = fileFact->enumOrValueString();
-                    fileValueVar    = fileFact->rawValue();
+                    fileValueStr = fileFact->enumOrValueString();
+                    fileValueVar = fileFact->rawValue();
                     vehicleValueStr = vehicleFact->enumOrValueString();
-                    units           = vehicleFact->cookedUnits();
+                    units = vehicleFact->cookedUnits();
                 } else {
                     noVehicleValue = true;
                 }
@@ -450,14 +440,15 @@ bool ParameterEditorController::buildDiffFromFile(const QString& filename)
                 if (!readOnly) {
                     ParameterEditorDiff* paramDiff = new ParameterEditorDiff(this);
 
-                    paramDiff->componentId      = componentId;
-                    paramDiff->name             = paramName;
-                    paramDiff->valueType        = ParameterManager::mavTypeToFactType(static_cast<MAV_PARAM_TYPE>(mavParamType));
-                    paramDiff->fileValue        = fileValueStr;
-                    paramDiff->fileValueVar     = fileValueVar;
-                    paramDiff->vehicleValue     = vehicleValueStr;
-                    paramDiff->noVehicleValue   = noVehicleValue;
-                    paramDiff->units            = units;
+                    paramDiff->componentId = componentId;
+                    paramDiff->name = paramName;
+                    paramDiff->valueType =
+                        ParameterMavlinkCodec::mavTypeToFactType(static_cast<MAV_PARAM_TYPE>(mavParamType));
+                    paramDiff->fileValue = fileValueStr;
+                    paramDiff->fileValueVar = fileValueVar;
+                    paramDiff->vehicleValue = vehicleValueStr;
+                    paramDiff->noVehicleValue = noVehicleValue;
+                    paramDiff->units = units;
 
                     _diffList.append(paramDiff);
                 }
@@ -533,13 +524,14 @@ void ParameterEditorController::_performSearch(void)
     QStringList rgSearchStrings = _searchText.split(' ', Qt::SkipEmptyParts);
 
     if (rgSearchStrings.isEmpty() && !_showModifiedOnly && !_showFavoritesOnly) {
-        ParameterEditorCategory* category = _categories.count() ? _categories.value<ParameterEditorCategory*>(0) : nullptr;
+        ParameterEditorCategory* category =
+            _categories.count() ? _categories.value<ParameterEditorCategory*>(0) : nullptr;
         setCurrentCategory(category);
         _searchParameters.clear();
     } else {
         QVector<QRegularExpression> regexList;
         regexList.reserve(rgSearchStrings.size());
-        for (const QString &searchItem : rgSearchStrings) {
+        for (const QString& searchItem : rgSearchStrings) {
             QRegularExpression re(searchItem, QRegularExpression::CaseInsensitiveOption);
             regexList.append(re.isValid() ? re : QRegularExpression());
         }
@@ -548,24 +540,23 @@ void ParameterEditorController::_performSearch(void)
         _searchParameters.clear();
 
         for (int compId : _parameterMgr->componentIds()) {
-            for (const QString &paraName: _parameterMgr->parameterNames(compId)) {
+            for (const QString& paraName : _parameterMgr->parameterNames(compId)) {
                 Fact* fact = _parameterMgr->getParameter(compId, paraName);
                 bool matched = _shouldShow(fact);
                 // All of the search items must match in order for the parameter to be added to the list
                 if (matched) {
                     for (int i = 0; i < rgSearchStrings.size(); ++i) {
-                        const QRegularExpression &re = regexList.at(i);
+                        const QRegularExpression& re = regexList.at(i);
                         if (re.isValid()) {
-                            if (!fact->name().contains(re) &&
-                                    !fact->shortDescription().contains(re) &&
-                                    !fact->longDescription().contains(re)) {
+                            if (!fact->name().contains(re) && !fact->shortDescription().contains(re) &&
+                                !fact->longDescription().contains(re)) {
                                 matched = false;
                             }
                         } else {
-                            const QString &searchItem = rgSearchStrings.at(i);
+                            const QString& searchItem = rgSearchStrings.at(i);
                             if (!fact->name().contains(searchItem, Qt::CaseInsensitive) &&
-                                    !fact->shortDescription().contains(searchItem, Qt::CaseInsensitive) &&
-                                    !fact->longDescription().contains(searchItem, Qt::CaseInsensitive)) {
+                                !fact->shortDescription().contains(searchItem, Qt::CaseInsensitive) &&
+                                !fact->longDescription().contains(searchItem, Qt::CaseInsensitive)) {
                                 matched = false;
                             }
                         }
@@ -583,8 +574,8 @@ void ParameterEditorController::_performSearch(void)
             _parameters = &_searchParameters;
             emit parametersChanged();
 
-            _currentCategory    = nullptr;
-            _currentGroup       = nullptr;
+            _currentCategory = nullptr;
+            _currentGroup = nullptr;
         }
     }
 }

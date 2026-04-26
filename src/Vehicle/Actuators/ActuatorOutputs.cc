@@ -23,8 +23,8 @@ ActuatorOutputChannel::ActuatorOutputChannel(QObject *parent, const QString &lab
         param.replace("${i}", sparamIndex);
 
         Fact* fact = nullptr;
-        if (parameterManager->parameterExists(ParameterManager::defaultComponentId, param)) {
-            fact = parameterManager->getParameter(ParameterManager::defaultComponentId, param);
+        if (parameterManager->parameterExists(ParameterManager::anyComponentId, param)) {
+            fact = parameterManager->getParameter(ParameterManager::anyComponentId, param);
             if (channelConfig->displayOption() == Parameter::DisplayOption::Bitset) {
                 fact = new FactBitset(channelConfig, fact, paramIndex + channelConfig->indexOffset());
             } else if (channelConfig->displayOption() == Parameter::DisplayOption::BoolTrueIfPositive) {

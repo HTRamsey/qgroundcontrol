@@ -42,7 +42,7 @@ APMFlightModesComponentController::APMFlightModesComponentController(QObject *pa
     for (int i = 1; i < 7; i++) {
         usedParams << QStringLiteral("%1%2").arg(_modeParamPrefix).arg(i);
     }
-    if (!_allParametersExists(ParameterManager::defaultComponentId, usedParams)) {
+    if (!_allParametersExists(ParameterManager::anyComponentId, usedParams)) {
         return;
     }
 
@@ -57,8 +57,10 @@ void APMFlightModesComponentController::channelValuesChanged(QVector<int> channe
 {
     int flightModeChannel = 4;
 
-    if (parameterExists(ParameterManager::defaultComponentId, _modeChannelParam)) {
-        flightModeChannel = getParameterFact(ParameterManager::defaultComponentId, _modeChannelParam)->rawValue().toInt() - 1;
+    if (parameterExists(ParameterManager::anyComponentId, _modeChannelParam)) {
+        if (Fact *const channelFact = getParameterFact(ParameterManager::anyComponentId, _modeChannelParam)) {
+            flightModeChannel = channelFact->rawValue().toInt() - 1;
+        }
     }
 
     if (flightModeChannel >= static_cast<int>(channelValues.size())) {

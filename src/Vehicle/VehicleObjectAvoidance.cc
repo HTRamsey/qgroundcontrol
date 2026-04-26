@@ -59,7 +59,7 @@ VehicleObjectAvoidance::enabled()
 {
     uint8_t id = static_cast<uint8_t>(_vehicle->compId());
     if(_vehicle->parameterManager()->parameterExists(id, kColPrevParam)) {
-        return _vehicle->parameterManager()->getParameter(id, kColPrevParam)->rawValue().toInt() >= 0;
+        return _vehicle->parameterManager()->requireParameter(id, kColPrevParam).rawValue().toInt() >= 0;
     }
     return false;
 }
@@ -70,7 +70,7 @@ VehicleObjectAvoidance::start(int minDistance)
 {
     uint8_t id = static_cast<uint8_t>(_vehicle->compId());
     if(_vehicle->parameterManager()->parameterExists(id, kColPrevParam)) {
-        _vehicle->parameterManager()->getParameter(id, kColPrevParam)->setRawValue(minDistance);
+        _vehicle->parameterManager()->requireParameter(id, kColPrevParam).setRawValue(minDistance);
         emit objectAvoidanceChanged();
     }
 }
@@ -81,7 +81,7 @@ VehicleObjectAvoidance::stop()
 {
     uint8_t id = static_cast<uint8_t>(_vehicle->compId());
     if(_vehicle->parameterManager()->parameterExists(id, kColPrevParam)) {
-        _vehicle->parameterManager()->getParameter(id, kColPrevParam)->setRawValue(-1);
+        _vehicle->parameterManager()->requireParameter(id, kColPrevParam).setRawValue(-1);
         emit objectAvoidanceChanged();
     }
 }

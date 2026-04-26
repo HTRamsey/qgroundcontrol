@@ -7,8 +7,8 @@ APMAirframeComponent::APMAirframeComponent(Vehicle *vehicle, AutoPilotPlugin *au
 {
     ParameterManager *const paramMgr = vehicle->parameterManager();
 
-    if (paramMgr->parameterExists(ParameterManager::defaultComponentId, _frameClassParam)) {
-        _frameClassFact = paramMgr->getParameter(ParameterManager::defaultComponentId, _frameClassParam);
+    if (paramMgr->parameterExists(ParameterManager::anyComponentId, _frameClassParam)) {
+        _frameClassFact = paramMgr->getParameter(ParameterManager::anyComponentId, _frameClassParam);
         if (vehicle->vehicleType() != MAV_TYPE_HELICOPTER) {
             _requiresFrameSetup = true;
         }

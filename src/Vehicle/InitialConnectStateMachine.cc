@@ -99,7 +99,7 @@ void InitialConnectStateMachine::_createStates()
         [this](SkippableAsyncState* state) { _requestParameters(state); },
         [this]() {
             qCDebug(InitialConnectStateMachineLog) << "Skipping parameter download" << _lastSkipReason;
-            vehicle()->_parameterManager->setParameterDownloadSkipped(true);
+            vehicle()->parameterManager()->setParameterDownloadSkipped(true);
         },
         _timeoutParameters
     );
@@ -425,25 +425,25 @@ void InitialConnectStateMachine::_requestParameters(SkippableAsyncState* state)
     QMetaObject::Connection cacheFailedConn;
     if (cacheOnly) {
         // If cache-only check fails (miss/timeout/non-PX4), complete the state without params
-        cacheFailedConn = connect(vehicle()->_parameterManager, &ParameterManager::cacheCheckOnlyFailed,
+        cacheFailedConn = connect(vehicle()->parameterManager(), &ParameterManager::cacheCheckOnlyFailed,
                 state, [state, this]() {
                     qCDebug(InitialConnectStateMachineLog) << "Parameter cache check failed while flying, advancing without parameters";
-                    vehicle()->_parameterManager->setParameterDownloadSkipped(true);
+                    vehicle()->parameterManager()->setParameterDownloadSkipped(true);
                     state->complete();
                 });
     }
 
-    connect(vehicle()->_parameterManager, &ParameterManager::loadProgressChanged,
+    connect(vehicle()->parameterManager(), &ParameterManager::loadProgressChanged,
             this, &InitialConnectStateMachine::_onSubProgressUpdate, Qt::UniqueConnection);
 
-    state->connectToCompletion(vehicle()->_parameterManager, &ParameterManager::parametersReadyChanged,
+    state->connectToCompletion(vehicle()->parameterManager(), &ParameterManager::parametersReadyChanged,
         [this](bool parametersReady) {
             _onParametersReady(parametersReady);
         });
 
     // Ensure progress tracking is always cleaned up, including timeout/skip paths.
     state->setOnExit([this, cacheFailedConn]() {
-        disconnect(vehicle()->_parameterManager, &ParameterManager::loadProgressChanged,
+        disconnect(vehicle()->parameterManager(), &ParameterManager::loadProgressChanged,
                    this, &InitialConnectStateMachine::_onSubProgressUpdate);
         if (cacheFailedConn) {
             disconnect(cacheFailedConn);
@@ -451,9 +451,9 @@ void InitialConnectStateMachine::_requestParameters(SkippableAsyncState* state)
     });
 
     if (cacheOnly) {
-        vehicle()->_parameterManager->tryHashCheckCacheLoad();
+        vehicle()->parameterManager()->tryHashCheckCacheLoad();
     } else {
-        vehicle()->_parameterManager->refreshAllParameters(MAV_COMP_ID_ALL);
+        vehicle()->parameterManager()->refreshAllParameters(MAV_COMP_ID_ALL);
     }
 }
 
@@ -462,7 +462,7 @@ void InitialConnectStateMachine::_onParametersReady(bool parametersReady)
     qCDebug(InitialConnectStateMachineLog) << "_onParametersReady" << parametersReady;
 
     // Disconnect progress tracking from parameter manager
-    disconnect(vehicle()->_parameterManager, &ParameterManager::loadProgressChanged,
+    disconnect(vehicle()->parameterManager(), &ParameterManager::loadProgressChanged,
                this, &InitialConnectStateMachine::_onSubProgressUpdate);
 
     if (parametersReady) {

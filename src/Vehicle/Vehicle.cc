@@ -1056,11 +1056,22 @@ void Vehicle::_handleExtendedSysState(mavlink_message_t& message)
     }
 }
 
+QString Vehicle::logPrefix(int componentId) const
+{
+    if (componentId == -1) {
+        return QStringLiteral("V:%1").arg(_systemID);
+    }
+    return QStringLiteral("V:%1 C:%2").arg(_systemID).arg(componentId);
+}
+
 bool Vehicle::_apmArmingNotRequired()
 {
     QString armingRequireParam("ARMING_REQUIRE");
-    return _parameterManager->parameterExists(ParameterManager::defaultComponentId, armingRequireParam) &&
-            _parameterManager->getParameter(ParameterManager::defaultComponentId, armingRequireParam)->rawValue().toInt() == 0;
+    if (!_parameterManager->parameterExists(ParameterManager::anyComponentId, armingRequireParam)) {
+        return false;
+    }
+    Fact *const param = _parameterManager->getParameter(ParameterManager::anyComponentId, armingRequireParam);
+    return param && param->rawValue().toInt() == 0;
 }
 
 void Vehicle::_handleSysStatus(mavlink_message_t& message)
@@ -1406,7 +1417,10 @@ int Vehicle::motorCount()
 {
     uint8_t frameType = 0;
     if (_vehicleType == MAV_TYPE_SUBMARINE) {
-        frameType = parameterManager()->getParameter(_compID, "FRAME_CONFIG")->rawValue().toInt();
+        Fact *const frameConfig = parameterManager()->getParameter(_compID, "FRAME_CONFIG");
+        if (frameConfig) {
+            frameType = frameConfig->rawValue().toInt();
+        }
     }
     return QGCMAVLink::motorCount(_vehicleType, frameType);
 }
@@ -1489,7 +1503,7 @@ void Vehicle::setFlightMode(const QString& flightMode)
         newBaseMode |= base_mode;
 
         if (_firmwarePlugin->MAV_CMD_DO_SET_MODE_is_supported()) {
-            sendMavCommand(defaultComponentId(),
+            sendMavCommand(primaryComponentId(),
                            MAV_CMD_DO_SET_MODE,
                            true,    // show error if fails
                            MAV_MODE_FLAG_CUSTOM_MODE_ENABLED,
@@ -1942,7 +1956,7 @@ void Vehicle::guidedModeOrbit(const QGeoCoordinate& centerCoord, double radius, 
     }
     if (capabilityBits() & MAV_PROTOCOL_CAPABILITY_COMMAND_INT) {
         sendMavCommandInt(
-                    defaultComponentId(),
+                    primaryComponentId(),
                     MAV_CMD_DO_ORBIT,
                     MAV_FRAME_GLOBAL,
                     true,                           // show error if fails
@@ -1953,7 +1967,7 @@ void Vehicle::guidedModeOrbit(const QGeoCoordinate& centerCoord, double radius, 
                     centerCoord.latitude(), centerCoord.longitude(), static_cast<float>(amslAltitude));
     } else {
         sendMavCommand(
-                    defaultComponentId(),
+                    primaryComponentId(),
                     MAV_CMD_DO_ORBIT,
                     true,                           // show error if fails
                     static_cast<float>(radius),
@@ -2002,7 +2016,7 @@ void Vehicle::stopGuidedModeROI()
     }
     if (capabilityBits() & MAV_PROTOCOL_CAPABILITY_COMMAND_INT) {
         sendMavCommandInt(
-                    defaultComponentId(),
+                    primaryComponentId(),
                     MAV_CMD_DO_SET_ROI_NONE,
                     MAV_FRAME_GLOBAL,
                     true,                           // show error if fails
@@ -2015,7 +2029,7 @@ void Vehicle::stopGuidedModeROI()
                     static_cast<float>(qQNaN()));   // Empty
     } else {
         sendMavCommand(
-                    defaultComponentId(),
+                    primaryComponentId(),
                     MAV_CMD_DO_SET_ROI_NONE,
                     true,                           // show error if fails
                     static_cast<float>(qQNaN()),    // Empty
@@ -2050,7 +2064,7 @@ void Vehicle::pauseVehicle()
 void Vehicle::abortLanding(double climbOutAltitude)
 {
     sendMavCommand(
-                defaultComponentId(),
+                primaryComponentId(),
                 MAV_CMD_DO_GO_AROUND,
                 true,        // show error if fails
                 static_cast<float>(climbOutAltitude));
@@ -2085,7 +2099,7 @@ void Vehicle::emergencyStop()
 void Vehicle::landingGearDeploy()
 {
     sendMavCommand(
-                defaultComponentId(),
+                primaryComponentId(),
                 MAV_CMD_AIRFRAME_CONFIGURATION,
                 true,       // show error if fails
                 -1.0f,      // all gears
@@ -2095,7 +2109,7 @@ void Vehicle::landingGearDeploy()
 void Vehicle::landingGearRetract()
 {
     sendMavCommand(
-                defaultComponentId(),
+                primaryComponentId(),
                 MAV_CMD_AIRFRAME_CONFIGURATION,
                 true,       // show error if fails
                 -1.0f,      // all gears
@@ -2130,7 +2144,7 @@ void Vehicle::setCurrentMissionSequence(int seq)
                 static_cast<uint16_t>(seq));
             sendMessageOnLinkThreadSafe(sharedLink.get(), msg);
         },
-        static_cast<uint8_t>(defaultComponentId()),
+        static_cast<uint8_t>(primaryComponentId()),
         MAV_CMD_DO_SET_MISSION_CURRENT,
         true, // showError
         static_cast<uint16_t>(seq)
@@ -2389,7 +2403,7 @@ void Vehicle::startCalibration(QGCMAVLink::CalibrationType calType)
                                        sharedLink->mavlinkChannel(),
                                        &msg,
                                        id(),
-                                       defaultComponentId(),            // target component
+                                       primaryComponentId(),            // target component
                                        MAV_CMD_PREFLIGHT_CALIBRATION,    // command id
                                        0,                                // 0=first transmission of command
                                        param1, param2, param3, param4, param5, param6, param7);
@@ -2398,7 +2412,7 @@ void Vehicle::startCalibration(QGCMAVLink::CalibrationType calType)
 
 void Vehicle::stopCalibration(bool showError)
 {
-    sendMavCommand(defaultComponentId(),    // target component
+    sendMavCommand(primaryComponentId(),    // target component
                    MAV_CMD_PREFLIGHT_CALIBRATION,     // command id
                    showError,
                    0,                                 // gyro cal
@@ -2412,7 +2426,7 @@ void Vehicle::stopCalibration(bool showError)
 
 void Vehicle::startUAVCANBusConfig(void)
 {
-    sendMavCommand(defaultComponentId(),        // target component
+    sendMavCommand(primaryComponentId(),        // target component
                    MAV_CMD_PREFLIGHT_UAVCAN,    // command id
                    true,                        // showError
                    1);                          // start config
@@ -2420,7 +2434,7 @@ void Vehicle::startUAVCANBusConfig(void)
 
 void Vehicle::stopUAVCANBusConfig(void)
 {
-    sendMavCommand(defaultComponentId(),        // target component
+    sendMavCommand(primaryComponentId(),        // target component
                    MAV_CMD_PREFLIGHT_UAVCAN,    // command id
                    true,                        // showError
                    0);                          // stop config
@@ -2598,8 +2612,8 @@ void Vehicle::_setupAutoDisarmSignalling()
 {
     QString param = _firmwarePlugin->autoDisarmParameter(this);
 
-    if (!param.isEmpty() && _parameterManager->parameterExists(ParameterManager::defaultComponentId, param)) {
-        Fact* fact = _parameterManager->getParameter(ParameterManager::defaultComponentId,param);
+    if (!param.isEmpty() && _parameterManager->parameterExists(ParameterManager::anyComponentId, param)) {
+        Fact* fact = _parameterManager->getParameter(ParameterManager::anyComponentId,param);
         connect(fact, &Fact::rawValueChanged, this, &Vehicle::autoDisarmChanged);
         emit autoDisarmChanged();
     }
@@ -2609,8 +2623,8 @@ bool Vehicle::autoDisarm()
 {
     QString param = _firmwarePlugin->autoDisarmParameter(this);
 
-    if (!param.isEmpty() && _parameterManager->parameterExists(ParameterManager::defaultComponentId, param)) {
-        Fact* fact = _parameterManager->getParameter(ParameterManager::defaultComponentId,param);
+    if (!param.isEmpty() && _parameterManager->parameterExists(ParameterManager::anyComponentId, param)) {
+        Fact* fact = _parameterManager->getParameter(ParameterManager::anyComponentId,param);
         return fact->rawValue().toDouble() > 0;
     }
 
@@ -2682,7 +2696,7 @@ void Vehicle::_updateHomepoint()
     if(setHomeCmdSupported && updateHomeActivated){
         QGeoCoordinate gcsPosition = QGCPositionManager::instance()->gcsPosition();
         if (coordinate().isValid() && gcsPosition.isValid()) {
-            sendMavCommand(defaultComponentId(),
+            sendMavCommand(primaryComponentId(),
                            MAV_CMD_DO_SET_HOME, false,
                            0,
                            0, 0, 0,
@@ -2790,7 +2804,7 @@ void Vehicle::setPIDTuningTelemetryMode(PIDTuningTelemetryMode mode)
 
 void Vehicle::_setMessageInterval(int messageId, int rate)
 {
-    sendMavCommand(defaultComponentId(),
+    sendMavCommand(primaryComponentId(),
                    MAV_CMD_SET_MESSAGE_INTERVAL,
                    true,                        // show error
                    messageId,
@@ -3279,7 +3293,7 @@ void Vehicle::flashBootloader()
 {
     if (apmFirmware()) {
         sendMavCommand(
-            defaultComponentId(),
+            primaryComponentId(),
             MAV_CMD_FLASH_BOOTLOADER,
             true,        // show error
             0, 0, 0, 0,  // param 1-4 not used
@@ -3291,7 +3305,7 @@ void Vehicle::motorInterlock(bool enable)
 {
     if (apmFirmware()) {
         sendMavCommand(
-            defaultComponentId(),
+            primaryComponentId(),
             MAV_CMD_DO_AUX_FUNCTION,
             true,
             APM::AUX_FUNC::MOTOR_INTERLOCK,
@@ -3405,7 +3419,7 @@ void Vehicle::sendSetupSigning(int keyIndex)
 
     mavlink_system_t target_system;
     target_system.sysid = id();
-    target_system.compid = defaultComponentId();
+    target_system.compid = primaryComponentId();
 
     MAVLinkSigning::createSetupSigning(channel, target_system, keyBytes, setup_signing);
 
@@ -3442,7 +3456,7 @@ void Vehicle::sendDisableSigning()
 
     mavlink_system_t target_system;
     target_system.sysid = id();
-    target_system.compid = defaultComponentId();
+    target_system.compid = primaryComponentId();
 
     MAVLinkSigning::createDisableSigning(target_system, setup_signing);
 

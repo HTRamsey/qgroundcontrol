@@ -43,16 +43,16 @@ bool APMSensorsComponent::compassSetupNeeded() const
     };
 
     for (qsizetype i = 0; i < rgDevicesIds.length(); i++) {
-        if (_vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, rgDevicesIds[i])->rawValue().toInt() == 0) {
+        if (_vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, rgDevicesIds[i]).rawValue().toInt() == 0) {
             continue;
         }
-        if (_vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, rgCompassUse[i])->rawValue().toInt() == 0) {
+        if (_vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, rgCompassUse[i]).rawValue().toInt() == 0) {
             continue;
         }
 
         const QStringList &offsets = rgOffsets[i];
         for (const QString &offset : offsets) {
-            if (_vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, offset)->rawValue().toFloat() == 0.0f) {
+            if (_vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, offset).rawValue().toFloat() == 0.0f) {
                 return true;
             }
         }
@@ -73,7 +73,7 @@ bool APMSensorsComponent::accelSetupNeeded() const
 
     int zeroCount = 0;
     for (const QString &offset: rgOffsets) {
-        if (_vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, offset)->rawValue().toFloat() == 0.0f) {
+        if (_vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, offset).rawValue().toFloat() == 0.0f) {
             zeroCount++;
         }
     }

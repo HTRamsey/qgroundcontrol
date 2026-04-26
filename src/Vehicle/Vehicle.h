@@ -422,6 +422,10 @@ public:
     // Property accesors
     int id() const{ return _systemID; }
     int compId() const{ return _compID; }
+
+    /// Render a "V:<sysid>" or "V:<sysid> C:<compId>" log prefix. Subsystems use this for
+    /// disambiguation in shared log categories so per-vehicle / per-component lines are greppable.
+    [[nodiscard]] QString logPrefix(int componentId = -1) const;
     MAV_AUTOPILOT firmwareType() const { return _firmwareType; }
     MAV_TYPE vehicleType() const { return _vehicleType; }
     QGCMAVLink::VehicleClass_t vehicleClass(void) const { return QGCMAVLink::vehicleClass(_vehicleType); }
@@ -665,7 +669,7 @@ public:
     bool soloFirmware() const { return _soloFirmware; }
     void setSoloFirmware(bool soloFirmware);
 
-    int defaultComponentId() const{ return _defaultComponentId; }
+    int primaryComponentId() const{ return _defaultComponentId; }
 
     /// Sets the default component id for an offline editing vehicle
     void setOfflineEditingDefaultComponentId(int defaultComponentId);
@@ -1303,7 +1307,7 @@ private:
 
 public:
     HealthAndArmingCheckReport* healthAndArmingCheckReport();
-    
+
     void setEventsMetadata(uint8_t compid, const QString& metadataJsonFileName);
 
 private:

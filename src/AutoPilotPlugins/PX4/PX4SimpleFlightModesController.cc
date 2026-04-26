@@ -11,7 +11,7 @@ PX4SimpleFlightModesController::PX4SimpleFlightModesController(void)
     usedParams << QStringLiteral("COM_FLTMODE1") << QStringLiteral("COM_FLTMODE2") << QStringLiteral("COM_FLTMODE3")
                << QStringLiteral("COM_FLTMODE4") << QStringLiteral("COM_FLTMODE5") << QStringLiteral("COM_FLTMODE6")
                << QStringLiteral("RC_MAP_FLTMODE");
-    if (!_allParametersExists(ParameterManager::defaultComponentId, usedParams)) {
+    if (!_allParametersExists(ParameterManager::anyComponentId, usedParams)) {
         return;
     }
 

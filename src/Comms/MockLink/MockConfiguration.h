@@ -103,6 +103,7 @@ public:
         FailMissingParamOnAllRequests,                              ///< Not all params are sent on initial request, QGC retries will fail as well
         FailInitialConnectRequestMessageAutopilotVersionFailure,    ///< REQUEST_MESSAGE:AUTOPILOT_VERSION returns failure
         FailInitialConnectRequestMessageAutopilotVersionLost,       ///< REQUEST_MESSAGE:AUTOPILOT_VERSION success, AUTOPILOT_VERSION never sent
+        FailParamFtpFileNotFound,                                   ///< FTP @PARAM/param.pck returns File Not Found, forcing PARAM_REQUEST_LIST fallback
     };
     FailureMode_t failureMode() const { return _failureMode; }
     void setFailureMode(FailureMode_t failureMode) { _failureMode = failureMode; }

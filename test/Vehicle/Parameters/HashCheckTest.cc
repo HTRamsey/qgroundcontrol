@@ -6,10 +6,12 @@
 #include <QtTest/QSignalSpy>
 #include <QtTest/QTest>
 
+#include "HashCheckController.h"
 #include "LinkManager.h"
 #include "MAVLinkLib.h"
 #include "MockConfiguration.h"
 #include "MultiVehicleManager.h"
+#include "ParameterCache.h"
 #include "ParameterManager.h"
 #include "Vehicle.h"
 
@@ -26,7 +28,7 @@ void HashCheckTest::cleanup()
 
 void HashCheckTest::_deleteCacheFiles()
 {
-    const QDir cacheDir = ParameterManager::parameterCacheDir();
+    const QDir cacheDir = ParameterCache::cacheDir();
     if (cacheDir.exists()) {
         const QStringList cacheFiles = cacheDir.entryList(QStringList() << QStringLiteral("*.v2"), QDir::Files);
         for (const QString &file : cacheFiles) {
@@ -248,7 +250,7 @@ void HashCheckTest::_hashCheckMatrix()
         QVERIFY(vehicle);
 
         QSignalSpy spyParamsReady(vehicleMgr, &MultiVehicleManager::parameterReadyVehicleAvailableChanged);
-        const int maxWaitMs = ParameterManager::kHashCheckTimeoutMs
+        const int maxWaitMs = HashCheckController::kHashCheckTimeoutMs
                             + ParameterManager::kTestMaxInitialRequestTimeMs
                             + TestTimeout::shortMs();
         QVERIFY_NO_SIGNAL_WAIT(spyParamsReady, maxWaitMs);

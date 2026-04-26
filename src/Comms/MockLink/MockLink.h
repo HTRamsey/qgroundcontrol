@@ -101,6 +101,8 @@ public:
     };
     void setRequestMessageFailureMode(RequestMessageFailureMode_t failureMode) { _requestMessageFailureMode = failureMode; }
 
+    MockConfiguration::FailureMode_t failureMode() const { return _failureMode; }
+
     /// Block or unblock REQUEST_MESSAGE responses for a specific message ID.
     /// When blocked, MockLink silently drops the request (no ACK, no message).
     void setRequestMessageNoResponse(uint32_t messageId, bool noResponse = true) {

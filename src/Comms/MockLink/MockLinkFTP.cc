@@ -123,6 +123,10 @@ void MockLinkFTP::_openCommand(uint8_t senderSystemId, uint8_t senderComponentId
     } else if (path == "/parameter.json.xz") {
         tmpFilename = QStringLiteral(":MockLink/Parameter.MetaData.json.xz");
     } else if (path == "@PARAM/param.pck" || path.startsWith("@PARAM/param.pck?")) {
+        if (_mockLink->failureMode() == MockConfiguration::FailParamFtpFileNotFound) {
+            _sendNak(senderSystemId, senderComponentId, MavlinkFTP::kErrFailFileNotFound, outgoingSeqNumber, MavlinkFTP::kCmdOpenFileRO);
+            return;
+        }
         const bool withDefaults = path.contains(QStringLiteral("withdefaults=1"));
         tmpFilename = _generateParamPck(withDefaults);
     }

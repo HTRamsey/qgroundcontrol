@@ -28,6 +28,7 @@
 #include "LinkManager.h"
 #include "MAVLinkProtocol.h"
 #include "MultiVehicleManager.h"
+#include "ParameterCache.h"
 #include "ParameterManager.h"
 #include "PositionManager.h"
 #include "QGCCommandLineParser.h"
@@ -120,10 +121,7 @@ QGCApplication::QGCApplication(int &argc, char *argv[], const QGCCommandLinePars
         // User requested settings to be cleared on command line
         settings.clear();
 
-        // Clear parameter cache
-        QDir paramDir(ParameterManager::parameterCacheDir());
-        paramDir.removeRecursively();
-        paramDir.mkpath(paramDir.absolutePath());
+        ParameterCache::clearAll();
     } else {
         // Determine if upgrade message for settings version bump is required. Check and clear must happen before toolbox is started since
         // that will write some settings.
@@ -137,8 +135,7 @@ QGCApplication::QGCApplication(int &argc, char *argv[], const QGCCommandLinePars
     settings.setValue(_settingsVersionKey, QGC_SETTINGS_VERSION);
 
     if (fClearCache) {
-        QDir dir(ParameterManager::parameterCacheDir());
-        dir.removeRecursively();
+        ParameterCache::clearAll();
         QFile parameter(cachedParameterMetaDataFile());
         parameter.remove();
         QFile airframe(cachedAirframeMetaDataFile());
@@ -487,9 +484,9 @@ void QGCApplication::showAppMessage(const QString &message, const QString &title
         QVariant varMessage = QVariant::fromValue(message);
         QMetaObject::invokeMethod(rootQmlObject, "_showMessageDialog", Q_RETURN_ARG(QVariant, varReturn), Q_ARG(QVariant, dialogTitle), Q_ARG(QVariant, varMessage));
     } else if (runningUnitTests()) {
-        // Unit tests can run without UI
-        // We don't use a logging category to make it easier to debug unit tests
-        qDebug() << "QGCApplication::showAppMessage unittest title:message" << dialogTitle << message;
+        // Unit tests can run without UI. Categorized so failure-context "uncategorized log" guards
+        // don't mark passing tests as failed when production code legitimately surfaces a message.
+        qCDebug(QGCApplicationLog) << "QGCApplication::showAppMessage unittest title:message" << dialogTitle << message;
     } else {
         // UI isn't ready yet
         _delayedAppMessages.append(QPair<QString, QString>(dialogTitle, message));
@@ -773,9 +770,9 @@ void QGCApplication::shutdown()
             }
         }
 
-        // Remove the app-specific settings directory (parent of ParamCache)
-        QDir settingsAppDir(ParameterManager::parameterCacheDir());
-        settingsAppDir.cdUp();
+        // Remove the app-specific settings directory (sibling of the .ini, named after the app).
+        const QFileInfo settingsFileInfo(settingsFile);
+        QDir settingsAppDir(settingsFileInfo.dir().absoluteFilePath(settingsFileInfo.completeBaseName()));
         if (settingsAppDir.exists()) {
             if (settingsAppDir.removeRecursively()) {
                 qCDebug(QGCApplicationLog) << "Removed test run settings directory:" << settingsAppDir.absolutePath();

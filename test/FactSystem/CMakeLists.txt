@@ -1,6 +1,6 @@
 # ============================================================================
 # Fact System Unit Tests
-# Tests for parameter management and fact metadata
+# Tests for fact metadata parsing (Parameter* tests live in test/Vehicle/Parameters)
 # ============================================================================
 
 target_sources(${CMAKE_PROJECT_NAME}
@@ -21,10 +21,6 @@ target_sources(${CMAKE_PROJECT_NAME}
         FactTest.h
         FactValueSliderListModelTest.cc
         FactValueSliderListModelTest.h
-        HashCheckTest.cc
-        HashCheckTest.h
-        ParameterManagerTest.cc
-        ParameterManagerTest.h
         ParameterMetaDataTestHelper.h
 )
 

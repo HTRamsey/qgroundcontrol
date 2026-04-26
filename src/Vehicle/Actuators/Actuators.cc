@@ -757,11 +757,11 @@ bool Actuators::parseJson(const QJsonDocument &json)
 
 Fact* Actuators::getFact(const QString& paramName)
 {
-    if (!_vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, paramName)) {
+    if (!_vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, paramName)) {
         qCDebug(ActuatorsLog) << "Mixer: Param does not exist:" << paramName;
         return nullptr;
     }
-    Fact* fact = _vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, paramName);
+    Fact* fact = _vehicle->parameterManager()->getParameter(ParameterManager::anyComponentId, paramName);
 	subscribeFact(fact);
 	return fact;
 }

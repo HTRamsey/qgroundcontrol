@@ -394,7 +394,7 @@ bool OnboardLogController::_prepareLogDownload()
     if (_vehicle->firmwareType() == MAV_AUTOPILOT_PX4) {
         const QString loggerParam = QStringLiteral("SYS_LOGGER");
         ParameterManager *const parameterManager = _vehicle->parameterManager();
-        if (parameterManager->parameterExists(ParameterManager::defaultComponentId, loggerParam) && parameterManager->getParameter(ParameterManager::defaultComponentId, loggerParam)->rawValue().toInt() == 0) {
+        if (parameterManager->parameterExists(ParameterManager::anyComponentId, loggerParam) && parameterManager->requireParameter(ParameterManager::anyComponentId, loggerParam).rawValue().toInt() == 0) {
             _downloadData->filename += ".px4log";
         } else {
             _downloadData->filename += ".ulg";
@@ -520,7 +520,7 @@ void OnboardLogController::eraseAll()
         sharedLink->mavlinkChannel(),
         &msg,
         _vehicle->id(),
-        _vehicle->defaultComponentId()
+        _vehicle->primaryComponentId()
     );
 
     if (!_vehicle->sendMessageOnLinkThreadSafe(sharedLink.get(), msg)) {
@@ -551,7 +551,7 @@ void OnboardLogController::_requestLogList(uint32_t start, uint32_t end)
         sharedLink->mavlinkChannel(),
         &msg,
         _vehicle->id(),
-        _vehicle->defaultComponentId(),
+        _vehicle->primaryComponentId(),
         start,
         end
     );
@@ -589,7 +589,7 @@ void OnboardLogController::_requestLogData(uint16_t id, uint32_t offset, uint32_
         sharedLink->mavlinkChannel(),
         &msg,
         _vehicle->id(),
-        _vehicle->defaultComponentId(),
+        _vehicle->primaryComponentId(),
         id,
         offset,
         count
@@ -620,7 +620,7 @@ void OnboardLogController::_requestLogEnd()
         sharedLink->mavlinkChannel(),
         &msg,
         _vehicle->id(),
-        _vehicle->defaultComponentId()
+        _vehicle->primaryComponentId()
     );
 
     if (!_vehicle->sendMessageOnLinkThreadSafe(sharedLink.get(), msg)) {

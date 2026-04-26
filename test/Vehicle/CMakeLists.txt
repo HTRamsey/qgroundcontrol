@@ -41,3 +41,8 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_
 # Component Information Tests
 # ----------------------------------------------------------------------------
 add_subdirectory(ComponentInformation)
+
+# ----------------------------------------------------------------------------
+# Parameters Tests
+# ----------------------------------------------------------------------------
+add_subdirectory(Parameters)

@@ -176,7 +176,7 @@ int ArduCopterFirmwarePlugin::remapParamNameHigestMinorVersionNumber(int majorVe
 
 bool ArduCopterFirmwarePlugin::multiRotorXConfig(Vehicle *vehicle) const
 {
-    return (vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, "FRAME")->rawValue().toInt() != 0);
+    return vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, "FRAME").rawValue().toInt() != 0;
 }
 
 QString ArduCopterFirmwarePlugin::pauseFlightMode() const

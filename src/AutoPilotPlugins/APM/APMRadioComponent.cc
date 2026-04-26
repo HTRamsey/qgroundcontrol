@@ -7,7 +7,7 @@ APMRadioComponent::APMRadioComponent(Vehicle *vehicle, AutoPilotPlugin *autopilo
     : VehicleComponent(vehicle, autopilot, AutoPilotPlugin::KnownRadioVehicleComponent, parent)
 {
     for (const QString &mapParam : _mapParams) {
-        Fact *const fact = _vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, mapParam);
+        Fact *const fact = _vehicle->parameterManager()->getParameter(ParameterManager::anyComponentId, mapParam);
         (void) connect(fact, &Fact::valueChanged, this, &APMRadioComponent::_triggerChanged);
     }
 
@@ -22,7 +22,7 @@ bool APMRadioComponent::setupComplete() const
 
     // First check for all attitude controls mapped
     for (int i = 0; i < _mapParams.count(); i++) {
-        mapValues << _vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, _mapParams[i])->rawValue().toInt();
+        mapValues << _vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, _mapParams[i]).rawValue().toInt();
         if (mapValues[i] <= 0) {
             return false;
         }
@@ -30,14 +30,14 @@ bool APMRadioComponent::setupComplete() const
 
     // Next check RC#_MIN/MAX/TRIM all at defaults
     for (const QString &mapParam : _mapParams) {
-        const int channel = _vehicle->parameterManager()->getParameter(-1, mapParam)->rawValue().toInt();
-        if (_vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, QStringLiteral("RC%1_MIN").arg(channel))->rawValue().toInt() != 1100) {
+        const int channel = _vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, mapParam).rawValue().toInt();
+        if (_vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, QStringLiteral("RC%1_MIN").arg(channel)).rawValue().toInt() != 1100) {
             return true;
         }
-        if (_vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, QStringLiteral("RC%1_MAX").arg(channel))->rawValue().toInt() != 1900) {
+        if (_vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, QStringLiteral("RC%1_MAX").arg(channel)).rawValue().toInt() != 1900) {
             return true;
         }
-        if (_vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, QStringLiteral("RC%1_TRIM").arg(channel))->rawValue().toInt() != 1500) {
+        if (_vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, QStringLiteral("RC%1_TRIM").arg(channel)).rawValue().toInt() != 1500) {
             return true;
         }
     }
@@ -54,17 +54,17 @@ void APMRadioComponent::_connectSetupTriggers()
 
     // Get the channels for attitude controls and connect to those values for triggers
     for (const QString &mapParam : _mapParams) {
-        const int channel = _vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, mapParam)->rawValue().toInt();
+        const int channel = _vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, mapParam).rawValue().toInt();
 
-        Fact *fact = _vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, QStringLiteral("RC%1_MIN").arg(channel));
+        Fact *fact = _vehicle->parameterManager()->getParameter(ParameterManager::anyComponentId, QStringLiteral("RC%1_MIN").arg(channel));
         _triggerFacts << fact;
         (void) connect(fact, &Fact::valueChanged, this, &APMRadioComponent::_triggerChanged);
 
-        fact = _vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, QStringLiteral("RC%1_MAX").arg(channel));
+        fact = _vehicle->parameterManager()->getParameter(ParameterManager::anyComponentId, QStringLiteral("RC%1_MAX").arg(channel));
         _triggerFacts << fact;
         (void) connect(fact, &Fact::valueChanged, this, &APMRadioComponent::_triggerChanged);
 
-        fact = _vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, QStringLiteral("RC%1_TRIM").arg(channel));
+        fact = _vehicle->parameterManager()->getParameter(ParameterManager::anyComponentId, QStringLiteral("RC%1_TRIM").arg(channel));
         _triggerFacts << fact;
         (void) connect(fact, &Fact::valueChanged, this, &APMRadioComponent::_triggerChanged);
     }

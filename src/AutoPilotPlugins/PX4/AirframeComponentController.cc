@@ -26,14 +26,14 @@ AirframeComponentController::AirframeComponentController(void) :
 
     QStringList usedParams;
     usedParams << "SYS_AUTOSTART" << "SYS_AUTOCONFIG";
-    if (!_allParametersExists(ParameterManager::defaultComponentId, usedParams)) {
+    if (!_allParametersExists(ParameterManager::anyComponentId, usedParams)) {
         return;
     }
 
     // Load up member variables
 
     bool autostartFound = false;
-    _autostartId = getParameterFact(ParameterManager::defaultComponentId, "SYS_AUTOSTART")->rawValue().toInt();
+    _autostartId = getParameterFact(ParameterManager::anyComponentId, "SYS_AUTOSTART")->rawValue().toInt();
     _currentVehicleName = QString::number(_autostartId); // Temp val. Replaced with actual vehicle name if found
 
     for (int tindex = 0; tindex < AirframeComponentAirframes::get().count(); tindex++) {
@@ -110,7 +110,7 @@ void AirframeComponentController::_waitParamWriteSignal(QVariant value)
 
 void AirframeComponentController::_rebootAfterStackUnwind(void)
 {
-    _vehicle->sendMavCommand(_vehicle->defaultComponentId(), MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN, true /* showError */, 1.0f);
+    _vehicle->sendMavCommand(_vehicle->primaryComponentId(), MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN, true /* showError */, 1.0f);
     QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
     for (unsigned i = 0; i < 2000; i++) {
         QThread::usleep(500);

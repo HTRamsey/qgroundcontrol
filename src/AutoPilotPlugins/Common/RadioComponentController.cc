@@ -28,7 +28,7 @@ RadioComponentController::RadioComponentController(QObject *parent)
     _calValidMaxValue = _calDefaultMaxValue - (valueRange * 0.3f);
 
     // Deal with parameter differences between PX4 and Ardupilot
-    if (parameterExists(ParameterManager::defaultComponentId, QStringLiteral("RC1_REVERSED"))) {
+    if (parameterExists(ParameterManager::anyComponentId, QStringLiteral("RC1_REVERSED"))) {
         // Newer ardupilot firmwares have a different reverse param naming scheme and value scheme
         _revParamFormat = "RC%1_REVERSED";
         _revParamIsBool = true; // param value is boolean 0/1 for reversed or not
@@ -71,7 +71,7 @@ void RadioComponentController::crsfBindMode()
 
 bool RadioComponentController::_channelReversedParamValue(int channel)
 {
-    Fact *const paramFact = getParameterFact(ParameterManager::defaultComponentId, _revParamFormat.arg(channel+1));
+    Fact *const paramFact = getParameterFact(ParameterManager::anyComponentId, _revParamFormat.arg(channel+1));
     if (paramFact) {
         if (_revParamIsBool) {
             return paramFact->rawValue().toBool();
@@ -91,7 +91,7 @@ bool RadioComponentController::_channelReversedParamValue(int channel)
 
 void RadioComponentController::_setChannelReversedParamValue(int channel, bool reversed)
 {
-    Fact *const paramFact = getParameterFact(ParameterManager::defaultComponentId, _revParamFormat.arg(channel+1));
+    Fact *const paramFact = getParameterFact(ParameterManager::anyComponentId, _revParamFormat.arg(channel+1));
     if (paramFact) {
         if (_revParamIsBool) {
             paramFact->setRawValue(reversed);
@@ -119,19 +119,19 @@ void RadioComponentController::_saveStoredCalibrationValues()
             ChannelInfo *const info = &_rgChannelInfo[chan];
             const int oneBasedChannel = chan + 1;
 
-            if (!parameterExists(ParameterManager::defaultComponentId, minTpl.arg(chan+1))) {
+            if (!parameterExists(ParameterManager::anyComponentId, minTpl.arg(chan+1))) {
                 continue;
             }
 
-            Fact* paramFact = getParameterFact(ParameterManager::defaultComponentId, trimTpl.arg(oneBasedChannel));
+            Fact* paramFact = getParameterFact(ParameterManager::anyComponentId, trimTpl.arg(oneBasedChannel));
             if (paramFact) {
                 paramFact->setRawValue(static_cast<float>(info->channelTrim));
             }
-            paramFact = getParameterFact(ParameterManager::defaultComponentId, minTpl.arg(oneBasedChannel));
+            paramFact = getParameterFact(ParameterManager::anyComponentId, minTpl.arg(oneBasedChannel));
             if (paramFact) {
                 paramFact->setRawValue(static_cast<float>(info->channelMin));
             }
-            paramFact = getParameterFact(ParameterManager::defaultComponentId, maxTpl.arg(oneBasedChannel));
+            paramFact = getParameterFact(ParameterManager::anyComponentId, maxTpl.arg(oneBasedChannel));
             if (paramFact) {
                 paramFact->setRawValue(static_cast<float>(info->channelMax));
             }
@@ -162,10 +162,10 @@ void RadioComponentController::_saveStoredCalibrationValues()
             }
 
             QString paramName = _stickFunctionToParamName(static_cast<StickFunction>(stickFunctionIndex));
-            Fact* paramFact = getParameterFact(ParameterManager::defaultComponentId, paramName);
+            Fact* paramFact = getParameterFact(ParameterManager::anyComponentId, paramName);
 
             if (paramFact && paramFact->rawValue().toInt() != paramChannel) {
-                paramFact = getParameterFact(ParameterManager::defaultComponentId, paramName);
+                paramFact = getParameterFact(ParameterManager::anyComponentId, paramName);
                 if (paramFact) {
                     paramFact->setRawValue(paramChannel);
                 }
@@ -175,8 +175,8 @@ void RadioComponentController::_saveStoredCalibrationValues()
 
     if (_vehicle->px4Firmware()) {
         // If the RC_CHAN_COUNT parameter is available write the channel count
-        if (parameterExists(ParameterManager::defaultComponentId, QStringLiteral("RC_CHAN_CNT"))) {
-            getParameterFact(ParameterManager::defaultComponentId, QStringLiteral("RC_CHAN_CNT"))->setRawValue(_chanCount);
+        if (parameterExists(ParameterManager::anyComponentId, QStringLiteral("RC_CHAN_CNT"))) {
+            getParameterFact(ParameterManager::anyComponentId, QStringLiteral("RC_CHAN_CNT"))->setRawValue(_chanCount);
         }
     }
 
@@ -206,7 +206,7 @@ void RadioComponentController::_readStoredCalibrationValues()
     for (int i = 0; i < _chanMax; ++i) {
         ChannelInfo *const info = &_rgChannelInfo[i];
 
-        if (!parameterExists(ParameterManager::defaultComponentId, minTpl.arg(i+1))) {
+        if (!parameterExists(ParameterManager::anyComponentId, minTpl.arg(i+1))) {
             info->channelTrim = 1500;
             info->channelMin = 1100;
             info->channelMax = 1900;
@@ -214,19 +214,19 @@ void RadioComponentController::_readStoredCalibrationValues()
             continue;
         }
 
-        Fact *paramFact = getParameterFact(ParameterManager::defaultComponentId, trimTpl.arg(i+1));
+        Fact *paramFact = getParameterFact(ParameterManager::anyComponentId, trimTpl.arg(i+1));
         if (paramFact) {
             info->channelTrim = paramFact->rawValue().toInt();
         }
 
-        paramFact = getParameterFact(ParameterManager::defaultComponentId, minTpl.arg(i+1));
+        paramFact = getParameterFact(ParameterManager::anyComponentId, minTpl.arg(i+1));
         if (paramFact) {
             info->channelMin = paramFact->rawValue().toInt();
         }
 
-        paramFact = getParameterFact(ParameterManager::defaultComponentId, maxTpl.arg(i+1));
+        paramFact = getParameterFact(ParameterManager::anyComponentId, maxTpl.arg(i+1));
         if (paramFact) {
-            info->channelMax = getParameterFact(ParameterManager::defaultComponentId, maxTpl.arg(i+1))->rawValue().toInt();
+            info->channelMax = getParameterFact(ParameterManager::anyComponentId, maxTpl.arg(i+1))->rawValue().toInt();
         }
 
         info->channelReversed = _channelReversedParamValue(i);
@@ -236,7 +236,7 @@ void RadioComponentController::_readStoredCalibrationValues()
         int32_t paramChannel;
 
         QString paramName = _stickFunctionToParamName(static_cast<StickFunction>(i));
-        Fact *const paramFact = getParameterFact(ParameterManager::defaultComponentId, paramName);
+        Fact *const paramFact = getParameterFact(ParameterManager::anyComponentId, paramName);
         if (paramFact) {
             paramChannel = paramFact->rawValue().toInt();
 

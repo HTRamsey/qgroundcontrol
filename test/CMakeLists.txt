@@ -122,8 +122,6 @@ add_qgc_test(FactSystemTestGeneric LABELS Integration Vehicle RESOURCE_LOCK Mock
 add_qgc_test(FactSystemTestPX4 LABELS Integration Vehicle RESOURCE_LOCK MockLink)
 add_qgc_test(FactTest LABELS Unit)
 add_qgc_test(FactValueSliderListModelTest LABELS Unit)
-add_qgc_test(HashCheckTest LABELS Integration Vehicle SERIAL TIMEOUT ${QGC_TEST_TIMEOUT_EXTENDED})
-add_qgc_test(ParameterManagerTest LABELS Integration Vehicle SERIAL TIMEOUT ${QGC_TEST_TIMEOUT_EXTENDED})
 
 # ----------------------------------------------------------------------------
 # FollowMe
@@ -344,3 +342,8 @@ add_qgc_test(RequestMetaDataTypeStateMachineTest LABELS Integration Vehicle RESO
 add_qgc_test(SendMavCommandWithHandlerTest LABELS Integration Vehicle RESOURCE_LOCK MockLink)
 add_qgc_test(SendMavCommandWithSignallingTest LABELS Integration Vehicle RESOURCE_LOCK MockLink)
 add_qgc_test(VehicleLinkManagerTest LABELS Integration Vehicle RESOURCE_LOCK MockLink)
+add_qgc_test(HashCheckTest LABELS Integration Vehicle SERIAL TIMEOUT ${QGC_TEST_TIMEOUT_EXTENDED})
+add_qgc_test(ParameterCacheTest LABELS Unit)
+add_qgc_test(ParameterManagerTest LABELS Integration Vehicle SERIAL TIMEOUT ${QGC_TEST_TIMEOUT_EXTENDED})
+add_qgc_test(ParameterMavlinkCodecTest LABELS Unit)
+add_qgc_test(ParameterPackFileTest LABELS Unit RESOURCE_LOCK TempFiles)

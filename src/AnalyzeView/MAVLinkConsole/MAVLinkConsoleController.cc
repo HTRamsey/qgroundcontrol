@@ -161,7 +161,7 @@ void MAVLinkConsoleController::_sendSerialData(const QByteArray &data, bool clos
             dataSize,
             reinterpret_cast<uint8_t*>(chunk.data()),
             _vehicle->id(),
-            _vehicle->defaultComponentId()
+            _vehicle->primaryComponentId()
         );
 
         (void) _vehicle->sendMessageOnLinkThreadSafe(sharedLink.get(), msg);

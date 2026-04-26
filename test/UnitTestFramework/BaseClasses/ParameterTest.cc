@@ -27,7 +27,7 @@ Fact* ParameterTest::getFact(const QString& name, int componentId) const
     }
 
     if (componentId < 0) {
-        componentId = ParameterManager::defaultComponentId;
+        componentId = ParameterManager::anyComponentId;
     }
 
     if (!parameterManager()->parameterExists(componentId, name)) {
@@ -45,7 +45,7 @@ bool ParameterTest::parameterExists(const QString& name, int componentId) const
     }
 
     if (componentId < 0) {
-        componentId = ParameterManager::defaultComponentId;
+        componentId = ParameterManager::anyComponentId;
     }
 
     return parameterManager()->parameterExists(componentId, name);

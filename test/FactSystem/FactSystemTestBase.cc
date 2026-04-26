@@ -28,8 +28,8 @@ void FactSystemTestBase::_cleanup()
 /// Basic test of parameter values in Fact System
 void FactSystemTestBase::_parameter_default_component_id_test()
 {
-    QVERIFY(_vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, "RC_MAP_THROTTLE"));
-    Fact* fact = _vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, "RC_MAP_THROTTLE");
+    QVERIFY(_vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, "RC_MAP_THROTTLE"));
+    Fact* fact = _vehicle->parameterManager()->getParameter(ParameterManager::anyComponentId, "RC_MAP_THROTTLE");
     QVERIFY(fact != nullptr);
     QVariant factValue = fact->rawValue();
     QCOMPARE(factValue.isValid(), true);
@@ -46,4 +46,3 @@ void FactSystemTestBase::_parameter_specific_component_id_test()
     QCOMPARE(factValue.isValid(), true);
     QCOMPARE(factValue.toInt(), 3);
 }
-

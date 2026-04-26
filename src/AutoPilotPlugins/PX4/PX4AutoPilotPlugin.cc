@@ -162,8 +162,8 @@ void PX4AutoPilotPlugin::parametersReadyPreChecks(void)
     AutoPilotPlugin::parametersReadyPreChecks();
 
     QString hitlParam("SYS_HITL");
-    if (_vehicle->parameterManager()->parameterExists(ParameterManager::defaultComponentId, hitlParam) &&
-            _vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, hitlParam)->rawValue().toBool()) {
+    if (_vehicle->parameterManager()->parameterExists(ParameterManager::anyComponentId, hitlParam) &&
+            _vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, hitlParam).rawValue().toBool()) {
         QGC::showAppMessage(tr("Warning: Hardware In The Loop (HITL) simulation is enabled for this vehicle."));
     }
 }
@@ -173,7 +173,7 @@ QString PX4AutoPilotPlugin::prerequisiteSetup(VehicleComponent* component) const
     bool requiresAirframeCheck = false;
 
     if (qobject_cast<const FlightModesComponent*>(component)) {
-        if (_vehicle->parameterManager()->getParameter(-1, "COM_RC_IN_MODE")->rawValue().toInt() == 1) {
+        if (_vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, "COM_RC_IN_MODE").rawValue().toInt() == 1) {
             // No RC input
             return QString();
         } else {
@@ -184,7 +184,7 @@ QString PX4AutoPilotPlugin::prerequisiteSetup(VehicleComponent* component) const
             }
         }
     } else if (qobject_cast<const PX4RadioComponent*>(component)) {
-        if (_vehicle->parameterManager()->getParameter(-1, "COM_RC_IN_MODE")->rawValue().toInt() != 1) {
+        if (_vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, "COM_RC_IN_MODE").rawValue().toInt() != 1) {
             //requiresAirframeCheck = true;
         }
     } else if (qobject_cast<const PX4TuningComponent*>(component)) {

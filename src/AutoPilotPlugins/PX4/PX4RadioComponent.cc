@@ -25,16 +25,16 @@ QString PX4RadioComponent::iconResource(void) const
 
 bool PX4RadioComponent::requiresSetup(void) const
 {
-    return _vehicle->parameterManager()->getParameter(-1, "COM_RC_IN_MODE")->rawValue().toInt() == 1 ? false : true;
+    return _vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, "COM_RC_IN_MODE").rawValue().toInt() == 1 ? false : true;
 }
 
 bool PX4RadioComponent::setupComplete(void) const
 {
-    if (_vehicle->parameterManager()->getParameter(-1, "COM_RC_IN_MODE")->rawValue().toInt() != 1) {
+    if (_vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, "COM_RC_IN_MODE").rawValue().toInt() != 1) {
         // The best we can do to detect the need for a radio calibration is look for attitude
         // controls to be mapped.
         for(const char* const&mapParam : {"RC_MAP_ROLL", "RC_MAP_PITCH", "RC_MAP_YAW", "RC_MAP_THROTTLE"}) {
-            if (_vehicle->parameterManager()->getParameter(ParameterManager::defaultComponentId, mapParam)->rawValue().toInt() == 0) {
+            if (_vehicle->parameterManager()->requireParameter(ParameterManager::anyComponentId, mapParam).rawValue().toInt() == 0) {
                 return false;
             }
         }

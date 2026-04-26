@@ -153,8 +153,8 @@ Condition::Condition(const QString &condition, ParameterManager* parameterManage
             qCDebug(CommonLog) << logPrefix + QStringLiteral(": Param:%1 op:%2 value:%3").arg(_parameter, operation).arg(_value);
         }
 
-        if (parameterManager->parameterExists(ParameterManager::defaultComponentId, _parameter)) {
-            Fact* param = parameterManager->getParameter(ParameterManager::defaultComponentId, _parameter);
+        if (parameterManager->parameterExists(ParameterManager::anyComponentId, _parameter)) {
+            Fact* param = parameterManager->getParameter(ParameterManager::anyComponentId, _parameter);
             if (param->type() == FactMetaData::ValueType_t::valueTypeBool ||
                     param->type() == FactMetaData::ValueType_t::valueTypeInt32) {
                 _fact = param;

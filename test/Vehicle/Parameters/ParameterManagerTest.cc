@@ -8,6 +8,7 @@
 
 #include "MockLinkFTP.h"
 #include "MultiVehicleManager.h"
+#include "ParameterFileTextIO.h"
 #include "ParameterManager.h"
 #include "QGCMath.h"
 #include "Vehicle.h"
@@ -379,6 +380,38 @@ void ParameterManagerTest::_FTPnoFailure()
     QCOMPARE(batt2MonFact->rawValue().toInt(), 4);
 }
 
+// FTP returns File Not Found for @PARAM/param.pck → InitialParameterDownloader clears _tryftp
+// and falls back to PARAM_REQUEST_LIST. Verifies parameters still load successfully.
+void ParameterManagerTest::_FTPFallbackToMavlink()
+{
+    QVERIFY2(!_mockLink, "MockLink already connected");
+    _mockLink = MockLink::startAPMArduPlaneMockLink(false /* sendStatusText */, false /* enableCamera */, false /* enableGimbal */, MockConfiguration::FailParamFtpFileNotFound);
+
+    MultiVehicleManager* vehicleMgr = MultiVehicleManager::instance();
+    QVERIFY(vehicleMgr);
+
+    QSignalSpy spyVehicle(vehicleMgr, &MultiVehicleManager::activeVehicleAvailableChanged);
+    QVERIFY_SIGNAL_WAIT(spyVehicle, TestTimeout::mediumMs());
+    QCOMPARE(spyVehicle.takeFirst().at(0).toBool(), true);
+
+    Vehicle* vehicle = vehicleMgr->activeVehicle();
+    QVERIFY(vehicle);
+
+    QSignalSpy spyParamsReady(vehicleMgr, &MultiVehicleManager::parameterReadyVehicleAvailableChanged);
+    QVERIFY_SIGNAL_WAIT(spyParamsReady, TestTimeout::longMs());
+    QCOMPARE(spyParamsReady.takeFirst().at(0).toBool(), true);
+
+    // FTP was attempted, then we fell back to PARAM_REQUEST_LIST
+    QVERIFY2(_mockLink->receivedMavlinkMessageCount(MAVLINK_MSG_ID_FILE_TRANSFER_PROTOCOL) > 0, "FTP open should have been attempted");
+    QVERIFY2(_mockLink->receivedMavlinkMessageCount(MAVLINK_MSG_ID_PARAM_REQUEST_LIST) > 0, "PARAM_REQUEST_LIST fallback should have been issued");
+
+    ParameterManager* paramManager = vehicle->parameterManager();
+    QVERIFY(paramManager);
+    QVERIFY(paramManager->parametersReady());
+    QVERIFY(!paramManager->missingParameters());
+    QVERIFY(paramManager->parameterExists(MAV_COMP_ID_AUTOPILOT1, QStringLiteral("BATT_LOW_VOLT")));
+}
+
 void ParameterManagerTest::_FTPChangeParam()
 {
     // Test that parameter set works after APM FTP param download
@@ -412,6 +445,105 @@ void ParameterManagerTest::_FTPChangeParam()
     fact->setRawValue(QVariant(testValue));
     QVERIFY_SIGNAL_WAIT(spyValueChanged, TestTimeout::mediumMs());
     QCOMPARE(fact->rawValue().toFloat(), testValue);
+}
+
+// PX4MockLink.params declares parameters across component IDs 1, 2, 3. The MockLink streams the
+// secondary components after the primary, so wait for the trailing comp 2 / comp 3 PARAM_VALUE
+// messages before asserting on the merged component map.
+void ParameterManagerTest::_multiComponentDownload()
+{
+    _noFailureWorker(MockConfiguration::FailNone);
+
+    Vehicle* const vehicle = MultiVehicleManager::instance()->activeVehicle();
+    QVERIFY(vehicle);
+    ParameterManager* const pm = vehicle->parameterManager();
+    QVERIFY(pm);
+    QVERIFY(pm->parametersReady());
+
+    QElapsedTimer timer;
+    timer.start();
+    while (pm->componentIds().size() < 3 && timer.elapsed() < TestTimeout::longMs()) {
+        QTest::qWait(50);
+    }
+
+    const QList<int> compIds = pm->componentIds();
+    QVERIFY2(compIds.contains(1), qPrintable(QStringLiteral("missing comp 1: have %1").arg(compIds.size())));
+    QVERIFY2(compIds.contains(2), qPrintable(QStringLiteral("missing comp 2: have %1").arg(compIds.size())));
+    QVERIFY2(compIds.contains(3), qPrintable(QStringLiteral("missing comp 3: have %1").arg(compIds.size())));
+
+    // Each component reported a non-empty parameter list.
+    for (const int compId : compIds) {
+        QVERIFY2(!pm->parameterNames(compId).isEmpty(),
+                 qPrintable(QStringLiteral("comp %1 has no parameters").arg(compId)));
+    }
+
+    // anyComponentId must route to the primary (comp 1 for PX4 mock).
+    QCOMPARE(vehicle->primaryComponentId(), 1);
+    const QStringList primaryNames = pm->parameterNames(ParameterManager::anyComponentId);
+    QCOMPARE(primaryNames, pm->parameterNames(1));
+}
+
+// Regression: PARAM_VALUE arriving from the vehicle must NOT trigger an outbound PARAM_SET.
+// _handleParamValue calls Fact::containerSetRawValue, which emits rawValueChanged but NOT
+// containerRawValueChanged (Fact.h:172). PM connects _factRawValueUpdated to the latter — if that
+// contract ever weakens, every PARAM_VALUE would echo back as a PARAM_SET → infinite write loop.
+void ParameterManagerTest::_paramValueRoundTripDoesNotEcho()
+{
+    _noFailureWorker(MockConfiguration::FailNone);
+
+    Vehicle* const vehicle = MultiVehicleManager::instance()->activeVehicle();
+    QVERIFY(vehicle);
+    ParameterManager* const pm = vehicle->parameterManager();
+    QVERIFY(pm->parametersReady());
+
+    _mockLink->clearReceivedMavlinkMessageCounts();
+    QCOMPARE(_mockLink->receivedMavlinkMessageCount(MAVLINK_MSG_ID_PARAM_SET), 0);
+
+    // Mutate the param on the mock side, then ask QGC to re-read it. Mock streams back a
+    // PARAM_VALUE; if the slot wiring is wrong, PM echoes it as a PARAM_SET.
+    _mockLink->setMockParamValue(MAV_COMP_ID_AUTOPILOT1, QStringLiteral("BAT1_V_CHARGED"), 99.0f);
+    QSignalSpy readSpy(pm, &ParameterManager::_paramRequestReadSuccess);
+    pm->refreshParameter(MAV_COMP_ID_AUTOPILOT1, QStringLiteral("BAT1_V_CHARGED"));
+    QVERIFY_SIGNAL_WAIT(readSpy, TestTimeout::mediumMs());
+
+    // The vehicle should observe exactly one PARAM_REQUEST_READ and zero PARAM_SETs.
+    QVERIFY(_mockLink->receivedMavlinkMessageCount(MAVLINK_MSG_ID_PARAM_REQUEST_READ) > 0);
+    QCOMPARE(_mockLink->receivedMavlinkMessageCount(MAVLINK_MSG_ID_PARAM_SET), 0);
+}
+
+// Regression: ParameterFileTextIO::write followed by read must restore the original raw values.
+// Locks the .params on-disk format against drift in formatRow / parseLine.
+void ParameterManagerTest::_textIORoundTrip()
+{
+    _noFailureWorker(MockConfiguration::FailNone);
+
+    Vehicle* const vehicle = MultiVehicleManager::instance()->activeVehicle();
+    QVERIFY(vehicle);
+    ParameterManager* const pm = vehicle->parameterManager();
+    QVERIFY(pm->parametersReady());
+
+    Fact* const fact = pm->getParameter(MAV_COMP_ID_AUTOPILOT1, QStringLiteral("BAT1_V_CHARGED"));
+    QVERIFY(fact);
+    const QVariant original = fact->rawValue();
+
+    QString buffer;
+    {
+        QTextStream out(&buffer);
+        ParameterFileTextIO::write(out, pm);
+    }
+    QVERIFY(!buffer.isEmpty());
+
+    // Mutate the in-memory fact so read() has something to restore.
+    fact->containerSetRawValue(QVariant(original.toFloat() + 1.5f));
+    QVERIFY(!qFuzzyCompare(fact->rawValue().toFloat(), original.toFloat()));
+
+    QString errors;
+    {
+        QTextStream in(&buffer, QIODeviceBase::ReadOnly);
+        errors = ParameterFileTextIO::read(in, pm);
+    }
+    QVERIFY2(errors.isEmpty(), qPrintable(errors));
+    QCOMPARE(fact->rawValue().toFloat(), original.toFloat());
 }
 
 UT_REGISTER_TEST(ParameterManagerTest, TestLabel::Integration, TestLabel::Vehicle, TestLabel::Serial)
