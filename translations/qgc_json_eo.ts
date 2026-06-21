@@ -4492,6 +4492,25 @@
             <source>altitude bias,3d data</source>
             <translation>[ȧĺṫıṫũḋė ƀıȧŝ,3ḋ ḋȧṫȧ______]</translation>
         </message>
+        <message>
+            <extracomment>.QGC.MetaData.Facts[keepSceneAlive].shortDesc</extracomment>
+            <location filename="/home/runner/work/qgroundcontrol/qgroundcontrol/src/Settings/Viewer3D.SettingsGroup.json" />
+            <source>Keep the 3D scene loaded in memory when switching back to fly view. Disable on memory-constrained devices.</source>
+            <translation>[Ķėėṗ ṫħė 3Ḋ ŝċėńė ĺǒȧḋėḋ ıń m̃ėm̃ǒŕẏ ẇħėń ŝẇıṫċħıńġ ƀȧċķ ṫǒ ƒĺẏ v̇ıėẇ. Ḋıŝȧƀĺė ǒń m̃ėm̃ǒŕẏ-ċǒńŝṫŕȧıńėḋ ḋėv̇ıċėŝ.______________________________]</translation>
+        </message>
+        <message>
+            <extracomment>.QGC.MetaData.Facts[keepSceneAlive].label</extracomment>
+            <location filename="/home/runner/work/qgroundcontrol/qgroundcontrol/src/Settings/Viewer3D.SettingsGroup.json" />
+            <source>Keep 3D scene alive when exiting 3D view</source>
+            <translation>[Ķėėṗ 3Ḋ ŝċėńė ȧĺıv̇ė ẇħėń ėẋıṫıńġ 3Ḋ v̇ıėẇ___________]</translation>
+        </message>
+        <message>
+            <extracomment>.QGC.MetaData.Facts[keepSceneAlive].keywords</extracomment>
+            <translatorcomment>Only use english comma ',' to separate strings</translatorcomment>
+            <location filename="/home/runner/work/qgroundcontrol/qgroundcontrol/src/Settings/Viewer3D.SettingsGroup.json" />
+            <source>3d view,memory,scene,alive</source>
+            <translation>[3ḋ v̇ıėẇ,m̃ėm̃ǒŕẏ,ŝċėńė,ȧĺıv̇ė_______]</translation>
+        </message>
     </context>
     <context>
         <name>OfflineMaps.SettingsGroup.json</name>
