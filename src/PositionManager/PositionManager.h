@@ -2,29 +2,36 @@
 
 #include <QtCore/QObject>
 #include <QtCore/QString>
+#include <QtCore/QList>
 #include <QtPositioning/QGeoCoordinate>
 #include <QtPositioning/QGeoPositionInfo>
 #include <QtPositioning/QGeoPositionInfoSource>
+#include <QtPositioning/QGeoSatelliteInfo>
 #include <QtQmlIntegration/QtQmlIntegration>
 
 #include <cstdint>
 
 class QNmeaPositionInfoSource;
+class QGeoSatelliteInfoSource;
 class QGCCompass;
 class QTimer;
 class QSerialPort;
 class UdpIODevice;
 class AutoConnectSettings;
+class SatelliteModel;
 
 class QGCPositionManager : public QObject
 {
     Q_OBJECT
+    friend class PositionManagerTest;
     QML_ELEMENT
     QML_UNCREATABLE("")
+    Q_MOC_INCLUDE("SatelliteModel.h")
 
     Q_PROPERTY(QGeoCoordinate gcsPosition                   READ gcsPosition                    NOTIFY gcsPositionChanged)
     Q_PROPERTY(qreal          gcsHeading                    READ gcsHeading                     NOTIFY gcsHeadingChanged)
     Q_PROPERTY(qreal          gcsPositionHorizontalAccuracy READ gcsPositionHorizontalAccuracy  NOTIFY gcsPositionHorizontalAccuracyChanged)
+    Q_PROPERTY(SatelliteModel *satelliteModel               READ satelliteModel                 CONSTANT)
 
 public:
     explicit QGCPositionManager(QObject *parent = nullptr);
@@ -43,6 +50,9 @@ public:
 
     int updateInterval() const { return _updateInterval; }
 
+    /// Satellites in view of the GCS-local receiver (internal GPS or NMEA source).
+    SatelliteModel *satelliteModel() { return _satelliteModel; }
+
     void setNmeaSourceDevice(QIODevice *device);
 
 signals:
@@ -54,6 +64,8 @@ signals:
 private slots:
     void _positionUpdated(const QGeoPositionInfo &update);
     void _positionError(QGeoPositionInfoSource::Error gcsPositioningError);
+    void _satellitesInViewUpdated(const QList<QGeoSatelliteInfo> &satellites);
+    void _satellitesInUseUpdated(const QList<QGeoSatelliteInfo> &satellites);
 
 private:
     enum QGCPositionSource {
@@ -66,6 +78,7 @@ private:
 
     void _setPositionSource(QGCPositionSource source);
     void _setupPositionSources();
+    void _setupSatelliteSource();
     void _handlePermissionStatus(Qt::PermissionStatus permissionStatus);
     void _checkPermission();
     void _setGCSHeading(qreal newGCSHeading);
@@ -98,6 +111,11 @@ private:
     QGeoPositionInfoSource *_defaultSource = nullptr;
     QNmeaPositionInfoSource *_nmeaSource = nullptr;
     QGeoPositionInfoSource *_simulatedSource = nullptr;
+
+    QGeoSatelliteInfoSource *_satelliteSource = nullptr;
+    SatelliteModel *_satelliteModel = nullptr;
+    QList<QGeoSatelliteInfo> _satellitesInView;
+    QList<QGeoSatelliteInfo> _satellitesInUse;
 
     QGCCompass *_compass = nullptr;
 

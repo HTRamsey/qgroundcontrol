@@ -4,7 +4,6 @@ import QtQuick.Layouts
 import QGroundControl
 import QGroundControl.Controls
 import QGroundControl.GPS
-
 /// Status block for the RTK corrections pipeline (NTRIP + GCS-connected RTK base).
 /// Shows current corrections state (RTK Fixed / Float / Waiting / No Fix), source,
 /// correction age, and a warning when corrections have been streaming with no RTK
@@ -15,8 +14,10 @@ SettingsGroupLayout {
 
     required property var vehicle
 
-    /// Whether RTCM corrections are flowing from any source.
-    property bool correctionsActive: false
+    /// Whether RTCM corrections are flowing from any source. Derived from the same
+    /// globals the rest of this block reads, so it needs no caller-side wiring.
+    readonly property bool correctionsActive: QGroundControl.gpsRtk.connected.value
+        || (root._ntripMgr && root._ntripMgr.connectionStatus === NTRIPManager.Connected)
 
     property string valueNA: qsTr("-.--")
 
@@ -99,6 +100,42 @@ SettingsGroupLayout {
             return age.toFixed(0) + " s"
         }
         visible: root._ntripMgr && root._ntripMgr.connectionStatus === NTRIPManager.Connected
+    }
+
+    LabelledLabel {
+        label:     qsTr("RTK Satellites")
+        labelText: root.vehicle ? root.vehicle.gps.rtkNumSats.valueString : root.valueNA
+        visible:   root.vehicle && root.vehicle.gps.rtkNumSats.rawValue > 0
+    }
+
+    LabelledLabel {
+        label:     qsTr("Correction Rate")
+        labelText: root.vehicle ? root.vehicle.gps.rtkRate.valueString + " Hz" : root.valueNA
+        visible:   root.vehicle && root.vehicle.gps.rtkRate.rawValue > 0
+    }
+
+    LabelledLabel {
+        label:     qsTr("RTK Health")
+        labelText: root.vehicle ? root.vehicle.gps.rtkHealth.valueString : root.valueNA
+        visible:   root.vehicle && root.vehicle.gps.rtkRate.rawValue > 0
+    }
+
+    LabelledLabel {
+        label:     qsTr("Baseline")
+        labelText: root.vehicle ? root.vehicle.gps.rtkBaseline.valueString + " m" : root.valueNA
+        visible:   root.vehicle && !isNaN(root.vehicle.gps.rtkBaseline.rawValue)
+    }
+
+    LabelledLabel {
+        label:     qsTr("RTK Accuracy")
+        labelText: root.vehicle ? root.vehicle.gps.rtkAccuracy.valueString + " m" : root.valueNA
+        visible:   root.vehicle && !isNaN(root.vehicle.gps.rtkAccuracy.rawValue)
+    }
+
+    LabelledLabel {
+        label:     qsTr("Ambiguity Hypotheses")
+        labelText: root.vehicle ? root.vehicle.gps.rtkIAR.valueString : root.valueNA
+        visible:   root.vehicle && root.vehicle.gps.rtkIAR.rawValue > 0
     }
 
     QGCLabel {

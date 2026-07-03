@@ -5,8 +5,6 @@
 #include <QtCore/QAbstractListModel>
 #include <QtCore/QList>
 
-class GPSManager;
-
 class GPSEventModel : public QAbstractListModel
 {
     Q_OBJECT

@@ -1,6 +1,7 @@
 #include "PositionManager.h"
 #include "AppMessages.h"
 #include "QGCCorePlugin.h"
+#include "SatelliteModel.h"
 #include "SimulatedPosition.h"
 // #include "QGCSensors.h"
 #include "QGCLoggingCategory.h"
@@ -12,6 +13,7 @@
 #include <QtCore/QPermissions>
 #include <QtCore/QTimer>
 #include <QtNetwork/QHostAddress>
+#include <QtPositioning/QGeoSatelliteInfoSource>
 #include <QtPositioning/QNmeaPositionInfoSource>
 
 #ifndef QGC_NO_SERIAL_LINK
@@ -25,6 +27,7 @@ Q_APPLICATION_STATIC(QGCPositionManager, _positionManager);
 
 QGCPositionManager::QGCPositionManager(QObject *parent)
     : QObject(parent)
+    , _satelliteModel(new SatelliteModel(this))
 {
     qCDebug(QGCPositionManagerLog) << this;
 }
@@ -70,6 +73,34 @@ void QGCPositionManager::_setupPositionSources()
     }
 
     _setPositionSource(QGCPositionSource::InternalGPS);
+    _setupSatelliteSource();
+}
+
+void QGCPositionManager::_setupSatelliteSource()
+{
+    _satelliteSource = QGeoSatelliteInfoSource::createDefaultSource(this);
+    if (!_satelliteSource) {
+        qCDebug(QGCPositionManagerLog) << "No satellite info source available";
+        return;
+    }
+
+    (void) connect(_satelliteSource, &QGeoSatelliteInfoSource::satellitesInViewUpdated,
+                   this, &QGCPositionManager::_satellitesInViewUpdated);
+    (void) connect(_satelliteSource, &QGeoSatelliteInfoSource::satellitesInUseUpdated,
+                   this, &QGCPositionManager::_satellitesInUseUpdated);
+    _satelliteSource->startUpdates();
+}
+
+void QGCPositionManager::_satellitesInViewUpdated(const QList<QGeoSatelliteInfo> &satellites)
+{
+    _satellitesInView = satellites;
+    _satelliteModel->updateFromQtPositioning(_satellitesInView, _satellitesInUse);
+}
+
+void QGCPositionManager::_satellitesInUseUpdated(const QList<QGeoSatelliteInfo> &satellites)
+{
+    _satellitesInUse = satellites;
+    _satelliteModel->updateFromQtPositioning(_satellitesInView, _satellitesInUse);
 }
 
 void QGCPositionManager::_handlePermissionStatus(Qt::PermissionStatus permissionStatus)

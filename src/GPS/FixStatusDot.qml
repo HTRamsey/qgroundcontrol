@@ -1,18 +1,20 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
 
 import QGroundControl
 import QGroundControl.Controls
-import QGroundControl.GPS
 
 /// Colored circle indicating GPS fix or general status.
 /// Pick ONE of:
-///   - `lockValue`   — GPS fix-type lock (uses GPSFormatter.fixTypeColor)
+///   - `quality`     — derived GPS quality tier (VehicleGPSFactGroup.GPSQuality)
 ///   - `severity`    — "Info" | "Warning" | "Error" (e.g. event log entries)
 ///   - `statusColor` — set directly (other status semantics)
+/// `lockValue` may additionally be set to show a fix-type tooltip.
 Item {
     id: root
 
+    property int    quality:     -1
     property int    lockValue:   -1
     property string severity:    ""
     property color  statusColor: _resolvedColor
@@ -33,11 +35,9 @@ Item {
             if (root.severity === "Warning") return _pal.colorOrange
             return _pal.colorGreen
         }
-        if (root.lockValue < 0) return _pal.colorGrey
-        var c = GPSFormatter.fixTypeColor(root.lockValue)
-        if (c === "green")  return _pal.colorGreen
-        if (c === "orange") return _pal.colorOrange
-        if (c === "red")    return _pal.colorRed
+        if (root.quality >= VehicleGPSFactGroup.QualityGood) return _pal.colorGreen
+        if (root.quality >= VehicleGPSFactGroup.QualityFair) return _pal.colorOrange
+        if (root.quality >= VehicleGPSFactGroup.QualityPoor) return _pal.colorRed
         return _pal.colorGrey
     }
 

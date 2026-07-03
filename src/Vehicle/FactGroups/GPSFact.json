@@ -191,6 +191,14 @@
     "name":             "rtkIAR",
     "shortDesc": "RTK Ambiguity Hypotheses",
     "type":             "int32"
+},
+{
+    "name":             "quality",
+    "shortDesc": "GPS Quality",
+    "type":             "uint8",
+    "enumStrings":      "None,Poor,Fair,Good,Excellent",
+    "enumValues":       "0,1,2,3,4",
+    "decimalPlaces":    0
 }
 ]
 }

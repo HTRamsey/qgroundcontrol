@@ -6,7 +6,6 @@
 #include "GPSRTKFactGroup.h"
 #include "GPSTransport.h"
 #include "GPSType.h"
-#include "NTRIPManager.h"
 #include "QGCLoggingCategory.h"
 #include "RTCMMavlink.h"
 #include "RTKSettings.h"
@@ -187,11 +186,10 @@ void GPSRtk::_startProvider(GPSProvider::TransportFactory makeTransport, std::sh
         .fixedBaseAccuracyMeters = rtkSettings->fixedBasePositionAccuracy()->rawValue().toFloat(),
     };
     _gpsProvider = new GPSProvider(std::move(makeTransport), type, rtkConfig, _requestGpsStop, this);
-    // Forward serial-RTK corrections through NTRIPManager's shared RTCMMavlink so
+    // Forward corrections through the GPSManager-injected shared RTCMMavlink so
     // serial and NTRIP sources share one GPS_RTCM_DATA sequence-id domain.
-    RTCMMavlink* const rtcmMavlink = NTRIPManager::instance()->rtcmMavlink();
-    if (rtcmMavlink) {
-        (void) connect(_gpsProvider, &GPSProvider::RTCMDataUpdate, rtcmMavlink, &RTCMMavlink::RTCMDataUpdate);
+    if (_rtcmMavlink) {
+        (void) connect(_gpsProvider, &GPSProvider::RTCMDataUpdate, _rtcmMavlink, &RTCMMavlink::RTCMDataUpdate);
     } else {
         qCWarning(GPSRtkLog) << "Shared RTCMMavlink unavailable; RTK corrections will not be forwarded";
     }

@@ -10,6 +10,4 @@ private slots:
     void testFormatDataRate();
     void testFormatCoordinate();
     void testFormatHeading();
-    void testFixTypeQuality();
-    void testFixTypeColor();
 };

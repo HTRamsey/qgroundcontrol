@@ -23,14 +23,19 @@ static mavlink_message_t makeGpsRawInt(int32_t lat, int32_t lon, int32_t alt, ui
     return msg;
 }
 
+static VehicleGPSFactGroup::GPSQuality quality(VehicleGPSFactGroup &fg)
+{
+    return static_cast<VehicleGPSFactGroup::GPSQuality>(fg.quality()->rawValue().toInt());
+}
+
 void VehicleGPSFactGroupTest::testQualityNone()
 {
     VehicleGPSFactGroup fg;
-    QCOMPARE(fg.quality(), VehicleGPSFactGroup::GPSQuality::QualityNone);
+    QCOMPARE(quality(fg), VehicleGPSFactGroup::GPSQuality::QualityNone);
 
     auto msg = makeGpsRawInt(0, 0, 0, 500, 500, UINT16_MAX, UINT16_MAX, 1, 4);
     fg.handleMessage(nullptr, msg);
-    QCOMPARE(fg.quality(), VehicleGPSFactGroup::GPSQuality::QualityNone);
+    QCOMPARE(quality(fg), VehicleGPSFactGroup::GPSQuality::QualityNone);
 }
 
 void VehicleGPSFactGroupTest::testQualityPoor()
@@ -39,7 +44,7 @@ void VehicleGPSFactGroupTest::testQualityPoor()
     // 3D fix, high HDOP (5.0), few sats (5) -> Poor
     auto msg = makeGpsRawInt(470000000, -1220000000, 100000, 500, 500, 100, 1800, 3, 5);
     fg.handleMessage(nullptr, msg);
-    QCOMPARE(fg.quality(), VehicleGPSFactGroup::GPSQuality::QualityPoor);
+    QCOMPARE(quality(fg), VehicleGPSFactGroup::GPSQuality::QualityPoor);
 }
 
 void VehicleGPSFactGroupTest::testQualityFair()
@@ -48,7 +53,7 @@ void VehicleGPSFactGroupTest::testQualityFair()
     // 3D fix, low HDOP (1.2) XOR sats: good hdop but few sats (5) -> Fair
     auto msg = makeGpsRawInt(470000000, -1220000000, 100000, 120, 120, 100, 1800, 3, 5);
     fg.handleMessage(nullptr, msg);
-    QCOMPARE(fg.quality(), VehicleGPSFactGroup::GPSQuality::QualityFair);
+    QCOMPARE(quality(fg), VehicleGPSFactGroup::GPSQuality::QualityFair);
 }
 
 void VehicleGPSFactGroupTest::testQualityGood()
@@ -57,7 +62,7 @@ void VehicleGPSFactGroupTest::testQualityGood()
     // 3D fix, low HDOP (1.2), many sats (14) -> Good
     auto msg = makeGpsRawInt(470000000, -1220000000, 100000, 120, 120, 100, 1800, 3, 14);
     fg.handleMessage(nullptr, msg);
-    QCOMPARE(fg.quality(), VehicleGPSFactGroup::GPSQuality::QualityGood);
+    QCOMPARE(quality(fg), VehicleGPSFactGroup::GPSQuality::QualityGood);
 }
 
 void VehicleGPSFactGroupTest::testQualityExcellent()
@@ -66,18 +71,27 @@ void VehicleGPSFactGroupTest::testQualityExcellent()
     // RTK Fixed (fix=6) -> Excellent regardless of other values
     auto msg = makeGpsRawInt(470000000, -1220000000, 100000, 80, 80, 100, 1800, 6, 20);
     fg.handleMessage(nullptr, msg);
-    QCOMPARE(fg.quality(), VehicleGPSFactGroup::GPSQuality::QualityExcellent);
+    QCOMPARE(quality(fg), VehicleGPSFactGroup::GPSQuality::QualityExcellent);
 }
 
 void VehicleGPSFactGroupTest::testQualityChangedEmittedOnGpsRawInt()
 {
     VehicleGPSFactGroup fg;
-    QSignalSpy spy(&fg, &VehicleGPSFactGroup::qualityChanged);
+    QSignalSpy spy(fg.quality(), &Fact::rawValueChanged);
     QVERIFY(spy.isValid());
 
     auto msg = makeGpsRawInt(470000000, -1220000000, 100000, 120, 120, 100, 1800, 3, 14);
     fg.handleMessage(nullptr, msg);
     QCOMPARE(spy.count(), 1);
+}
+
+void VehicleGPSFactGroupTest::testQualityRecomputedOnDirectFactChange()
+{
+    // The derived Fact must track constituent facts even when they change outside
+    // a message handler (e.g. another telemetry path or a test).
+    VehicleGPSFactGroup fg;
+    fg.lock()->setRawValue(static_cast<int>(VehicleGPSFactGroup::GPSFixType::FixRTKFixed));
+    QCOMPARE(quality(fg), VehicleGPSFactGroup::GPSQuality::QualityExcellent);
 }
 
 UT_REGISTER_TEST(VehicleGPSFactGroupTest, TestLabel::Unit)

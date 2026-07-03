@@ -30,6 +30,9 @@ GPSManager *GPSManager::instance()
 void GPSManager::init()
 {
     _ntripManager->init();
+    // Coordinator-level wiring: both RTK and NTRIP corrections flow through the
+    // same RTCMMavlink so they share one GPS_RTCM_DATA sequence-id domain.
+    _gpsRtk->setRtcmMavlink(_ntripManager->rtcmMavlink());
 }
 
 void GPSManager::connectSerialRTK(const QString &device, QStringView gpsType)

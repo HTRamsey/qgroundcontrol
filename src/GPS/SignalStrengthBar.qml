@@ -2,7 +2,6 @@ import QtQuick
 
 import QGroundControl
 import QGroundControl.Controls
-import QGroundControl.GPS
 
 /// Vertical signal bar with SNR-proportional height and threshold-based coloring.
 /// Used for satellite signal strength displays.

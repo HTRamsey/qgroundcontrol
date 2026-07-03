@@ -27,14 +27,5 @@ public:
     Q_INVOKABLE static QString formatCoordinate(double lat, double lon, int precision = 7, bool withHemisphere = false);
     Q_INVOKABLE static QString formatHeading(double degrees);
 
-    /// Maps a GPS fix-type lock value (VehicleGPSFactGroup::GPSFixType) to a quality tier:
-    ///   0 = none (grey), 1 = no fix (red), 2 = 2D (orange), 3 = 3D/DGPS (green),
-    ///   4 = RTK Float (orange), 5 = RTK Fixed/Static (green)
-    Q_INVOKABLE static int fixTypeQuality(int lockVal);
-
-    /// Maps a GPS fix-type lock value to a color name for QML.
-    /// Returns: "green", "orange", "red", or "grey".
-    Q_INVOKABLE static QString fixTypeColor(int lockVal);
-
     static constexpr int defaultCoordPrecision = 7;
 };

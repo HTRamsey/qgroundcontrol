@@ -57,23 +57,3 @@ QString GPSFormatter::formatHeading(double degrees)
     // U+00B0 = degree sign
     return QStringLiteral("%1\u00B0").arg(degrees, 0, 'f', 1);
 }
-
-// lockVal: 0=None, 1=NoFix, 2=2D, 3=3D, 4=DGPS, 5=RTKFloat, 6=RTKFixed, 7=Static
-int GPSFormatter::fixTypeQuality(int lockVal)
-{
-    if (lockVal >= 6) return 5; // RTK Fixed / Static — green
-    if (lockVal >= 5) return 4; // RTK Float — orange
-    if (lockVal >= 3) return 3; // 3D / DGPS — green
-    if (lockVal >= 2) return 2; // 2D — orange
-    if (lockVal >= 1) return 1; // No Fix — red
-    return 0;                   // None — grey
-}
-
-QString GPSFormatter::fixTypeColor(int lockVal)
-{
-    const int q = fixTypeQuality(lockVal);
-    if (q >= 3) return QStringLiteral("green");
-    if (q >= 2) return QStringLiteral("orange");
-    if (q >= 1) return QStringLiteral("red");
-    return QStringLiteral("grey");
-}

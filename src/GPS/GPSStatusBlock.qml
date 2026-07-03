@@ -3,7 +3,6 @@ import QtQuick.Layouts
 
 import QGroundControl
 import QGroundControl.Controls
-import QGroundControl.GPS
 
 /// Reusable GPS status display block.
 /// Shows fix status dot, lock type, satellite count, HDOP/VDOP, accuracy, and errors.
@@ -24,6 +23,7 @@ SettingsGroupLayout {
         spacing: ScreenTools.defaultFontPixelWidth
 
         FixStatusDot {
+            quality:   root.gps ? root.gps.quality.rawValue : -1
             lockValue: root.gps ? root.gps.lock.rawValue : -1
         }
 

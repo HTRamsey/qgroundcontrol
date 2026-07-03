@@ -5,6 +5,7 @@ import QGroundControl
 import QGroundControl.Controls
 import QGroundControl.FactControls
 import QGroundControl.GPS
+import QGroundControl.GPS.RTK
 
 // This indicator page is used both when showing RTK status only with no vehicle connect and when showing GPS/RTK status with a vehicle connected
 
@@ -71,8 +72,7 @@ ToolIndicatorPage {
             }
 
             RTKCorrectionsStatusBlock {
-                vehicle:           activeVehicle
-                correctionsActive: QGroundControl.gpsRtk.connected.value || (QGroundControl.ntripManager && QGroundControl.ntripManager.connectionStatus === NTRIPManager.Connected)
+                vehicle: activeVehicle
             }
 
             SettingsGroupLayout {
@@ -120,6 +120,66 @@ ToolIndicatorPage {
                         delegate: SignalStrengthBar {
                             snr:  model.snr
                             used: model.used
+                        }
+                    }
+                }
+            }
+
+            SettingsGroupLayout {
+                heading:    qsTr("GCS GPS")
+                visible:    QGroundControl.qgcPositionManger.satelliteModel
+                            && QGroundControl.qgcPositionManger.satelliteModel.count > 0
+
+                LabelledLabel {
+                    label:      qsTr("Satellites")
+                    labelText:  QGroundControl.qgcPositionManger.satelliteModel.usedCount + " / "
+                                + QGroundControl.qgcPositionManger.satelliteModel.count
+                }
+
+                LabelledLabel {
+                    label:      qsTr("Constellations")
+                    labelText:  QGroundControl.qgcPositionManger.satelliteModel.constellationSummary
+                    visible:    QGroundControl.qgcPositionManger.satelliteModel.constellationSummary !== ""
+                }
+
+                Flow {
+                    Layout.fillWidth:   true
+                    spacing:            2
+
+                    Repeater {
+                        model: QGroundControl.qgcPositionManger.satelliteModel
+                        delegate: SignalStrengthBar {
+                            snr:  model.snr
+                            used: model.used
+                        }
+                    }
+                }
+            }
+
+            SettingsGroupLayout {
+                heading:    qsTr("Recent Events")
+                visible:    QGroundControl.gpsRtk.eventModel.count > 0
+
+                Repeater {
+                    model: QGroundControl.gpsRtk.eventModel
+
+                    RowLayout {
+                        Layout.fillWidth:   true
+                        spacing:            ScreenTools.defaultFontPixelWidth
+
+                        FixStatusDot {
+                            severity: model.severity
+                        }
+
+                        QGCLabel {
+                            text:           model.timestamp
+                            font.pointSize: ScreenTools.smallFontPointSize
+                        }
+
+                        QGCLabel {
+                            Layout.fillWidth:   true
+                            text:               model.message
+                            elide:              Text.ElideRight
                         }
                     }
                 }

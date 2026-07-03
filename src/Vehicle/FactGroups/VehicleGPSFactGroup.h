@@ -104,12 +104,10 @@ public:
     Q_PROPERTY(Fact* rtkBaseline            READ rtkBaseline            CONSTANT)
     Q_PROPERTY(Fact* rtkAccuracy            READ rtkAccuracy            CONSTANT)
     Q_PROPERTY(Fact* rtkIAR                 READ rtkIAR                 CONSTANT)
-    Q_PROPERTY(GPSQuality quality           READ quality                NOTIFY qualityChanged)
+    Q_PROPERTY(Fact* quality                READ quality                CONSTANT)
 
 public:
     explicit VehicleGPSFactGroup(QObject *parent = nullptr);
-
-    GPSQuality quality() const;
 
     Fact *lat() { return &_latFact; }
     Fact *lon() { return &_lonFact; }
@@ -141,13 +139,13 @@ public:
     Fact *rtkBaseline() { return &_rtkBaselineFact; }
     Fact *rtkAccuracy() { return &_rtkAccuracyFact; }
     Fact *rtkIAR() { return &_rtkIARFact; }
+    Fact *quality() { return &_qualityFact; }
 
     // Overrides from FactGroup
     void handleMessage(Vehicle *vehicle, const mavlink_message_t &message) override;
 
 signals:
     void gnssIntegrityReceived();
-    void qualityChanged();
 
 protected:
     void _handleGpsRawInt(const mavlink_message_t &message);
@@ -156,9 +154,12 @@ protected:
     void _handleGnssIntegrity(const mavlink_message_t& message);
     void _handleGpsRtk(const mavlink_message_t &message);
 
-    /// Emit qualityChanged() only when the derived quality actually changes, so bound
-    /// QML isn't re-evaluated at telemetry rate.
-    void _emitQualityIfChanged();
+    /// Recompute the derived quality Fact from lock/count/hdop. Connected to those
+    /// facts' rawValueChanged, so it stays correct no matter which handler (or test)
+    /// changes them; Fact::setRawValue only signals on actual change.
+    void _updateQuality();
+
+    GPSQuality _computeQuality() const;
 
     Fact _latFact = Fact(0, QStringLiteral("lat"), FactMetaData::valueTypeDouble);
     Fact _lonFact = Fact(0, QStringLiteral("lon"), FactMetaData::valueTypeDouble);
@@ -190,8 +191,7 @@ protected:
     Fact _rtkBaselineFact = Fact(0, QStringLiteral("rtkBaseline"), FactMetaData::valueTypeDouble);
     Fact _rtkAccuracyFact = Fact(0, QStringLiteral("rtkAccuracy"), FactMetaData::valueTypeDouble);
     Fact _rtkIARFact = Fact(0, QStringLiteral("rtkIAR"), FactMetaData::valueTypeInt32);
-
-    GPSQuality _lastQuality = GPSQuality::QualityNone;
+    Fact _qualityFact = Fact(0, QStringLiteral("quality"), FactMetaData::valueTypeUint8);
 
     // -1 until the first message latches the reporting receiver's id, so a receiver
     // using a non-zero id isn't silently filtered out.

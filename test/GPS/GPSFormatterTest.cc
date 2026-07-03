@@ -118,35 +118,4 @@ void GPSFormatterTest::testFormatHeading()
     QCOMPARE(GPSFormatter::formatHeading(359.9), QStringLiteral("359.9\u00B0"));
 }
 
-// ---------------------------------------------------------------------------
-// fixTypeQuality
-// ---------------------------------------------------------------------------
-
-void GPSFormatterTest::testFixTypeQuality()
-{
-    QCOMPARE(GPSFormatter::fixTypeQuality(0), 0); // None → grey tier
-    QCOMPARE(GPSFormatter::fixTypeQuality(1), 1); // NoFix → red tier
-    QCOMPARE(GPSFormatter::fixTypeQuality(2), 2); // 2D → orange tier
-    QCOMPARE(GPSFormatter::fixTypeQuality(3), 3); // 3D → green tier
-    QCOMPARE(GPSFormatter::fixTypeQuality(4), 3); // DGPS → green tier (>= 3)
-    QCOMPARE(GPSFormatter::fixTypeQuality(5), 4); // RTK Float → orange tier
-    QCOMPARE(GPSFormatter::fixTypeQuality(6), 5); // RTK Fixed → green tier
-    QCOMPARE(GPSFormatter::fixTypeQuality(7), 5); // Static → green tier
-}
-
-// ---------------------------------------------------------------------------
-// fixTypeColor
-// ---------------------------------------------------------------------------
-
-void GPSFormatterTest::testFixTypeColor()
-{
-    QCOMPARE(GPSFormatter::fixTypeColor(0), QStringLiteral("grey"));
-    QCOMPARE(GPSFormatter::fixTypeColor(1), QStringLiteral("red"));
-    QCOMPARE(GPSFormatter::fixTypeColor(2), QStringLiteral("orange"));
-    QCOMPARE(GPSFormatter::fixTypeColor(3), QStringLiteral("green"));
-    QCOMPARE(GPSFormatter::fixTypeColor(4), QStringLiteral("green")); // DGPS → quality 3 → green
-    QCOMPARE(GPSFormatter::fixTypeColor(5), QStringLiteral("green")); // RTK Float → quality 4 → q>=3 → green
-    QCOMPARE(GPSFormatter::fixTypeColor(6), QStringLiteral("green")); // RTK Fixed → quality 5 → green
-}
-
 UT_REGISTER_TEST(GPSFormatterTest, TestLabel::Unit)

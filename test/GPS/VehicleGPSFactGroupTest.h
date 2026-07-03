@@ -13,4 +13,5 @@ private slots:
     void testQualityGood();
     void testQualityExcellent();
     void testQualityChangedEmittedOnGpsRawInt();
+    void testQualityRecomputedOnDirectFactChange();
 };

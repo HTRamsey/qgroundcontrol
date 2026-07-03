@@ -40,6 +40,7 @@ VehicleGPSFactGroup::VehicleGPSFactGroup(QObject *parent)
     _addFact(&_rtkBaselineFact);
     _addFact(&_rtkAccuracyFact);
     _addFact(&_rtkIARFact);
+    _addFact(&_qualityFact);
 
     _latFact.setRawValue(std::numeric_limits<float>::quiet_NaN());
     _lonFact.setRawValue(std::numeric_limits<float>::quiet_NaN());
@@ -64,9 +65,15 @@ VehicleGPSFactGroup::VehicleGPSFactGroup(QObject *parent)
     _systemQualityFact.setRawValue(255);
     _gnssSignalQualityFact.setRawValue(255);
     _postProcessingQualityFact.setRawValue(255);
+
+    // Derived Fact: recompute whenever a constituent fact changes, regardless of
+    // which message handler (or test) changed it.
+    (void) connect(&_lockFact, &Fact::rawValueChanged, this, &VehicleGPSFactGroup::_updateQuality);
+    (void) connect(&_countFact, &Fact::rawValueChanged, this, &VehicleGPSFactGroup::_updateQuality);
+    (void) connect(&_hdopFact, &Fact::rawValueChanged, this, &VehicleGPSFactGroup::_updateQuality);
 }
 
-VehicleGPSFactGroup::GPSQuality VehicleGPSFactGroup::quality() const
+VehicleGPSFactGroup::GPSQuality VehicleGPSFactGroup::_computeQuality() const
 {
     const int fixType = _lockFact.rawValue().toInt();
     const int sats = _countFact.rawValue().toInt();
@@ -141,8 +148,6 @@ void VehicleGPSFactGroup::_handleGpsRawInt(const mavlink_message_t &message)
     lock()->setRawValue(gpsRawInt.fix_type);
 
     _setTelemetryAvailable(true);
-
-    _emitQualityIfChanged();
 }
 
 void VehicleGPSFactGroup::_handleHighLatency(const mavlink_message_t &message)
@@ -163,8 +168,6 @@ void VehicleGPSFactGroup::_handleHighLatency(const mavlink_message_t &message)
     vAcc()->setRawValue(qQNaN());
 
     _setTelemetryAvailable(true);
-
-    _emitQualityIfChanged();
 }
 
 void VehicleGPSFactGroup::_handleHighLatency2(const mavlink_message_t &message)
@@ -183,8 +186,6 @@ void VehicleGPSFactGroup::_handleHighLatency2(const mavlink_message_t &message)
     vAcc()->setRawValue(qQNaN());
 
     _setTelemetryAvailable(true);
-
-    _emitQualityIfChanged();
 }
 
 void VehicleGPSFactGroup::_handleGnssIntegrity(const mavlink_message_t& message)
@@ -233,11 +234,7 @@ void VehicleGPSFactGroup::_handleGpsRtk(const mavlink_message_t &message)
     rtkBaseline()->setRawValue(qSqrt((a * a) + (b * b) + (c * c)));
 }
 
-void VehicleGPSFactGroup::_emitQualityIfChanged()
+void VehicleGPSFactGroup::_updateQuality()
 {
-    const GPSQuality newQuality = quality();
-    if (newQuality != _lastQuality) {
-        _lastQuality = newQuality;
-        emit qualityChanged();
-    }
+    _qualityFact.setRawValue(static_cast<uint8_t>(_computeQuality()));
 }

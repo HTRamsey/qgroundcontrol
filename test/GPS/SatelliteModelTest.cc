@@ -1,10 +1,10 @@
-#include "RTKSatelliteModelTest.h"
+#include "SatelliteModelTest.h"
 #include "SatelliteModel.h"
 
 #include <QtTest/QSignalSpy>
 #include <QtTest/QTest>
 
-void RTKSatelliteModelTest::testEmptyModel()
+void SatelliteModelTest::testEmptyModel()
 {
     SatelliteModel model;
     QCOMPARE(model.count(), 0);
@@ -12,7 +12,7 @@ void RTKSatelliteModelTest::testEmptyModel()
     QVERIFY(model.constellationSummary().isEmpty());
 }
 
-void RTKSatelliteModelTest::testUpdatePopulatesModel()
+void SatelliteModelTest::testUpdatePopulatesModel()
 {
     SatelliteModel model;
     QSignalSpy spy(&model, &SatelliteModel::modelDataChanged);
@@ -39,7 +39,7 @@ void RTKSatelliteModelTest::testUpdatePopulatesModel()
     QCOMPARE(model.data(idx1, SatelliteModel::UsedRole).toBool(), false);
 }
 
-void RTKSatelliteModelTest::testClear()
+void SatelliteModelTest::testClear()
 {
     SatelliteModel model;
 
@@ -55,7 +55,7 @@ void RTKSatelliteModelTest::testClear()
     QCOMPARE(model.usedCount(), 0);
 }
 
-void RTKSatelliteModelTest::testRoleNames()
+void SatelliteModelTest::testRoleNames()
 {
     SatelliteModel model;
     auto roles = model.roleNames();
@@ -68,7 +68,7 @@ void RTKSatelliteModelTest::testRoleNames()
     QVERIFY(roles.contains(SatelliteModel::ConstellationRole));
 }
 
-void RTKSatelliteModelTest::testUsedCount()
+void SatelliteModelTest::testUsedCount()
 {
     SatelliteModel model;
 
@@ -86,7 +86,7 @@ void RTKSatelliteModelTest::testUsedCount()
     QCOMPARE(model.usedCount(), 3);
 }
 
-void RTKSatelliteModelTest::testGrowModel()
+void SatelliteModelTest::testGrowModel()
 {
     SatelliteModel model;
 
@@ -110,7 +110,7 @@ void RTKSatelliteModelTest::testGrowModel()
     QCOMPARE(model.usedCount(), 4);
 }
 
-void RTKSatelliteModelTest::testShrinkModel()
+void SatelliteModelTest::testShrinkModel()
 {
     SatelliteModel model;
 
@@ -134,7 +134,7 @@ void RTKSatelliteModelTest::testShrinkModel()
     QCOMPARE(model.usedCount(), 1);
 }
 
-void RTKSatelliteModelTest::testSameSizeUpdate()
+void SatelliteModelTest::testSameSizeUpdate()
 {
     SatelliteModel model;
     QSignalSpy spy(&model, &SatelliteModel::modelDataChanged);
@@ -159,7 +159,7 @@ void RTKSatelliteModelTest::testSameSizeUpdate()
     QCOMPARE(model.data(model.index(1), SatelliteModel::UsedRole).toBool(), false);
 }
 
-void RTKSatelliteModelTest::testConstellationSummaryContent()
+void SatelliteModelTest::testConstellationSummaryContent()
 {
     SatelliteModel model;
 
@@ -176,4 +176,4 @@ void RTKSatelliteModelTest::testConstellationSummaryContent()
     QVERIFY(model.constellationSummary().contains("GLO:1"));
 }
 
-UT_REGISTER_TEST(RTKSatelliteModelTest, TestLabel::Unit)
+UT_REGISTER_TEST(SatelliteModelTest, TestLabel::Unit)

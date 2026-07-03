@@ -12,6 +12,7 @@
 
 class GPSRTKFactGroup;
 class FactGroup;
+class RTCMMavlink;
 
 class GPSRtk : public QObject
 {
@@ -28,6 +29,10 @@ public:
     void disconnectGPS();
     bool connected() const;
     FactGroup* gpsRtkFactGroup();
+
+    /// Shared RTCM→MAVLink forwarder, injected by GPSManager so serial-RTK and NTRIP
+    /// corrections share one GPS_RTCM_DATA sequence-id domain.
+    void setRtcmMavlink(RTCMMavlink* rtcmMavlink) { _rtcmMavlink = rtcmMavlink; }
 
     struct SatelliteCounts
     {
@@ -54,6 +59,7 @@ private:
 
     GPSProvider* _gpsProvider = nullptr;
     GPSRTKFactGroup* _gpsRtkFactGroup = nullptr;
+    RTCMMavlink* _rtcmMavlink = nullptr;
 
     bool _connected = false;
     // Per-provider stop flag. Shared ownership so an abandoned (slow-to-exit) provider

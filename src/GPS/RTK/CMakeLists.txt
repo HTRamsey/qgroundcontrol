@@ -1,21 +1,16 @@
 # ============================================================================
 # RTK Module
-# GCS-attached RTK base-station provider stack, models, and satellite-signal UI
+# GCS-attached RTK base-station provider stack and RTK corrections UI
 # ============================================================================
 
 target_sources(${CMAKE_PROJECT_NAME}
     PRIVATE
-        GPSEvent.h
-        GPSEventModel.cc
-        GPSEventModel.h
         GPSProvider.cc
         GPSProvider.h
         GPSRtk.cc
         GPSRtk.h
         GPSRTKFactGroup.cc
         GPSRTKFactGroup.h
-        SatelliteModel.cc
-        SatelliteModel.h
         TcpGPSTransport.cc
         TcpGPSTransport.h
 )
@@ -40,32 +35,17 @@ qt_add_resources(${CMAKE_PROJECT_NAME} json_gps_drivers
 )
 
 # ----------------------------------------------------------------------------
-# RTK QML Module — formatting singleton and satellite-signal QML components.
+# RTK QML Module — RTK corrections status UI.
 # ----------------------------------------------------------------------------
-qt_add_library(GPSModule STATIC)
+qt_add_library(GPSRTKModule STATIC)
 
-target_sources(GPSModule
-    PRIVATE
-        GPSFormatter.cc
-        GPSFormatter.h
-)
-
-target_link_libraries(GPSModule PRIVATE Qt6::Core Qt6::QmlIntegration)
-
-set_source_files_properties(GPSSNRThresholds.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
-
-qt_add_qml_module(GPSModule
-    URI QGroundControl.GPS
+qt_add_qml_module(GPSRTKModule
+    URI QGroundControl.GPS.RTK
     VERSION 1.0
     RESOURCE_PREFIX /qml
     QML_FILES
-        FixStatusDot.qml
-        GPSSNRThresholds.qml
-        GPSStatusBlock.qml
         RTKCorrectionsStatusBlock.qml
-        SignalIntegrityBlock.qml
-        SignalStrengthBar.qml
     NO_PLUGIN
 )
 
-target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE GPSModule)
+target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE GPSRTKModule)

@@ -2,7 +2,7 @@
 
 #include "UnitTest.h"
 
-class RTKSatelliteModelTest : public UnitTest
+class SatelliteModelTest : public UnitTest
 {
     Q_OBJECT
 
