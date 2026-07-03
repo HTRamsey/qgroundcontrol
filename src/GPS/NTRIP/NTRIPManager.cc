@@ -1,11 +1,11 @@
 #include "NTRIPManager.h"
 
-#include <QtCore/QApplicationStatic>
 #include <QtCore/QCoreApplication>
 #include <QtCore/QtMath>
 #include <chrono>
 
 #include "Fact.h"
+#include "GPSManager.h"
 #include "MultiVehicleManager.h"
 #include "NTRIPError.h"
 #include "NTRIPHttpTransport.h"
@@ -19,11 +19,11 @@
 
 QGC_LOGGING_CATEGORY(NTRIPManagerLog, "GPS.NTRIPManager")
 
-Q_APPLICATION_STATIC(NTRIPManager, _ntripManagerInstance);
-
 NTRIPManager* NTRIPManager::instance()
 {
-    return _ntripManagerInstance();
+    // Owned by GPSManager (the GPS/RTK/NTRIP subsystem coordinator); this accessor
+    // stays as a back-compat convenience for existing callers and tests.
+    return GPSManager::instance()->ntripManager();
 }
 
 // -----------------------------------------------------------------------------

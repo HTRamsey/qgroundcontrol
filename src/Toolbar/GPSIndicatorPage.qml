@@ -4,6 +4,7 @@ import QtQuick.Layouts
 import QGroundControl
 import QGroundControl.Controls
 import QGroundControl.FactControls
+import QGroundControl.GPS
 
 // This indicator page is used both when showing RTK status only with no vehicle connect and when showing GPS/RTK status with a vehicle connected
 
@@ -54,69 +55,24 @@ ToolIndicatorPage {
         updateSettingsDisplayId()
     }
 
-    function errorText() {
-        if (!_activeVehicle) {
-            return qsTr("Disconnected");
-        }
-
-        switch (_activeVehicle.gps.systemErrors.value) {
-            case 1:
-                return qsTr("Incoming correction");
-            case 2:
-                return qsTr("Configuration");
-            case 4:
-                return qsTr("Software");
-            case 8:
-                return qsTr("Antenna");
-            case 16:
-                return qsTr("Event congestion");
-            case 32:
-                return qsTr("CPU overload");
-            case 64:
-                return qsTr("Output congestion");
-            default:
-                return qsTr("Multiple errors");
-        }
-    }
-
     contentComponent: Component {
         ColumnLayout {
             spacing: ScreenTools.defaultFontPixelHeight / 2
 
-            SettingsGroupLayout {
-                heading: qsTr("Vehicle GPS Status")
-                visible: activeVehicle
+            GPSStatusBlock {
+                heading:     qsTr("Vehicle GPS Status")
+                gps:         activeVehicle ? activeVehicle.gps : null
+                showDetails: true
+            }
 
-                LabelledLabel {
-                    label:      qsTr("Satellites")
-                    labelText:  activeVehicle ? activeVehicle.gps.count.valueString : na
-                }
+            SignalIntegrityBlock {
+                heading: qsTr("Signal Integrity")
+                gps:     activeVehicle ? activeVehicle.gps : null
+            }
 
-                LabelledLabel {
-                    label:      qsTr("GPS Lock")
-                    labelText:  activeVehicle ? activeVehicle.gps.lock.enumStringValue : na
-                }
-
-                LabelledLabel {
-                    label:      qsTr("HDOP")
-                    labelText:  activeVehicle ? activeVehicle.gps.hdop.valueString : valueNA
-                }
-
-                LabelledLabel {
-                    label:      qsTr("VDOP")
-                    labelText:  activeVehicle ? activeVehicle.gps.vdop.valueString : valueNA
-                }
-
-                LabelledLabel {
-                    label:      qsTr("Course Over Ground")
-                    labelText:  activeVehicle ? activeVehicle.gps.courseOverGround.valueString : valueNA
-                }
-
-                LabelledLabel {
-                    label: qsTr("GPS Error")
-                    labelText: errorText()
-                    visible: activeVehicle && activeVehicle.gps.systemErrors.value > 0
-                }
+            RTKCorrectionsStatusBlock {
+                vehicle:           activeVehicle
+                correctionsActive: QGroundControl.gpsRtk.connected.value || (QGroundControl.ntripManager && QGroundControl.ntripManager.connectionStatus === NTRIPManager.Connected)
             }
 
             SettingsGroupLayout {
@@ -134,13 +90,38 @@ ToolIndicatorPage {
 
                 LabelledLabel {
                     label:      qsTr("Duration")
-                    labelText:  QGroundControl.gpsRtk.currentDuration.value + ' s'
+                    labelText:  GPSFormatter.formatDuration(QGroundControl.gpsRtk.currentDuration.value)
                 }
 
                 LabelledLabel {
                     label:      QGroundControl.gpsRtk.valid.value ? qsTr("Accuracy") : qsTr("Current Accuracy")
                     labelText:  QGroundControl.gpsRtk.currentAccuracy.valueString + " " + QGroundControl.unitsConversion.appSettingsHorizontalDistanceUnitsString
                     visible:    QGroundControl.gpsRtk.currentAccuracy.value > 0
+                }
+
+                LabelledLabel {
+                    label:      qsTr("Constellations")
+                    labelText:  QGroundControl.gpsRtk.satelliteModel.constellationSummary
+                    visible:    QGroundControl.gpsRtk.satelliteModel.count > 0
+                }
+
+                QGCLabel {
+                    text:       qsTr("Satellite Signal (SNR)")
+                    visible:    QGroundControl.gpsRtk.satelliteModel.count > 0
+                }
+
+                Flow {
+                    Layout.fillWidth:   true
+                    spacing:            2
+                    visible:            QGroundControl.gpsRtk.satelliteModel.count > 0
+
+                    Repeater {
+                        model: QGroundControl.gpsRtk.satelliteModel
+                        delegate: SignalStrengthBar {
+                            snr:  model.snr
+                            used: model.used
+                        }
+                    }
                 }
             }
         }
@@ -261,6 +242,36 @@ ToolIndicatorPage {
                     rtkSettings.fixedBasePositionLongitude.rawValue = QGroundControl.gpsRtk.currentLongitude.rawValue
                     rtkSettings.fixedBasePositionAltitude.rawValue  = QGroundControl.gpsRtk.currentAltitude.rawValue
                     rtkSettings.fixedBasePositionAccuracy.rawValue  = QGroundControl.gpsRtk.currentAccuracy.rawValue
+                }
+            }
+
+            QGCLabel {
+                text:               qsTr("Network Base Station (TCP)")
+                Layout.topMargin:   10
+            }
+
+            LabelledFactTextField {
+                label:              rtkSettings.networkBaseHost.shortDescription
+                fact:               rtkSettings.networkBaseHost
+            }
+
+            LabelledFactTextField {
+                label:              rtkSettings.networkBasePort.shortDescription
+                fact:               rtkSettings.networkBasePort
+            }
+
+            RowLayout {
+                QGCButton {
+                    text:       qsTr("Connect")
+                    enabled:    rtkSettings.networkBaseHost.rawValue !== ""
+                    onClicked:  QGroundControl.connectNetworkRTK(
+                                    rtkSettings.networkBaseHost.rawValue,
+                                    rtkSettings.networkBasePort.rawValue,
+                                    rtkSettings.baseReceiverManufacturers.enumStringValue)
+                }
+                QGCButton {
+                    text:       qsTr("Disconnect")
+                    onClicked:  QGroundControl.disconnectRTK()
                 }
             }
         }

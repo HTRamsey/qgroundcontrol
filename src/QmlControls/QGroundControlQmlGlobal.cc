@@ -17,10 +17,8 @@
 #include "VideoManager.h"
 #include "MultiVehicleManager.h"
 #include "LoggingCategoryModel.h"
-#ifndef QGC_NO_SERIAL_LINK
 #include "GPSManager.h"
 #include "GPSRtk.h"
-#endif
 #ifdef QT_DEBUG
 #include "MockLink.h"
 #endif
@@ -51,9 +49,7 @@ QGroundControlQmlGlobal::QGroundControlQmlGlobal(QObject *parent)
     , _settingsManager(SettingsManager::instance())
     , _corePlugin(QGCCorePlugin::instance())
     , _globalPalette(new QGCPalette(this))
-#ifndef QGC_NO_SERIAL_LINK
-    , _gpsRtkFactGroup(GPSManager::instance()->gpsRtk()->gpsRtkFactGroup())
-#endif
+    , _gpsRtkFactGroup(GPSManager::instance()->gpsRtkFactGroup())
 {
     // We clear the parent on this object since we run into shutdown problems caused by hybrid qml app. Instead we let it leak on shutdown.
     // setParent(nullptr);
@@ -116,6 +112,20 @@ bool QGroundControlQmlGlobal::loadBoolGlobalSetting (const QString& key, bool de
     QSettings settings;
     settings.beginGroup(kQmlGlobalKeyName);
     return settings.value(key, defaultValue).toBool();
+}
+
+void QGroundControlQmlGlobal::connectNetworkRTK(const QString& host, int port, const QString& receiverType)
+{
+    if (host.isEmpty() || (port <= 0) || (port > 65535)) {
+        qCWarning(GuidedActionsControllerLog) << "Ignoring network RTK connect with invalid endpoint" << host << port;
+        return;
+    }
+    GPSManager::instance()->connectNetworkRTK(host, static_cast<quint16>(port), receiverType);
+}
+
+void QGroundControlQmlGlobal::disconnectRTK()
+{
+    GPSManager::instance()->disconnectRTK();
 }
 
 void QGroundControlQmlGlobal::startPX4MockLink(bool sendStatusText, bool enableCamera, bool enableGimbal)

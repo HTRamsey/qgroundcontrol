@@ -26,8 +26,8 @@
 #include "LogManager.h"
 #include "MAVLinkProtocol.h"
 #include "MavlinkSettings.h"
+#include "GPSManager.h"
 #include "MultiVehicleManager.h"
-#include "NTRIPManager.h"
 #include "ParameterManager.h"
 #include "PositionManager.h"
 #include "QGCCommandLineParser.h"
@@ -304,7 +304,7 @@ void QGCApplication::_initForNormalAppBoot()
                                   SettingsManager::instance()->appSettings()->audioMuted());
     FollowMe::instance()->init();
     QGCPositionManager::instance()->init();
-    NTRIPManager::instance()->init();
+    GPSManager::instance()->init();
     LinkManager::instance()->init();
     VideoManager::instance()->init(mainRootWindow());
 

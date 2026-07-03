@@ -1,13 +1,25 @@
 #include "GPSRtk.h"
 
+#include "GPSEvent.h"
+#include "GPSEventModel.h"
 #include "GPSProvider.h"
 #include "GPSRTKFactGroup.h"
+#include "GPSTransport.h"
 #include "GPSType.h"
 #include "NTRIPManager.h"
 #include "QGCLoggingCategory.h"
 #include "RTCMMavlink.h"
 #include "RTKSettings.h"
+#include "SatelliteModel.h"
 #include "SettingsManager.h"
+#include "TcpGPSTransport.h"
+
+#ifndef QGC_NO_SERIAL_LINK
+#include "SerialGPSTransport.h"
+#endif
+
+#include <memory>
+#include <utility>
 
 QGC_LOGGING_CATEGORY(GPSRtkLog, "GPS.GPSRtk")
 
@@ -25,6 +37,8 @@ constexpr GPSTypeEntry kGPSTypeTable[] = {
     {QLatin1StringView("femtomes"), GPSType::femto, 3},
     {QLatin1StringView("blox"), GPSType::u_blox, 4},
 };
+
+constexpr int kMaxGpsEvents = 100;
 }  // namespace
 
 GPSRtk::GPSRtk(QObject* parent) : QObject(parent), _gpsRtkFactGroup(new GPSRTKFactGroup(this))
@@ -44,30 +58,48 @@ GPSRtk::~GPSRtk()
     qCDebug(GPSRtkLog) << this;
 }
 
+void GPSRtk::_setConnected(bool connected)
+{
+    _connected = connected;
+    _gpsRtkFactGroup->connected()->setRawValue(connected);
+}
+
 void GPSRtk::_onGPSConnect()
 {
-    _gpsRtkFactGroup->connected()->setRawValue(true);
+    _setConnected(true);
+    _gpsRtkFactGroup->eventModel()->append(
+        GPSEvent::info(GPSEvent::Source::GPS, tr("GPS receiver connected")), kMaxGpsEvents);
 }
 
 void GPSRtk::_onGPSDisconnect()
 {
-    _gpsRtkFactGroup->connected()->setRawValue(false);
+    _setConnected(false);
+    _gpsRtkFactGroup->satelliteModel()->clear();
+    _gpsRtkFactGroup->eventModel()->append(
+        GPSEvent::info(GPSEvent::Source::GPS, tr("GPS receiver disconnected")), kMaxGpsEvents);
 }
 
 void GPSRtk::_onGPSConnectionError(GPSConnectionError error)
 {
+    QString message;
     switch (error) {
         case GPSConnectionError::OpenFailed:
-            qCWarning(GPSRtkLog) << "Failed to open GPS serial device";
+            message = tr("Failed to open GPS device");
             break;
         case GPSConnectionError::ConfigFailed:
-            qCWarning(GPSRtkLog) << "GPS receiver did not accept configuration";
+            message = tr("GPS receiver did not accept configuration");
             break;
         case GPSConnectionError::DeviceError:
-            qCWarning(GPSRtkLog) << "GPS device error, connection lost";
+            message = tr("GPS device error, connection lost");
             break;
         case GPSConnectionError::None:
             break;
+    }
+
+    if (!message.isEmpty()) {
+        qCWarning(GPSRtkLog) << message;
+        _gpsRtkFactGroup->eventModel()->append(
+            GPSEvent::error(GPSEvent::Source::GPS, message), kMaxGpsEvents);
     }
 
     _gpsRtkFactGroup->lastError()->setRawValue(static_cast<int>(error));
@@ -84,12 +116,10 @@ void GPSRtk::_onGPSSurveyInStatus(const GPSSurveyInStatus& status)
     _gpsRtkFactGroup->active()->setRawValue(status.active);
 }
 
-void GPSRtk::connectGPS(const QString& device, QStringView gps_type)
+GPSType GPSRtk::_resolveGPSType(QStringView gps_type, int& manufacturerId) const
 {
-    RTKSettings* const rtkSettings = SettingsManager::instance()->rtkSettings();
-
     GPSType type = GPSType::u_blox;
-    int manufacturerId = 4;  // u-blox by default
+    manufacturerId = 4;  // u-blox by default
     for (const GPSTypeEntry& entry : kGPSTypeTable) {
         if (gps_type.contains(entry.key, Qt::CaseInsensitive)) {
             type = entry.type;
@@ -97,12 +127,52 @@ void GPSRtk::connectGPS(const QString& device, QStringView gps_type)
             break;
         }
     }
+    return type;
+}
+
+void GPSRtk::connectGPS(const QString& device, QStringView gps_type)
+{
+#ifndef QGC_NO_SERIAL_LINK
+    int manufacturerId = 0;
+    const GPSType type = _resolveGPSType(gps_type, manufacturerId);
+    qCDebug(GPSRtkLog) << "Connecting serial GPS device" << device << gps_type;
+
+    auto requestStop = std::make_shared<std::atomic_bool>(false);
+    GPSProvider::TransportFactory makeTransport = [device, requestStop]() -> std::unique_ptr<GPSTransport> {
+        return std::make_unique<SerialGPSTransport>(device, requestStop);
+    };
+    _startProvider(std::move(makeTransport), std::move(requestStop), type, manufacturerId);
+#else
+    Q_UNUSED(device)
+    Q_UNUSED(gps_type)
+    qCWarning(GPSRtkLog) << "Serial RTK is unavailable in this build (QGC_NO_SERIAL_LINK)";
+#endif
+}
+
+void GPSRtk::connectGPS(const QString& host, quint16 port, QStringView gps_type)
+{
+    int manufacturerId = 0;
+    const GPSType type = _resolveGPSType(gps_type, manufacturerId);
+    qCDebug(GPSRtkLog) << "Connecting network GPS base" << host << port << gps_type;
+
+    auto requestStop = std::make_shared<std::atomic_bool>(false);
+    GPSProvider::TransportFactory makeTransport = [host, port, requestStop]() -> std::unique_ptr<GPSTransport> {
+        return std::make_unique<TcpGPSTransport>(host, port, requestStop);
+    };
+    _startProvider(std::move(makeTransport), std::move(requestStop), type, manufacturerId);
+}
+
+void GPSRtk::_startProvider(GPSProvider::TransportFactory makeTransport, std::shared_ptr<std::atomic_bool> requestStop,
+                           GPSType type, int manufacturerId)
+{
+    RTKSettings* const rtkSettings = SettingsManager::instance()->rtkSettings();
     rtkSettings->baseReceiverManufacturers()->setRawValue(manufacturerId);
-    qCDebug(GPSRtkLog) << "Connecting GPS device" << gps_type << "manufacturer id" << manufacturerId;
 
     disconnectGPS();
 
-    _requestGpsStop = false;
+    // Adopt the new provider's flag only after disconnectGPS() has signalled the prior
+    // provider to stop via its own (now distinct) flag.
+    _requestGpsStop = std::move(requestStop);
     _gpsRtkFactGroup->lastError()->setRawValue(static_cast<int>(GPSConnectionError::None));
     const bool useFixedBase =
         static_cast<BaseModeDefinition::Mode>(rtkSettings->useFixedBasePosition()->rawValue().toInt()) ==
@@ -116,22 +186,21 @@ void GPSRtk::connectGPS(const QString& device, QStringView gps_type)
         .fixedBaseAltitudeMeters = rtkSettings->fixedBasePositionAltitude()->rawValue().toFloat(),
         .fixedBaseAccuracyMeters = rtkSettings->fixedBasePositionAccuracy()->rawValue().toFloat(),
     };
-    _gpsProvider = new GPSProvider(device, type, rtkConfig, _requestGpsStop, this);
+    _gpsProvider = new GPSProvider(std::move(makeTransport), type, rtkConfig, _requestGpsStop, this);
     // Forward serial-RTK corrections through NTRIPManager's shared RTCMMavlink so
     // serial and NTRIP sources share one GPS_RTCM_DATA sequence-id domain.
     RTCMMavlink* const rtcmMavlink = NTRIPManager::instance()->rtcmMavlink();
     if (rtcmMavlink) {
         (void) connect(_gpsProvider, &GPSProvider::RTCMDataUpdate, rtcmMavlink, &RTCMMavlink::RTCMDataUpdate);
     } else {
-        qCWarning(GPSRtkLog) << "Shared RTCMMavlink unavailable; serial RTK corrections will not be forwarded";
+        qCWarning(GPSRtkLog) << "Shared RTCMMavlink unavailable; RTK corrections will not be forwarded";
     }
     (void) connect(_gpsProvider, &GPSProvider::satelliteInfoUpdate, this, &GPSRtk::_satelliteInfoUpdate);
     (void) connect(_gpsProvider, &GPSProvider::sensorGpsUpdate, this, &GPSRtk::_sensorGpsUpdate);
     (void) connect(_gpsProvider, &GPSProvider::surveyInStatus, this, &GPSRtk::_onGPSSurveyInStatus);
     (void) connect(_gpsProvider, &GPSProvider::connectionError, this, &GPSRtk::_onGPSConnectionError);
+    (void) connect(_gpsProvider, &GPSProvider::connectionEstablished, this, &GPSRtk::_onGPSConnect);
     (void) connect(_gpsProvider, &GPSProvider::finished, this, &GPSRtk::_onGPSDisconnect);
-
-    _onGPSConnect();
 
     // Start the thread only after every signal is wired, so no early emission is lost.
     (void) QMetaObject::invokeMethod(_gpsProvider, "start", Qt::AutoConnection);
@@ -140,21 +209,32 @@ void GPSRtk::connectGPS(const QString& device, QStringView gps_type)
 void GPSRtk::disconnectGPS()
 {
     if (_gpsProvider) {
-        _requestGpsStop = true;
+        if (_requestGpsStop) {
+            *_requestGpsStop = true;
+        }
         if (_gpsProvider->wait(kGPSThreadDisconnectTimeout)) {
             _gpsProvider->deleteLater();
         } else {
             qCWarning(GPSRtkLog) << "GPS thread did not exit in time; deferring cleanup to finished()";
-            (void) _gpsProvider->disconnect(this);  // stale signals must not flip facts after reconnect
+            // Sever ALL of the provider's connections (including RTCMDataUpdate -> shared
+            // RTCMMavlink), not just those to this, so an abandoned provider can't keep
+            // injecting corrections or flipping facts after a reconnect.
+            (void) _gpsProvider->disconnect();
             (void) connect(_gpsProvider, &QThread::finished, _gpsProvider, &QObject::deleteLater);
         }
         _gpsProvider = nullptr;
     }
+
+    // Drop our handle to the flag; an abandoned provider/transport keeps its own copy
+    // alive (shared ownership), so its reference never dangles.
+    _requestGpsStop.reset();
+
+    _setConnected(false);
 }
 
 bool GPSRtk::connected() const
 {
-    return (_gpsProvider ? _gpsProvider->isRunning() : false);
+    return _connected;
 }
 
 FactGroup* GPSRtk::gpsRtkFactGroup()
@@ -180,6 +260,7 @@ void GPSRtk::_satelliteInfoUpdate(const satellite_info_s& msg)
     qCDebug(GPSRtkLog) << Q_FUNC_INFO << QStringLiteral("%1 in view, %2 used").arg(counts.inView).arg(counts.used);
     _gpsRtkFactGroup->numSatellites()->setRawValue(counts.inView);
     _gpsRtkFactGroup->numSatellitesUsed()->setRawValue(counts.used);
+    _gpsRtkFactGroup->satelliteModel()->updateFromDriverInfo(msg);
 }
 
 void GPSRtk::_sensorGpsUpdate(const sensor_gps_s& msg)

@@ -4,10 +4,20 @@
 #include "SimulatedPosition.h"
 // #include "QGCSensors.h"
 #include "QGCLoggingCategory.h"
+#include "SettingsManager.h"
+#include "AutoConnectSettings.h"
+#include "UdpIODevice.h"
 
 #include <QtCore/QApplicationStatic>
 #include <QtCore/QPermissions>
+#include <QtCore/QTimer>
+#include <QtNetwork/QHostAddress>
 #include <QtPositioning/QNmeaPositionInfoSource>
+
+#ifndef QGC_NO_SERIAL_LINK
+#include "QGCSerialPortInfo.h"
+#include <QtSerialPort/QSerialPort>
+#endif
 
 QGC_LOGGING_CATEGORY(QGCPositionManagerLog, "PositionManager.QGCPositionManager")
 
@@ -36,6 +46,11 @@ void QGCPositionManager::init()
         _setPositionSource(QGCPositionSource::Simulated);
     } else {
         _checkPermission();
+
+        _nmeaPollTimer = new QTimer(this);
+        _nmeaPollTimer->setInterval(kNmeaPollIntervalMs);
+        (void) connect(_nmeaPollTimer, &QTimer::timeout, this, &QGCPositionManager::_pollNmeaDevice);
+        _nmeaPollTimer->start();
     }
 }
 
@@ -100,6 +115,135 @@ void QGCPositionManager::setNmeaSourceDevice(QIODevice *device)
     _nmeaSource->setUserEquivalentRangeError(5.1);
     _setPositionSource(QGCPositionManager::NmeaGPS);
 }
+
+void QGCPositionManager::_pollNmeaDevice()
+{
+    AutoConnectSettings *const settings = SettingsManager::instance()->autoConnectSettings();
+    const QString portSetting = settings->autoConnectNmeaPort()->cookedValueString();
+
+    if (portSetting.isEmpty() || (portSetting == QLatin1String("Disabled"))) {
+        _closeNmeaDevice();
+        return;
+    }
+
+    if (portSetting == QLatin1String("UDP Port")) {
+        _pollUdpNmeaDevice(settings);
+        return;
+    }
+
+#ifndef QGC_NO_SERIAL_LINK
+    _pollSerialNmeaDevice(settings, portSetting);
+#endif
+}
+
+void QGCPositionManager::_pollUdpNmeaDevice(AutoConnectSettings *settings)
+{
+#ifndef QGC_NO_SERIAL_LINK
+    _closeSerialPort();
+#endif
+
+    if (!_nmeaUdpSocket) {
+        _nmeaUdpSocket = new UdpIODevice(this);
+    }
+
+    const uint16_t udpPort = static_cast<uint16_t>(settings->nmeaUdpPort()->rawValue().toUInt());
+    if ((_nmeaUdpSocket->localPort() != udpPort) || (_nmeaUdpSocket->state() != UdpIODevice::BoundState)) {
+        _openNmeaUdpPort(udpPort);
+    }
+}
+
+void QGCPositionManager::_openNmeaUdpPort(uint16_t udpPort)
+{
+    _nmeaUdpSocket->close();
+    if (_nmeaUdpSocket->bind(QHostAddress::AnyIPv4, udpPort)) {
+        qCDebug(QGCPositionManagerLog) << "Binding UDP NMEA port" << udpPort;
+        setNmeaSourceDevice(_nmeaUdpSocket);
+    } else {
+        qCWarning(QGCPositionManagerLog) << "Failed to bind UDP NMEA port" << udpPort;
+    }
+}
+
+void QGCPositionManager::_closeNmeaDevice()
+{
+#ifndef QGC_NO_SERIAL_LINK
+    _closeSerialPort();
+#endif
+    if (_nmeaUdpSocket) {
+        _nmeaUdpSocket->close();
+    }
+}
+
+#ifndef QGC_NO_SERIAL_LINK
+void QGCPositionManager::_pollSerialNmeaDevice(AutoConnectSettings *settings, const QString &portSetting)
+{
+    if (_nmeaUdpSocket) {
+        _nmeaUdpSocket->close();
+    }
+
+    const uint32_t baud = settings->autoConnectNmeaBaud()->cookedValue().toUInt();
+
+    if (_nmeaSerialPort && (_nmeaSerialPortName == portSetting)) {
+        if (_nmeaSerialBaud != baud) {
+            _nmeaSerialBaud = baud;
+            _nmeaSerialPort->setBaudRate(static_cast<qint32>(baud));
+            qCDebug(QGCPositionManagerLog) << "Configuring NMEA baudrate" << baud;
+        }
+        return;
+    }
+
+    // Only open the configured device once it is physically present, so we don't
+    // repeatedly retry a disconnected port.
+    bool present = false;
+    for (const QGCSerialPortInfo &info : QGCSerialPortInfo::availablePorts()) {
+        if (info.systemLocation() == portSetting) {
+            present = true;
+            break;
+        }
+    }
+
+    if (present) {
+        _openNmeaSerialPort(portSetting, baud);
+    }
+}
+
+void QGCPositionManager::_openNmeaSerialPort(const QString &portName, uint32_t baud)
+{
+    auto *const port = new QSerialPort(portName, this);
+    port->setBaudRate(static_cast<qint32>(baud));
+    if (!port->open(QIODevice::ReadOnly)) {
+        qCWarning(QGCPositionManagerLog) << "Failed to open NMEA port" << portName << port->errorString();
+        delete port;
+        return;
+    }
+
+    qCDebug(QGCPositionManagerLog) << "Configuring NMEA port" << portName << "baudrate" << baud;
+    // setNmeaSourceDevice() deletes the previous source (which referenced the old
+    // port), so the old port is unreferenced and safe to delete afterwards.
+    setNmeaSourceDevice(port);
+    if (_nmeaSerialPort) {
+        _nmeaSerialPort->close();
+        delete _nmeaSerialPort;
+    }
+
+    _nmeaSerialPort = port;
+    _nmeaSerialPortName = portName;
+    _nmeaSerialBaud = baud;
+}
+
+void QGCPositionManager::_closeSerialPort()
+{
+    if (_nmeaSerialPort) {
+        if (_nmeaSource) {
+            _nmeaSource->setDevice(nullptr);
+        }
+        _nmeaSerialPort->close();
+        delete _nmeaSerialPort;
+        _nmeaSerialPort = nullptr;
+        _nmeaSerialPortName.clear();
+        _nmeaSerialBaud = 0;
+    }
+}
+#endif // !QGC_NO_SERIAL_LINK
 
 void QGCPositionManager::_positionUpdated(const QGeoPositionInfo &update)
 {

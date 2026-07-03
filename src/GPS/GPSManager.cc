@@ -1,5 +1,6 @@
 #include "GPSManager.h"
 #include "GPSRtk.h"
+#include "NTRIPManager.h"
 #include "QGCLoggingCategory.h"
 
 #include <QtCore/QApplicationStatic>
@@ -11,6 +12,7 @@ Q_APPLICATION_STATIC(GPSManager, _gpsManager);
 GPSManager::GPSManager(QObject *parent)
     : QObject(parent)
     , _gpsRtk(new GPSRtk(this))
+    , _ntripManager(new NTRIPManager(this))
 {
     qCDebug(GPSManagerLog) << this;
 }
@@ -23,4 +25,34 @@ GPSManager::~GPSManager()
 GPSManager *GPSManager::instance()
 {
     return _gpsManager();
+}
+
+void GPSManager::init()
+{
+    _ntripManager->init();
+}
+
+void GPSManager::connectSerialRTK(const QString &device, QStringView gpsType)
+{
+    _gpsRtk->connectGPS(device, gpsType);
+}
+
+void GPSManager::connectNetworkRTK(const QString &host, quint16 port, QStringView gpsType)
+{
+    _gpsRtk->connectGPS(host, port, gpsType);
+}
+
+void GPSManager::disconnectRTK()
+{
+    _gpsRtk->disconnectGPS();
+}
+
+bool GPSManager::rtkConnected() const
+{
+    return _gpsRtk->connected();
+}
+
+FactGroup *GPSManager::gpsRtkFactGroup()
+{
+    return _gpsRtk->gpsRtkFactGroup();
 }

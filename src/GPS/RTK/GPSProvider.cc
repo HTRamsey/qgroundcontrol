@@ -1,19 +1,20 @@
 #include "GPSProvider.h"
 
 #include "GPSDriver.h"
+#include "GPSTransport.h"
 #include "QGCLoggingCategory.h"
 #include "RTCMMavlink.h"
-#include "SerialGPSTransport.h"
 
+#include <memory>
 #include <utility>
 
 QGC_LOGGING_CATEGORY(GPSProviderLog, "GPS.GPSProvider")
 
-GPSProvider::GPSProvider(const QString &device, GPSType type, const GPSReceiverConfig &config, const std::atomic_bool &requestStop, QObject *parent)
+GPSProvider::GPSProvider(TransportFactory makeTransport, GPSType type, const GPSReceiverConfig &config, std::shared_ptr<std::atomic_bool> requestStop, QObject *parent)
     : QThread(parent)
-    , _device(device)
+    , _makeTransport(std::move(makeTransport))
     , _type(type)
-    , _requestStop(requestStop)
+    , _requestStop(std::move(requestStop))
     , _config(config)
 {
     qCDebug(GPSProviderLog) << QStringLiteral("Survey in accuracy: %1 | duration: %2").arg(_config.surveyInAccMeters).arg(_config.surveyInDurationSecs);
@@ -23,17 +24,21 @@ void GPSProvider::run()
 {
 #ifdef SIMULATE_RTCM_OUTPUT
     RTCMMavlink rtcm;
-    rtcm.sendSimulatedData(_requestStop);
+    rtcm.sendSimulatedData(*_requestStop);
     return;
 #endif
 
-    SerialGPSTransport transport(_device, _requestStop);
-    if (!transport.open()) {
-        if (!_requestStop) {
+    std::unique_ptr<GPSTransport> transport = _makeTransport ? _makeTransport() : nullptr;
+    if (!transport || !transport->open()) {
+        if (!*_requestStop) {
             emit connectionError(GPSConnectionError::OpenFailed);
         }
         return;
     }
+
+    // Device is open only now; connected() must not report true during the
+    // (up to ~30s) open() retry that ran above.
+    emit connectionEstablished();
 
     bool gotData = false;
     GPSDriverSinks sinks;
@@ -50,12 +55,12 @@ void GPSProvider::run()
         emit surveyInStatus(status);
     };
 
-    GPSDriver driver(_type, transport, _config, std::move(sinks));
+    GPSDriver driver(_type, *transport, _config, std::move(sinks));
 
     bool configErrorReported = false;
-    while (!_requestStop) {
+    while (!*_requestStop) {
         if (!driver.configure()) {
-            if (_requestStop) {
+            if (*_requestStop) {
                 break; // disconnect aborted configure mid-flight; not a real failure
             }
             if (!configErrorReported) {
@@ -68,14 +73,14 @@ void GPSProvider::run()
         configErrorReported = false;
 
         uint8_t idleCycles = 0;
-        while (!_requestStop && (idleCycles < kMaxIdleReceiveCycles)) {
+        while (!*_requestStop && (idleCycles < kMaxIdleReceiveCycles)) {
             gotData = false;
             const int ret = driver.receive(kGPSReceiveTimeout);
             const bool progress = (ret > 0) || gotData; // position/sat (ret) or RTCM/survey-in (sinks)
             idleCycles = progress ? 0 : (idleCycles + 1);
         }
 
-        if (transport.fatalError()) {
+        if (transport->fatalError()) {
             emit connectionError(GPSConnectionError::DeviceError);
             break;
         }

@@ -15,15 +15,15 @@ class QSerialPort;
 class SerialGPSTransport : public GPSTransport
 {
 public:
-    SerialGPSTransport(QString device, const std::atomic_bool &requestStop);
+    SerialGPSTransport(QString device, std::shared_ptr<std::atomic_bool> requestStop);
     ~SerialGPSTransport() override;
 
     /// Open the device, retrying briefly while it settles after startup. Aborts the
     /// retry promptly if requestStop is set, so a disconnect can't be stalled by it.
-    bool open();
+    bool open() override;
 
     /// True once the port hits an error the receive loop should stop retrying past.
-    bool fatalError() const;
+    bool fatalError() const override;
 
     int read(uint8_t *buffer, int length, int timeoutMs) override;
     int write(const uint8_t *buffer, int length) override;
@@ -33,6 +33,6 @@ private:
     static constexpr int kWriteTimeoutMs = 500;
 
     QString _device;
-    const std::atomic_bool &_requestStop;
+    std::shared_ptr<std::atomic_bool> _requestStop;
     std::unique_ptr<QSerialPort> _serial;
 };

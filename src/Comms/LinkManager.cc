@@ -11,16 +11,11 @@
 #include "AutoConnectSettings.h"
 #include "TCPLink.h"
 #include "UDPLink.h"
-
 #include "BluetoothLink.h"
-
-#include "PositionManager.h"
-#include "UdpIODevice.h"
 
 #ifndef QGC_NO_SERIAL_LINK
 #include "SerialLink.h"
 #include "GPSManager.h"
-#include "GPSRtk.h"
 #endif
 
 #ifdef QT_DEBUG
@@ -39,7 +34,6 @@ LinkManager::LinkManager(QObject *parent)
     : QObject(parent)
     , _portListTimer(new QTimer(this))
     , _qmlConfigurations(new QmlObjectListModel(this))
-    , _nmeaSocket(new UdpIODevice(this))
 {
     qCDebug(LinkManagerLog) << this;
 
@@ -508,26 +502,6 @@ void LinkManager::_updateAutoConnectLinks()
     _addMAVLinkForwardingLink();
     _reconnectAutoConnectLinks();
 
-    // check to see if nmea gps is configured for UDP input, if so, set it up to connect
-    if (_autoConnectSettings->autoConnectNmeaPort()->cookedValueString() == "UDP Port") {
-        if ((_nmeaSocket->localPort() != _autoConnectSettings->nmeaUdpPort()->rawValue().toUInt()) || (_nmeaSocket->state() != UdpIODevice::BoundState)) {
-            qCDebug(LinkManagerLog) << "Changing port for UDP NMEA stream";
-            _nmeaSocket->close();
-            _nmeaSocket->bind(QHostAddress::AnyIPv4, _autoConnectSettings->nmeaUdpPort()->rawValue().toUInt());
-            QGCPositionManager::instance()->setNmeaSourceDevice(_nmeaSocket);
-        }
-#ifndef QGC_NO_SERIAL_LINK
-        if (_nmeaPort) {
-            _nmeaPort->close();
-            delete _nmeaPort;
-            _nmeaPort = nullptr;
-            _nmeaDeviceName = "";
-        }
-#endif
-    } else {
-        _nmeaSocket->close();
-    }
-
 #ifndef QGC_NO_SERIAL_LINK
     _addSerialAutoConnectLink();
 #endif
@@ -835,27 +809,12 @@ void LinkManager::_addSerialAutoConnectLink()
         QGCSerialPortInfo::BoardType_t boardType;
         QString boardName;
 
-        // check to see if nmea gps is configured for current Serial port, if so, set it up to connect
+        // The port reserved for GCS NMEA position is owned by QGCPositionManager; skip it here.
         if (portInfo.systemLocation().trimmed() == _autoConnectSettings->autoConnectNmeaPort()->cookedValueString()) {
-            if (portInfo.systemLocation().trimmed() != _nmeaDeviceName) {
-                _nmeaDeviceName = portInfo.systemLocation().trimmed();
-                qCDebug(LinkManagerLog) << "Configuring nmea port" << _nmeaDeviceName;
-                QSerialPort* newPort = new QSerialPort(portInfo, this);
-                _nmeaBaud = _autoConnectSettings->autoConnectNmeaBaud()->cookedValue().toUInt();
-                newPort->setBaudRate(static_cast<qint32>(_nmeaBaud));
-                qCDebug(LinkManagerLog) << "Configuring nmea baudrate" << _nmeaBaud;
-                // This will stop polling old device if previously set
-                QGCPositionManager::instance()->setNmeaSourceDevice(newPort);
-                if (_nmeaPort) {
-                    delete _nmeaPort;
-                }
-                _nmeaPort = newPort;
-            } else if (_autoConnectSettings->autoConnectNmeaBaud()->cookedValue().toUInt() != _nmeaBaud) {
-                _nmeaBaud = _autoConnectSettings->autoConnectNmeaBaud()->cookedValue().toUInt();
-                _nmeaPort->setBaudRate(static_cast<qint32>(_nmeaBaud));
-                qCDebug(LinkManagerLog) << "Configuring nmea baudrate" << _nmeaBaud;
-            }
-        } else if (portInfo.getBoardInfo(boardType, boardName)) {
+            continue;
+        }
+
+        if (portInfo.getBoardInfo(boardType, boardName)) {
             // Should we be auto-connecting to this board type?
             if (!_allowAutoConnectToBoard(boardType)) {
                 continue;
@@ -891,7 +850,7 @@ void LinkManager::_addSerialAutoConnectLink()
                 case QGCSerialPortInfo::BoardTypeRTKGPS:
                     qCDebug(LinkManagerLog) << "RTK GPS auto-connected" << portInfo.portName().trimmed();
                     _autoConnectRTKPort = portInfo.systemLocation();
-                    GPSManager::instance()->gpsRtk()->connectGPS(portInfo.systemLocation(), boardName);
+                    GPSManager::instance()->connectSerialRTK(portInfo.systemLocation(), boardName);
                     break;
                 default:
                     qCWarning(LinkManagerLog) << "Internal error: Unknown board type" << boardType;
@@ -915,7 +874,7 @@ void LinkManager::_addSerialAutoConnectLink()
     // Check for RTK GPS connection gone
     if (!_autoConnectRTKPort.isEmpty() && !currentPorts.contains(_autoConnectRTKPort)) {
         qCDebug(LinkManagerLog) << "RTK GPS disconnected" << _autoConnectRTKPort;
-        GPSManager::instance()->gpsRtk()->disconnectGPS();
+        GPSManager::instance()->disconnectRTK();
         _autoConnectRTKPort.clear();
     }
 }
@@ -939,7 +898,7 @@ bool LinkManager::_allowAutoConnectToBoard(QGCSerialPortInfo::BoardType_t boardT
         }
         break;
     case QGCSerialPortInfo::BoardTypeRTKGPS:
-        if (_autoConnectSettings->autoConnectRTKGPS()->rawValue().toBool() && !GPSManager::instance()->gpsRtk()->connected()) {
+        if (_autoConnectSettings->autoConnectRTKGPS()->rawValue().toBool() && !GPSManager::instance()->rtkConnected()) {
             return true;
         }
         break;

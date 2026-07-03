@@ -1,10 +1,14 @@
 #include "GPSRTKFactGroup.h"
+#include "SatelliteModel.h"
+#include "GPSEventModel.h"
 #include "QGCLoggingCategory.h"
 
 QGC_LOGGING_CATEGORY(GPSRTKFactGroupLog, "GPS.GPSRTKFactGroup")
 
 GPSRTKFactGroup::GPSRTKFactGroup(QObject *parent)
     : FactGroup(1000, QStringLiteral(":/json/Vehicle/GPSRTKFact.json"), parent)
+    , _satelliteModel(new SatelliteModel(this))
+    , _eventModel(new GPSEventModel(this))
 {
     // qCDebug(GPSRTKFactGroupLog) << Q_FUNC_INFO << this;
 

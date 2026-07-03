@@ -10,6 +10,12 @@ class GPSTransport
 public:
     virtual ~GPSTransport() = default;
 
+    /// Open the link. Returns false if it could not be established.
+    virtual bool open() = 0;
+
+    /// True once the link hits an error the receive loop should stop retrying past.
+    virtual bool fatalError() const = 0;
+
     /// Read up to length bytes into buffer, waiting up to timeoutMs.
     /// Returns bytes read, 0 on timeout, <0 on error.
     virtual int read(uint8_t *buffer, int length, int timeoutMs) = 0;

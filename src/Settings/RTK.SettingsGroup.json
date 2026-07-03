@@ -95,6 +95,25 @@
             "decimalPlaces": 2,
             "qgcRebootRequired": true,
             "label": "Base Position Accuracy"
+        },
+        {
+            "name": "networkBaseHost",
+            "shortDesc": "Network base station host",
+            "longDesc": "Hostname or IP address of a network-attached RTK base station / receiver reached over TCP.",
+            "type": "string",
+            "default": "",
+            "label": "Base station host"
+        },
+        {
+            "name": "networkBasePort",
+            "shortDesc": "Network base station port",
+            "longDesc": "TCP port of the network-attached RTK base station / receiver.",
+            "type": "uint32",
+            "default": 28784,
+            "min": 1,
+            "max": 65535,
+            "decimalPlaces": 0,
+            "label": "Base station port"
         }
     ]
 }

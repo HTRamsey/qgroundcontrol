@@ -1,6 +1,8 @@
 #pragma once
 
 #include "FactGroup.h"
+#include "GPSEventModel.h"
+#include "SatelliteModel.h"
 
 class GPSRTKFactGroup : public FactGroup
 {
@@ -16,6 +18,8 @@ class GPSRTKFactGroup : public FactGroup
     Q_PROPERTY(Fact *numSatellites      READ numSatellites      CONSTANT)
     Q_PROPERTY(Fact *numSatellitesUsed  READ numSatellitesUsed  CONSTANT)
     Q_PROPERTY(Fact *lastError          READ lastError          CONSTANT)
+    Q_PROPERTY(SatelliteModel *satelliteModel READ satelliteModel CONSTANT)
+    Q_PROPERTY(GPSEventModel  *eventModel     READ eventModel     CONSTANT)
 
 public:
     explicit GPSRTKFactGroup(QObject *parent = nullptr);
@@ -33,6 +37,9 @@ public:
     Fact *numSatellitesUsed() { return &_numSatellitesUsedFact; }
     Fact *lastError() { return &_lastErrorFact; }
 
+    SatelliteModel *satelliteModel() { return _satelliteModel; }
+    GPSEventModel  *eventModel() { return _eventModel; }
+
 private:
     Fact _connectedFact = Fact(0, QStringLiteral("connected"), FactMetaData::valueTypeBool);
     Fact _currentDurationFact = Fact(0, QStringLiteral("currentDuration"), FactMetaData::valueTypeDouble);
@@ -45,4 +52,7 @@ private:
     Fact _numSatellitesFact = Fact(0, QStringLiteral("numSatellites"), FactMetaData::valueTypeInt32);
     Fact _numSatellitesUsedFact = Fact(0, QStringLiteral("numSatellitesUsed"), FactMetaData::valueTypeInt32);
     Fact _lastErrorFact = Fact(0, QStringLiteral("lastError"), FactMetaData::valueTypeUint32);
+
+    SatelliteModel *_satelliteModel = nullptr;
+    GPSEventModel  *_eventModel = nullptr;
 };

@@ -11,7 +11,7 @@
 #include "LinkConfiguration.h"
 #include "LinkInterface.h"
 #ifndef QGC_NO_SERIAL_LINK
-    #include "QGCSerialPortInfo.h"
+#include "QGCSerialPortInfo.h"
 #endif
 
 class AutoConnectSettings;
@@ -21,7 +21,6 @@ class QmlObjectListModel;
 class QTimer;
 class SerialLink;
 class UDPConfiguration;
-class UdpIODevice;
 
 /// @brief Manage communication links
 ///        The Link Manager organizes the physical Links. It can manage arbitrary
@@ -188,11 +187,5 @@ private:
     QStringList _commPortList;
     QStringList _commPortDisplayList;
     QString _autoConnectRTKPort;
-    QString _nmeaDeviceName;
-    uint32_t _nmeaBaud = 0;
-    QSerialPort *_nmeaPort = nullptr;
 #endif // QGC_NO_SERIAL_LINK
-
-    // NMEA UDP is network-only; available regardless of QGC_NO_SERIAL_LINK.
-    UdpIODevice *_nmeaSocket = nullptr;
 };

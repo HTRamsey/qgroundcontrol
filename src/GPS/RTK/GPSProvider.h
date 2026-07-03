@@ -6,11 +6,14 @@
 #include <QtCore/QByteArray>
 #include <QtCore/QMetaType>
 #include <QtCore/QObject>
-#include <QtCore/QString>
 #include <QtCore/QThread>
 
 #include <atomic>
 #include <cstdint>
+#include <functional>
+#include <memory>
+
+class GPSTransport;
 
 enum class GPSConnectionError
 {
@@ -26,7 +29,11 @@ class GPSProvider : public QThread
     Q_OBJECT
 
 public:
-    GPSProvider(const QString &device, GPSType type, const GPSReceiverConfig &config, const std::atomic_bool &requestStop, QObject *parent = nullptr);
+    /// Builds the byte-link the driver pumps. Invoked once on the worker thread in
+    /// run(), so transports with thread affinity (e.g. QSerialPort) are created there.
+    using TransportFactory = std::function<std::unique_ptr<GPSTransport>()>;
+
+    GPSProvider(TransportFactory makeTransport, GPSType type, const GPSReceiverConfig &config, std::shared_ptr<std::atomic_bool> requestStop, QObject *parent = nullptr);
 
 signals:
     void satelliteInfoUpdate(const satellite_info_s &message);
@@ -34,13 +41,14 @@ signals:
     void RTCMDataUpdate(const QByteArray &message);
     void surveyInStatus(const GPSSurveyInStatus &status);
     void connectionError(GPSConnectionError error);
+    void connectionEstablished();
 
 private:
     void run() final;
 
-    QString _device;
+    TransportFactory _makeTransport;
     GPSType _type;
-    const std::atomic_bool &_requestStop;
+    std::shared_ptr<std::atomic_bool> _requestStop;
     GPSReceiverConfig _config{};
 
     static constexpr uint32_t kGPSReceiveTimeout = 1200;

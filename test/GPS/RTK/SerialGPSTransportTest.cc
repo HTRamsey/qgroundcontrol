@@ -4,10 +4,11 @@
 
 #include <atomic>
 #include <cstdint>
+#include <memory>
 
 void SerialGPSTransportTest::_testReadAbortsWhenStopRequested()
 {
-    std::atomic_bool stop{true};
+    auto stop = std::make_shared<std::atomic_bool>(true);
     SerialGPSTransport transport(QStringLiteral("/dev/null"), stop);
 
     uint8_t buffer[16] = {};
@@ -16,7 +17,7 @@ void SerialGPSTransportTest::_testReadAbortsWhenStopRequested()
 
 void SerialGPSTransportTest::_testWriteAbortsWhenStopRequested()
 {
-    std::atomic_bool stop{true};
+    auto stop = std::make_shared<std::atomic_bool>(true);
     SerialGPSTransport transport(QStringLiteral("/dev/null"), stop);
 
     const uint8_t payload[4] = { 1, 2, 3, 4 };

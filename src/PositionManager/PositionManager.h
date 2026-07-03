@@ -1,13 +1,20 @@
 ﻿#pragma once
 
 #include <QtCore/QObject>
+#include <QtCore/QString>
 #include <QtPositioning/QGeoCoordinate>
 #include <QtPositioning/QGeoPositionInfo>
 #include <QtPositioning/QGeoPositionInfoSource>
 #include <QtQmlIntegration/QtQmlIntegration>
 
+#include <cstdint>
+
 class QNmeaPositionInfoSource;
 class QGCCompass;
+class QTimer;
+class QSerialPort;
+class UdpIODevice;
+class AutoConnectSettings;
 
 class QGCPositionManager : public QObject
 {
@@ -64,6 +71,16 @@ private:
     void _setGCSHeading(qreal newGCSHeading);
     void _setGCSPosition(const QGeoCoordinate &newGCSPosition);
 
+    void _pollNmeaDevice();
+    void _pollUdpNmeaDevice(AutoConnectSettings *settings);
+    void _openNmeaUdpPort(uint16_t udpPort);
+    void _closeNmeaDevice();
+#ifndef QGC_NO_SERIAL_LINK
+    void _pollSerialNmeaDevice(AutoConnectSettings *settings, const QString &portSetting);
+    void _openNmeaSerialPort(const QString &portName, uint32_t baud);
+    void _closeSerialPort();
+#endif
+
     bool _usingPluginSource = false;
     int _updateInterval = 0;
 
@@ -84,7 +101,16 @@ private:
 
     QGCCompass *_compass = nullptr;
 
+    QTimer *_nmeaPollTimer = nullptr;
+    UdpIODevice *_nmeaUdpSocket = nullptr;
+#ifndef QGC_NO_SERIAL_LINK
+    QSerialPort *_nmeaSerialPort = nullptr;
+    QString _nmeaSerialPortName;
+    uint32_t _nmeaSerialBaud = 0;
+#endif
+
     static constexpr qreal kMinHorizonalAccuracyMeters = 100.;
     static constexpr qreal kMinVerticalAccuracyMeters = 10.;
     static constexpr qreal kMinDirectionAccuracyDegrees = 30.;
+    static constexpr int kNmeaPollIntervalMs = 1000;
 };
