@@ -241,8 +241,6 @@ void GStreamerTest::_testDmaBufDispatch()
     QVERIFY(probeId);
     auto probeGuard = qScopeGuard([&] { gst_pad_remove_probe(appsinkPad, probeId); });
 
-    const quint64 deliveredBefore = GstHwPathTelemetry::peekDeliveredCount(HwVideoBufferPath::DmaBuf);
-
     GstStateChangeReturn ret = gst_element_set_state(pipeline, GST_STATE_PLAYING);
     if (ret == GST_STATE_CHANGE_FAILURE) {
         QSKIP("DMABuf pipeline failed to PLAY (no VA driver / DRI device?)");
@@ -287,7 +285,13 @@ void GStreamerTest::_testDmaBufDispatch()
         gst_caps_unref(negotiated);
     }
 
-    const quint64 deliveredAfter = GstHwPathTelemetry::peekDeliveredCount(HwVideoBufferPath::DmaBuf);
+    guint64 dmaBufFrames = 0;
+    GstStructure* stats = nullptr;
+    g_object_get(qvideosink, "frame-stats", &stats, nullptr);
+    if (stats) {
+        (void) gst_structure_get_uint64(stats, HwBuffers::sinkFramesField(HwVideoBufferPath::DmaBuf), &dmaBufFrames);
+        gst_structure_free(stats);
+    }
     const int bufferCount = probe.bufferCount.load();
     const int dmaBufCount = probe.dmaBufCount.load();
 
@@ -301,13 +305,11 @@ void GStreamerTest::_testDmaBufDispatch()
                              .arg(bufferCount)
                              .arg(negotiatedStr)));
     }
-    QVERIFY2(deliveredAfter > deliveredBefore,
-             qPrintable(QStringLiteral("DMABuf negotiated but DmaBuf delivered-count did not advance "
-                                       "(before=%1 after=%2). Buffers: %3, caps: %4")
-                            .arg(deliveredBefore)
-                            .arg(deliveredAfter)
-                            .arg(bufferCount)
-                            .arg(negotiatedStr)));
+    QVERIFY2(
+        dmaBufFrames > 0,
+        qPrintable(QStringLiteral("DMABuf negotiated but the sink delivered no DmaBuf frames. Buffers: %1, caps: %2")
+                       .arg(bufferCount)
+                       .arg(negotiatedStr)));
 }
 
 void GStreamerTest::_testDmaDrmCapsRejectNonLinearModifiers()

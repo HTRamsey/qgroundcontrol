@@ -1,7 +1,9 @@
 #include "HwBuffers.h"
 
-#include <QtCore/QByteArray>
+#include <array>
 #include <utility>
+
+#include <QtCore/QByteArray>
 
 #include "QGCLoggingCategory.h"
 
@@ -202,6 +204,19 @@ bool proposeDeviceBoundPool(GstQuery* query, GstCaps* caps, const GstVideoInfo* 
     return false;
 }
 
+const char* sinkFramesField(HwVideoBufferPath path) noexcept
+{
+    static const std::array<QByteArray, GstHw::kPathCount> s_fields = [] {
+        std::array<QByteArray, GstHw::kPathCount> fields;
+        for (std::size_t i = 0; i < fields.size(); ++i) {
+            fields[i] = QByteArray("frames-") + QByteArray(GstHw::toString(HwVideoBufferPath(i))).toLower();
+        }
+        return fields;
+    }();
+    const auto index = static_cast<std::size_t>(path);
+    return (index < s_fields.size()) ? s_fields[index].constData() : nullptr;
+}
+
 PathStats formatSinkStats(const GstStructure* stats, const GstStructure* since) noexcept
 {
     PathStats out;
@@ -219,7 +234,7 @@ PathStats formatSinkStats(const GstStructure* stats, const GstStructure* since) 
     };
     for (std::size_t i = 0; i < GstHw::kPathCount; ++i) {
         const auto path = HwVideoBufferPath(i);
-        if (const quint64 frames = countOf(GstHwPathTelemetry::sinkFramesField(path)); frames > 0) {
+        if (const quint64 frames = countOf(sinkFramesField(path)); frames > 0) {
             out.line += QStringLiteral(" %1:%2").arg(QLatin1String(GstHw::toString(path))).arg(frames);
             if (path != HwVideoBufferPath::None) {
                 out.totalDelivered += frames;
@@ -238,31 +253,12 @@ QString takeExtraPathStats() noexcept
 {
     QString out;
 #if defined(QGC_HAS_ANY_GPU_PATH)
-    if (GstHwPathRegistry::has(HwVideoBufferPath::GlMemory)) {
-        const quint64 glReuse = GstHwPathTelemetry::takeTextureReuseHits(HwVideoBufferPath::GlMemory);
-        quint64 glGpuWaits = 0;
-        const quint64 glCpuWaits = GstHwPathTelemetry::takeSyncWaitCounts(HwVideoBufferPath::GlMemory, glGpuWaits);
-        out += QStringLiteral(" GL-reuse:%1 GL-wait[gpu/cpu]:%2/%3").arg(glReuse).arg(glGpuWaits).arg(glCpuWaits);
-    }
-    if (GstHwPathRegistry::has(HwVideoBufferPath::Vulkan)) {
-        quint64 vkGpuWaits = 0;
-        const quint64 vkCpuWaits = GstHwPathTelemetry::takeSyncWaitCounts(HwVideoBufferPath::Vulkan, vkGpuWaits);
-        out += QStringLiteral(" Vulkan-wait[gpu/cpu]:%1/%2").arg(vkGpuWaits).arg(vkCpuWaits);
-    }
-    if (GstHwPathRegistry::has(HwVideoBufferPath::DmaBuf)) {
-        out += QStringLiteral(" DMABuf-fence-timeouts:%1 DMABuf-cpu-barriers:%2 DMABuf-explicit-fence-waits:%3")
-                   .arg(GstHwPathTelemetry::takeProducerFenceTimeouts(HwVideoBufferPath::DmaBuf))
-                   .arg(GstHwPathTelemetry::takeCpuBarrierWaits(HwVideoBufferPath::DmaBuf))
-                   .arg(GstHwPathTelemetry::takeExplicitFenceWaits(HwVideoBufferPath::DmaBuf));
-    }
     static constexpr std::pair<GstHwPathTelemetry::HwFallbackReason, const char*> kReasons[] = {
         {GstHwPathTelemetry::HwFallbackReason::NoExt, "no-ext"},
         {GstHwPathTelemetry::HwFallbackReason::ModifierRejected, "modifier"},
         {GstHwPathTelemetry::HwFallbackReason::EglBadMatch, "egl-bad-match"},
-        {GstHwPathTelemetry::HwFallbackReason::FenceTimeout, "fence-timeout"},
         {GstHwPathTelemetry::HwFallbackReason::ValidateFailed, "validate"},
         {GstHwPathTelemetry::HwFallbackReason::UnknownMemType, "unknown-mem"},
-        {GstHwPathTelemetry::HwFallbackReason::NullSample, "null-sample"},
         {GstHwPathTelemetry::HwFallbackReason::MapFailed, "map-failed"},
         {GstHwPathTelemetry::HwFallbackReason::VulkanNoSync, "vulkan-no-sync"},
         {GstHwPathTelemetry::HwFallbackReason::ImportUnsupported, "import-unsupported"},
@@ -277,9 +273,18 @@ QString takeExtraPathStats() noexcept
         if (ewmaUs > 0) {
             out += QStringLiteral(" %1-map-us:%2").arg(pathLabel).arg(ewmaUs);
         }
-        const quint64 demotions = GstHwPathTelemetry::takeStreamDemotions(path);
-        if (demotions > 0) {
-            out += QStringLiteral(" %1-demotions:%2").arg(pathLabel).arg(demotions);
+        const quint64 reuse = GstHwPathTelemetry::takeTextureReuseHits(path);
+        if (reuse > 0) {
+            out += QStringLiteral(" %1-reuse:%2").arg(pathLabel).arg(reuse);
+        }
+        quint64 gpuWaits = 0;
+        const quint64 cpuWaits = GstHwPathTelemetry::takeSyncWaitCounts(path, gpuWaits);
+        if ((gpuWaits > 0) || (cpuWaits > 0)) {
+            out += QStringLiteral(" %1-wait[gpu/cpu]:%2/%3").arg(pathLabel).arg(gpuWaits).arg(cpuWaits);
+        }
+        const quint64 fenceTimeouts = GstHwPathTelemetry::takeProducerFenceTimeouts(path);
+        if (fenceTimeouts > 0) {
+            out += QStringLiteral(" %1-fence-timeouts:%2").arg(pathLabel).arg(fenceTimeouts);
         }
         const quint64 cacheHits = GstHwPathTelemetry::takeImageCacheHits(path);
         const quint64 cacheMisses = GstHwPathTelemetry::takeImageCacheMisses(path);
@@ -299,17 +304,10 @@ QString takeExtraPathStats() noexcept
         }
     });
     // None-path accumulates UnknownMemType (no allocator matched any compiled path).
-    {
-        const quint64 unknownMem =
-            GstHwPathTelemetry::takeFallbackReason(HwVideoBufferPath::None,
-                                                   GstHwPathTelemetry::HwFallbackReason::UnknownMemType);
-        if (unknownMem > 0) {
-            out += QStringLiteral(" None-fallback[unknown-mem=%1]").arg(unknownMem);
-        }
-        const quint64 cpuDemotions = GstHwPathTelemetry::takeStreamDemotions(HwVideoBufferPath::None);
-        if (cpuDemotions > 0) {
-            out += QStringLiteral(" None-demotions:%1").arg(cpuDemotions);
-        }
+    const quint64 unknownMem = GstHwPathTelemetry::takeFallbackReason(
+        HwVideoBufferPath::None, GstHwPathTelemetry::HwFallbackReason::UnknownMemType);
+    if (unknownMem > 0) {
+        out += QStringLiteral(" None-fallback[unknown-mem=%1]").arg(unknownMem);
     }
 #endif
     return out;

@@ -72,13 +72,17 @@ struct PathStats
     quint64 totalDelivered = 0;
 };
 
+/// guint64 "frame-stats" field holding the frames @p path delivered: "frames-" plus the lower-cased
+/// GstHw::toString(path).
+const char* sinkFramesField(HwVideoBufferPath path) noexcept;
+
 /// One qgcqvideosink's frame accounting, from its "frame-stats" structure: the per-path counts it has delivered, plus
 /// its GPU fallbacks and demotions. With @p since (an earlier "frame-stats" value of the same sink), only what changed
 /// since.
 PathStats formatSinkStats(const GstStructure* stats, const GstStructure* since = nullptr) noexcept;
 
-/// Process-wide render-time counters no sink can attribute (map failures, GL reuse/sync waits, fallback reasons, ...);
-/// reads-and-clears, teardown only.
+/// Process-wide render-time counters no sink can attribute (map failures, texture reuse, producer waits, fallback
+/// reasons, ...), each printed only when nonzero; reads-and-clears, teardown only.
 QString takeExtraPathStats() noexcept;
 
 }  // namespace HwBuffers

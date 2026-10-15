@@ -390,7 +390,6 @@ bool tryExplicitFenceWait(EGLDisplay eglDpy, int dmaFd)
     }
     QGC_HW_WARN_ONCE(GstDmaBufLog, s_loggedExplicitFence,
                      "DMABuf: using producer dma-buf fence for GPU-side sync (CPU barrier skipped)");
-    GstHwPathTelemetry::recordExplicitFenceWait(HwVideoBufferPath::DmaBuf);
     GstHwPathTelemetry::recordSyncWait(HwVideoBufferPath::DmaBuf, /*gpuSide=*/true);
     return true;
 #else
@@ -431,7 +430,6 @@ bool waitForProducerWrites(GstBuffer* buffer)
         }
     }
     GstHwPathTelemetry::recordSyncWait(HwVideoBufferPath::DmaBuf, /*gpuSide=*/false);
-    GstHwPathTelemetry::recordCpuBarrierWait(HwVideoBufferPath::DmaBuf);
     return true;
 }
 
