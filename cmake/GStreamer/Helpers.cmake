@@ -5,7 +5,7 @@
 # helper, or `include(GStreamer/<Name>)` from outside the namespace.
 #
 # Submodule contents:
-#   Json         — _qgc_json_array_to_list (build-config.json reader)
+#   Json         — _qgc_gst_json_array_to_list (build-config.json reader)
 #   Download     — URL templates, S3 mirror, checksum fetch,
 #                  gstreamer_resilient_download (thin wrapper over
 #                  project-level qgc_resilient_download in
@@ -18,7 +18,7 @@
 #                  _gst_save_find_suffixes / _gst_restore_find_suffixes,
 #                  _gst_resolve_and_link_libraries
 #   Layout       — gstreamer_create_layout_target (FLAT / FRAMEWORK /
-#                  XCFRAMEWORK / STATIC_TARBALL → GStreamer::Layout)
+#                  MERGED_STATIC / STATIC_TARBALL → GStreamer::Layout)
 #   Targets      — qgc_gst_create_pkgconfig_targets (GStreamer::GStreamer /
 #                  deps / api_* / static plugin targets from pkg-config)
 #   Probe        — qgc_check_gst_header (header/symbol check_cxx_source_compiles
