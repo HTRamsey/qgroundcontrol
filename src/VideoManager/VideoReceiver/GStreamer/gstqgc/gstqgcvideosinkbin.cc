@@ -150,8 +150,7 @@ static gboolean wireGpuPath(GstQgcVideoSinkBin* self, GstQgc::BinChain& chain, G
         GST_ERROR_OBJECT(self, "Failed to create glupload element");
         return FALSE;
     }
-    // Converts amcvideodec's external-OES Surface textures to GL_TEXTURE_2D (else the Qt RHI 2D sink
-    // samples them black); no-op passthrough when upstream is already 2D (Linux va/DMABuf).
+    // glcolorconvert honours texture-target=2D (GstQgcCaps.cc); a passthrough when upstream is already 2D.
     GstElement* glcolorconvert = chain.adopt(gst_element_factory_make("glcolorconvert", NULL));
     if (!glcolorconvert) {
         GST_ERROR_OBJECT(self, "Failed to create glcolorconvert element");
