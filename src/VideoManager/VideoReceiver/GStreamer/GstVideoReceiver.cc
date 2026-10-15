@@ -234,8 +234,7 @@ void GstVideoReceiver::_startPipeline(const StartConfig& config)
             break;
         }
 
-        _teeProbeId = gst_pad_add_probe(teeSink.get(), GST_PAD_PROBE_TYPE_BUFFER, _teeProbe, this, nullptr);
-        if (_teeProbeId == 0) {
+        if (!_teeFrameProbe.add(teeSink.get(), GST_PAD_PROBE_TYPE_BUFFER, _teeProbe, this)) {
             // _teeProbe feeds the watchdog; without it the watchdog fires spuriously instead of reporting a real
             // failure.
             qCCritical(GstVideoReceiverLog) << "Failed to add the tee frame probe";
@@ -340,14 +339,8 @@ void GstVideoReceiver::_resetPipelineState()
     _detachBus();
     _pipelineGeneration.fetch_add(1, std::memory_order_relaxed);
 
-    if (_teeProbeId != 0 && _tee) {
-        if (const GStreamer::GstPadPtr teeSink = GStreamer::adoptPad(gst_element_get_static_pad(_tee, "sink"))) {
-            gst_pad_remove_probe(teeSink.get(), _teeProbeId);
-        }
-    }
-    _teeProbeId = 0;
-
-    _removeSourceEosProbe();
+    _teeFrameProbe.remove();
+    _sourceEosProbe.remove();
 
     _recordingBranch.reset();
     _decodingBranch.reset();
@@ -479,11 +472,7 @@ void GstVideoReceiver::_onNewSourcePad(GstPad *pad)
 
     // Lives as long as the source pad/pipeline (removed in _resetPipelineState), so stopDecoding()
     // doesn't lose source-EOS detection.
-    _removeSourceEosProbe();
-    _eosProbeId = gst_pad_add_probe(pad, GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, _eosProbe, this, nullptr);
-    if (_eosProbeId != 0) {
-        _eosProbePad = GStreamer::adoptPad(GST_PAD(gst_object_ref(pad)));
-    }
+    (void) _sourceEosProbe.add(pad, GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, _eosProbe, this);
 
     _decodingBranch.onSourceStreaming();
 }
@@ -497,15 +486,6 @@ void GstVideoReceiver::_noteTeeFrame()
         qCDebug(GstVideoReceiverLog).noquote() << "Source flow: teeFrames=" << sourceFrames
                                                << "decoding=" << _decodingBranch.isDecoding() << _redactedUri();
     }
-}
-
-void GstVideoReceiver::_removeSourceEosProbe()
-{
-    if (_eosProbeId != 0 && _eosProbePad) {
-        gst_pad_remove_probe(_eosProbePad.get(), _eosProbeId);
-    }
-    _eosProbeId = 0;
-    _eosProbePad.reset();
 }
 
 void GstVideoReceiver::_onPipelinePlaying()

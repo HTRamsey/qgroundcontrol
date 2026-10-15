@@ -1,13 +1,7 @@
 #include "GStreamerHelpers.h"
 
-#include <QtCore/QByteArray>
-#include <QtCore/QDateTime>
-#include <QtCore/QDir>
-#include <QtCore/QFile>
-#include <QtCore/QFileInfo>
 #include <QtCore/QLatin1String>
 #include <QtCore/QString>
-#include <QtCore/QStringList>
 #include <QtQuick/QQuickWindow>
 #include <QtQuick/QSGRendererInterface>
 #include <array>
@@ -55,64 +49,6 @@ bool isValidRtspUri(const gchar* uri_str)
     return hasHost;
 }
 
-QString dotFileTag(QStringView tag)
-{
-    // Fits a 255-byte file name with the "-yyyyMMdd-HHmmss-zzz.dot" suffix writePipelineDot() adds, even at 4 UTF-8
-    // bytes a character.
-    constexpr qsizetype kMaxTagLength = (255 - 24) / 4;
-
-    QString safe;
-    for (const QChar c : tag.left(kMaxTagLength)) {
-        safe.append((c.isLetterOrNumber() || (c == u'-') || (c == u'_')) ? c : u'_');
-    }
-    return safe.isEmpty() ? QStringLiteral("graph") : safe;
-}
-
-QString writePipelineDot(GstElement* pipeline, QStringView tag, const QString& directory)
-{
-    // kMaxDotFiles: cap retained .dot pipeline graphs; below 5 makes retro-debugging hard.
-    constexpr int kMaxDotFiles = 10;
-
-    if (!pipeline || directory.isEmpty()) {
-        return {};
-    }
-    QDir dir(directory);
-    if (!dir.exists() && !dir.mkpath(QStringLiteral("."))) {
-        qCWarning(GStreamerHelpersLog) << "Failed to create" << dir.absolutePath();
-        return {};
-    }
-
-    // Rotate: remove oldest .dot files until under cap. Sort by mtime ascending.
-    QFileInfoList existing = dir.entryInfoList(QStringList{QStringLiteral("*.dot")},
-                                               QDir::Files, QDir::Time | QDir::Reversed);
-    while (existing.size() >= kMaxDotFiles) {
-        QFile::remove(existing.takeFirst().absoluteFilePath());
-    }
-
-    const GCharPtr data = adoptGChar(gst_debug_bin_to_dot_data(GST_BIN(pipeline), kDiagnosticDotGraphDetails));
-    if (!data) {
-        return {};
-    }
-    const QString fileName =
-        QStringLiteral("%1-%2.dot")
-            .arg(dotFileTag(tag), QDateTime::currentDateTimeUtc().toString(QStringLiteral("yyyyMMdd-HHmmss-zzz")));
-    const QString fullPath = dir.absoluteFilePath(fileName);
-    const QByteArray dotData = QByteArray::fromRawData(data.get(), static_cast<qsizetype>(qstrlen(data.get())));
-    bool wrote = false;
-    QFile out(fullPath);
-    if (out.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        wrote = (out.write(dotData) == static_cast<qint64>(dotData.size()));
-        if (!out.flush()) {
-            wrote = false;
-        }
-        out.close();
-        if (out.error() != QFileDevice::NoError) {
-            wrote = false;
-        }
-    }
-    return wrote ? fullPath : QString{};
-}
-
 void disposeChild(GstElement* element)
 {
     const GstObjectPtr parent = element ? adoptObject(gst_object_get_parent(GST_OBJECT(element))) : nullptr;
@@ -136,6 +72,25 @@ GstElement* addToBin(GstElement* bin, GstElementPtr element, const char* what)
         return nullptr;
     }
     return borrowed;
+}
+
+TeeBranch addTeeBranch(GstElement* pipeline, GstElement* tee, const char* what)
+{
+    GstElementPtr queue = adoptElement(gst_element_factory_make("queue", nullptr));
+    GstElementPtr valve = adoptElement(gst_element_factory_make("valve", nullptr));
+    if (!queue || !valve) {
+        qCWarning(GStreamerHelpersLog) << "Failed to create the queue and valve of the" << what << "branch";
+        return {};
+    }
+    g_object_set(valve.get(), "drop", TRUE, nullptr);
+
+    const TeeBranch branch{.queue = addToBin(pipeline, std::move(queue), "queue"),
+                           .valve = addToBin(pipeline, std::move(valve), "valve")};
+    if (!branch.queue || !branch.valve || !gst_element_link_many(tee, branch.queue, branch.valve, nullptr)) {
+        qCWarning(GStreamerHelpersLog) << "Unable to link the" << what << "branch";
+        return {};
+    }
+    return branch;
 }
 
 GstPadPtr firstSrcPad(GstElement* element)

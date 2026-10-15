@@ -25,33 +25,18 @@ bool DecodingBranch::build(GstElement* pipeline, GstElement* tee)
 {
     _pipeline = pipeline;
 
-    GstElement* queue = gst_element_factory_make("queue", nullptr);
-    if (!queue) {
-        qCWarning(GstVideoReceiverLog) << "gst_element_factory_make('queue') failed";
+    const GStreamer::TeeBranch branch = GStreamer::addTeeBranch(_pipeline, tee, "display");
+    if (!branch.valve) {
         return false;
     }
+    _valve = branch.valve;
 
     // Leaky downstream + tiny depth: the live-display branch must drop the oldest
     // buffer on backpressure, not stall the streaming thread. The recording branch
     // keeps default non-leaky semantics so every frame reaches the muxer.
-    gst_util_set_object_arg(G_OBJECT(queue), "leaky", "downstream");
-    g_object_set(queue, "max-size-buffers", kDisplayQueueMaxBuffers, "max-size-bytes", 0, "max-size-time",
+    gst_util_set_object_arg(G_OBJECT(branch.queue), "leaky", "downstream");
+    g_object_set(branch.queue, "max-size-buffers", kDisplayQueueMaxBuffers, "max-size-bytes", 0, "max-size-time",
                  G_GUINT64_CONSTANT(0), nullptr);
-    (void) gst_bin_add(GST_BIN(_pipeline), queue);
-
-    _valve = gst_element_factory_make("valve", nullptr);
-    if (!_valve) {
-        qCWarning(GstVideoReceiverLog) << "gst_element_factory_make('valve') failed";
-        return false;
-    }
-
-    g_object_set(_valve, "drop", TRUE, nullptr);
-    (void) gst_bin_add(GST_BIN(_pipeline), _valve);
-
-    if (!gst_element_link_many(tee, queue, _valve, nullptr)) {
-        qCWarning(GstVideoReceiverLog) << "Unable to link decoder queue";
-        return false;
-    }
     return true;
 }
 
@@ -97,7 +82,7 @@ void DecodingBranch::start(GstElement* videoSink, bool hasWidget, bool streaming
 
     _receiver._watchdog.clearSinkFrames();
 
-    _sinkProbeId = gst_pad_add_probe(pad.get(), GST_PAD_PROBE_TYPE_BUFFER, _sinkProbe, this, nullptr);
+    (void) _sinkFrameProbe.add(pad.get(), GST_PAD_PROBE_TYPE_BUFFER, _sinkProbe, this);
 
     _videoSink = GStreamer::adoptElement(GST_ELEMENT(gst_object_ref(videoSink)));
     _sinkStatsAtStart = _readSinkStats();
@@ -309,13 +294,7 @@ void DecodingBranch::_shutdown()
         _decoder.reset();
     }
 
-    if (_sinkProbeId != 0 && _videoSink) {
-        if (const GStreamer::GstPadPtr sinkPad =
-                GStreamer::adoptPad(gst_element_get_static_pad(_videoSink.get(), "sink"))) {
-            gst_pad_remove_probe(sinkPad.get(), _sinkProbeId);
-        }
-    }
-    _sinkProbeId = 0;
+    _sinkFrameProbe.remove();
 
     _receiver._watchdog.clearSinkFrames();
 

@@ -81,7 +81,7 @@ private:
     GStreamer::GstElementPtr _videoSink;
     // The sink's "frame-stats" when start() took it: the sink outlives sessions and its counters don't restart.
     GStreamer::GstStructurePtr _sinkStatsAtStart;
-    gulong _sinkProbeId = 0;
+    GStreamer::PadProbe _sinkFrameProbe;
     std::atomic<bool> _decoding = false;  ///< Read by the receiver's tee probe log.
 
     mutable QMutex _decoderNameMutex;     // Written on the worker, read from any thread.
