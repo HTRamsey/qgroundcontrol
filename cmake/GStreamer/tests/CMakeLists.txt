@@ -15,6 +15,8 @@ set(_qgc_findmod_tests
     test_windows_runtime_libproxy
     test_windows_sdk_version
     test_install_libs_guard_windows
+    test_android_abi_info
+    test_windows_sdk_root
 )
 
 foreach(_t IN LISTS _qgc_findmod_tests)
@@ -97,3 +99,25 @@ foreach(qgc_failure_case IN LISTS _qgc_gst_script_failure_cases)
     list(GET _qgc_failure_parts 1 _qgc_expected_regex)
     _qgc_add_findmodule_failure_test("${_qgc_script}" "${_qgc_script}" "${_qgc_expected_regex}")
 endforeach()
+
+_qgc_add_findmodule_failure_test(test_android_abi_info.UnsupportedAbi test_android_abi_info
+                                 "Unsupported Android ABI: mips" unsupported-abi
+)
+
+# The Orchestrator fixture generates a Linux-layout fake SDK and drives it through the host's
+# pkg-config, so it only runs on Linux hosts.
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+    foreach(_qgc_scenario IN ITEMS targets idempotent)
+        add_test(
+            NAME "FindModule.test_orchestrator.${_qgc_scenario}"
+            COMMAND
+                "${CMAKE_COMMAND}" "-DQGC_MODULE_DIR=${PROJECT_SOURCE_DIR}/cmake"
+                "-DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/test_orchestrator/${_qgc_scenario}"
+                "-DSCENARIO=${_qgc_scenario}" "-DGENERATOR=${CMAKE_GENERATOR}" "-DMAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}"
+                -P "${CMAKE_CURRENT_SOURCE_DIR}/test_orchestrator.cmake"
+        )
+        set_tests_properties("FindModule.test_orchestrator.${_qgc_scenario}"
+                             PROPERTIES LABELS "Unit;FindModule" TIMEOUT 120 SKIP_REGULAR_EXPRESSION "QGC_TEST_SKIPPED"
+        )
+    endforeach()
+endif()
