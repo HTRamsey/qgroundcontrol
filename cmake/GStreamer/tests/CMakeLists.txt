@@ -128,6 +128,7 @@ if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
               missing-mandatory
               missing-gl
               install
+              android-mobile
     )
         add_test(
             NAME "FindModule.test_orchestrator.${_qgc_scenario}"

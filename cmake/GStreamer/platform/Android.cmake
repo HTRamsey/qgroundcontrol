@@ -120,7 +120,7 @@ endmacro()
 # ─────────────────────────────────────────────────────────────────────────────
 # Pure-computation helper — no add_library / target_* calls.
 # Reads GStreamer* globals set by the parent scope; returns results via OUT params.
-function(_qgc_compute_android_mobile_target plugins_out apis_out found_components_out wa_libs_out)
+function(_qgc_compute_android_mobile_target plugins_out apis_out found_components_out)
     set(_gst_plugins ${GStreamerMobile_FIND_COMPONENTS})
     list(REMOVE_ITEM _gst_plugins fonts ca_certificates mobile)
     list(REMOVE_DUPLICATES _gst_plugins)
@@ -173,18 +173,34 @@ function(_qgc_compute_android_mobile_target plugins_out apis_out found_component
     list(APPEND _gst_validate_components ${_gst_mobile_plugins})
     list(REMOVE_DUPLICATES _gst_validate_components)
 
-    # Build whole-archive list from resolved paths.
-    set(_gst_wa_libs)
-    foreach(_gst_PLUGIN IN LISTS _gst_mobile_plugins)
-        if(GStreamer_${_gst_PLUGIN}_FOUND AND _gst_plugin_lib_${CMAKE_ANDROID_ARCH_ABI}_${_gst_PLUGIN})
-            list(APPEND _gst_wa_libs "${_gst_plugin_lib_${CMAKE_ANDROID_ARCH_ABI}_${_gst_PLUGIN}}")
-        endif()
-    endforeach()
-
     set(${plugins_out}         "${_gst_mobile_plugins}"    PARENT_SCOPE)
     set(${apis_out}            "${_gst_mobile_apis}"       PARENT_SCOPE)
     set(${found_components_out} "${_gst_validate_components}" PARENT_SCOPE)
-    set(${wa_libs_out}         "${_gst_wa_libs}"           PARENT_SCOPE)
+endfunction()
+
+# _qgc_android_whole_archive_plugins(<plugin>...)
+# Links each plugin's static archive (found by _qgc_compute_android_mobile_target) as
+# $<LINK_LIBRARY:WHOLE_ARCHIVE,GStreamer::<plugin>_archive> wherever GStreamer::<plugin> is linked, so every
+# gst_plugin_<plugin>_register() and its GType objects survive the linker's dead-strip and register into the
+# app's single core. GStreamer::<plugin> no longer links the archive by path as well: a plain occurrence ahead of
+# the whole-archive one would let the linker load some members twice.
+function(_qgc_android_whole_archive_plugins)
+    foreach(_plugin IN LISTS ARGN)
+        set(_archive "${_gst_plugin_lib_${CMAKE_ANDROID_ARCH_ABI}_${_plugin}}")
+        add_library(GStreamer::${_plugin}_archive STATIC IMPORTED GLOBAL)
+        set_target_properties(GStreamer::${_plugin}_archive PROPERTIES IMPORTED_LOCATION "${_archive}")
+
+        cmake_path(GET _archive FILENAME _archive_name)
+        get_target_property(_libraries GStreamer::${_plugin} INTERFACE_LINK_LIBRARIES)
+        set(_kept_libraries "$<LINK_LIBRARY:WHOLE_ARCHIVE,GStreamer::${_plugin}_archive>")
+        foreach(_library IN LISTS _libraries)
+            cmake_path(GET _library FILENAME _library_name)
+            if(NOT _library_name STREQUAL _archive_name AND NOT _library MATCHES "-NOTFOUND$")
+                list(APPEND _kept_libraries "${_library}")
+            endif()
+        endforeach()
+        set_target_properties(GStreamer::${_plugin} PROPERTIES INTERFACE_LINK_LIBRARIES "${_kept_libraries}")
+    endforeach()
 endfunction()
 
 macro(_qgc_create_android_mobile_target)
@@ -264,7 +280,7 @@ if(NOT TARGET GStreamer::GStreamer)
 endif()
 
 # ── Computation phase (function to avoid variable leakage) ───────────────────
-_qgc_compute_android_mobile_target(_gst_mobile_plugins _gst_mobile_apis _gst_validate_components _gst_wa_libs)
+_qgc_compute_android_mobile_target(_gst_mobile_plugins _gst_mobile_apis _gst_validate_components)
 set(GSTREAMER_STATIC_PLUGINS ${_gst_mobile_plugins})
 list(TRANSFORM G_IO_MODULES PREPEND "gio" OUTPUT_VARIABLE G_IO_MODULES_LIBS)
 
@@ -477,40 +493,21 @@ foreach(_gst_PLUGIN IN LISTS _gst_plugins)
     set(GStreamerMobile_${_gst_PLUGIN}_FOUND "${GStreamer_${_gst_PLUGIN}_FOUND}")
 endforeach()
 if(GSTREAMER_IS_MOBILE AND TARGET GStreamerMobile)
-    if(GStreamer_DEBUG)
-        message(STATUS "[GstMobile] WHOLE_ARCHIVE plugin libs: ${_gst_wa_libs}")
-    endif()
+    _qgc_android_whole_archive_plugins(${_gst_mobile_plugins})
 
-    if(_gst_wa_libs)
-        # Whole-archive the plugin .a's into the app so every gst_plugin_<name>_register() and its
-        # GType objects survive the linker's dead-strip and register into the app's single core.
-        target_link_options(GStreamerMobile INTERFACE
-            "LINKER:--whole-archive"
-            ${_gst_wa_libs}
-            "LINKER:--no-whole-archive"
-        )
-    endif()
-
-    # The whole-archived plugin .a's reference GStreamer helper libraries
-    # (gstbase/rtp/rtpbase/app/video/audio/tag/pbutils/net/sdp/rtsp/controller)
-    # absent from PC_GStreamer_LIBRARIES; each found GStreamer::<comp> target
-    # carries them as absolute .a paths via PC_GStreamer_<comp>_STATIC_LIBRARIES.
+    # Each plugin target carries its whole-archived .a plus the GStreamer helper libraries the plugin references
+    # (gstbase/rtp/rtpbase/app/video/audio/tag/pbutils/net/sdp/rtsp/controller), which are absent from
+    # PC_GStreamer_LIBRARIES. The NDK's lld resolves archives regardless of their order, so no link group is needed.
     set(_gst_mobile_helper_targets)
     foreach(_gst_comp IN LISTS _gst_mobile_plugins)
-        if(TARGET GStreamer::${_gst_comp})
-            list(APPEND _gst_mobile_helper_targets GStreamer::${_gst_comp})
-        endif()
+        list(APPEND _gst_mobile_helper_targets GStreamer::${_gst_comp})
     endforeach()
     foreach(_gst_comp IN LISTS _gst_mobile_apis)
         if(GStreamer_${_gst_comp}_FOUND AND TARGET GStreamer::${_gst_comp})
             list(APPEND _gst_mobile_helper_targets GStreamer::${_gst_comp})
         endif()
     endforeach()
-    if(_gst_mobile_helper_targets)
-        target_link_options(GStreamerMobile INTERFACE "LINKER:--start-group")
-        target_link_libraries(GStreamerMobile INTERFACE ${_gst_mobile_helper_targets})
-        target_link_options(GStreamerMobile INTERFACE "LINKER:--end-group")
-    endif()
+    target_link_libraries(GStreamerMobile INTERFACE ${_gst_mobile_helper_targets})
 
     # GIO core (g_tls_*) for the static-plugin TLS shim; gioopenssl is a GIO
     # module and does not pull gio core, so add it explicitly.
