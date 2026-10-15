@@ -1,7 +1,11 @@
 #include "gstqgcqvideosink.h"
 
+#include <atomic>
 #include <gst/video/video-info.h>
 #include <gst/video/video.h>
+#include <memory>
+#include <new>
+#include <utility>
 
 #include <QtCore/QMetaObject>
 #include <QtCore/QMutex>
@@ -16,14 +20,6 @@
 #include "HwBuffers/dmabuf/GstDmaDrmCaps.h"
 #include "QGCLoggingCategory.h"
 #include "gstqgcelements.h"
-#if GST_CHECK_VERSION(1, 24, 0)
-#include <gst/video/video-info-dma.h>
-#endif
-
-#include <atomic>
-#include <memory>
-#include <new>
-#include <utility>
 
 QGC_LOGGING_CATEGORY(GstQgcQVideoSinkLog, "Video.GStreamer.QgcQVideoSink")
 

@@ -17,6 +17,12 @@
 #include "GstD3D12ContextBridge.h"
 #include "GstD3D12VideoBuffer.h"
 #endif
+#if defined(Q_OS_WIN) && defined(QGC_HAS_GST_D3D11_GPU_PATH)
+#include <gst/d3d11/gstd3d11.h>
+#endif
+#if defined(Q_OS_WIN) && defined(QGC_HAS_GST_D3D12_GPU_PATH)
+#include <gst/d3d12/gstd3d12.h>
+#endif
 #if defined(QGC_HAS_GST_GLMEMORY_GPU_PATH)
 #include "GstGlContextBridge.h"
 #endif
@@ -77,6 +83,74 @@ constexpr HwVideoBufferPath kEnabledPaths[] = {
     HwVideoBufferPath::Vulkan,
 #endif
 };
+
+#if defined(Q_OS_WIN) && defined(QGC_HAS_GST_D3D11_GPU_PATH)
+// Bind allocation to QRhi's shared device so import stays same-device instead of hitting
+// GstD3D11VideoBuffer's foreign-device copy path; SHADER_RESOURCE matches the importer's sampled texture.
+bool tryProposeD3D11Pool(GstQuery* query, GstCaps* caps, const GstVideoInfo* vinfo, gsize size, guint minBuffers)
+{
+    GstD3D11Device* device = GstD3D11ContextBridge::currentDevice();
+    if (!device) {
+        return false;
+    }
+    bool proposed = false;
+    if (GstBufferPool* pool = gst_d3d11_buffer_pool_new(device)) {
+        GstStructure* config = gst_buffer_pool_get_config(pool);
+        gst_buffer_pool_config_set_params(config, caps, size, minBuffers, 0);
+        gst_buffer_pool_config_add_option(config, GST_BUFFER_POOL_OPTION_VIDEO_META);
+        if (GstD3D11AllocationParams* params = gst_d3d11_allocation_params_new(
+                device, vinfo, GST_D3D11_ALLOCATION_FLAG_DEFAULT, D3D11_BIND_SHADER_RESOURCE, 0)) {
+            gst_buffer_pool_config_set_d3d11_allocation_params(config, params);
+            gst_d3d11_allocation_params_free(params);
+        }
+        if (gst_buffer_pool_set_config(pool, config)) {
+            // The d3d11 pool may grow the buffer size to the allocated texture's pitch; re-read it.
+            GstStructure* updated = gst_buffer_pool_get_config(pool);
+            guint poolSize = static_cast<guint>(size);
+            gst_buffer_pool_config_get_params(updated, nullptr, &poolSize, nullptr, nullptr);
+            gst_structure_free(updated);
+            gst_query_add_allocation_pool(query, pool, poolSize, minBuffers, 0);
+            proposed = true;
+        }
+        gst_object_unref(pool);
+    }
+    gst_object_unref(device);  // currentDevice() returns a transfer-full ref.
+    return proposed;
+}
+#endif
+
+#if defined(Q_OS_WIN) && defined(QGC_HAS_GST_D3D12_GPU_PATH)
+// D3D12 counterpart of tryProposeD3D11Pool — steers allocation onto QRhi's shared (LUID-matched) adapter.
+bool tryProposeD3D12Pool(GstQuery* query, GstCaps* caps, const GstVideoInfo* vinfo, gsize size, guint minBuffers)
+{
+    GstD3D12Device* device = GstD3D12ContextBridge::currentDevice();
+    if (!device) {
+        return false;
+    }
+    bool proposed = false;
+    if (GstBufferPool* pool = gst_d3d12_buffer_pool_new(device)) {
+        GstStructure* config = gst_buffer_pool_get_config(pool);
+        gst_buffer_pool_config_set_params(config, caps, size, minBuffers, 0);
+        gst_buffer_pool_config_add_option(config, GST_BUFFER_POOL_OPTION_VIDEO_META);
+        if (GstD3D12AllocationParams* params = gst_d3d12_allocation_params_new(
+                device, vinfo, GST_D3D12_ALLOCATION_FLAG_DEFAULT, D3D12_RESOURCE_FLAG_NONE, D3D12_HEAP_FLAG_NONE)) {
+            gst_buffer_pool_config_set_d3d12_allocation_params(config, params);
+            gst_d3d12_allocation_params_free(params);
+        }
+        if (gst_buffer_pool_set_config(pool, config)) {
+            GstStructure* updated = gst_buffer_pool_get_config(pool);
+            guint poolSize = static_cast<guint>(size);
+            gst_buffer_pool_config_get_params(updated, nullptr, &poolSize, nullptr, nullptr);
+            gst_structure_free(updated);
+            gst_query_add_allocation_pool(query, pool, poolSize, minBuffers, 0);
+            proposed = true;
+        }
+        gst_object_unref(pool);
+    }
+    gst_object_unref(device);
+    return proposed;
+}
+#endif
 }  // namespace
 #endif
 
@@ -262,6 +336,30 @@ bool answerSinkBinContextQuery(GstQuery* query) noexcept
 #endif
     Q_UNUSED(query);
     return handled;
+}
+
+bool proposeDeviceBoundPool(GstQuery* query, GstCaps* caps, const GstVideoInfo* vinfo, gsize size,
+                            guint minBuffers) noexcept
+{
+    GstCapsFeatures* features = gst_caps_get_features(caps, 0);
+    if (!features) {
+        return false;
+    }
+#if defined(Q_OS_WIN) && defined(QGC_HAS_GST_D3D11_GPU_PATH)
+    if (gst_caps_features_contains(features, GST_CAPS_FEATURE_MEMORY_D3D11_MEMORY)) {
+        return tryProposeD3D11Pool(query, caps, vinfo, size, minBuffers);
+    }
+#endif
+#if defined(Q_OS_WIN) && defined(QGC_HAS_GST_D3D12_GPU_PATH)
+    if (gst_caps_features_contains(features, GST_CAPS_FEATURE_MEMORY_D3D12_MEMORY)) {
+        return tryProposeD3D12Pool(query, caps, vinfo, size, minBuffers);
+    }
+#endif
+    (void) query;
+    (void) vinfo;
+    (void) size;
+    (void) minBuffers;
+    return false;
 }
 
 PathStats formatPathStats(bool reset) noexcept

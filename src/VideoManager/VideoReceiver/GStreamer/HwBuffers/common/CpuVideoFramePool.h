@@ -23,9 +23,9 @@ public:
     QVideoFrame acquireFrame(const QVideoFrameFormat& format, const GstVideoInfo& info);
 
     /// Upper bound on decoder buffers one sink holds downstream at once, zero-copy CPU and GPU frames alike: the frame
-    /// being mapped in show_frame, one pending GUI delivery (latest-frame-only), the frame Qt displays, and one older
-    /// frame kept alive by Qt's texture bundle for the other in-flight slot (QRhi FramesInFlight is 2 on the common
-    /// backends).
+    /// being mapped in show_frame, one pending GUI delivery (latest-frame-only), the frame Qt displays, and the
+    /// previous frame, whose texture bundle keeps its sample until Qt reuses that in-flight slot (QRhi FramesInFlight
+    /// is 2 on the common backends).
     static constexpr int kMaxPinnedFrames = 4;
 
     /// Live zero-copy frames of one sink; shared so frames Qt still holds after the sink is gone can release it.

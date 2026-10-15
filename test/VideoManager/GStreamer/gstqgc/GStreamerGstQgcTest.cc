@@ -1597,6 +1597,24 @@ void GStreamerTest::_testAdvertisedFormatListMatchesTable()
     QVERIFY2(list.rfind("{ ", 0) == 0 && list.find(" }") != std::string::npos, "list must be brace-wrapped");
 }
 
+void GStreamerTest::_testAdvertisedFormatListForOffer_data()
+{
+    QTest::addColumn<uint>("offer");
+    QTest::addColumn<QString>("expected");
+
+    // Multi-plane GLMemory renders green through Qt's GL import, so glupload must stay single-plane RGB.
+    QTest::newRow("glupload") << uint(GstQgc::kOfferGlUpload) << QStringLiteral("{ BGRA, RGBA }");
+    QTest::newRow("linear-dma-drm") << uint(GstQgc::kOfferLinearDmaDrm)
+                                    << QStringLiteral("{ NV12, NV21, I420, P010_10LE, BGRA, RGBA }");
+}
+
+void GStreamerTest::_testAdvertisedFormatListForOffer()
+{
+    QFETCH(uint, offer);
+    QFETCH(QString, expected);
+    QCOMPARE(QString::fromStdString(GstQgc::advertisedFormatList(offer)), expected);
+}
+
 void GStreamerTest::_testColorimetryFrameRatePropagation()
 {
     // Verify that a 30/1 caps framerate is surfaced on the delivered QVideoFrame.
