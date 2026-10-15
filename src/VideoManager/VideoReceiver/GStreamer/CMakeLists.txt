@@ -52,12 +52,6 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_sources(QGCGStreamer PRIVATE MockVideoStreamServer.cc MockVideoStreamServer.h)
 endif()
 
-# The test-only hooks (the *ForTest() helpers, GstHwPathRegistry::ScopedPathsForTest) compile only under this flag.
-# PUBLIC so both QGCGStreamer (helper defs) and the app target's GStreamerTest.cc (decls) see it.
-if(QGC_BUILD_TESTING)
-    target_compile_definitions(QGCGStreamer PUBLIC QGC_GST_BUILD_TESTING)
-endif()
-
 target_include_directories(
     QGCGStreamer
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}
