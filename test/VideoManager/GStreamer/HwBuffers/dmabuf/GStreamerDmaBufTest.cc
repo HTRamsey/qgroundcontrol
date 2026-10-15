@@ -450,22 +450,22 @@ void GStreamerTest::_testDmaBufSingleFdImportEnvGate()
     TestFixtures::EnvVarFixture gate("QGC_GST_DMABUF_SINGLE_EGLIMAGE");
 
     qunsetenv("QGC_GST_DMABUF_SINGLE_EGLIMAGE");
-    QVERIFY(GstDmaBufVideoBuffer::singleFdImportEnabledForTest());
+    QVERIFY(HwBuffers::readHwBufferEnvConfig().dmaBufSingleEglImage);
 
     qputenv("QGC_GST_DMABUF_SINGLE_EGLIMAGE", "0");
-    QVERIFY(!GstDmaBufVideoBuffer::singleFdImportEnabledForTest());
+    QVERIFY(!HwBuffers::readHwBufferEnvConfig().dmaBufSingleEglImage);
 
     qputenv("QGC_GST_DMABUF_SINGLE_EGLIMAGE", "false");
-    QVERIFY(!GstDmaBufVideoBuffer::singleFdImportEnabledForTest());
+    QVERIFY(!HwBuffers::readHwBufferEnvConfig().dmaBufSingleEglImage);
 
     qputenv("QGC_GST_DMABUF_SINGLE_EGLIMAGE", "off");
-    QVERIFY(!GstDmaBufVideoBuffer::singleFdImportEnabledForTest());
+    QVERIFY(!HwBuffers::readHwBufferEnvConfig().dmaBufSingleEglImage);
 
     qputenv("QGC_GST_DMABUF_SINGLE_EGLIMAGE", "1");
-    QVERIFY(GstDmaBufVideoBuffer::singleFdImportEnabledForTest());
+    QVERIFY(HwBuffers::readHwBufferEnvConfig().dmaBufSingleEglImage);
 
     qputenv("QGC_GST_DMABUF_SINGLE_EGLIMAGE", "force");
-    QVERIFY(GstDmaBufVideoBuffer::singleFdImportEnabledForTest());
+    QVERIFY(HwBuffers::readHwBufferEnvConfig().dmaBufSingleEglImage);
 #endif
 }
 

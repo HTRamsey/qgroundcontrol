@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <atomic>
 #include <gst/gst.h>
-#include <gst/video/video-frame.h>
 #include <gst/video/video-info.h>
 #include <private/qhwvideobuffer_p.h>
 
@@ -12,6 +11,7 @@
 #include <QtMultimedia/QVideoFrame>
 #include <QtMultimedia/QVideoFrameFormat>
 
+#include "CpuVideoFramePool.h"
 #include "GstHwTypes.h"
 
 namespace GstHw {
@@ -104,6 +104,5 @@ private:
     /// Pixel format of the sample's memory, as constructed. A subclass may advertise another one in _format for its GPU
     /// import (the DMABuf eglfs YUYV/UYVY-as-RGBA quirk); such frames have no CPU layout matching format().
     QVideoFrameFormat::PixelFormat _memoryPixelFormat;
-    GstVideoFrame _cpuFrame = {};
-    bool _cpuMapped = false;
+    CpuVideoFramePool::FrameMapping _cpuView;
 };

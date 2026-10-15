@@ -769,17 +769,6 @@ constinit const HwPathDescriptor GstHwPaths::kDmaBuf = {
 };
 
 #ifdef QGC_GST_BUILD_TESTING
-bool GstDmaBufVideoBuffer::singleFdImportEnabledForTest() noexcept
-{
-    // Read live: production singleFdImportEnabled() reads the parse-once env cache, which can't observe
-    // per-case env mutations under test. Mirrors HwBuffers truthy() with default=on.
-    const QByteArray v = qgetenv("QGC_GST_DMABUF_SINGLE_EGLIMAGE").trimmed().toLower();
-    if (v.isEmpty()) {
-        return true;
-    }
-    return v != "0" && v != "false" && v != "off" && v != "no";
-}
-
 bool GstDmaBufVideoBuffer::texStorageImportAllowedForTest(bool contextIsOpenGles, bool hasTexStorageExt) noexcept
 {
     return texStorageImportAllowed(contextIsOpenGles, hasTexStorageExt);
