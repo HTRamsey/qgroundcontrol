@@ -26,7 +26,6 @@ using GstD3DVideoBufferCommon::kMaxPlanes;
 using GstD3DVideoBufferCommon::MapDiagnostics;
 using D3D12FrameTextures = GstD3DVideoBufferCommon::FrameTextures<ID3D12Resource>;
 using GstD3DVideoBufferCommon::StagingKey;
-using GstD3DVideoBufferCommon::StagingKeyHash;
 
 MapDiagnostics s_diag;
 
@@ -148,10 +147,9 @@ public:
                                               const D3D12_HEAP_PROPERTIES& heapProps, int planeIdx, guint subIdx)
     {
         QMutexLocker lock(&_mutex);
-        StagingRing* ring = _entries.find(key);
+        StagingRing* ring = _entries.find(key).resource;
         if (!ring) {
-            _entries.insert(key, StagingRing{});
-            ring = _entries.find(key);
+            ring = _entries.insert(key, StagingRing{}).resource;
         }
         for (std::size_t probe = 0; probe < kStagingRingSize; ++probe) {
             const std::size_t slot = (ring->next + probe) % kStagingRingSize;
@@ -213,7 +211,7 @@ private:
         return true;
     }
 
-    static void releaseRing(const StagingKey&, StagingRing& ring)
+    static void releaseRing(StagingRing& ring)
     {
         for (StagingEntry& e : ring.entries) {
             releaseEntryResources(e);
@@ -223,7 +221,7 @@ private:
 
     static constexpr std::size_t kMaxEntries = 8;
     QMutex _mutex;
-    GstHw::GstHwImportCache<StagingKey, StagingRing, StagingKeyHash> _entries{kMaxEntries, &releaseRing};
+    GstHw::GstHwImportCache<StagingKey, StagingRing, kMaxEntries> _entries{&releaseRing};
 };
 
 /// Copy one subresource slice into a leased COPY-queue (DIRECT fallback) staging slot and submit the copy WITHOUT

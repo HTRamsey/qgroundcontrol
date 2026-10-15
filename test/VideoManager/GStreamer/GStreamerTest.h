@@ -67,6 +67,12 @@ private slots:
     void _testContextBridgeRegistry();
     void _testHwBufferLifecycleResetsNativeCaches();
     void _testHwFrameTexturesRejectsForeignOldTextures();
+    void _testHwImportCacheEvictsLeastRecentlyUsed();
+    void _testHwImportCacheReplaceDestroysPrevious();
+    void _testHwImportCacheEraseIfDestroysMatches();
+    void _testHwImportCachePinnedEntriesOutliveRemoval();
+    void _testHwImportCacheRejectsInsertWhenAllPinned();
+    void _testHwImportCacheDefersDestroyToOwnerThread();
     void _testHwBufferFactoryDispatchSystemMemory();
     void _testHwBufferFactoryCacheRejectsMemoryTypeChange();
     void _testDmaBufSingleFdImportEnvGate();

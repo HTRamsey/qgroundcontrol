@@ -11,13 +11,11 @@
 #include <array>
 #include <atomic>
 #include <cstddef>
-#include <functional>
 #include <gst/gst.h>
 #include <memory>
 #include <private/qhwvideobuffer_p.h>
 #include <private/qvideotexturehelper_p.h>
 #include <rhi/qrhi.h>
-#include <tuple>
 
 #include "GstHwFrameTexturesBase.h"
 #include "GstHwImportPreflight.h"
@@ -75,24 +73,7 @@ struct StagingKey
     quint32 format = 0;  // DXGI_FORMAT
     int plane = 0;
 
-    bool operator<(const StagingKey& o) const
-    {
-        return std::tie(width, height, format, plane) < std::tie(o.width, o.height, o.format, o.plane);
-    }
-
     bool operator==(const StagingKey& o) const noexcept = default;
-};
-
-struct StagingKeyHash
-{
-    std::size_t operator()(const StagingKey& key) const noexcept
-    {
-        std::size_t seed = std::hash<quint64>{}(key.width);
-        seed ^= std::hash<quint32>{}(key.height) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        seed ^= std::hash<quint32>{}(key.format) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        seed ^= std::hash<int>{}(key.plane) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        return seed;
-    }
 };
 
 /// Scope guard for the native handles a resolvePlaneResources() loop builds up: releases every owned handle on scope

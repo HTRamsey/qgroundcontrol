@@ -155,30 +155,6 @@ struct DmaImageKey
     }
 };
 
-template <typename T>
-void hashCombine(std::size_t& h, const T& value) noexcept
-{
-    h ^= std::hash<T>{}(value) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
-}
-
-struct DmaImageKeyHash
-{
-    std::size_t operator()(const DmaImageKey& k) const noexcept
-    {
-        std::size_t h = std::hash<int>{}(k.fd);
-        hashCombine(h, k.modifier);
-        hashCombine(h, k.width);
-        hashCombine(h, k.height);
-        hashCombine(h, k.fourcc);
-        hashCombine(h, k.planeCount);
-        for (int p = 0; p < k.planeCount; ++p) {
-            hashCombine(h, k.offsets[p]);
-            hashCombine(h, k.strides[p]);
-        }
-        return h;
-    }
-};
-
 struct DmaCachedImage
 {
     EGLDisplay display = EGL_NO_DISPLAY;
@@ -186,39 +162,25 @@ struct DmaCachedImage
     GstMemory* mem = nullptr;  // eviction key only; never dereferenced
 };
 
-constexpr int kImageCacheCapacity = 8;
+constexpr std::size_t kImageCacheCapacity = 8;
+
+void destroyCachedDmaImage(DmaCachedImage& entry)
+{
+    if (entry.image != EGL_NO_IMAGE_KHR && entry.display != EGL_NO_DISPLAY) {
+        eglDestroyImage(entry.display, entry.image);
+    }
+}
+
+// EGLImages are destroyed on a render thread with Qt's GL context current; an off-thread finalize notify or reset
+// parks them until the next render-thread drain.
+bool glContextCurrent(const DmaCachedImage&)
+{
+    return QOpenGLContext::currentContext() != nullptr;
+}
 
 QMutex s_dmaCacheMutex;
-// EGLImages orphaned by an off-thread finalize notify; destroyed on the render thread (drainOrphanedImagesLocked).
-std::vector<std::pair<EGLDisplay, EGLImage>> s_orphanedImages;
-
-// Render-thread; caller holds s_dmaCacheMutex with Qt's GL context current.
-void drainOrphanedImagesLocked()
-{
-    for (const auto& [display, image] : s_orphanedImages) {
-        if (image != EGL_NO_IMAGE_KHR && display != EGL_NO_DISPLAY) {
-            eglDestroyImage(display, image);
-        }
-    }
-    s_orphanedImages.clear();
-}
-
-// Eviction/erase/clear hook. Render thread (GL context current): destroy the EGLImage. Off-thread finalize notify (no
-// GL context): defer the image to s_orphanedImages.
-void destroyCachedDmaImage(const DmaImageKey&, DmaCachedImage& entry)
-{
-    if (entry.image == EGL_NO_IMAGE_KHR || entry.display == EGL_NO_DISPLAY) {
-        return;
-    }
-    if (QOpenGLContext::currentContext()) {
-        eglDestroyImage(entry.display, entry.image);
-    } else {
-        s_orphanedImages.emplace_back(entry.display, entry.image);
-    }
-}
-
-GstHw::GstHwImportCache<DmaImageKey, DmaCachedImage, DmaImageKeyHash> s_dmaImageCache{kImageCacheCapacity,
-                                                                                      destroyCachedDmaImage};
+GstHw::GstHwImportCache<DmaImageKey, DmaCachedImage, kImageCacheCapacity> s_dmaImageCache{destroyCachedDmaImage,
+                                                                                          glContextCurrent};
 
 GQuark cachedMemoryQuark()
 {
@@ -227,8 +189,8 @@ GQuark cachedMemoryQuark()
 }
 
 // qdata destroy-notify, run while the GstMemory finalizes on a pool/streaming thread (no GL context): the stale
-// EGLImage is queued for render-thread destruction (drainOrphanedImagesLocked). Unlike a weak ref, the qdata is never
-// removed from the render thread, which would mutate the notify list gst is iterating during finalize.
+// EGLImage is parked for render-thread destruction. Unlike a weak ref, the qdata is never removed from the render
+// thread, which would mutate the notify list gst is iterating during finalize.
 void onSourceMemoryFinalized(gpointer finalizedMem)
 {
     const QMutexLocker lock(&s_dmaCacheMutex);
@@ -236,19 +198,11 @@ void onSourceMemoryFinalized(gpointer finalizedMem)
         [&](const DmaImageKey&, const DmaCachedImage& e) { return static_cast<gpointer>(e.mem) == finalizedMem; });
 }
 
-// Render-thread; caller holds s_dmaCacheMutex with Qt's GL context current.
-void clearDmaImageCacheLocked(EGLDisplay eglDpy)
-{
-    s_dmaImageCache.clear();
-    drainOrphanedImagesLocked();
-    Q_UNUSED(eglDpy);
-}
-
 EGLImage cachedDmaImageLocked(const DmaImageKey& key, EGLDisplay eglDpy)
 {
-    if (DmaCachedImage* entry = s_dmaImageCache.find(key);
-        entry && entry->display == eglDpy && entry->image != EGL_NO_IMAGE_KHR) {
-        return entry->image;
+    if (const auto hit = s_dmaImageCache.find(key);
+        hit && hit.resource->display == eglDpy && hit.resource->image != EGL_NO_IMAGE_KHR) {
+        return hit.resource->image;
     }
     return EGL_NO_IMAGE_KHR;
 }
@@ -260,8 +214,6 @@ void insertDmaImageLocked(const DmaImageKey& key, EGLDisplay eglDpy, EGLImage im
     }
     s_dmaImageCache.insert(key, DmaCachedImage{eglDpy, image, mem});
 }
-
-std::atomic<bool> s_dmaCacheResetPending{false};
 
 bool singleFdImportEnabled() noexcept
 {
@@ -463,17 +415,10 @@ void GstDmaBufVideoBuffer::resetCachedState() noexcept
     s_loggedProducerWaitTimeout.store(false, std::memory_order_release);
     s_bindValidated.store(false, std::memory_order_release);
     s_loggedBindFailed.store(false, std::memory_order_release);
-    if (QOpenGLContext::currentContext()) {
-        // GL context current (render-thread reset, e.g. sceneGraphInvalidated): drain now so cached/orphaned EGLImages
-        // can't leak when no DMABuf frame is ever mapped again.
-        const QMutexLocker lock(&s_dmaCacheMutex);
-        clearDmaImageCacheLocked(EGL_NO_DISPLAY);
-        s_dmaCacheResetPending.store(false, std::memory_order_release);
-    } else {
-        // Defer EGLImage teardown to the next render-thread mapTextures(); eglDestroyImage off the GL thread is
-        // unsafe.
-        s_dmaCacheResetPending.store(true, std::memory_order_release);
-    }
+    // Destroyed now on a render-thread reset (e.g. sceneGraphInvalidated); otherwise parked for the next mapTextures().
+    const QMutexLocker lock(&s_dmaCacheMutex);
+    s_dmaImageCache.clear();
+    s_dmaImageCache.drainDeferred();
 }
 
 namespace {
@@ -627,16 +572,10 @@ QVideoFrameTexturesUPtr GstDmaBufVideoBuffer::mapTextures(QRhi& rhi, QVideoFrame
         s_cachedDisplay.compare_exchange_strong(expected, eglDpy, std::memory_order_release);
     }
 
-    // Render thread, GL context current: reap EGLImages orphaned by off-thread weak-notifies, then any pending reset.
+    // Render thread, GL context current: destroy EGLImages parked by off-thread finalize notifies or resets.
     if (imageCacheEnabled()) {
-        const bool resetPending = s_dmaCacheResetPending.exchange(false, std::memory_order_acq_rel);
         const QMutexLocker lock(&s_dmaCacheMutex);
-        if (!s_orphanedImages.empty()) {
-            drainOrphanedImagesLocked();
-        }
-        if (resetPending) {
-            clearDmaImageCacheLocked(eglDpy);
-        }
+        s_dmaImageCache.drainDeferred();
     }
 
     GstBuffer* buffer = gst_sample_get_buffer(_sample);

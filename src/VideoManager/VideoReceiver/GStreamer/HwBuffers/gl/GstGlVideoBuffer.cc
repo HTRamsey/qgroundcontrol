@@ -1,7 +1,6 @@
 #include "GstGlVideoBuffer.h"
 
 #include "GstGlFrameTextures.h"
-#include "GstHwImportCache.h"
 #include "GstHwImportPreflight.h"
 #include "GstHwPathTelemetry.h"
 #include "GstHwVideoBuffer.h"
@@ -63,34 +62,6 @@ public:
 };
 
 GstHw::MapDiagnostics s_diag;
-
-// Pool-ring recycle key: the gst-gl texture id tuple for a frame. gst-gl rotates a fixed set of ids, so re-seeing a
-// tuple means a pool slot recycled (the immediate `old`-bundle reuse below only covers the last frame, not the ring).
-struct GlTexKey
-{
-    std::array<GLuint, kMaxPlanes> names{};
-    int count = 0;
-
-    bool operator==(const GlTexKey& o) const noexcept { return count == o.count && names == o.names; }
-};
-
-struct GlTexKeyHash
-{
-    std::size_t operator()(const GlTexKey& k) const noexcept
-    {
-        std::size_t h = std::hash<int>{}(k.count);
-        for (int i = 0; i < k.count; ++i) {
-            h ^= std::hash<GLuint>{}(k.names[i]) + 0x9e3779b97f4a7c15ULL + (h << 6) + (h >> 2);
-        }
-        return h;
-    }
-};
-
-// Per render thread (each window has its own QRhi thread): no locking needed. Values are non-owning markers — the GL
-// textures belong to gst-gl, so the deleter is a no-op; the cache only tracks ring membership for reuse telemetry.
-constexpr std::size_t kGlRingCapacity = 8;
-thread_local GstHw::GstHwImportCache<GlTexKey, char, GlTexKeyHash> s_glRingCache{kGlRingCapacity,
-                                                                                 [](const GlTexKey&, char&) {}};
 
 // Orders Qt's context after gst-gl's fence. gst_gl_sync_meta_wait() would wait inside gst-gl's own context and leave
 // Qt's unordered; GL sync objects are shared across the share group, so Qt's context waits on the GLsync server-side.
@@ -200,12 +171,6 @@ QVideoFrameTexturesUPtr GstGlVideoBuffer::mapTextures(QRhi& rhi, QVideoFrameText
         }
     }
 
-    // Ring recycle: the `old` bundle missed (different frame) but this id tuple was validated within the last
-    // kGlRingCapacity frames, so the pool reused a slot. Record the reuse; the createFrom below is a cheap non-owning
-    // view over the existing gst-gl texture (no real re-import).
-    const GlTexKey ringKey{names, planeCount};
-    const bool ringHit = (s_glRingCache.find(ringKey) != nullptr);
-
     // Pre-flight the per-plane RHI format/size before createFrom() so an unsupported import demotes to CPU on a cheap
     // capability query instead of a driver error.
     if (!GstHwImportPreflight::preflightOrRecord(&rhi, HwVideoBufferPath::GlMemory, _format.pixelFormat(),
@@ -224,10 +189,6 @@ QVideoFrameTexturesUPtr GstGlVideoBuffer::mapTextures(QRhi& rhi, QVideoFrameText
             return GstHwPathTelemetry::fail(HwVideoBufferPath::GlMemory);
         }
     }
-    if (ringHit) {
-        GstHwPathTelemetry::recordTextureReuse(HwVideoBufferPath::GlMemory);
-    }
-    s_glRingCache.insert(ringKey, char{});
     textures->setSourceSample(takeSample());
     return textures;
 }
