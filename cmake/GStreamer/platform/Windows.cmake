@@ -75,10 +75,14 @@ function(_qgc_gst_windows_extract staging installer)
         )
     endif()
 
+    # /portable=1 (cerbero's Inno script, 1.28+) skips the uninstaller, the GSTREAMER_1_0_ROOT_* environment
+    # variable, the InstallDir registry key, the VC++ redistributable and the Visual Studio templates. Without
+    # it they would record <staging>, which is renamed once the install completes. /CURRENTUSER avoids
+    # elevation; nothing is written outside <staging>.
     message(STATUS "Installing GStreamer SDK (silent)...")
     execute_process(
-        COMMAND "${_installer_native}" /VERYSILENT /SUPPRESSMSGBOXES /SP- /NORESTART "/LOG=${_installer_log_native}"
-                "/DIR=${_staging_native}"
+        COMMAND "${_installer_native}" /VERYSILENT /SUPPRESSMSGBOXES /SP- /NORESTART /CURRENTUSER /portable=1
+                "/LOG=${_installer_log_native}" "/DIR=${_staging_native}"
         RESULT_VARIABLE _installer_rc
         ERROR_VARIABLE _installer_err
         TIMEOUT 600
