@@ -38,6 +38,10 @@
 #include "gstqgc/GstQgcVideoFormats.h"
 
 #if defined(QGC_HAS_GST_DMABUF_GPU_PATH)
+#include <gst/allocators/gstdmabuf.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
 #include "GstDmaBufVideoBuffer.h"
 #endif
 #if defined(QGC_HAS_GST_GLMEMORY_GPU_PATH)
@@ -475,6 +479,66 @@ void GStreamerTest::_testDmaBufSingleFdImportEnvGate()
 
     qputenv("QGC_GST_DMABUF_SINGLE_EGLIMAGE", "force");
     QVERIFY(GstDmaBufVideoBuffer::singleFdImportEnabledForTest());
+#endif
+}
+
+void GStreamerTest::_testDmaBufEglBadMatchLatch_data()
+{
+    QTest::addColumn<bool>("singleFd");
+    QTest::addColumn<quint64>("drmModifier");
+    QTest::addColumn<bool>("expectDisabled");
+
+    constexpr quint64 kIntelTileYModifier = 0x0100000000000009ULL;
+    QTest::newRow("single-fd LINEAR keeps per-plane import") << true << quint64(0) << false;
+    QTest::newRow("single-fd tiled has no fallback") << true << kIntelTileYModifier << true;
+    QTest::newRow("per-plane disables path") << false << quint64(0) << true;
+}
+
+void GStreamerTest::_testDmaBufEglBadMatchLatch()
+{
+#if !defined(QGC_HAS_GST_DMABUF_GPU_PATH)
+    QSKIP("DMABuf GPU path not compiled in this build");
+#else
+    QFETCH(bool, singleFd);
+    QFETCH(quint64, drmModifier);
+    QFETCH(bool, expectDisabled);
+
+    GstDmaBufVideoBuffer::resetCachedState();
+    const auto resetGuard = qScopeGuard([] { GstDmaBufVideoBuffer::resetCachedState(); });
+
+    GstVideoInfo info;
+    gst_video_info_set_format(&info, GST_VIDEO_FORMAT_NV12, 64, 64);
+    const int fd = memfd_create("qgc-dmabuf-test", MFD_CLOEXEC);
+    QVERIFY(fd >= 0);
+    if (ftruncate(fd, static_cast<off_t>(GST_VIDEO_INFO_SIZE(&info))) != 0) {
+        ::close(fd);
+        QFAIL("ftruncate on memfd failed");
+    }
+    GstAllocator* allocator = gst_dmabuf_allocator_new();
+    GstMemory* memory = gst_dmabuf_allocator_alloc(allocator, fd, GST_VIDEO_INFO_SIZE(&info));
+    gst_object_unref(allocator);
+    QVERIFY(memory);
+    GstBuffer* buffer = gst_buffer_new();
+    gst_buffer_append_memory(buffer, memory);
+    GstCaps* caps = gst_video_info_to_caps(&info);
+    GstSample* sample = gst_sample_new(buffer, caps, nullptr, nullptr);
+    gst_buffer_unref(buffer);
+    gst_caps_unref(caps);
+
+    GstDmaBufVideoBuffer frame(sample, info, QVideoFrameFormat(QSize(64, 64), QVideoFrameFormat::Format_NV12),
+                               EGL_NO_DISPLAY);
+    gst_sample_unref(sample);
+    QVERIFY(frame.validatePlaneHandles());
+
+    if (expectDisabled) {
+        expectLogMessage("Video.GStreamer.HwBuffers.GstDmaBuf", QtWarningMsg,
+                         QRegularExpression(QStringLiteral("EGL_BAD_MATCH.*disabling DMABuf zero-copy")));
+    }
+    GstDmaBufVideoBuffer::recordEglBadMatchForTest(singleFd, drmModifier);
+    if (expectDisabled) {
+        verifyExpectedLogMessage();
+    }
+    QCOMPARE(frame.validatePlaneHandles(), !expectDisabled);
 #endif
 }
 
