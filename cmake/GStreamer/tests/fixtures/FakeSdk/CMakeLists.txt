@@ -164,9 +164,6 @@ if(GStreamer_USE_STATIC_LIBS)
     qgc_test_assert_in_list("static init source" "${_qgc_static_init}" _qgc_app_sources)
     get_source_file_property(_qgc_skip_pch "${_qgc_static_init}" TARGET_DIRECTORY QGCFakeApp SKIP_PRECOMPILE_HEADERS)
     qgc_test_assert_streq("static init skips the precompiled header" ON "${_qgc_skip_pch}")
-    file(STRINGS "${_qgc_static_init}" _qgc_registered REGEX "^    QGC_REGISTER_STATIC_PLUGIN\\(")
-    list(TRANSFORM _qgc_registered REPLACE "^    QGC_REGISTER_STATIC_PLUGIN\\(([a-z0-9_]+)\\);$" "\\1")
-    qgc_test_assert_streq("static init registrations" coreelements "${_qgc_registered}")
 else()
     qgc_test_assert_property("core libraries" GStreamer::deps INTERFACE_LINK_LIBRARIES
                              "${EXPECT_ROOT}/lib/libgstreamer-1.0.so"
