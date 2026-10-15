@@ -62,6 +62,8 @@ private slots:
     void _testInactiveQgcQVideoSinkDropsAndCounts();
     void _testQgcQVideoSinkDeliversLatestFrameOnly();
     void _testQgcQVideoSinkShowsPrerollBufferOnce();
+    void _testQgcQVideoSinkRenegotiatesMidStream();
+    void _testQgcQVideoSinkAppliesCropMeta();
     void _testQgcQVideoSinkStatsArePerSink();
     void _testQgcQVideoSinkGpuPathSelection_data();
     void _testQgcQVideoSinkGpuPathSelection();
