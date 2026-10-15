@@ -101,13 +101,33 @@ function(_qgc_gst_windows_extract staging installer)
     endif()
 endfunction()
 
+# _qgc_gst_windows_sdk_arch(<out_var>)
+# Returns the SDK architecture (arm64 or x86_64) of the build's target: the MSVC compiler's target
+# architecture when known, since a Ninja build from a vcvarsamd64_arm64 prompt reports the AMD64
+# host as CMAKE_SYSTEM_PROCESSOR; otherwise the Visual Studio platform or the processor.
+function(_qgc_gst_windows_sdk_arch out_var)
+    if(CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "ARM64")
+        set(_arch arm64)
+    elseif(CMAKE_CXX_COMPILER_ARCHITECTURE_ID STREQUAL "x64")
+        set(_arch x86_64)
+    elseif(CMAKE_GENERATOR_PLATFORM MATCHES "ARM64|aarch64"
+           OR (NOT CMAKE_GENERATOR_PLATFORM AND CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64|aarch64")
+    )
+        set(_arch arm64)
+    else()
+        set(_arch x86_64)
+    endif()
+    set(${out_var}
+        "${_arch}"
+        PARENT_SCOPE
+    )
+endfunction()
+
 macro(_qgc_discover_windows_sdk)
-    if(CMAKE_GENERATOR_PLATFORM MATCHES "ARM64|aarch64" OR
-       (NOT CMAKE_GENERATOR_PLATFORM AND CMAKE_SYSTEM_PROCESSOR MATCHES "ARM64|aarch64"))
-        set(_gst_win_arch "arm64")
+    _qgc_gst_windows_sdk_arch(_gst_win_arch)
+    if(_gst_win_arch STREQUAL "arm64")
         set(_gst_win_platform "windows_msvc_arm64")
     else()
-        set(_gst_win_arch "x86_64")
         set(_gst_win_platform "windows_msvc_x64")
     endif()
 

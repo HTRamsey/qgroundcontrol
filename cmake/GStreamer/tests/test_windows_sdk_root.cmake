@@ -32,3 +32,17 @@ qgc_test_assert_streq("no pkg-config" "" "${_root}")
 
 file(REMOVE_RECURSE "${_sandbox}")
 qgc_test_pass("Windows extracted SDK root selection")
+
+# compiler architecture id|generator platform|system processor|expected SDK architecture. The first
+# case is Ninja from a vcvarsamd64_arm64 prompt, where only the compiler knows the target is ARM64.
+set(_arch_cases "ARM64||AMD64|arm64" "x64|ARM64|ARM64|x86_64" "|ARM64|AMD64|arm64" "||aarch64|arm64" "||AMD64|x86_64")
+foreach(_case IN LISTS _arch_cases)
+    string(REPLACE "|" ";" _parts "${_case}")
+    list(GET _parts 0 CMAKE_CXX_COMPILER_ARCHITECTURE_ID)
+    list(GET _parts 1 CMAKE_GENERATOR_PLATFORM)
+    list(GET _parts 2 CMAKE_SYSTEM_PROCESSOR)
+    list(GET _parts 3 _expected)
+    _qgc_gst_windows_sdk_arch(_arch)
+    qgc_test_assert_streq("SDK architecture for ${_case}" "${_expected}" "${_arch}")
+endforeach()
+qgc_test_pass("Windows SDK architecture follows the compiler target")
