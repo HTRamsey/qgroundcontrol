@@ -9,11 +9,13 @@
 #include <memory>
 #include <utility>
 
+#include <QtCore/QLoggingCategory>
 #include <QtCore/QMetaObject>
 #include <QtCore/QMutex>
 #include <QtCore/QSemaphore>
 #include <QtCore/QString>
 
+#include "PipelineDotDumper.h"
 #include "StreamWatchdog.h"
 #include "VideoReceiver.h"
 
@@ -21,6 +23,9 @@ class QThread;
 class QTimer;
 class GStreamerTest;
 class GstVideoReceiverTest;
+
+/// Shared by GstVideoReceiver and its components.
+Q_DECLARE_LOGGING_CATEGORY(GstVideoReceiverLog)
 
 class GstVideoReceiver : public VideoReceiver
 {
@@ -202,6 +207,7 @@ private:
     bool _streaming = false;
     std::atomic<bool> _decoding = false;  ///< Read by the tee probe's flow log.
     StreamWatchdog _watchdog;
+    PipelineDotDumper _dotDumper;
 
     mutable QMutex _decoderNameMutex;  // QString refcount isn't thread-safe across reader/writer threads
     QString _decoderName;
