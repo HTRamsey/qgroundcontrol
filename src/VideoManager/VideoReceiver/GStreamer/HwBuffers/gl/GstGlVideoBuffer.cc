@@ -67,12 +67,12 @@ void waitInQtContext(GstGLSyncMeta* syncMeta, GstGLContext* glCtx)
         QOpenGLExtraFunctions* gl = hasSyncObjects ? qtCtx->extraFunctions() : nullptr;
         if (gl && gl->glIsSync(sync)) {
             gl->glWaitSync(sync, 0, GL_TIMEOUT_IGNORED);
-            GstHwPathTelemetry::recordSyncWait(HwVideoBufferPath::GlMemory, /*gpuSide=*/true);
+            GstHwPathTelemetry::record(HwVideoBufferPath::GlMemory, GstHwPathTelemetry::Counter::GpuWaits);
             return;
         }
     }
     gst_gl_sync_meta_wait_cpu(syncMeta, glCtx);
-    GstHwPathTelemetry::recordSyncWait(HwVideoBufferPath::GlMemory, /*gpuSide=*/false);
+    GstHwPathTelemetry::record(HwVideoBufferPath::GlMemory, GstHwPathTelemetry::Counter::CpuWaits);
 }
 
 // mapTextures() binds GLMemory only under Qt's OpenGL(ES2) QRhi, but the glupload bin still emits GLMemory under a

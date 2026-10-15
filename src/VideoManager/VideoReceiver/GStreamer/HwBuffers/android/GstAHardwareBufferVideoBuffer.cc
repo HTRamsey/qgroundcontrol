@@ -265,12 +265,12 @@ QVideoFrameTexturesUPtr GstAHardwareBufferVideoBuffer::mapTextures(QRhi& rhi, QV
             name = hit.resource->textureName;
             entry = hit.id;
             s_imageCache.pin(entry);  // provisional pin: hold the entry across the unlocked gap below
-            GstHwPathTelemetry::recordImageCacheHit(HwVideoBufferPath::AHardwareBuffer);
+            GstHwPathTelemetry::record(HwVideoBufferPath::AHardwareBuffer, GstHwPathTelemetry::Counter::ImageCacheHits);
         }
     }
 
     if (name == 0) {
-        GstHwPathTelemetry::recordImageCacheMiss(HwVideoBufferPath::AHardwareBuffer);
+        GstHwPathTelemetry::record(HwVideoBufferPath::AHardwareBuffer, GstHwPathTelemetry::Counter::ImageCacheMisses);
 
         EGLClientBuffer clientBuffer = eglGetNativeClientBufferANDROID_(ahwb);
         if (!clientBuffer) {
