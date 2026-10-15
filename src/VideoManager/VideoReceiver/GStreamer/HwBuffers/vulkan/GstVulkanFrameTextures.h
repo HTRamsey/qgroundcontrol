@@ -36,7 +36,7 @@ protected:
     }
 };
 
-/// Owns the imported VkImage + backing VkDeviceMemory (DMABuf zero-copy import); destroyed with the bundle.
+/// Owns the imported VkImage + backing VkDeviceMemory (DMABuf zero-copy import); released with the bundle.
 class GstVulkanOwnedFrameTextures final : public GstVulkanFrameTexturesBase
 {
 public:
@@ -51,33 +51,18 @@ public:
     {
         // QRhiTexture must be gone before the VkImage it wraps; reset it first.
         _textures[0].reset();
-        if (_image != VK_NULL_HANDLE && _destroyImage) {
-            _destroyImage(_dev, _image, nullptr);
-        }
-        if (_memory != VK_NULL_HANDLE && _freeMemory) {
-            _freeMemory(_dev, _memory, nullptr);
+        if (_release) {
+            _release();
         }
     }
 
     HwVideoBufferPath sourcePath() const override { return HwVideoBufferPath::DmaBuf; }
 
-    /// Transfers VkImage/VkDeviceMemory ownership into the bundle for deferred destruction.
-    void adoptVulkanResources(VkDevice dev, VkImage image, VkDeviceMemory memory, PFN_vkDestroyImage destroyImage,
-                              PFN_vkFreeMemory freeMemory) noexcept
-    {
-        _dev = dev;
-        _image = image;
-        _memory = memory;
-        _destroyImage = destroyImage;
-        _freeMemory = freeMemory;
-    }
+    /// Transfers VkImage/VkDeviceMemory ownership into the bundle: @p release runs once, when Qt destroys the bundle.
+    void adoptVulkanResources(std::function<void()> release) noexcept { _release = std::move(release); }
 
 private:
-    VkDevice _dev = VK_NULL_HANDLE;
-    VkImage _image = VK_NULL_HANDLE;
-    VkDeviceMemory _memory = VK_NULL_HANDLE;
-    PFN_vkDestroyImage _destroyImage = nullptr;
-    PFN_vkFreeMemory _freeMemory = nullptr;
+    std::function<void()> _release;
 };
 
 /// Borrows a VkImage owned by GstVulkanImageMemory and kept alive via the held GstSample (setSourceSample). Never

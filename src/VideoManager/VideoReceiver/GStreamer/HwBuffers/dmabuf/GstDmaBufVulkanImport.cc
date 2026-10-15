@@ -1,5 +1,7 @@
 #include "GstDmaBufVulkanImport.h"
 
+#include <vector>
+
 #if defined(QGC_HAS_GST_DMABUF_GPU_PATH) && defined(QGC_HAS_GST_VULKAN_GPU_PATH)
 
 #include <QtCore/QLoggingCategory>
@@ -63,11 +65,18 @@ struct VulkanImportFns
     PFN_vkGetImageMemoryRequirements getImageMemoryRequirements = nullptr;
     PFN_vkGetMemoryFdPropertiesKHR getMemoryFdProperties = nullptr;
     PFN_vkGetPhysicalDeviceMemoryProperties getPhysicalDeviceMemoryProperties = nullptr;
+    PFN_vkCreateFence createFence = nullptr;
+    PFN_vkDestroyFence destroyFence = nullptr;
+    PFN_vkGetFenceStatus getFenceStatus = nullptr;
+    PFN_vkWaitForFences waitForFences = nullptr;
+    PFN_vkQueueSubmit queueSubmit = nullptr;
+    PFN_vkQueueWaitIdle queueWaitIdle = nullptr;
 
     bool ok() const noexcept
     {
         return createImage && destroyImage && allocateMemory && freeMemory && bindImageMemory &&
-               getImageMemoryRequirements && getMemoryFdProperties && getPhysicalDeviceMemoryProperties;
+               getImageMemoryRequirements && getMemoryFdProperties && getPhysicalDeviceMemoryProperties &&
+               createFence && destroyFence && getFenceStatus && waitForFences && queueSubmit && queueWaitIdle;
     }
 };
 
@@ -107,9 +116,73 @@ const VulkanImportFns& resolveVulkanImportFns(QVulkanInstance& inst, VkDevice de
     fns.getMemoryFdProperties = reinterpret_cast<PFN_vkGetMemoryFdPropertiesKHR>(dev_fn("vkGetMemoryFdPropertiesKHR"));
     fns.getPhysicalDeviceMemoryProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceMemoryProperties>(
         inst.getInstanceProcAddr("vkGetPhysicalDeviceMemoryProperties"));
+    fns.createFence = reinterpret_cast<PFN_vkCreateFence>(dev_fn("vkCreateFence"));
+    fns.destroyFence = reinterpret_cast<PFN_vkDestroyFence>(dev_fn("vkDestroyFence"));
+    fns.getFenceStatus = reinterpret_cast<PFN_vkGetFenceStatus>(dev_fn("vkGetFenceStatus"));
+    fns.waitForFences = reinterpret_cast<PFN_vkWaitForFences>(dev_fn("vkWaitForFences"));
+    fns.queueSubmit = reinterpret_cast<PFN_vkQueueSubmit>(dev_fn("vkQueueSubmit"));
+    fns.queueWaitIdle = reinterpret_cast<PFN_vkQueueWaitIdle>(dev_fn("vkQueueWaitIdle"));
     cache.dev = dev;
     cache.generation = generation;
     return fns;
+}
+
+// Qt destroys a frame bundle when its pool slot is reused, which can be right after the frame that last sampled it was
+// submitted, so the imported image is only destroyed once a fence queued behind that work on QRhi's queue signals.
+// Render-thread confined, like the QRhi whose queue the fences are submitted to.
+struct RetiredImport
+{
+    VkDevice dev = VK_NULL_HANDLE;
+    VkFence fence = VK_NULL_HANDLE;
+    VkImage image = VK_NULL_HANDLE;
+    VkDeviceMemory memory = VK_NULL_HANDLE;
+    VulkanImportFns fns;
+};
+
+thread_local std::vector<RetiredImport> t_retiredImports;
+const char s_retiredImportsCleanupKey = 0;
+
+void destroyRetiredImport(const RetiredImport& retired)
+{
+    retired.fns.destroyImage(retired.dev, retired.image, nullptr);
+    retired.fns.freeMemory(retired.dev, retired.memory, nullptr);
+    if (retired.fence != VK_NULL_HANDLE) {
+        retired.fns.destroyFence(retired.dev, retired.fence, nullptr);
+    }
+}
+
+// Destroys @p dev's retired imports whose fence signalled; with @p waitAll (QRhi teardown) waits for every fence first.
+void reapRetiredImports(VkDevice dev, bool waitAll)
+{
+    auto& retiredImports = t_retiredImports;
+    for (auto it = retiredImports.begin(); it != retiredImports.end();) {
+        if (it->dev != dev) {
+            ++it;
+            continue;
+        }
+        if (waitAll) {
+            (void) it->fns.waitForFences(dev, 1, &it->fence, VK_TRUE, UINT64_MAX);
+        } else if (it->fns.getFenceStatus(dev, it->fence) != VK_SUCCESS) {
+            ++it;
+            continue;
+        }
+        destroyRetiredImport(*it);
+        it = retiredImports.erase(it);
+    }
+}
+
+void retireImport(VkQueue queue, RetiredImport retired)
+{
+    const VkFenceCreateInfo fenceInfo = {VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, nullptr, 0};
+    // A submit without batches signals its fence once all work already submitted to the queue has completed.
+    if (retired.fns.createFence(retired.dev, &fenceInfo, nullptr, &retired.fence) != VK_SUCCESS ||
+        retired.fns.queueSubmit(queue, 0, nullptr, retired.fence) != VK_SUCCESS) {
+        (void) retired.fns.queueWaitIdle(queue);
+        destroyRetiredImport(retired);
+        return;
+    }
+    t_retiredImports.push_back(retired);
+    reapRetiredImports(retired.dev, /*waitAll=*/false);
 }
 
 quint64 dmaMemoryBound(GstMemory* memory, const GstVideoInfo& videoInfo) noexcept
@@ -214,7 +287,8 @@ QVideoFrameTexturesUPtr GstDmaBufVideoBuffer::importVulkan(QRhi& rhi)
     // with QRhiTexture::createFrom. Every step is capability-gated; any miss returns fail(). Single-plane RGB layouts
     // only (see vkFormatForVideoInfo); validatePlaneHandles() already routed other layouts to the CPU path.
     const auto* nh = static_cast<const QRhiVulkanNativeHandles*>(rhi.nativeHandles());
-    if (!nh || nh->dev == VK_NULL_HANDLE || nh->physDev == VK_NULL_HANDLE || !nh->inst) {
+    if (!nh || nh->dev == VK_NULL_HANDLE || nh->physDev == VK_NULL_HANDLE || nh->gfxQueue == VK_NULL_HANDLE ||
+        !nh->inst) {
         QGC_HW_WARN_ONCE(GstDmaBufVulkanLog, s_loggedVulkanUnimpl, "Vulkan import: native device handles unavailable");
         return GstHwPathTelemetry::fail(HwVideoBufferPath::DmaBuf);
     }
@@ -383,9 +457,14 @@ QVideoFrameTexturesUPtr GstDmaBufVideoBuffer::importVulkan(QRhi& rhi)
         return GstHwPathTelemetry::fail(HwVideoBufferPath::DmaBuf);
     }
     // Ownership of image/memory passes to the bundle; disarm the scope guards.
-    frameTextures->adoptVulkanResources(dev, image, memory, pfnDestroyImage, pfnFreeMemory);
+    frameTextures->adoptVulkanResources(
+        [queue = nh->gfxQueue, retired = RetiredImport{dev, VK_NULL_HANDLE, image, memory, fns}] {
+            retireImport(queue, retired);
+        });
     image = VK_NULL_HANDLE;
     memory = VK_NULL_HANDLE;
+    // Keyed: one teardown hook per QRhi, run while its device is still alive.
+    rhi.addCleanupCallback(&s_retiredImportsCleanupKey, [dev](QRhi*) { reapRetiredImports(dev, /*waitAll=*/true); });
     frameTextures->setSourceSample(takeSample());
     static std::atomic<bool> s_loggedVulkanOk{false};
     if (!s_loggedVulkanOk.exchange(true, std::memory_order_relaxed)) {
