@@ -17,6 +17,7 @@ set(_qgc_findmod_tests
     test_install_libs_guard_windows
     test_android_abi_info
     test_windows_sdk_root
+    test_checksum_authority
 )
 
 foreach(_t IN LISTS _qgc_findmod_tests)
@@ -102,6 +103,12 @@ endforeach()
 
 _qgc_add_findmodule_failure_test(test_android_abi_info.UnsupportedAbi test_android_abi_info
                                  "Unsupported Android ABI: mips" unsupported-abi
+)
+_qgc_add_findmodule_failure_test(test_checksum_authority.PinMismatch test_checksum_authority
+                                 "does NOT match the in-tree pinned hash" pin-mismatch
+)
+_qgc_add_findmodule_failure_test(test_checksum_authority.SidecarOnlyRequired test_checksum_authority
+                                 "cannot satisfy GStreamer_REQUIRE_CHECKSUM=ON" sidecar-only-required
 )
 
 # The Orchestrator fixture generates a Linux-layout fake SDK and drives it through the host's

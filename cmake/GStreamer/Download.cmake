@@ -145,7 +145,9 @@ function(gstreamer_fetch_checksum PLATFORM VERSION OUTPUT_VAR)
 
         file(READ "${_checksum_file}" _content)
         string(STRIP "${_content}" _content)
-        string(REGEX MATCH "([0-9a-fA-F]{64})" _match "${_content}")
+        # CMake regex has no {n} quantifier.
+        string(REPEAT "[0-9a-fA-F]" 64 _sha256_hex)
+        string(REGEX MATCH "(${_sha256_hex})" _match "${_content}")
         if(_match)
             set(_fetched_hash "SHA256=${CMAKE_MATCH_1}")
             if(_pinned_hash AND NOT _pinned_hash STREQUAL _fetched_hash)
