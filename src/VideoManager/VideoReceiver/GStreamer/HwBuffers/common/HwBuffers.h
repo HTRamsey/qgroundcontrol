@@ -8,13 +8,10 @@
 
 class QQuickWindow;
 
-// HwVideoBufferContext/Path and telemetry are unconditional (CPU path uses them); GstHwVideoBuffer needs
-// MultimediaPrivate so it's GPU-only.
+// Same in every build and free of EGL/Qt-private headers; GstHwVideoBuffer.h (Qt-private) is included where needed.
 #include "GstHwPathTelemetry.h"
-#include "GstHwVideoBufferFactory.h"  // HwVideoBufferContext, HwVideoBufferPath, makeHwVideoBuffer
-#if defined(QGC_HAS_ANY_GPU_PATH)
-#include "GstHwVideoBuffer.h"
-#endif
+#include "GstHwTypes.h"
+#include "GstHwVideoBufferFactory.h"  // makeHwVideoBuffer, HwResolvedPathCache
 
 namespace HwBuffers {
 

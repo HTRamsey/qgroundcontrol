@@ -328,32 +328,9 @@ constexpr quint64 kMaxConsecutiveMapFailures = 120;
 // A backward PTS jump larger than this is a new timeline (source restart, loop), not reordered output to drop.
 constexpr int64_t kPtsResyncThresholdNs = static_cast<int64_t>(GST_SECOND);
 
-static const char* describeMappedPath([[maybe_unused]] const MappedFrame& m) noexcept
+static const char* describeMappedPath(const MappedFrame& m) noexcept
 {
-#if defined(QGC_HAS_ANY_GPU_PATH)
-    if (m.source == MappedFrame::Source::Gpu) {
-        switch (m.gpuPath) {
-            case HwVideoBufferPath::DmaBuf:
-                return "GPU/DmaBuf";
-            case HwVideoBufferPath::GlMemory:
-                return "GPU/GlMemory";
-            case HwVideoBufferPath::D3D11:
-                return "GPU/D3D11";
-            case HwVideoBufferPath::D3D12:
-                return "GPU/D3D12";
-            case HwVideoBufferPath::IOSurface:
-                return "GPU/IOSurface";
-            case HwVideoBufferPath::AHardwareBuffer:
-                return "GPU/AHardwareBuffer";
-            case HwVideoBufferPath::Vulkan:
-                return "GPU/Vulkan";
-            case HwVideoBufferPath::None:
-                break;
-        }
-        return "GPU/Unknown";
-    }
-#endif
-    return "CPU";
+    return GstHw::toString((m.source == MappedFrame::Source::Gpu) ? m.gpuPath : HwVideoBufferPath::None);
 }
 
 static GstFlowReturn gst_qgc_q_video_sink_show_frame(GstVideoSink* vsink, GstBuffer* buf)

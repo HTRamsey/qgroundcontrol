@@ -38,11 +38,6 @@ public:
                                                               const QVideoFrameFormat& format,
                                                               const PinnedFrameCounter& pinned);
 
-    /// Telemetry: total acquireFrame() calls satisfied from the pool vs. fresh alloc.
-    quint64 hitCount() const noexcept { return _hits.load(std::memory_order_relaxed); }
-
-    quint64 missCount() const noexcept { return _misses.load(std::memory_order_relaxed); }
-
     struct PlaneLayout
     {
         int planeCount = 0;
@@ -82,6 +77,4 @@ private:
     QMutex _mutex;
     std::array<Slot, kMaxSlots> _slots;
     int _evictCursor = 0;
-    std::atomic<quint64> _hits{0};
-    std::atomic<quint64> _misses{0};
 };

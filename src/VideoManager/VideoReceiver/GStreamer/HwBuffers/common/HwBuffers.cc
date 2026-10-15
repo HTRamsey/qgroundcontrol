@@ -43,7 +43,6 @@ QGC_LOGGING_CATEGORY(HwBuffersFacadeLog, "Video.GStreamer.HwBuffers.Facade")
 #endif
 
 #include <QtCore/QByteArray>
-#include <array>
 #include <utility>
 
 #include "QGCLoggingCategory.h"
@@ -54,60 +53,30 @@ QGC_LOGGING_CATEGORY(HwBuffersConfigLog, "Video.GStreamer.HwBuffers.Config")
 
 #if defined(QGC_HAS_ANY_GPU_PATH)
 namespace {
-// Compile-time table of enabled GPU paths; iterated by formatPathStats/takeExtraPathStats to avoid repeating the
-// ifdef ladder.
-struct GpuPathEntry
-{
-    HwVideoBufferPath path;
-    const char* label;
+// GPU paths compiled into this build; the stats formatters iterate it instead of repeating the ifdef ladder.
+constexpr HwVideoBufferPath kEnabledPaths[] = {
+#if defined(QGC_HAS_GST_DMABUF_GPU_PATH)
+    HwVideoBufferPath::DmaBuf,
+#endif
+#if defined(QGC_HAS_GST_GLMEMORY_GPU_PATH)
+    HwVideoBufferPath::GlMemory,
+#endif
+#if defined(QGC_HAS_GST_D3D11_GPU_PATH)
+    HwVideoBufferPath::D3D11,
+#endif
+#if defined(QGC_HAS_GST_D3D12_GPU_PATH)
+    HwVideoBufferPath::D3D12,
+#endif
+#if defined(QGC_HAS_GST_IOSURFACE_GPU_PATH)
+    HwVideoBufferPath::IOSurface,
+#endif
+#if defined(QGC_HAS_GST_AHARDWAREBUFFER_GPU_PATH)
+    HwVideoBufferPath::AHardwareBuffer,
+#endif
+#if defined(QGC_HAS_GST_VULKAN_GPU_PATH)
+    HwVideoBufferPath::Vulkan,
+#endif
 };
-
-constexpr std::array<GpuPathEntry, 0
-#if defined(QGC_HAS_GST_DMABUF_GPU_PATH)
-                                       + 1
-#endif
-#if defined(QGC_HAS_GST_GLMEMORY_GPU_PATH)
-                                       + 1
-#endif
-#if defined(QGC_HAS_GST_D3D11_GPU_PATH)
-                                       + 1
-#endif
-#if defined(QGC_HAS_GST_D3D12_GPU_PATH)
-                                       + 1
-#endif
-#if defined(QGC_HAS_GST_IOSURFACE_GPU_PATH)
-                                       + 1
-#endif
-#if defined(QGC_HAS_GST_AHARDWAREBUFFER_GPU_PATH)
-                                       + 1
-#endif
-#if defined(QGC_HAS_GST_VULKAN_GPU_PATH)
-                                       + 1
-#endif
-                     >
-    kEnabledPaths = {{
-#if defined(QGC_HAS_GST_DMABUF_GPU_PATH)
-        {HwVideoBufferPath::DmaBuf, "DMABuf"},
-#endif
-#if defined(QGC_HAS_GST_GLMEMORY_GPU_PATH)
-        {HwVideoBufferPath::GlMemory, "GL"},
-#endif
-#if defined(QGC_HAS_GST_D3D11_GPU_PATH)
-        {HwVideoBufferPath::D3D11, "D3D11"},
-#endif
-#if defined(QGC_HAS_GST_D3D12_GPU_PATH)
-        {HwVideoBufferPath::D3D12, "D3D12"},
-#endif
-#if defined(QGC_HAS_GST_IOSURFACE_GPU_PATH)
-        {HwVideoBufferPath::IOSurface, "IOSurface"},
-#endif
-#if defined(QGC_HAS_GST_AHARDWAREBUFFER_GPU_PATH)
-        {HwVideoBufferPath::AHardwareBuffer, "AHWBuf"},
-#endif
-#if defined(QGC_HAS_GST_VULKAN_GPU_PATH)
-        {HwVideoBufferPath::Vulkan, "Vulkan"},
-#endif
-    }};
 }  // namespace
 #endif
 
@@ -297,17 +266,17 @@ PathStats formatPathStats(bool reset) noexcept
 {
     PathStats out;
 #if defined(QGC_HAS_ANY_GPU_PATH)
-    for (const auto& entry : kEnabledPaths) {
-        const quint64 delivered = reset ? GstHwPathTelemetry::takeDeliveredCount(entry.path)
-                                        : GstHwPathTelemetry::peekDeliveredCount(entry.path);
-        const quint64 failures = reset ? GstHwPathTelemetry::takeMapFailureCount(entry.path)
-                                       : GstHwPathTelemetry::peekMapFailureCount(entry.path);
+    for (const HwVideoBufferPath path : kEnabledPaths) {
+        const QLatin1String label(GstHw::toString(path));
+        const quint64 delivered =
+            reset ? GstHwPathTelemetry::takeDeliveredCount(path) : GstHwPathTelemetry::peekDeliveredCount(path);
+        const quint64 failures =
+            reset ? GstHwPathTelemetry::takeMapFailureCount(path) : GstHwPathTelemetry::peekMapFailureCount(path);
         // Teardown (reset) uses expanded label so operators can copy the failures field into bug reports.
         if (reset) {
-            out.line +=
-                QStringLiteral(" %1:%2 %1-failures:%3").arg(QLatin1String(entry.label)).arg(delivered).arg(failures);
+            out.line += QStringLiteral(" %1:%2 %1-failures:%3").arg(label).arg(delivered).arg(failures);
         } else {
-            out.line += QStringLiteral(" %1:%2/%3").arg(QLatin1String(entry.label)).arg(delivered).arg(failures);
+            out.line += QStringLiteral(" %1:%2/%3").arg(label).arg(delivered).arg(failures);
         }
         out.totalDelivered += delivered;
     }
@@ -350,25 +319,26 @@ QString takeExtraPathStats() noexcept
         {GstHwPathTelemetry::HwFallbackReason::VulkanNoSync, "vulkan-no-sync"},
         {GstHwPathTelemetry::HwFallbackReason::ImportUnsupported, "import-unsupported"},
     };
-    for (const auto& entry : kEnabledPaths) {
-        const quint64 ewmaUs = GstHwPathTelemetry::peekMapDurationUsEwma(entry.path);
+    for (const HwVideoBufferPath path : kEnabledPaths) {
+        const QLatin1String pathLabel(GstHw::toString(path));
+        const quint64 ewmaUs = GstHwPathTelemetry::peekMapDurationUsEwma(path);
         if (ewmaUs > 0) {
-            out += QStringLiteral(" %1-map-us:%2").arg(QLatin1String(entry.label)).arg(ewmaUs);
+            out += QStringLiteral(" %1-map-us:%2").arg(pathLabel).arg(ewmaUs);
         }
-        const quint64 demotions = GstHwPathTelemetry::takeStreamDemotions(entry.path);
+        const quint64 demotions = GstHwPathTelemetry::takeStreamDemotions(path);
         if (demotions > 0) {
-            out += QStringLiteral(" %1-demotions:%2").arg(QLatin1String(entry.label)).arg(demotions);
+            out += QStringLiteral(" %1-demotions:%2").arg(pathLabel).arg(demotions);
         }
         QString reasonBreakdown;
         for (const auto& [reason, label] : kReasons) {
-            const quint64 n = GstHwPathTelemetry::takeFallbackReason(entry.path, reason);
+            const quint64 n = GstHwPathTelemetry::takeFallbackReason(path, reason);
             if (n > 0) {
                 reasonBreakdown += QStringLiteral("%1=%2,").arg(QLatin1String(label)).arg(n);
             }
         }
         if (!reasonBreakdown.isEmpty()) {
             reasonBreakdown.chop(1);
-            out += QStringLiteral(" %1-fallback[%2]").arg(QLatin1String(entry.label)).arg(reasonBreakdown);
+            out += QStringLiteral(" %1-fallback[%2]").arg(pathLabel).arg(reasonBreakdown);
         }
     }
     // None-path accumulates UnknownMemType (no allocator matched any compiled path).
