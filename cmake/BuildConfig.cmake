@@ -18,14 +18,14 @@ set_property(
 file(READ "${QGC_BUILD_CONFIG_FILE}" QGC_BUILD_CONFIG_CONTENT)
 
 # Extract value from JSON using CMake's native JSON parser; supports dotted paths
-function(qgc_config_get_value VAR_NAME JSON_KEY)
+function(qgc_config_get_value var_name json_key)
     if(NOT ARGC EQUAL 2
-       OR NOT VAR_NAME MATCHES "^[A-Za-z_][A-Za-z0-9_]*$"
-       OR NOT JSON_KEY
+       OR NOT var_name MATCHES "^[A-Za-z_][A-Za-z0-9_]*$"
+       OR NOT json_key
     )
         message(FATAL_ERROR "qgc_config_get_value: a valid output variable and non-empty JSON key are required")
     endif()
-    string(REPLACE "." ";" _path "${JSON_KEY}")
+    string(REPLACE "." ";" _path "${json_key}")
     string(
         JSON
         _type
@@ -36,10 +36,10 @@ function(qgc_config_get_value VAR_NAME JSON_KEY)
         ${_path}
     )
     if(_err)
-        message(FATAL_ERROR "QGC: BuildConfig: Key '${JSON_KEY}' not found in ${QGC_BUILD_CONFIG_FILE}")
+        message(FATAL_ERROR "QGC: BuildConfig: Key '${json_key}' not found in ${QGC_BUILD_CONFIG_FILE}")
     endif()
     if(_type STREQUAL "ARRAY" OR _type STREQUAL "OBJECT")
-        message(FATAL_ERROR "QGC: BuildConfig: Key '${JSON_KEY}' must be scalar, got ${_type}")
+        message(FATAL_ERROR "QGC: BuildConfig: Key '${json_key}' must be scalar, got ${_type}")
     endif()
     string(
         JSON
@@ -51,11 +51,11 @@ function(qgc_config_get_value VAR_NAME JSON_KEY)
         ${_path}
     )
     if(_err)
-        message(FATAL_ERROR "QGC: BuildConfig: Key '${JSON_KEY}' not found in ${QGC_BUILD_CONFIG_FILE}")
+        message(FATAL_ERROR "QGC: BuildConfig: Key '${json_key}' not found in ${QGC_BUILD_CONFIG_FILE}")
     endif()
-    set(${VAR_NAME}
+    set(${var_name}
         "${_value}"
-        CACHE STRING "${JSON_KEY}" FORCE
+        CACHE STRING "${json_key}" FORCE
     )
 endfunction()
 
@@ -76,7 +76,6 @@ qgc_config_get_value(QGC_CONFIG_CMAKE_MINIMUM "build.cmake_minimum_version")
 qgc_config_get_value(QGC_CONFIG_MACOS_DEPLOYMENT_TARGET "apple.macos_deployment_target")
 qgc_config_get_value(QGC_CONFIG_IOS_DEPLOYMENT_TARGET "apple.ios_deployment_target")
 
-message(
-    STATUS
-        "BuildConfig: Qt ${QGC_CONFIG_QT_VERSION}, GStreamer ${QGC_CONFIG_GSTREAMER_VERSION}, NDK ${QGC_CONFIG_NDK_VERSION}"
+message(STATUS "BuildConfig: Qt ${QGC_CONFIG_QT_VERSION}, GStreamer ${QGC_CONFIG_GSTREAMER_VERSION}, "
+               "NDK ${QGC_CONFIG_NDK_VERSION}"
 )

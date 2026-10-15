@@ -4,12 +4,14 @@ include_guard(GLOBAL)
 
 string(TIMESTAMP QGC_CONFIGURE_TIME "%Y-%m-%d %H:%M:%S %Z")
 
+# Prints "<label><value>", skipping an empty value.
 function(_qgc_kv _label _value)
     if(NOT "${_value}" STREQUAL "")
         message(STATUS "  ${_label}${_value}")
     endif()
 endfunction()
 
+# Prints "<label>: ON|OFF" for the truth of the remaining arguments.
 macro(OptionOutput _label)
     if(${ARGN})
         set(_val "ON")

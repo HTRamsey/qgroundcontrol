@@ -14,9 +14,8 @@ endif()
 if(DEFINED QGC_CONFIG_NDK_FULL_VERSION)
     string(REGEX MATCH "^([0-9]+\\.[0-9]+)" _ndk_major_minor "${QGC_CONFIG_NDK_FULL_VERSION}")
     if(_ndk_major_minor AND NOT CMAKE_ANDROID_NDK_VERSION VERSION_GREATER_EQUAL "${_ndk_major_minor}")
-        message(
-            FATAL_ERROR
-                "QGC: NDK ${CMAKE_ANDROID_NDK_VERSION} is too old. Qt ${Qt6_VERSION} requires NDK ${_ndk_major_minor}+ (${QGC_CONFIG_NDK_VERSION})"
+        message(FATAL_ERROR "QGC: NDK ${CMAKE_ANDROID_NDK_VERSION} is too old. Qt ${Qt6_VERSION} requires NDK "
+                            "${_ndk_major_minor}+ (${QGC_CONFIG_NDK_VERSION})"
         )
     endif()
     unset(_ndk_major_minor)
@@ -71,9 +70,8 @@ if(NOT ANDROID_DEV_VERSION MATCHES "^[0-9]+$")
     set(ANDROID_DEV_VERSION 0)
 endif()
 if(ANDROID_DEV_VERSION GREATER 999)
-    message(
-        WARNING
-            "QGC: Android dev version ${ANDROID_DEV_VERSION} exceeds 999; clamping. Cut a release tag to reset the counter."
+    message(WARNING "QGC: Android dev version ${ANDROID_DEV_VERSION} exceeds 999; clamping. "
+                    "Cut a release tag to reset the counter."
     )
     set(ANDROID_DEV_VERSION 999)
 endif()
@@ -85,8 +83,9 @@ elseif(_qgc_dev_len EQUAL 2)
 endif()
 
 # Version code format: BBMIPPDDD (B=Bitness, M=Major, I=Minor, P=Patch, D=Dev)
-set(ANDROID_VERSION_CODE
-    "${ANDROID_BITNESS_CODE}${CMAKE_PROJECT_VERSION_MAJOR}${CMAKE_PROJECT_VERSION_MINOR}${ANDROID_PATCH_VERSION}${ANDROID_DEV_VERSION}"
+string(CONCAT ANDROID_VERSION_CODE
+              "${ANDROID_BITNESS_CODE}${CMAKE_PROJECT_VERSION_MAJOR}${CMAKE_PROJECT_VERSION_MINOR}"
+              "${ANDROID_PATCH_VERSION}${ANDROID_DEV_VERSION}"
 )
 message(STATUS "QGC: Android version code: ${ANDROID_VERSION_CODE}")
 
@@ -127,7 +126,8 @@ set_target_properties(
 #     set(QT_ANDROID_APPLICATION_ARGUMENTS)
 # endif()
 
-# Forward Python3_EXECUTABLE so per-ABI sub-configures use the same interpreter (jinja2 lives in workspace .venv, not hostedtoolcache python).
+# Forward Python3_EXECUTABLE so per-ABI sub-configures use the same interpreter (jinja2 lives in workspace .venv, not
+# hostedtoolcache python).
 list(APPEND QT_ANDROID_MULTI_ABI_FORWARD_VARS QGC_STABLE_BUILD QT_HOST_PATH Python3_EXECUTABLE)
 
 # ----------------------------------------------------------------------------
