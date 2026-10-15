@@ -60,7 +60,7 @@ Per-platform import of decoded GPU frames without a copy, all sharing `GstHwFram
 ## Build Configuration
 
 - **Enable/disable**: Set the `QGC_ENABLE_GST_VIDEOSTREAMING` CMake option to `ON`/`OFF`.
-- **Versions, checksums and plugins**: `gstreamer.version.<platform>`, `gstreamer.checksums`, `gstreamer.plugins` and the iOS CA-bundle pin live in [`.github/build-config.json`](../../../../.github/build-config.json), read by [`cmake/BuildConfig.cmake`](../../../../cmake/BuildConfig.cmake). The download URLs (upstream and the QGC S3 mirror) are templated from the version in [`cmake/GStreamer/Download.cmake`](../../../../cmake/GStreamer/Download.cmake). Linux uses the system GStreamer and treats `gstreamer.version.minimum` as its floor.
+- **Versions, checksums and plugins**: `gstreamer.version.<platform>`, `gstreamer.checksums`, `gstreamer.plugins` and the iOS CA-bundle pin live in [`.github/build-config.json`](../../../../.github/build-config.json), read through `qgc_config_read` ([`cmake/modules/BuildConfigReader.cmake`](../../../../cmake/modules/BuildConfigReader.cmake)). The download URLs (upstream and the QGC S3 mirror) are templated from the version in [`cmake/GStreamer/Download.cmake`](../../../../cmake/GStreamer/Download.cmake). Linux uses the system GStreamer and treats `gstreamer.version.minimum` as its floor.
 - **Configure options**:
   - `GStreamer_ROOT_DIR`: the SDK to use. Configure never writes it; the SDK it selected is recorded as `QGC_GST_RESOLVED_ROOT` in `CMakeCache.txt`.
   - `QGC_GST_VERSION`: overrides the build-config version (the minimum on Linux, the SDK to download elsewhere).
@@ -76,7 +76,7 @@ Per-platform import of decoded GPU frames without a copy, all sharing `GstHwFram
   - `StaticInit.cmake`: generates `gst_init_static_plugins()` for static layouts from `gst_static_plugins.c.in`.
   - `Install.cmake`: desktop install helpers; each reports the plugin directory it installs to, which the install-time verifier checks.
   - `SdkState.cmake`: the resolved-SDK cache entries and the SDK fingerprint that drops cached probe results when the SDK changes.
-  - `Platform.cmake`, `Components.cmake`, `Layout.cmake`, `Link.cmake`, `Json.cmake` and `Probe.cmake`: the target platform, the component registry, the `GStreamer::Layout` target describing the SDK's on-disk layout, library resolution for the targets, the `build-config.json` reader and the header probes.
+  - `Platform.cmake`, `Components.cmake`, `Layout.cmake`, `Link.cmake` and `Probe.cmake`: the target platform, the component registry, the `GStreamer::Layout` target describing the SDK's on-disk layout, library resolution for the targets and the header probes.
   - `Helpers.cmake`: include aggregator for the modules above.
   - `tests/`: script tests and a fake-SDK configure fixture, run with `ctest -L FindModule`.
 

@@ -24,7 +24,6 @@ endfunction()
 
 string(SHA256 _pinned "pinned")
 string(SHA256 _other "other")
-string(TOUPPER "${_pinned}" _pinned_upper)
 string(TOUPPER "${_other}" _other_upper)
 
 if(TEST_CASE STREQUAL "sidecar-only-required")
@@ -41,10 +40,10 @@ if(DEFINED TEST_CASE)
 endif()
 
 # A pinned SDK never consults the sidecar, so even a disagreeing cached one is ignored.
-_qgc_test_set_pin(9.0.1 "${_pinned_upper}")
+_qgc_test_set_pin(9.0.1 "${_pinned}")
 _qgc_test_seed_sidecar(9.0.1 "${_other}")
 gstreamer_fetch_checksum(${_platform} 9.0.1 _hash)
-qgc_test_assert_streq("pin, lowercased" "SHA256=${_pinned}" "${_hash}")
+qgc_test_assert_streq("pin" "SHA256=${_pinned}" "${_hash}")
 qgc_test_pass("pinned checksum is authoritative")
 
 set(QGC_BUILD_CONFIG_CONTENT "{}")

@@ -5,6 +5,8 @@
 
 include_guard(GLOBAL)
 
+include("${CMAKE_CURRENT_LIST_DIR}/../modules/BuildConfigReader.cmake")
+
 if(POLICY CMP0174)
     cmake_policy(SET CMP0174 NEW)
 endif()
@@ -68,7 +70,6 @@ _qgc_gst_assert_policy_consistent()
 # gstreamer_plugins_for(PLATFORM <key> OUT_VAR <var>)
 # Reads the plugin list for <key> ("android"|"apple"|"windows"|"linux"|"") from
 # build-config.json (gstreamer.plugins.common + gstreamer.plugins.<key>).
-# Requires QGC_BUILD_CONFIG_CONTENT to be set by BuildConfig.cmake.
 function(gstreamer_plugins_for)
     cmake_parse_arguments(PARSE_ARGV 0 ARG "" "PLATFORM;OUT_VAR" "")
     set(_missing_values ${ARG_KEYWORDS_MISSING_VALUES})
@@ -82,14 +83,9 @@ function(gstreamer_plugins_for)
     if(NOT ARG_OUT_VAR)
         message(FATAL_ERROR "gstreamer_plugins_for: OUT_VAR is required")
     endif()
-    if(NOT DEFINED QGC_BUILD_CONFIG_CONTENT)
-        message(FATAL_ERROR "gstreamer_plugins_for: build-config.json not loaded; "
-                            "expected QGC_BUILD_CONFIG_CONTENT to be set by BuildConfig.cmake."
-        )
-    endif()
-    _qgc_gst_json_array_to_list(_plugins "${QGC_BUILD_CONFIG_CONTENT}" gstreamer plugins common)
+    qgc_config_read(_plugins LIST gstreamer plugins common)
     if(ARG_PLATFORM)
-        _qgc_gst_json_array_to_list(_extra "${QGC_BUILD_CONFIG_CONTENT}" gstreamer plugins ${ARG_PLATFORM})
+        qgc_config_read(_extra LIST OPTIONAL gstreamer plugins ${ARG_PLATFORM})
         list(APPEND _plugins ${_extra})
     endif()
     set(${ARG_OUT_VAR}

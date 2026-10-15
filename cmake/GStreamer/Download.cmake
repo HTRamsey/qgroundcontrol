@@ -6,6 +6,7 @@ include_guard(GLOBAL)
 # test_download.cmake adds cmake/GStreamer/ to MODULE_PATH, a bare `include(Download)`
 # would resolve to this file and self-recurse.
 include("${CMAKE_CURRENT_LIST_DIR}/../modules/Download.cmake") # qgc_resilient_download / qgc_parse_expected_hash
+include("${CMAKE_CURRENT_LIST_DIR}/../modules/BuildConfigReader.cmake")
 
 # gstreamer_get_package_url(<platform> <version> <output_var>)
 # Sets <output_var> to the gstreamer.freedesktop.org URL of the <version> SDK package for <platform> (android, ios,
@@ -78,27 +79,11 @@ endfunction()
 # Sets <output_var> to "SHA256=<hex>" pinned at gstreamer.checksums.<version>.<platform> in build-config.json, or ""
 # when the package is not pinned.
 function(gstreamer_get_fallback_checksum platform version output_var)
+    qgc_config_read(_hash OPTIONAL gstreamer checksums ${version} ${platform})
     set(_checksum "")
-
-    if(DEFINED QGC_BUILD_CONFIG_CONTENT)
-        string(
-            JSON
-            _hash
-            ERROR_VARIABLE
-            _err
-            GET
-            "${QGC_BUILD_CONFIG_CONTENT}"
-            "gstreamer"
-            "checksums"
-            "${version}"
-            "${platform}"
-        )
-        if(NOT _err AND _hash)
-            string(TOLOWER "${_hash}" _hash)
-            set(_checksum "SHA256=${_hash}")
-        endif()
+    if(_hash)
+        set(_checksum "SHA256=${_hash}")
     endif()
-
     set(${output_var}
         "${_checksum}"
         PARENT_SCOPE
