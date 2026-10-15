@@ -42,35 +42,21 @@ qgc_test_assert_streq(
 
 qgc_test_pass("get_package_url known platforms")
 
+set(_s3_base "https://qgroundcontrol.s3.us-west-2.amazonaws.com/dependencies/gstreamer")
+
 gstreamer_get_s3_mirror_url(android 1.28.2 _s3_android)
-qgc_test_assert_streq(
-    "s3 android"
-    "https://qgroundcontrol.s3.us-west-2.amazonaws.com/dependencies/gstreamer/android/gstreamer-1.0-android-universal-1.28.2.tar.xz"
-    "${_s3_android}"
-)
+qgc_test_assert_streq("s3 android" "${_s3_base}/android/gstreamer-1.0-android-universal-1.28.2.tar.xz" "${_s3_android}")
 
 gstreamer_get_s3_mirror_url(macos 1.28.2 _s3_mac)
-qgc_test_assert_streq(
-    "s3 macos"
-    "https://qgroundcontrol.s3.us-west-2.amazonaws.com/dependencies/gstreamer/macos/gstreamer-1.0-1.28.2-universal.pkg"
-    "${_s3_mac}"
-)
+qgc_test_assert_streq("s3 macos" "${_s3_base}/macos/gstreamer-1.0-1.28.2-universal.pkg" "${_s3_mac}")
 
 gstreamer_get_s3_mirror_url(windows_msvc_x64 1.28.2 _s3_win)
-qgc_test_assert_streq(
-    "s3 windows"
-    "https://qgroundcontrol.s3.us-west-2.amazonaws.com/dependencies/gstreamer/windows/gstreamer-1.0-msvc-x86_64-1.28.2.exe"
-    "${_s3_win}"
-)
+qgc_test_assert_streq("s3 windows" "${_s3_base}/windows/gstreamer-1.0-msvc-x86_64-1.28.2.exe" "${_s3_win}")
 
 gstreamer_get_s3_mirror_url(linux 1.28.2 _s3_linux)
 qgc_test_assert_streq("s3 linux empty (no mirror)" "" "${_s3_linux}")
 
 gstreamer_get_s3_mirror_url(macos_devel 1.28.2 _s3_macd)
-qgc_test_assert_streq(
-    "s3 macos_devel"
-    "https://qgroundcontrol.s3.us-west-2.amazonaws.com/dependencies/gstreamer/macos/gstreamer-1.0-devel-1.28.2-universal.pkg"
-    "${_s3_macd}"
-)
+qgc_test_assert_streq("s3 macos_devel" "${_s3_base}/macos/gstreamer-1.0-devel-1.28.2-universal.pkg" "${_s3_macd}")
 
 qgc_test_pass("get_s3_mirror_url routing")

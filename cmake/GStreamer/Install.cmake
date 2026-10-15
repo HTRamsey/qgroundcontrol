@@ -7,49 +7,48 @@
 
 include_guard(GLOBAL)
 
-# Shared install-from-glob helper. CALLER must specify GLOB_PATTERN; FILTER_PREFIX
-# (optional) restricts results to files matching ${PREFIX}${name}.${EXT} where name
-# is in GSTREAMER_PLUGINS. Used by the public install_* wrappers below.
-# Invariant: GLOB is evaluated at configure time, so the SDK must already be
-# expanded before any install_* wrapper runs; re-running cmake --install without
-# re-configure reuses this stale list.
-
 # Pure (script-testable) plugin-name filter: keep only paths whose basename is
-# ${PREFIX}<name>(boundary) where <name> is in GSTREAMER_PLUGINS. The trailing
+# <prefix><name>(boundary) where <name> is in GSTREAMER_PLUGINS. The trailing
 # boundary stops gstvideo matching gstvideoconvert.
-function(_qgc_gst_filter_plugin_paths PREFIX PATHS OUT_VAR)
+function(_qgc_gst_filter_plugin_paths prefix paths out_var)
     set(_filtered "")
-    foreach(_path IN LISTS PATHS)
+    foreach(_path IN LISTS paths)
         get_filename_component(_name "${_path}" NAME)
         foreach(_allowed IN LISTS GSTREAMER_PLUGINS)
             string(REGEX REPLACE "([][.+*?^$()|\\\\])" "\\\\\\1" _allowed_re "${_allowed}")
-            if(_name MATCHES "^${PREFIX}${_allowed_re}([^a-zA-Z0-9]|$)")
+            if(_name MATCHES "^${prefix}${_allowed_re}([^a-zA-Z0-9]|$)")
                 list(APPEND _filtered "${_path}")
                 break()
             endif()
         endforeach()
     endforeach()
-    set(${OUT_VAR}
+    set(${out_var}
         "${_filtered}"
         PARENT_SCOPE
     )
 endfunction()
 
-function(_qgc_gst_install_glob LABEL)
+# Shared install-from-glob helper; <label> prefixes its errors. CALLER must specify GLOB_PATTERN; FILTER_PREFIX
+# (optional) restricts results to files matching ${FILTER_PREFIX}${name}.${EXT} where name
+# is in GSTREAMER_PLUGINS. Used by the public install_* wrappers below.
+# Invariant: GLOB is evaluated at configure time, so the SDK must already be
+# expanded before any install_* wrapper runs; re-running cmake --install without
+# re-configure reuses this stale list.
+function(_qgc_gst_install_glob label)
     cmake_parse_arguments(PARSE_ARGV 1 ARG "REQUIRE_NONEMPTY" "SOURCE_DIR;DEST_DIR;GLOB_PATTERN;FILTER_PREFIX" "")
     if(ARG_KEYWORDS_MISSING_VALUES)
-        message(FATAL_ERROR "${LABEL}: missing values for: ${ARG_KEYWORDS_MISSING_VALUES}")
+        message(FATAL_ERROR "${label}: missing values for: ${ARG_KEYWORDS_MISSING_VALUES}")
     endif()
     if(ARG_UNPARSED_ARGUMENTS)
-        message(FATAL_ERROR "${LABEL}: unknown arguments: ${ARG_UNPARSED_ARGUMENTS}")
+        message(FATAL_ERROR "${label}: unknown arguments: ${ARG_UNPARSED_ARGUMENTS}")
     endif()
     foreach(_required IN ITEMS SOURCE_DIR DEST_DIR GLOB_PATTERN)
         if(NOT ARG_${_required})
-            message(FATAL_ERROR "${LABEL}: ${_required} is required")
+            message(FATAL_ERROR "${label}: ${_required} is required")
         endif()
     endforeach()
     if(NOT EXISTS "${ARG_SOURCE_DIR}")
-        message(WARNING "${LABEL}: SOURCE_DIR does not exist: ${ARG_SOURCE_DIR}")
+        message(WARNING "${label}: SOURCE_DIR does not exist: ${ARG_SOURCE_DIR}")
         return()
     endif()
     file(GLOB _matches "${ARG_SOURCE_DIR}/${ARG_GLOB_PATTERN}")
@@ -61,13 +60,15 @@ function(_qgc_gst_install_glob LABEL)
     elseif(ARG_REQUIRE_NONEMPTY)
         # Empty here means a missing/unexpanded SDK — fail loudly rather than ship
         # a video build with zero plugins.
-        message(FATAL_ERROR "${LABEL}: glob '${ARG_GLOB_PATTERN}' in '${ARG_SOURCE_DIR}' matched no files. "
+        message(FATAL_ERROR "${label}: glob '${ARG_GLOB_PATTERN}' in '${ARG_SOURCE_DIR}' matched no files. "
                             "The GStreamer SDK must be fully expanded at configure time before install. "
                             "Re-run cmake configure against a complete SDK."
         )
     endif()
 endfunction()
 
+# gstreamer_install_gio_modules(SOURCE_DIR <dir> DEST_DIR <dir> EXTENSION <ext>)
+# Installs every *.<ext> GIO module in SOURCE_DIR (warns and installs nothing when it does not exist).
 function(gstreamer_install_gio_modules)
     cmake_parse_arguments(PARSE_ARGV 0 ARG "" "SOURCE_DIR;DEST_DIR;EXTENSION" "")
     if(ARG_KEYWORDS_MISSING_VALUES)
@@ -92,6 +93,8 @@ function(gstreamer_install_gio_modules)
     )
 endfunction()
 
+# gstreamer_install_plugins(SOURCE_DIR <dir> DEST_DIR <dir> EXTENSION <ext> PREFIX <prefix>)
+# Installs the GSTREAMER_PLUGINS found as <prefix><name>*.<ext> in SOURCE_DIR; fails when none match.
 function(gstreamer_install_plugins)
     cmake_parse_arguments(PARSE_ARGV 0 ARG "" "SOURCE_DIR;DEST_DIR;EXTENSION;PREFIX" "")
     if(ARG_KEYWORDS_MISSING_VALUES)
@@ -119,6 +122,8 @@ function(gstreamer_install_plugins)
     )
 endfunction()
 
+# gstreamer_install_libs(SOURCE_DIR <dir> DEST_DIR <dir> EXTENSION <ext>)
+# Installs every *.<ext> library of an isolated SDK directory; refuses system prefixes.
 function(gstreamer_install_libs)
     cmake_parse_arguments(PARSE_ARGV 0 ARG "" "SOURCE_DIR;DEST_DIR;EXTENSION" "")
     if(ARG_KEYWORDS_MISSING_VALUES)
@@ -162,27 +167,29 @@ function(gstreamer_install_libs)
     endif()
 endfunction()
 
-function(_qgc_gst_windows_runtime_dependency_dirs ROOT_DIR OUT_VAR)
+# Sets <out_var> to the Windows SDK directories under <root_dir> whose DLLs must also be installed next to the app.
+function(_qgc_gst_windows_runtime_dependency_dirs root_dir out_var)
     set(_runtime_dirs)
 
     # giolibproxy.dll loads proxy-1.dll, which loads pxbackend-1.0.dll from
     # lib/libproxy in the official Windows SDK. Install those backend DLLs next
     # to the executable because startup only prepends the app bin dir to PATH.
     foreach(_relative_dir IN ITEMS "lib/libproxy")
-        set(_candidate_dir "${ROOT_DIR}/${_relative_dir}")
+        set(_candidate_dir "${root_dir}/${_relative_dir}")
         file(GLOB _candidate_dlls "${_candidate_dir}/*.dll")
         if(_candidate_dlls)
             list(APPEND _runtime_dirs "${_candidate_dir}")
         endif()
     endforeach()
 
-    set(${OUT_VAR}
+    set(${out_var}
         "${_runtime_dirs}"
         PARENT_SCOPE
     )
 endfunction()
 
-function(_qgc_gst_is_blocked_lib_copy_source SOURCE_DIR OUT_VAR)
+# Sets <out_var> TRUE when <source_dir> is a system or shared prefix that gstreamer_install_libs must not copy from.
+function(_qgc_gst_is_blocked_lib_copy_source source_dir out_var)
     set(_blocked_prefixes /usr/lib /usr/local/lib /opt/homebrew/lib /opt/homebrew/opt)
     set(_allowed_prefixes)
 
@@ -194,7 +201,7 @@ function(_qgc_gst_is_blocked_lib_copy_source SOURCE_DIR OUT_VAR)
     endif()
 
     # Normalize case + separators so the guard isn't bypassed by C:\Windows or c:/windows.
-    cmake_path(SET _src_norm NORMALIZE "${SOURCE_DIR}")
+    cmake_path(SET _src_norm NORMALIZE "${source_dir}")
     if(WIN32)
         string(TOLOWER "${_src_norm}" _src_norm)
     endif()
@@ -204,7 +211,7 @@ function(_qgc_gst_is_blocked_lib_copy_source SOURCE_DIR OUT_VAR)
             string(TOLOWER "${_prefix}" _prefix)
             string(FIND "${_src_norm}/" "${_prefix}/" _is_allowed_pos)
             if(_is_allowed_pos EQUAL 0)
-                set(${OUT_VAR}
+                set(${out_var}
                     FALSE
                     PARENT_SCOPE
                 )
@@ -214,7 +221,7 @@ function(_qgc_gst_is_blocked_lib_copy_source SOURCE_DIR OUT_VAR)
         endif()
         cmake_path(IS_PREFIX _prefix "${_src_norm}" NORMALIZE _is_allowed)
         if(_is_allowed)
-            set(${OUT_VAR}
+            set(${out_var}
                 FALSE
                 PARENT_SCOPE
             )
@@ -227,7 +234,7 @@ function(_qgc_gst_is_blocked_lib_copy_source SOURCE_DIR OUT_VAR)
             string(TOLOWER "${_prefix}" _prefix)
             string(FIND "${_src_norm}/" "${_prefix}/" _is_system_pos)
             if(_is_system_pos EQUAL 0)
-                set(${OUT_VAR}
+                set(${out_var}
                     TRUE
                     PARENT_SCOPE
                 )
@@ -237,14 +244,14 @@ function(_qgc_gst_is_blocked_lib_copy_source SOURCE_DIR OUT_VAR)
         endif()
         cmake_path(IS_PREFIX _prefix "${_src_norm}" NORMALIZE _is_system)
         if(_is_system)
-            set(${OUT_VAR}
+            set(${out_var}
                 TRUE
                 PARENT_SCOPE
             )
             return()
         endif()
     endforeach()
-    set(${OUT_VAR}
+    set(${out_var}
         FALSE
         PARENT_SCOPE
     )
@@ -257,6 +264,7 @@ endfunction()
 # GStreamer_ROOT_DIR, GStreamer_AUTO_DOWNLOADED, etc.).
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Linux: plugins, GIO modules and the gst-plugin-scanner/gst-ptp-helper binaries.
 function(gstreamer_install_linux_sdk app_name plugin_dest_out)
     set(_plugin_dest "lib/gstreamer-1.0")
     gstreamer_install_plugins(
@@ -296,6 +304,7 @@ function(gstreamer_install_linux_sdk app_name plugin_dest_out)
     )
 endfunction()
 
+# Windows: the SDK and libproxy DLLs, GIO modules, plugins, libexec helpers and the CA bundle.
 function(gstreamer_install_windows_sdk app_name plugin_dest_out)
     set(_plugin_dest "${CMAKE_INSTALL_LIBDIR}/gstreamer-1.0")
     gstreamer_install_libs(SOURCE_DIR "${GStreamer_ROOT_DIR}/bin" DEST_DIR "${CMAKE_INSTALL_BINDIR}" EXTENSION "dll")
@@ -507,7 +516,8 @@ function(gstreamer_install_macos_flat_sdk app_name plugin_dest_out)
                 if(NOT _otool_rc EQUAL 0)
                     # otool failed: empty output would make the FIND below wrongly
                     # conclude 'rpath absent' and add a duplicate — skip and warn.
-                    message(WARNING \"GStreamer: otool -l failed for \${_lib} (rc=\${_otool_rc}): \${_otool_err}; skipping rpath fixup\")
+                    message(WARNING \"GStreamer: otool -l failed for \${_lib} (rc=\${_otool_rc}): \${_otool_err}; \"
+                                    \"skipping rpath fixup\")
                     continue()
                 endif()
                 string(FIND \"\${_otool_out}\" \"${_rpath}\" _has_rpath)
@@ -557,14 +567,14 @@ endfunction()
 
 # Top-level dispatcher — call this from CMakeLists.txt after the ANDROID/IOS guard. Runs the platform's
 # install helper (qgc_gst_platform_descriptor); mobile platforms install nothing.
-# PROJECT_NAME is CMAKE_PROJECT_NAME in the caller.
-# gstreamer_install_platform_sdk(PROJECT_NAME [REQUIRED_PLUGINS <names…>])
+# <app_name> is CMAKE_PROJECT_NAME in the caller.
+# gstreamer_install_platform_sdk(<app_name> [REQUIRED_PLUGINS <names…>])
 # REQUIRED_PLUGINS: list of plugin basenames (no platform prefix or extension) to
 # verify exist post-install; default is the minimum needed to run any pipeline,
 # extended with every configured plugin present in the SDK at configure time.
-function(gstreamer_install_platform_sdk PROJECT_NAME)
-    if(NOT PROJECT_NAME)
-        message(FATAL_ERROR "gstreamer_install_platform_sdk: PROJECT_NAME is required")
+function(gstreamer_install_platform_sdk app_name)
+    if(NOT app_name)
+        message(FATAL_ERROR "gstreamer_install_platform_sdk: app_name is required")
     endif()
     cmake_parse_arguments(PARSE_ARGV 1 GIPS "" "" "REQUIRED_PLUGINS")
     if(GIPS_KEYWORDS_MISSING_VALUES)
@@ -607,7 +617,7 @@ function(gstreamer_install_platform_sdk PROJECT_NAME)
         list(REMOVE_DUPLICATES GIPS_REQUIRED_PLUGINS)
     endif()
 
-    cmake_language(CALL ${_gips_platform_INSTALL} "${PROJECT_NAME}" _verify_dest)
+    cmake_language(CALL ${_gips_platform_INSTALL} "${app_name}" _verify_dest)
 
     # Post-install plugin verification, against the plugin directory the installer reported.
     # Checked at install time against $ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}, where CPack stages packages. Install

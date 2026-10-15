@@ -357,15 +357,15 @@ endif()
 # Resolves ALIAS targets and applies INTERFACE compile definitions — the cycle
 # below (and the feature probe further down) need this twice.
 # target_compile_definitions can't be called on ALIAS targets, so unwrap first.
-function(_qgc_gst_apply_def GST_TARGET)
-    if(NOT TARGET ${GST_TARGET})
+function(_qgc_gst_apply_def gst_target)
+    if(NOT TARGET ${gst_target})
         return()
     endif()
-    get_target_property(_aliased ${GST_TARGET} ALIASED_TARGET)
+    get_target_property(_aliased ${gst_target} ALIASED_TARGET)
     if(_aliased)
         target_compile_definitions(${_aliased} INTERFACE ${ARGN})
     else()
-        target_compile_definitions(${GST_TARGET} INTERFACE ${ARGN})
+        target_compile_definitions(${gst_target} INTERFACE ${ARGN})
     endif()
 endfunction()
 
@@ -429,9 +429,8 @@ else()
         endif()
     endforeach()
 endif()
-message(
-    STATUS
-        "QGCGStreamer: version=${GStreamer_VERSION} path=${_qgc_gst_path} root=${GStreamer_ROOT_DIR} plugins=${_qgc_gst_plugin_count}/${_qgc_gst_plugin_total} auto_downloaded=${GStreamer_AUTO_DOWNLOADED}"
+message(STATUS "QGCGStreamer: version=${GStreamer_VERSION} path=${_qgc_gst_path} root=${GStreamer_ROOT_DIR} "
+               "plugins=${_qgc_gst_plugin_count}/${_qgc_gst_plugin_total} auto_downloaded=${GStreamer_AUTO_DOWNLOADED}"
 )
 
 # Post-configure tooling (.github/scripts/verify_executable.py, the Windows workflow) reads

@@ -7,19 +7,22 @@ include_guard(GLOBAL)
 # would resolve to this file and self-recurse.
 include("${CMAKE_CURRENT_LIST_DIR}/../modules/Download.cmake") # qgc_resilient_download / qgc_parse_expected_hash
 
-function(gstreamer_get_package_url PLATFORM VERSION OUTPUT_VAR)
+# gstreamer_get_package_url(<platform> <version> <output_var>)
+# Sets <output_var> to the gstreamer.freedesktop.org URL of the <version> SDK package for <platform> (android, ios,
+# macos, macos_devel, windows_msvc_x64 or windows_msvc_arm64).
+function(gstreamer_get_package_url platform version output_var)
     set(_base "https://gstreamer.freedesktop.org")
 
-    # URL templates for simple platforms — VERSION substituted via _base.
-    set(_url_android "${_base}/data/pkg/android/${VERSION}/gstreamer-1.0-android-universal-${VERSION}.tar.xz")
-    set(_url_ios "${_base}/data/pkg/ios/${VERSION}/gstreamer-1.0-devel-${VERSION}-ios-universal.pkg")
-    set(_url_macos "${_base}/data/pkg/macos/${VERSION}/gstreamer-1.0-${VERSION}-universal.pkg")
-    set(_url_macos_devel "${_base}/data/pkg/macos/${VERSION}/gstreamer-1.0-devel-${VERSION}-universal.pkg")
+    # URL templates for simple platforms — version substituted via _base.
+    set(_url_android "${_base}/data/pkg/android/${version}/gstreamer-1.0-android-universal-${version}.tar.xz")
+    set(_url_ios "${_base}/data/pkg/ios/${version}/gstreamer-1.0-devel-${version}-ios-universal.pkg")
+    set(_url_macos "${_base}/data/pkg/macos/${version}/gstreamer-1.0-${version}-universal.pkg")
+    set(_url_macos_devel "${_base}/data/pkg/macos/${version}/gstreamer-1.0-devel-${version}-universal.pkg")
 
-    if(PLATFORM MATCHES "^windows_msvc_(x64|arm64)$")
+    if(platform MATCHES "^windows_msvc_(x64|arm64)$")
         # Windows: 1.28+ ships .exe with arch-tagged filename (defensive guard against manual override).
-        if(VERSION VERSION_LESS "1.28.0")
-            message(FATAL_ERROR "Windows GStreamer SDK requires version 1.28 or later (got '${VERSION}'). "
+        if(version VERSION_LESS "1.28.0")
+            message(FATAL_ERROR "Windows GStreamer SDK requires version 1.28 or later (got '${version}'). "
                                 "Bump gstreamer.version.windows in build-config.json."
             )
         endif()
@@ -28,48 +31,53 @@ function(gstreamer_get_package_url PLATFORM VERSION OUTPUT_VAR)
         else()
             set(_arch "arm64")
         endif()
-        set(_url "${_base}/data/pkg/windows/${VERSION}/msvc/gstreamer-1.0-msvc-${_arch}-${VERSION}.exe")
-    elseif(DEFINED _url_${PLATFORM})
-        set(_url "${_url_${PLATFORM}}")
+        set(_url "${_base}/data/pkg/windows/${version}/msvc/gstreamer-1.0-msvc-${_arch}-${version}.exe")
+    elseif(DEFINED _url_${platform})
+        set(_url "${_url_${platform}}")
     else()
-        message(FATAL_ERROR "gstreamer_get_package_url: Unknown platform '${PLATFORM}'")
+        message(FATAL_ERROR "gstreamer_get_package_url: Unknown platform '${platform}'")
     endif()
 
-    set(${OUTPUT_VAR}
+    set(${output_var}
         "${_url}"
         PARENT_SCOPE
     )
 endfunction()
 
-function(gstreamer_get_s3_mirror_url PLATFORM VERSION OUTPUT_VAR)
+# gstreamer_get_s3_mirror_url(<platform> <version> <output_var>)
+# Sets <output_var> to the QGC S3 mirror of that package, or "" for a platform without a mirror.
+function(gstreamer_get_s3_mirror_url platform version output_var)
     set(_s3_base "https://qgroundcontrol.s3.us-west-2.amazonaws.com/dependencies/gstreamer")
 
-    if(PLATFORM STREQUAL "android")
+    if(platform STREQUAL "android")
         set(_dir "android")
-    elseif(PLATFORM STREQUAL "ios")
+    elseif(platform STREQUAL "ios")
         set(_dir "ios")
-    elseif(PLATFORM MATCHES "^macos")
+    elseif(platform MATCHES "^macos")
         set(_dir "macos")
-    elseif(PLATFORM MATCHES "^windows_msvc_")
+    elseif(platform MATCHES "^windows_msvc_")
         set(_dir "windows")
     else()
-        set(${OUTPUT_VAR}
+        set(${output_var}
             ""
             PARENT_SCOPE
         )
         return()
     endif()
 
-    gstreamer_get_package_url("${PLATFORM}" "${VERSION}" _primary_url)
+    gstreamer_get_package_url("${platform}" "${version}" _primary_url)
     cmake_path(GET _primary_url FILENAME _filename)
 
-    set(${OUTPUT_VAR}
+    set(${output_var}
         "${_s3_base}/${_dir}/${_filename}"
         PARENT_SCOPE
     )
 endfunction()
 
-function(gstreamer_get_fallback_checksum PLATFORM VERSION OUTPUT_VAR)
+# gstreamer_get_fallback_checksum(<platform> <version> <output_var>)
+# Sets <output_var> to "SHA256=<hex>" pinned at gstreamer.checksums.<version>.<platform> in build-config.json, or ""
+# when the package is not pinned.
+function(gstreamer_get_fallback_checksum platform version output_var)
     set(_checksum "")
 
     if(DEFINED QGC_BUILD_CONFIG_CONTENT)
@@ -82,8 +90,8 @@ function(gstreamer_get_fallback_checksum PLATFORM VERSION OUTPUT_VAR)
             "${QGC_BUILD_CONFIG_CONTENT}"
             "gstreamer"
             "checksums"
-            "${VERSION}"
-            "${PLATFORM}"
+            "${version}"
+            "${platform}"
         )
         if(NOT _err AND _hash)
             string(TOLOWER "${_hash}" _hash)
@@ -91,7 +99,7 @@ function(gstreamer_get_fallback_checksum PLATFORM VERSION OUTPUT_VAR)
         endif()
     endif()
 
-    set(${OUTPUT_VAR}
+    set(${output_var}
         "${_checksum}"
         PARENT_SCOPE
     )
@@ -117,13 +125,13 @@ function(_qgc_gst_unverified_or_fail platform version output_var reason)
 endfunction()
 
 # _qgc_gst_download_sidecar(<url> <dest_file> <result_var>)
-# Downloads the .sha256sum sidecar to DEST_FILE; sets RESULT_VAR TRUE on success.
-function(_qgc_gst_download_sidecar URL DEST_FILE RESULT_VAR)
+# Downloads the .sha256sum sidecar to <dest_file>; sets <result_var> TRUE on success.
+function(_qgc_gst_download_sidecar url dest_file result_var)
     file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/_deps/checksums")
-    set(_tmp "${DEST_FILE}.tmp")
-    foreach(_attempt RANGE 1 3)
+    set(_tmp "${dest_file}.tmp")
+    foreach(_attempt RANGE 1 3 1)
         file(
-            DOWNLOAD "${URL}" "${_tmp}"
+            DOWNLOAD "${url}" "${_tmp}"
             STATUS _status
             TIMEOUT 30
             INACTIVITY_TIMEOUT 10
@@ -131,8 +139,8 @@ function(_qgc_gst_download_sidecar URL DEST_FILE RESULT_VAR)
         )
         list(GET _status 0 _code)
         if(_code EQUAL 0)
-            file(RENAME "${_tmp}" "${DEST_FILE}")
-            set(${RESULT_VAR}
+            file(RENAME "${_tmp}" "${dest_file}")
+            set(${result_var}
                 TRUE
                 PARENT_SCOPE
             )
@@ -142,30 +150,33 @@ function(_qgc_gst_download_sidecar URL DEST_FILE RESULT_VAR)
         message(STATUS "GStreamer: Checksum download attempt ${_attempt}/3 failed: ${_msg}")
         file(REMOVE "${_tmp}")
     endforeach()
-    set(${RESULT_VAR}
+    set(${result_var}
         FALSE
         PARENT_SCOPE
     )
 endfunction()
 
-function(gstreamer_fetch_checksum PLATFORM VERSION OUTPUT_VAR)
+# gstreamer_fetch_checksum(<platform> <version> <output_var>)
+# Sets <output_var> to the checksum to verify the package against: the pinned one, else the upstream .sha256sum
+# sidecar, else "" (unverified). See GStreamer_REQUIRE_CHECKSUM for when the latter two are fatal.
+function(gstreamer_fetch_checksum platform version output_var)
     # The in-tree pin is authoritative and the download is verified against it, so the
     # same-origin .sha256sum sidecar is only fetched for unpinned SDKs.
-    gstreamer_get_fallback_checksum(${PLATFORM} ${VERSION} _pinned_hash)
+    gstreamer_get_fallback_checksum(${platform} ${version} _pinned_hash)
     if(_pinned_hash)
-        set(${OUTPUT_VAR}
+        set(${output_var}
             "${_pinned_hash}"
             PARENT_SCOPE
         )
         return()
     endif()
 
-    gstreamer_get_package_url(${PLATFORM} ${VERSION} _pkg_url)
+    gstreamer_get_package_url(${platform} ${version} _pkg_url)
 
     string(FIND "${_pkg_url}" "?" _qs_pos)
     if(NOT _qs_pos EQUAL -1)
-        message(STATUS "GStreamer: Skipping checksum for ${PLATFORM} ${VERSION} (URL contains query string)")
-        set(${OUTPUT_VAR}
+        message(STATUS "GStreamer: Skipping checksum for ${platform} ${version} (URL contains query string)")
+        set(${output_var}
             ""
             PARENT_SCOPE
         )
@@ -177,12 +188,12 @@ function(gstreamer_fetch_checksum PLATFORM VERSION OUTPUT_VAR)
     set(_checksum_file "${CMAKE_BINARY_DIR}/_deps/checksums/${_url_hash}.sha256sum")
 
     set(_dl_ok FALSE)
-    foreach(_round RANGE 1 2)
+    foreach(_round RANGE 1 2 1)
         if(NOT EXISTS "${_checksum_file}")
             _qgc_gst_download_sidecar("${_checksum_url}" "${_checksum_file}" _dl_ok)
             if(NOT _dl_ok)
-                _qgc_gst_unverified_or_fail(${PLATFORM} ${VERSION} _result "Checksum sidecar unavailable")
-                set(${OUTPUT_VAR}
+                _qgc_gst_unverified_or_fail(${platform} ${version} _result "Checksum sidecar unavailable")
+                set(${output_var}
                     "${_result}"
                     PARENT_SCOPE
                 )
@@ -201,29 +212,29 @@ function(gstreamer_fetch_checksum PLATFORM VERSION OUTPUT_VAR)
             # satisfy GStreamer_REQUIRE_CHECKSUM=ON.
             if(GStreamer_REQUIRE_CHECKSUM)
                 message(
-                    FATAL_ERROR "GStreamer: no trusted (in-tree pinned) checksum for ${PLATFORM} ${VERSION}; "
+                    FATAL_ERROR "GStreamer: no trusted (in-tree pinned) checksum for ${platform} ${version}; "
                                 "the fetched same-origin .sha256sum sidecar cannot satisfy "
                                 "GStreamer_REQUIRE_CHECKSUM=ON. Pin the hash in .github/build-config.json "
-                                "(gstreamer.checksums.${VERSION}.${PLATFORM}) or set GStreamer_REQUIRE_CHECKSUM=OFF."
+                                "(gstreamer.checksums.${version}.${platform}) or set GStreamer_REQUIRE_CHECKSUM=OFF."
                 )
             endif()
-            message(WARNING "GStreamer: using same-origin .sha256sum sidecar for ${PLATFORM} ${VERSION}; "
+            message(WARNING "GStreamer: using same-origin .sha256sum sidecar for ${platform} ${version}; "
                             "this detects corruption only, NOT supply-chain tampering. Pin the hash in "
                             ".github/build-config.json for authenticity."
             )
-            set(${OUTPUT_VAR}
+            set(${output_var}
                 "SHA256=${_fetched_hex}"
                 PARENT_SCOPE
             )
             return()
         endif()
 
-        message(STATUS "GStreamer: Could not parse checksum for ${PLATFORM} ${VERSION}")
+        message(STATUS "GStreamer: Could not parse checksum for ${platform} ${version}")
         file(REMOVE "${_checksum_file}")
     endforeach()
 
-    _qgc_gst_unverified_or_fail(${PLATFORM} ${VERSION} _result "Checksum content invalid/unparseable")
-    set(${OUTPUT_VAR}
+    _qgc_gst_unverified_or_fail(${platform} ${version} _result "Checksum content invalid/unparseable")
+    set(${output_var}
         "${_result}"
         PARENT_SCOPE
     )
@@ -302,20 +313,20 @@ endfunction()
 # gstreamer_download_sdk(<platform> <version> <filename> <destination_dir> <result_var>
 #                        [ALLOW_FAILURE] [HASH_VAR <var>])
 # HASH_VAR receives the "SHA256=<hex>" the archive was verified against, or "" when unverified.
-function(gstreamer_download_sdk PLATFORM VERSION FILENAME DESTINATION_DIR RESULT_VAR)
+function(gstreamer_download_sdk platform version filename destination_dir result_var)
     cmake_parse_arguments(PARSE_ARGV 5 _DL "ALLOW_FAILURE" "HASH_VAR" "")
     if(_DL_UNPARSED_ARGUMENTS)
         message(FATAL_ERROR "gstreamer_download_sdk: unknown arguments: ${_DL_UNPARSED_ARGUMENTS}")
     endif()
-    foreach(_required IN ITEMS PLATFORM VERSION FILENAME DESTINATION_DIR RESULT_VAR)
+    foreach(_required IN ITEMS platform version filename destination_dir result_var)
         if("${${_required}}" STREQUAL "")
             message(FATAL_ERROR "gstreamer_download_sdk: ${_required} is required")
         endif()
     endforeach()
 
-    gstreamer_get_package_url("${PLATFORM}" "${VERSION}" _url)
-    gstreamer_get_s3_mirror_url("${PLATFORM}" "${VERSION}" _s3_url)
-    gstreamer_fetch_checksum("${PLATFORM}" "${VERSION}" _hash)
+    gstreamer_get_package_url("${platform}" "${version}" _url)
+    gstreamer_get_s3_mirror_url("${platform}" "${version}" _s3_url)
+    gstreamer_fetch_checksum("${platform}" "${version}" _hash)
 
     set(_urls "${_url}")
     if(_s3_url)
@@ -326,9 +337,9 @@ function(gstreamer_download_sdk PLATFORM VERSION FILENAME DESTINATION_DIR RESULT
         URLS
         ${_urls}
         FILENAME
-        "${FILENAME}"
+        "${filename}"
         DESTINATION_DIR
-        "${DESTINATION_DIR}"
+        "${destination_dir}"
         RESULT_VAR
         _result
     )
@@ -340,7 +351,7 @@ function(gstreamer_download_sdk PLATFORM VERSION FILENAME DESTINATION_DIR RESULT
     endif()
 
     gstreamer_resilient_download(${_args})
-    set(${RESULT_VAR}
+    set(${result_var}
         "${_result}"
         PARENT_SCOPE
     )

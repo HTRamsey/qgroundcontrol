@@ -98,9 +98,9 @@ function(gstreamer_plugins_for)
     )
 endfunction()
 
-# gstreamer_runtime_required_plugins(OUT_VAR)
-function(gstreamer_runtime_required_plugins OUT_VAR)
-    set(${OUT_VAR}
+# gstreamer_runtime_required_plugins(<out_var>)
+function(gstreamer_runtime_required_plugins out_var)
+    set(${out_var}
         "${GSTREAMER_RUNTIME_REQUIRED_PLUGINS}"
         PARENT_SCOPE
     )
@@ -206,9 +206,9 @@ function(gstreamer_missing_required)
     )
 endfunction()
 
-# gstreamer_xcfw_skip(OUT_VAR)
-function(gstreamer_xcfw_skip OUT_VAR)
-    set(${OUT_VAR}
+# gstreamer_xcfw_skip(<out_var>)
+function(gstreamer_xcfw_skip out_var)
+    set(${out_var}
         "${GSTREAMER_XCFRAMEWORK_SKIP_PLUGINS}"
         PARENT_SCOPE
     )

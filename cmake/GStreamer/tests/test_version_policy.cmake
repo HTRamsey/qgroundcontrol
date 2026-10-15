@@ -3,6 +3,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/_assert.cmake")
 
 file(READ "${CMAKE_CURRENT_LIST_DIR}/../../../.github/build-config.json" _build_config)
 
+# Sets <out_var> to gstreamer.version.<key> from build-config.json.
 function(_qgc_json_version key out_var)
     string(
         JSON

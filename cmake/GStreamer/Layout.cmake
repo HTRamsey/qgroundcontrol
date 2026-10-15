@@ -33,6 +33,8 @@ include_guard(GLOBAL)
 # time, so `TYPE FRAMEWORK FRAMEWORK <path>` would be ambiguous (TYPE's value
 # gets eaten by the keyword recognizer).
 function(gstreamer_create_layout_target)
+    # One validation branch per layout TYPE; splitting them would scatter the per-type path rules.
+    # cmake-lint: disable=R0912,R0915
     cmake_parse_arguments(PARSE_ARGV 0 GCLT ""
                           "SDK_ROOT;TYPE;LIB_PATH;INCLUDE_PATH;FRAMEWORK_BUNDLE;XCFRAMEWORK_BUNDLE" ""
     )
@@ -113,9 +115,8 @@ function(gstreamer_create_layout_target)
             endif()
         endforeach()
     else()
-        message(
-            FATAL_ERROR
-                "gstreamer_create_layout_target: unknown TYPE \'${GCLT_TYPE}\' — must be FLAT, FRAMEWORK, MERGED_STATIC, or STATIC_TARBALL"
+        message(FATAL_ERROR "gstreamer_create_layout_target: unknown TYPE \'${GCLT_TYPE}\' — must be FLAT, FRAMEWORK, "
+                            "MERGED_STATIC, or STATIC_TARBALL"
         )
     endif()
 
@@ -155,46 +156,45 @@ function(gstreamer_create_layout_target)
     endif()
 endfunction()
 
-# gstreamer_layout_get(<KEY> <OUT_VAR>)
+# gstreamer_layout_get(<key> <out_var>)
 # Read a layout property. Returns empty string when the target doesn't exist
 # or the property isn't set, so callers can skip the NOTFOUND-handling dance.
-# KEY is the bare name (e.g. FRAMEWORK_BUNDLE); the GSTREAMER_ prefix is added
+# <key> is the bare name (e.g. FRAMEWORK_BUNDLE); the GSTREAMER_ prefix is added
 # automatically.
-function(gstreamer_layout_get KEY OUT_VAR)
+function(gstreamer_layout_get key out_var)
     if(NOT TARGET GStreamer::Layout)
-        set(${OUT_VAR}
+        set(${out_var}
             ""
             PARENT_SCOPE
         )
         return()
     endif()
-    get_target_property(_val GStreamer::Layout "GSTREAMER_${KEY}")
+    get_target_property(_val GStreamer::Layout "GSTREAMER_${key}")
     if(_val STREQUAL "_val-NOTFOUND" OR NOT _val)
-        set(${OUT_VAR}
+        set(${out_var}
             ""
             PARENT_SCOPE
         )
     else()
-        set(${OUT_VAR}
+        set(${out_var}
             "${_val}"
             PARENT_SCOPE
         )
     endif()
 endfunction()
 
-# gstreamer_layout_set(<KEY> <VALUE>)
-# Write a layout property. KEY is the bare name (e.g. FRAMEWORK_BUNDLE); the
+# gstreamer_layout_set(<key> <value>)
+# Write a layout property. <key> is the bare name (e.g. FRAMEWORK_BUNDLE); the
 # GSTREAMER_ prefix is added automatically. Skipped silently in cmake -P
 # script mode (target creation isn't scriptable).
-function(gstreamer_layout_set KEY VALUE)
+function(gstreamer_layout_set key value)
     if(CMAKE_SCRIPT_MODE_FILE)
         return()
     endif()
     if(NOT TARGET GStreamer::Layout)
-        message(
-            FATAL_ERROR
-                "gstreamer_layout_set: GStreamer::Layout target does not exist; call gstreamer_create_layout_target first."
+        message(FATAL_ERROR "gstreamer_layout_set: GStreamer::Layout target does not exist; "
+                            "call gstreamer_create_layout_target first."
         )
     endif()
-    set_target_properties(GStreamer::Layout PROPERTIES "GSTREAMER_${KEY}" "${VALUE}")
+    set_target_properties(GStreamer::Layout PROPERTIES "GSTREAMER_${key}" "${value}")
 endfunction()

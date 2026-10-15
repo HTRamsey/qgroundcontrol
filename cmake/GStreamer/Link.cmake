@@ -93,6 +93,8 @@ endfunction()
 # suffixes land in CFLAGS_OTHER/LDFLAGS_OTHER as `Files/...`. Rebuild paths only
 # when root + suffix exists, then remove the consumed suffixes from options.
 function(_gst_recover_split_pkgconfig_paths _grspp_PREFIX)
+    # One pass rebuilds each path/option pair; splitting it would only pass the pair state around.
+    # cmake-lint: disable=R0915
     set(_grspp_pairs ${ARGN})
     list(LENGTH _grspp_pairs _grspp_len)
     math(EXPR _grspp_remainder "${_grspp_len} % 2")
@@ -199,6 +201,7 @@ macro(_gst_save_find_suffixes)
     endif()
 endmacro()
 
+# Restores what _gst_save_find_suffixes saved.
 macro(_gst_restore_find_suffixes)
     set(CMAKE_FIND_LIBRARY_SUFFIXES ${_gst_saved_suffixes})
     set(CMAKE_FIND_LIBRARY_PREFIXES ${_gst_saved_prefixes})
@@ -213,6 +216,8 @@ endmacro()
 #                  the library plus --exclude-libs,<name> (ELF)
 #   WARN_MISSING - Warn and skip missing libraries instead of failing
 function(_gst_resolve_and_link_libraries _grll_TARGET _grll_SCOPE _grll_LIBS _grll_HINTS)
+    # Each library goes through one resolve/patch/link decision chain; splitting it would scatter that chain.
+    # cmake-lint: disable=R0912,R0915
     cmake_parse_arguments(PARSE_ARGV 4 _grll "HIDE;WARN_MISSING" "" "")
     if(_grll_UNPARSED_ARGUMENTS)
         message(FATAL_ERROR "_gst_resolve_and_link_libraries: unknown arguments: ${_grll_UNPARSED_ARGUMENTS}")

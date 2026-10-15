@@ -41,6 +41,8 @@ endfunction()
 #                        win but system glib/gobject .pc files stay discoverable.
 #                        Used by Linux distro-installed GStreamer.
 # PKG_CONFIG_EXECUTABLE / PKG_CONFIG_ARGN are set as normal variables in the caller's scope.
+# cmakelang reads set(ENV{<name>}) as a variable name.
+# cmake-lint: disable=C0103
 function(gstreamer_apply_pkgconfig_env)
     cmake_parse_arguments(PARSE_ARGV 0 ARG "DONT_DEFINE_PREFIX" "MODE;PKG_CONFIG_EXE" "LIBDIR")
     if(ARG_KEYWORDS_MISSING_VALUES)

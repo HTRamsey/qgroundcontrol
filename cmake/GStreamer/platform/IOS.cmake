@@ -73,8 +73,9 @@ endfunction()
 # GStreamer_AUTO_DOWNLOADED, GStreamer_USE_{MERGED_STATIC,FRAMEWORK,STATIC_LIBS}, GSTREAMER_XCFRAMEWORK_LIB,
 # GStreamer_IOS_INFO_PLIST, GSTREAMER_{LIB,PLUGIN,INCLUDE,XCFRAMEWORK}_PATH and the GStreamer_IOS_CA_BUNDLE cache
 # entry.
-# cmakelang 0.6.13 predates return(PROPAGATE).
-# cmake-lint: disable=C0103,E1121
+# cmakelang 0.6.13 predates return(PROPAGATE). Discovery is one ordered fallback chain (xcframework, framework,
+# iPhone.sdk, download) that fills in the whole layout.
+# cmake-lint: disable=C0103,E1121,R0912,R0915
 function(_qgc_gst_discover_ios_sdk)
     if(NOT CMAKE_HOST_APPLE)
         message(FATAL_ERROR "GStreamer for iOS can only be built on macOS")
@@ -444,6 +445,8 @@ endfunction()
 # Function: exports GStreamer_VERSION, GSTREAMER_STATIC_PLUGINS and GStreamer_<api|plugin>_FOUND via PARENT_SCOPE and
 # creates GLOBAL IMPORTED targets.
 # ─────────────────────────────────────────────────────────────────────────────
+# Every target comes from the one merged archive, so the steps share its state in one function.
+# cmake-lint: disable=R0912,R0915
 function(_qgc_gst_create_ios_targets)
     # Read the bundle's real version from Info.plist to re-check the floor — the
     # _discover check only sees the requested version. Warn + fall back if unreadable.
