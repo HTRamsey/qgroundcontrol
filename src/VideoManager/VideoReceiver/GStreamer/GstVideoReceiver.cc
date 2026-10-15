@@ -37,11 +37,7 @@ namespace {
 constexpr std::chrono::seconds kEosTimeout{3};
 // Destructor wait for the worker. Must exceed kEosTimeout so a finalizing recording isn't abandoned.
 constexpr std::chrono::seconds kWorkerShutdownTimeout = kEosTimeout + std::chrono::seconds{2};
-constexpr qint64 kMinWatchdogTimeoutMs = 1000;
 constexpr std::chrono::milliseconds kWatchdogInterval{1000};
-// Reconnect backoff: 1 s, 2 s, 4 s, ... capped at 30 s. The cap bounds worst-case recovery after a long
-// RF outage and stays below a typical RTSP server keepalive (60 s).
-constexpr int kMaxReconnectBackoffSec = 30;
 
 // MP4/MOV robust muxing: qtmux reserves header space at the start of the file and rewrites the moov
 // there every update period, so a crash or power loss leaves a file playable up to the last update.
@@ -50,12 +46,6 @@ constexpr int kMaxReconnectBackoffSec = 30;
 // The period bounds crash data loss without rewriting the growing moov too often.
 constexpr guint64 kRecordingReservedMaxDurationNs = 2 * 3600 * GST_SECOND;
 constexpr guint64 kRecordingMoovUpdatePeriodNs = 5 * GST_SECOND;
-
-qint64 monotonicMs()
-{
-    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
-        .count();
-}
 
 /// Per-recording state for the keyframe gate, owned by its probe.
 struct KeyframeWatch
@@ -311,7 +301,7 @@ void GstVideoReceiver::start(uint32_t timeout)
     _runOnWorker([this, config]() {
         // A user start supersedes any pending reconnect and restarts the backoff.
         _reconnectTimer->stop();
-        _reconnectAttempts = 0;
+        _watchdog.resetBackoff();
         _startPipeline(config);
     });
 }
@@ -331,7 +321,7 @@ void GstVideoReceiver::_startPipeline(const StartConfig& config)
     }
 
     _config = config;
-    _sourceFrameCount.store(0, std::memory_order_relaxed);
+    _watchdog.start(_config.timeoutSec);
 
     qCDebug(GstVideoReceiverLog) << "Starting" << _redactedUri() << ", lowLatency" << _config.lowLatency << ", timeout"
                                  << _config.timeoutSec;
@@ -365,12 +355,11 @@ void GstVideoReceiver::_startPipeline(const StartConfig& config)
             break;
         }
 
-        _lastSourceFrameTime = 0;
-
         _teeProbeId = gst_pad_add_probe(pad, GST_PAD_PROBE_TYPE_BUFFER, _teeProbe, this, nullptr);
         gst_clear_object(&pad);
         if (_teeProbeId == 0) {
-            // _teeProbe updates _lastSourceFrameTime; without it the watchdog timer fires spuriously instead of reporting a real failure.
+            // _teeProbe feeds the watchdog; without it the watchdog fires spuriously instead of reporting a real
+            // failure.
             qCCritical(GstVideoReceiverLog) << "gst_pad_add_probe(_teeProbe) failed";
             break;
         }
@@ -508,7 +497,7 @@ void GstVideoReceiver::stop()
     _runOnWorker([this]() {
         // A user stop also cancels a pending reconnect.
         _reconnectTimer->stop();
-        _reconnectAttempts = 0;
+        _watchdog.resetBackoff();
         emit onStopComplete(_stopPipeline() ? STATUS_OK : STATUS_INVALID_STATE);
     });
 }
@@ -640,8 +629,7 @@ void GstVideoReceiver::_resetPipelineState()
     _tee = nullptr;
     _source = nullptr;
 
-    _lastSourceFrameTime = 0;
-    _lastVideoFrameTime = 0;
+    _watchdog.stop();
 
     if (std::exchange(_streaming, false)) {
         qCDebug(GstVideoReceiverLog) << "Streaming stopped" << _redactedUri();
@@ -688,7 +676,7 @@ void GstVideoReceiver::_startDecoding(GstElement* videoSink, bool hasWidget)
         return;
     }
 
-    _lastVideoFrameTime = 0;
+    _watchdog.clearSinkFrames();
 
     _videoSinkProbeId = gst_pad_add_probe(pad, GST_PAD_PROBE_TYPE_BUFFER, _videoSinkProbe, this, nullptr);
     gst_clear_object(&pad);
@@ -904,15 +892,6 @@ void GstVideoReceiver::_onWatchdogTick()
         return;
     }
 
-    const qint64 now = monotonicMs();
-    // start(0) would otherwise trip on every tick.
-    const qint64 timeoutMs = std::max(static_cast<qint64>(_config.timeoutSec) * 1000, kMinWatchdogTimeoutMs);
-    qint64 lastSourceFrameTime = _lastSourceFrameTime.load(std::memory_order_relaxed);
-    if (lastSourceFrameTime == 0) {
-        lastSourceFrameTime = now;
-        _lastSourceFrameTime.store(now, std::memory_order_relaxed);
-    }
-
     if (++_statsTickCounter >= 10) {
         _statsTickCounter = 0;
         if (const HwBuffers::PathStats hwStats = HwBuffers::formatPathStats(false); hwStats.totalDelivered > 0) {
@@ -925,35 +904,22 @@ void GstVideoReceiver::_onWatchdogTick()
         _notifyDecoderStatsChanged();
     }
 
-    qint64 elapsed = now - lastSourceFrameTime;
-    if (elapsed > timeoutMs) {
-        qCDebug(GstVideoReceiverLog) << "Stream timeout, no frames for" << elapsed << "ms" << _redactedUri();
-        GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(_pipeline), GST_DEBUG_GRAPH_SHOW_ALL, "pipeline-watchdog-timeout");
-        emit timeout();
-        _onStreamFailure("source watchdog");
+    const StreamWatchdog::Result result = _watchdog.check(StreamWatchdog::now(), _decoding);
+    if (result.stall == StreamWatchdog::Stall::None) {
         return;
     }
 
-    // _decoding is only set once a frame reached the sink, so the last frame time is valid. The probe alone writes it:
-    // its first write is what reports decoding.
-    if (_decoding) {
-        elapsed = now - _lastVideoFrameTime.load(std::memory_order_relaxed);
-        if (elapsed > (timeoutMs * 2)) {
-            qCDebug(GstVideoReceiverLog) << "Video decoder timeout, no frames for" << elapsed << "ms" << _redactedUri();
-            GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(_pipeline), GST_DEBUG_GRAPH_SHOW_ALL, "pipeline-watchdog-timeout");
-            emit timeout();
-            _onStreamFailure("decoder watchdog");
-        }
-    }
+    const bool sourceStalled = (result.stall == StreamWatchdog::Stall::Source);
+    qCDebug(GstVideoReceiverLog) << (sourceStalled ? "Stream timeout, no frames for"
+                                                   : "Video decoder timeout, no frames for")
+                                 << result.silentMs << "ms" << _redactedUri();
+    GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(_pipeline), GST_DEBUG_GRAPH_SHOW_ALL, "pipeline-watchdog-timeout");
+    emit timeout();
+    _onStreamFailure(sourceStalled ? "source watchdog" : "decoder watchdog");
 }
 
 void GstVideoReceiver::_onStreamFailure(const char* reason)
 {
-    // A pipeline that delivered frames recovered; the next failure starts the backoff over.
-    if (_sourceFrameCount.load(std::memory_order_relaxed) > 0) {
-        _reconnectAttempts = 0;
-    }
-
     qCDebug(GstVideoReceiverLog) << "Stopping after" << reason << _redactedUri();
     (void) _stopPipeline();
     emit onStopComplete(STATUS_FAIL);
@@ -967,11 +933,10 @@ void GstVideoReceiver::_scheduleReconnect(const char* reason)
         return;
     }
 
-    ++_reconnectAttempts;
-    const int delaySec = std::min(1 << std::min(_reconnectAttempts - 1, 5), kMaxReconnectBackoffSec);
-    qCDebug(GstVideoReceiverLog) << "Scheduling reconnect #" << _reconnectAttempts << "in" << delaySec << "s after"
-                                 << reason << _redactedUri();
-    _reconnectTimer->start(std::chrono::seconds(delaySec));
+    const std::chrono::seconds delay = _watchdog.nextReconnectDelay();
+    qCDebug(GstVideoReceiverLog) << "Scheduling reconnect #" << _watchdog.reconnectAttempts() << "in" << delay.count()
+                                 << "s after" << reason << _redactedUri();
+    _reconnectTimer->start(delay);
 }
 
 void GstVideoReceiver::_reconnect()
@@ -981,7 +946,7 @@ void GstVideoReceiver::_reconnect()
         return;
     }
 
-    qCDebug(GstVideoReceiverLog) << "Reconnecting (attempt" << _reconnectAttempts << ")" << _redactedUri();
+    qCDebug(GstVideoReceiverLog) << "Reconnecting (attempt" << _watchdog.reconnectAttempts() << ")" << _redactedUri();
     _startPipeline(_config);
 }
 
@@ -1336,8 +1301,7 @@ bool GstVideoReceiver::_addVideoSink(GstPad *pad)
 
 void GstVideoReceiver::_noteTeeFrame()
 {
-    _lastSourceFrameTime.store(monotonicMs(), std::memory_order_relaxed);
-    const quint64 sourceFrames = _sourceFrameCount.fetch_add(1, std::memory_order_relaxed) + 1;
+    const quint64 sourceFrames = _watchdog.noteSourceFrame(StreamWatchdog::now());
     if (sourceFrames == 1) {
         qCDebug(GstVideoReceiverLog).noquote() << "Source receiving frames (tee):" << _redactedUri();
     } else if ((sourceFrames % 300) == 0) {
@@ -1348,7 +1312,7 @@ void GstVideoReceiver::_noteTeeFrame()
 
 void GstVideoReceiver::_noteVideoSinkFrame()
 {
-    if (_lastVideoFrameTime.exchange(monotonicMs(), std::memory_order_relaxed) == 0) {
+    if (_watchdog.noteSinkFrame(StreamWatchdog::now())) {
         _runOnWorkerForPipeline([this]() { _onFirstVideoFrame(); });
     }
 }
@@ -1425,7 +1389,7 @@ void GstVideoReceiver::_shutdownDecodingBranch()
     }
     _videoSinkProbeId = 0;
 
-    _lastVideoFrameTime = 0;
+    _watchdog.clearSinkFrames();
 
     if (_videoSink) {
         GstObject *parent = gst_element_get_parent(_videoSink);

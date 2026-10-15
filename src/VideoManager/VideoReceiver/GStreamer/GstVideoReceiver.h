@@ -14,6 +14,7 @@
 #include <QtCore/QSemaphore>
 #include <QtCore/QString>
 
+#include "StreamWatchdog.h"
 #include "VideoReceiver.h"
 
 class QThread;
@@ -182,14 +183,11 @@ private:
     GstElement *_source = nullptr;
     GstElement *_tee = nullptr;
     GstElement *_videoSink = nullptr;
-    int _reconnectAttempts = 0;
     /// Identifies the current pipeline; bumped on every teardown (stop() or failed start()) once its callbacks have
     /// stopped. Written on the worker, read by callbacks on streaming threads.
     std::atomic<quint64> _pipelineGeneration = 0;
     bool _busHandlerAttached = false;
     QSemaphore _busHandlerReleased;  ///< Released by GStreamer once the detached bus handler is no longer running.
-    std::atomic<quint64> _sourceFrameCount =
-        0;  ///< Tee-probe frame tally (streaming thread); drives the source-side flow heartbeat log.
     gulong _teeProbeId = 0;
     gulong _videoSinkProbeId = 0;
     gulong _eosProbeId = 0;
@@ -203,9 +201,7 @@ private:
     int _statsTickCounter = 0;
     bool _streaming = false;
     std::atomic<bool> _decoding = false;  ///< Read by the tee probe's flow log.
-    // Monotonic ms. Written on streaming threads (pad probes), read/written by the watchdog on the worker thread.
-    std::atomic<qint64> _lastSourceFrameTime = 0;
-    std::atomic<qint64> _lastVideoFrameTime = 0;
+    StreamWatchdog _watchdog;
 
     mutable QMutex _decoderNameMutex;  // QString refcount isn't thread-safe across reader/writer threads
     QString _decoderName;
