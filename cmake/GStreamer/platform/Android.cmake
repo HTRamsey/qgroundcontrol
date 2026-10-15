@@ -89,8 +89,6 @@ function(_qgc_gst_discover_android_sdk)
             ${_gst_android_abi_DIR}
             EXTRACT_FUNCTION
             _qgc_gst_android_extract
-            EXTRACT_ARGS
-            ${_gst_android_abi_DIR}
             CONTENT_DIR_OUT
             _gst_android_sdk
         )

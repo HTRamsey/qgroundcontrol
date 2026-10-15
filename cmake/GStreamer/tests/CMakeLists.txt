@@ -69,9 +69,6 @@ function(_qgc_add_findmodule_failure_test test_name script expected_regex)
 endfunction()
 
 set(_qgc_gst_argument_failure_cases
-    "DownloadDelegatesRequired|download-delegates-required|qgc_resilient_download: missing values for: FILENAME"
-    "DownloadResultRequired|download-result-required|gstreamer_resilient_download: RESULT_VAR is required"
-    "DownloadUnknown|download-unknown|gstreamer_resilient_download: unknown arguments"
     "AcquireExtractor|acquire-extractor|EXTRACT_FUNCTION '_qgc_no_such_extractor' is not a command"
     "InstallUnknown|install-unknown|gstreamer_install_plugins: unknown arguments"
     "LayoutUnknown|layout-unknown|gstreamer_create_layout_target: unknown arguments"

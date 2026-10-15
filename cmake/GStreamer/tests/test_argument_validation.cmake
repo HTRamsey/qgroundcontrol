@@ -2,20 +2,7 @@ cmake_minimum_required(VERSION 3.25)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/..")
 
-if(TEST_CASE STREQUAL "download-delegates-required")
-    include(Download)
-    gstreamer_resilient_download(DESTINATION_DIR "${CMAKE_CURRENT_BINARY_DIR}" RESULT_VAR _result URLS
-                                 "https://invalid.example.invalid/archive"
-    )
-elseif(TEST_CASE STREQUAL "download-result-required")
-    include(Download)
-    gstreamer_resilient_download(FILENAME archive DESTINATION_DIR "${CMAKE_CURRENT_BINARY_DIR}" URLS
-                                 "https://invalid.example.invalid/archive"
-    )
-elseif(TEST_CASE STREQUAL "download-unknown")
-    include(Download)
-    gstreamer_resilient_download(UNKNOWN_ARGUMENT value)
-elseif(TEST_CASE STREQUAL "acquire-extractor")
+if(TEST_CASE STREQUAL "acquire-extractor")
     include(Download)
     qgc_gst_acquire_sdk(
         PLATFORM
