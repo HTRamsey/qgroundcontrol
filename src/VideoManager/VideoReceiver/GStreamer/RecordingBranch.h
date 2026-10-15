@@ -1,6 +1,5 @@
 #pragma once
 
-#include <atomic>
 #include <chrono>
 
 #include <QtCore/QString>
@@ -77,6 +76,6 @@ private:
     /// Ours, besides the pipeline's while it is inside.
     GStreamer::GstElementPtr _fileSink;
     State _state = State::Idle;
-    std::atomic<gulong> _keyframeWatchId = 0;  ///< Cleared by the keyframe probe when it removes itself.
+    gulong _keyframeWatchId = 0;
     RecordingFinalizer _finalizer;
 };

@@ -29,8 +29,8 @@ constexpr const char* kFileMux[VideoReceiver::FILE_FORMAT_MAX + 1] = {
 struct KeyframeWatch
 {
     VideoReceiver* receiver = nullptr;
-    std::atomic<gulong>* watchId = nullptr;
     QString file;
+    bool started = false;  ///< Only the probe touches it, on the recorder's streaming thread.
 };
 
 const char* recordingParserFactory(const GstCaps* caps)
@@ -170,6 +170,11 @@ GstPadProbeReturn keyframeWatch(GstPad* pad, GstPadProbeInfo* info, gpointer use
         return GST_PAD_PROBE_DROP;
     }
 
+    auto* const watch = static_cast<KeyframeWatch*>(user_data);
+    if (watch->started) {
+        return GST_PAD_PROBE_OK;
+    }
+
     // Upstream of the tee is always a parser (GstBaseParse), which pushes single buffers, never lists.
     GstBuffer* buf = gst_pad_probe_info_get_buffer(info);
     if (!buf || GST_BUFFER_FLAG_IS_SET(buf, GST_BUFFER_FLAG_DELTA_UNIT) || !GST_BUFFER_PTS_IS_VALID(buf)) {
@@ -198,13 +203,9 @@ GstPadProbeReturn keyframeWatch(GstPad* pad, GstPadProbeInfo* info, gpointer use
 
     qCDebug(GstVideoReceiverLog) << "Got keyframe, stop dropping buffers";
 
-    const auto* watch = static_cast<const KeyframeWatch*>(user_data);
+    watch->started = true;
     emit watch->receiver->recordingStarted(watch->file);
-
-    // Returning REMOVE drops the probe; forget its id so RecordingBranch::_shutdown() doesn't remove it again.
-    gulong ownId = GST_PAD_PROBE_INFO_ID(info);
-    (void) watch->watchId->compare_exchange_strong(ownId, 0);
-    return GST_PAD_PROBE_REMOVE;
+    return GST_PAD_PROBE_OK;
 }
 
 }  // namespace
@@ -339,7 +340,7 @@ void RecordingBranch::start(const QString& videoFile, VideoReceiver::FILE_FORMAT
     // This will ensure the first frame is a keyframe at t=0, and decoding can begin immediately on playback
     _receiver._recordingOutput = videoFile;
     _keyframeWatchId = gst_pad_add_probe(probepad.get(), GST_PAD_PROBE_TYPE_BUFFER, keyframeWatch,
-                                         new KeyframeWatch{&_receiver, &_keyframeWatchId, videoFile},
+                                         new KeyframeWatch{.receiver = &_receiver, .file = videoFile},
                                          [](gpointer watch) { delete static_cast<KeyframeWatch*>(watch); });
     if (_keyframeWatchId == 0) {
         qCCritical(GstVideoReceiverLog) << "Failed to add the keyframe probe" << _receiver._redactedUri();
@@ -498,12 +499,12 @@ void RecordingBranch::_shutdown()
 {
     _stopTimer->stop();
 
-    const gulong keyframeWatchId = _keyframeWatchId.exchange(0);
-    if (keyframeWatchId != 0 && _valve) {
+    if (_keyframeWatchId != 0 && _valve) {
         if (const GStreamer::GstPadPtr probepad = GStreamer::adoptPad(gst_element_get_static_pad(_valve, "src"))) {
-            gst_pad_remove_probe(probepad.get(), keyframeWatchId);
+            gst_pad_remove_probe(probepad.get(), _keyframeWatchId);
         }
     }
+    _keyframeWatchId = 0;
 
     if (_fileSink) {
         // Removed before going NULL, so nothing it posts while stopping reaches the bus as a pipeline error.
