@@ -36,6 +36,14 @@ constexpr std::chrono::seconds kEosTimeout{3};
 constexpr std::chrono::seconds kWorkerShutdownTimeout = kEosTimeout + std::chrono::seconds{2};
 constexpr qint64 kMinWatchdogTimeoutMs = 1000;
 
+// MP4/MOV robust muxing: qtmux reserves header space at the start of the file and rewrites the moov
+// there every update period, so a crash or power loss leaves a file playable up to the last update.
+// The reservation (550 B/s per track by default, ~8 MB here) outlasts the nominal duration since the
+// index grows ~140 B/s at 30 fps and ~260 B/s at 60 fps; overrunning it makes qtmux post an ERROR.
+// The period bounds crash data loss without rewriting the growing moov too often.
+constexpr guint64 kRecordingReservedMaxDurationNs = 2 * 3600 * GST_SECOND;
+constexpr guint64 kRecordingMoovUpdatePeriodNs = 5 * GST_SECOND;
+
 qint64 monotonicMs()
 {
     return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch())
@@ -365,14 +373,20 @@ bool GstVideoReceiver::_stopPipeline()
         gboolean recordingValveClosed = TRUE;
         g_object_get(_recorderValve, "drop", &recordingValveClosed, nullptr);
 
-        if (!recordingValveClosed) {
+        if (!recordingValveClosed && _fileSink) {
+            // Nothing else pops this bus, so it still holds e.g. the fragment-closed of an earlier
+            // recording or ERRORs the bus handler ignored; drop them so they can't end the wait early.
+            while (GstMessage* stale = gst_bus_pop(bus)) {
+                gst_message_unref(stale);
+            }
+
             (void) gst_element_send_event(_pipeline, gst_event_new_eos());
 
             // Wait for splitmuxsink to actually finalize its current fragment. async-finalize
             // pushes muxer teardown off the streaming thread; the splitmuxsink-fragment-closed
             // element message is posted (via message-forward=TRUE) exactly when the muxer's
             // state has gone NULL. EOS is the fallback for older builds / unexpected paths;
-            // ERROR breaks out so we don't burn the full budget on a known failure.
+            // a recorder ERROR breaks out so we don't burn the full budget on a known failure.
             const QDeadlineTimer deadline(kEosTimeout);
             bool finalized = false;
             while (!finalized) {
@@ -386,10 +400,11 @@ bool GstVideoReceiver::_stopPipeline()
                 if (!msg) {
                     break;
                 }
+                const bool fromRecorder = gst_object_has_as_ancestor(GST_MESSAGE_SRC(msg), GST_OBJECT(_fileSink));
                 switch (GST_MESSAGE_TYPE(msg)) {
                     case GST_MESSAGE_ELEMENT: {
                         const GstStructure* s = gst_message_get_structure(msg);
-                        if (s && gst_structure_has_name(s, "splitmuxsink-fragment-closed")) {
+                        if (fromRecorder && s && gst_structure_has_name(s, "splitmuxsink-fragment-closed")) {
                             qCDebug(GstVideoReceiverLog) << "splitmuxsink fragment finalized";
                             finalized = true;
                         }
@@ -400,8 +415,10 @@ bool GstVideoReceiver::_stopPipeline()
                         finalized = true;
                         break;
                     case GST_MESSAGE_ERROR:
-                        qCCritical(GstVideoReceiverLog) << "Error stopping pipeline!";
-                        finalized = true;
+                        if (fromRecorder) {
+                            qCWarning(GstVideoReceiverLog) << "Recording failed while finalizing";
+                            finalized = true;
+                        }
                         break;
                     default:
                         break;
@@ -412,7 +429,7 @@ bool GstVideoReceiver::_stopPipeline()
                 qCWarning(GstVideoReceiverLog) << "splitmuxsink finalize signal not received within"
                                                << std::chrono::milliseconds(kEosTimeout).count()
                                                << "ms — forcing pipeline NULL (recording may be truncated; "
-                                               << "faststart + reserved-moov-update-period keep the file playable)";
+                                               << "MP4/MOV stay playable up to the last moov update)";
             }
         }
 
@@ -964,14 +981,13 @@ GstElement* GstVideoReceiver::_makeFileSink(const QString& videoFile, FILE_FORMA
                      "message-forward", TRUE,
                      nullptr);
 
-        // Crash-safe MP4/MOV: faststart writes moov up-front; reserved-moov-update-period
-        // refreshes the moov on a 1 s cadence so an abrupt kill still leaves a playable file.
-        // matroskamux is naturally streamable; skip the GstStructure dance.
+        // Crash-safe MP4/MOV via robust muxing. faststart is deliberately off: it spools the whole
+        // recording to a temp file and writes the real file only at EOS. matroskamux is naturally
+        // streamable; skip the GstStructure dance.
         if (format == FILE_FORMAT_MP4 || format == FILE_FORMAT_MOV) {
-            GstStructure *muxerProps = gst_structure_new("properties",
-                "faststart", G_TYPE_BOOLEAN, TRUE,
-                "reserved-moov-update-period", G_TYPE_UINT64, G_GUINT64_CONSTANT(1000000000),
-                nullptr);
+            GstStructure* muxerProps =
+                gst_structure_new("properties", "reserved-max-duration", G_TYPE_UINT64, kRecordingReservedMaxDurationNs,
+                                  "reserved-moov-update-period", G_TYPE_UINT64, kRecordingMoovUpdatePeriodNs, nullptr);
             g_object_set(splitmux, "muxer-properties", muxerProps, nullptr);
             gst_structure_free(muxerProps);
         }
