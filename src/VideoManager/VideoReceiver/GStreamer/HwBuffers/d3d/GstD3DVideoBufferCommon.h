@@ -2,13 +2,14 @@
 
 #include <QtCore/qglobal.h>
 
-#if defined(Q_OS_WIN) && (defined(QGC_HAS_GST_D3D11_GPU_PATH) || defined(QGC_HAS_GST_D3D12_GPU_PATH))
+#if defined(QGC_HAS_GST_D3D11_GPU_PATH) || defined(QGC_HAS_GST_D3D12_GPU_PATH)
 
 #include <algorithm>
 #include <array>
 #include <atomic>
 #include <cstddef>
 #include <gst/gst.h>
+#include <gst/video/gstvideopool.h>
 #include <memory>
 #include <private/qhwvideobuffer_p.h>
 #include <private/qvideotexturehelper_p.h>
@@ -79,7 +80,7 @@ struct StagingKey
     bool operator==(const StagingKey& o) const noexcept = default;
 };
 
-/// Scope guard for the native handles a resolvePlaneResources() loop builds up: releases every owned handle on scope
+/// Scope guard for the native handles a resolvePlanes() loop builds up: releases every owned handle on scope
 /// exit unless commit() transfers ownership on the success path.
 template <class HandleT>
 struct PlaneResourceGuard
@@ -100,7 +101,7 @@ struct PlaneResourceGuard
     void commit() noexcept { owned = 0; }
 };
 
-/// Streaming-thread resolve shared by D3D11 and D3D12, run once per buffer from the GstD3D1xVideoBuffer ctor. For each
+/// Streaming-thread resolve shared by D3D11 and D3D12, run once per buffer from the VideoBuffer ctor. For each
 /// memory: type check, native-device guard (plane 0) against the bridge's shared device, decoder sync, resource lookup,
 /// and either a slice copy into staging (QRhi::createFrom has no subresource selector) or an AddRef of the decoder's
 /// resource. Fills @p guard and returns the resolved plane count; 0 after warning the cause once.
@@ -110,6 +111,9 @@ struct PlaneResourceGuard
 ///   sameDevice(Device*, Device*), resource(Memory*), subresource(Memory*, int plane), isArraySlice(Handle*, guint);
 ///   members prepare(Memory*, int plane) (decoder sync), copySlice(Handle*, guint subresource, int plane, Memory*)
 ///   (returns an AddRef'd staging handle), finish() (flush/fence-wait the submitted copies).
+/// VideoBuffer and proposePool() below need the rest of the API: static kPath, kBackend (QRhi::Implementation),
+///   kCapsFeature, diag(), newPool(Device*), setAllocationParams(GstStructure* config, Device*, const GstVideoInfo*);
+///   member takeKeepAlive() (state the frame bundle must keep alive, or null).
 template <class Api>
 int resolvePlanes(GstBuffer* buffer, Api& api, MapDiagnostics& diag, PlaneResourceGuard<typename Api::Handle>& guard)
 {
@@ -260,6 +264,113 @@ QVideoFrameTexturesUPtr mapResolvedTextures(GstHwVideoBuffer& self, QRhi& rhi, Q
         });
 }
 
+/// Wraps a D3D11Memory/D3D12Memory-backed GstSample as a QHwVideoBuffer. The device guard, decoder sync and slice
+/// copies run in the constructor, on the streaming thread (blocking there is harmless: the decoder is async), so
+/// mapTextures() on the render thread only imports resolved resources.
+template <class Api>
+class VideoBuffer final : public GstHwVideoBuffer
+{
+public:
+    VideoBuffer(GstSample* sample, const GstVideoInfo& videoInfo, const QVideoFrameFormat& format)
+        : GstHwVideoBuffer(QVideoFrame::RhiTextureHandle, sample, videoInfo, format)
+    {
+        GstBuffer* buffer = _sample ? gst_sample_get_buffer(_sample) : nullptr;
+        if (!buffer) {
+            return;
+        }
+        PlaneResourceGuard<Handle> guard;
+        Api api;
+        const int resolvedCount = resolvePlanes(buffer, api, Api::diag(), guard);
+        if (resolvedCount == 0) {
+            return;
+        }
+        _handles = guard.handles;
+        _resolvedCount = resolvedCount;
+        guard.commit();
+        _keepAlive = api.takeKeepAlive();
+    }
+
+    ~VideoBuffer() override
+    {
+        for (int i = 0; i < _resolvedCount; ++i) {
+            if (_handles[i]) {
+                _handles[i]->Release();
+            }
+        }
+    }
+
+    bool validatePlaneHandles() const override
+    {
+        // A failed constructor-time resolve (device mismatch, sync or copy failure) sends the frame to the CPU.
+        if (_resolvedCount == 0) {
+            return false;
+        }
+        return validatePlanes([](GstMemory* mem) {
+            return mem && Api::isMemory(mem) &&
+                   (Api::resource(reinterpret_cast<typename Api::Memory*>(mem)) != nullptr);
+        });
+    }
+
+    QVideoFrameTexturesUPtr mapTextures(QRhi& rhi, QVideoFrameTexturesUPtr& old) override
+    {
+        // The device bridge must be primed: resources on another device import fine but render corrupt.
+        GstBuffer* buffer = nullptr;
+        if (!checkMapPreconditions(rhi, static_cast<int>(Api::kBackend), Api::log(), Api::diag(), buffer) ||
+            (_resolvedCount == 0)) {
+            return GstHwPathTelemetry::fail(Api::kPath);
+        }
+        const GstHwMapTail tail{.path = Api::kPath,
+                                .frameSize = _format.frameSize(),
+                                .pixelFormat = _format.pixelFormat(),
+                                .log = &Api::log(),
+                                .diag = &Api::diag(),
+                                .successTag = GstHw::toString(Api::kPath)};
+        return mapResolvedTextures(*this, rhi, old, tail, _handles, _resolvedCount, _keepAlive);
+    }
+
+private:
+    using Handle = typename Api::Handle;
+
+    std::array<Handle*, kMaxPlanes> _handles{};
+    int _resolvedCount = 0;
+    /// Backend state the frame bundles share while QRhi samples them (D3D12 staging slot leases).
+    std::shared_ptr<void> _keepAlive;
+};
+
+/// HwPathDescriptor::proposePool for @p Api's memory: adds a pool on the bridge's device (Qt's) to an ALLOCATION query
+/// whose caps carry that memory, so the decoder allocates on the device QRhi samples from.
+template <class Api>
+bool proposePool(GstQuery* query, GstCaps* caps, const GstVideoInfo* vinfo, gsize size, guint minBuffers)
+{
+    GstCapsFeatures* features = gst_caps_get_features(caps, 0);
+    if (!features || !gst_caps_features_contains(features, Api::kCapsFeature)) {
+        return false;
+    }
+    typename Api::Device* device = Api::bridgeDevice();
+    if (!device) {
+        return false;
+    }
+    bool proposed = false;
+    if (GstBufferPool* pool = Api::newPool(device)) {
+        GstStructure* config = gst_buffer_pool_get_config(pool);
+        gst_buffer_pool_config_set_params(config, caps, size, minBuffers, 0);
+        gst_buffer_pool_config_add_option(config, GST_BUFFER_POOL_OPTION_VIDEO_META);
+        Api::setAllocationParams(config, device, vinfo);
+        if (gst_buffer_pool_set_config(pool, config)) {
+            // The pool may grow the buffer size to the allocated texture's pitch; re-read it.
+            GstStructure* updated = gst_buffer_pool_get_config(pool);
+            guint poolSize = static_cast<guint>(size);
+            gst_buffer_pool_config_get_params(updated, nullptr, &poolSize, nullptr, nullptr);
+            gst_structure_free(updated);
+            gst_query_add_allocation_pool(query, pool, poolSize, minBuffers, 0);
+            proposed = true;
+        }
+        gst_object_unref(pool);
+    }
+    gst_object_unref(device);  // bridgeDevice() returns a transfer-full ref.
+    return proposed;
+}
+
 }  // namespace GstD3DVideoBufferCommon
 
-#endif  // Q_OS_WIN && (QGC_HAS_GST_D3D11_GPU_PATH || QGC_HAS_GST_D3D12_GPU_PATH)
+#endif  // QGC_HAS_GST_D3D11_GPU_PATH || QGC_HAS_GST_D3D12_GPU_PATH

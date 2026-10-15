@@ -224,8 +224,8 @@ foreach(_ver IN ITEMS 11 12)
         LIBS d3d${_ver}
         UNSTABLE_API
         DEFINE QGC_HAS_GST_D3D${_ver}_GPU_PATH
-        SOURCES d3d/GstD3D${_ver}VideoBuffer.cc d3d/GstD3D${_ver}VideoBuffer.h d3d/GstD3D${_ver}ContextBridge.cc
-                d3d/GstD3D${_ver}ContextBridge.h d3d/GstD3DVideoBufferCommon.h)
+        SOURCES d3d/GstD3D${_ver}VideoBuffer.cc d3d/GstD3D${_ver}ContextBridge.cc d3d/GstD3D${_ver}ContextBridge.h
+                d3d/GstD3DVideoBufferCommon.h)
 endforeach()
 # Android AHardwareBuffer (gst-plugins-bad >= 1.28; GLMemory covers older SDKs).
 set(_qgc_gpu_row_AHardwareBuffer
