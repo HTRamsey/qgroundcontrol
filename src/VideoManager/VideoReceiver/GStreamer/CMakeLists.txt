@@ -115,6 +115,10 @@ target_sources(${CMAKE_PROJECT_NAME}
         StreamWatchdog.h
         PipelineDotDumper.cc
         PipelineDotDumper.h
+        RecordingBranch.cc
+        RecordingBranch.h
+        RecordingFinalizer.cc
+        RecordingFinalizer.h
 )
 
 # iOS xcframework ships no CA list / no keychain-via-OpenSSL; bundle a Mozilla NSS extract for

@@ -5,21 +5,20 @@
 //              |
 // _source-->_tee
 //              |
-//              +-->queue-->_recorderValve[-->_fileSink]
+//              +-->RecordingBranch: queue-->valve[-->sinkbin]
 //-----------------------------------------------------------------------------
 
 #include "GstVideoReceiver.h"
 
-#include <algorithm>
 #include <chrono>
 #include <gst/gst.h>
+#include <memory>
 
 #include <QtCore/QDeadlineTimer>
 #include <QtCore/QMutexLocker>
 #include <QtCore/QThread>
 #include <QtCore/QTimer>
 #include <QtCore/QUrl>
-#include <QtCore/QWaitCondition>
 #include <QtQuick/QQuickItem>
 
 #include "GStreamerHelpers.h"
@@ -33,26 +32,10 @@
 QGC_LOGGING_CATEGORY(GstVideoReceiverLog, "Video.GStreamer.GstVideoReceiver")
 
 namespace {
-// Bus wait budget for an active recording to finalize during stop(); covers slow storage.
-constexpr std::chrono::seconds kEosTimeout{3};
-// Destructor wait for the worker. Must exceed kEosTimeout so a finalizing recording isn't abandoned.
-constexpr std::chrono::seconds kWorkerShutdownTimeout = kEosTimeout + std::chrono::seconds{2};
+// Destructor wait for the worker. Must exceed the recording finalize timeout so a finalizing recording isn't
+// abandoned.
+constexpr std::chrono::seconds kWorkerShutdownTimeout = RecordingBranch::kFinalizeTimeout + std::chrono::seconds{2};
 constexpr std::chrono::milliseconds kWatchdogInterval{1000};
-
-// MP4/MOV robust muxing: qtmux reserves header space at the start of the file and rewrites the moov
-// there every update period, so a crash or power loss leaves a file playable up to the last update.
-// The reservation (550 B/s per track by default, ~8 MB here) outlasts the nominal duration since the
-// index grows ~140 B/s at 30 fps and ~260 B/s at 60 fps; overrunning it makes qtmux post an ERROR.
-// The period bounds crash data loss without rewriting the growing moov too often.
-constexpr guint64 kRecordingReservedMaxDurationNs = 2 * 3600 * GST_SECOND;
-constexpr guint64 kRecordingMoovUpdatePeriodNs = 5 * GST_SECOND;
-
-/// Per-recording state for the keyframe gate, owned by its probe.
-struct KeyframeWatch
-{
-    GstVideoReceiver* receiver = nullptr;
-    QString file;
-};
 
 void logBusWarning(GstMessage* message)
 {
@@ -124,111 +107,7 @@ bool isRecoverableH265PaciError(GstMessage *msg, const GError *error, const gcha
     return factory && (g_strcmp0(GST_OBJECT_NAME(factory), "rtph265depay") == 0);
 }
 
-const char* recordingParserFactory(const GstCaps* caps)
-{
-    if (!caps || gst_caps_is_any(caps) || gst_caps_is_empty(caps)) {
-        return nullptr;
-    }
-
-    for (guint i = 0; i < gst_caps_get_size(caps); ++i) {
-        const GstStructure* structure = gst_caps_get_structure(caps, i);
-        if (gst_structure_has_name(structure, "video/x-h264")) {
-            return "h264parse";
-        }
-        if (gst_structure_has_name(structure, "video/x-h265")) {
-            return "h265parse";
-        }
-    }
-
-    return nullptr;
-}
-
 }  // namespace
-
-/// Finalization of the active recording. Settled from the bus handler on whichever thread posts, by the first of:
-/// splitmuxsink-fragment-closed or a branch/pipeline EOS (closed), or a recorder ERROR (failed). Armed with the
-/// recording's file sink so messages about an earlier file can never settle the current one.
-class GstVideoReceiver::RecordingFinalizer
-{
-public:
-    enum class Outcome
-    {
-        Pending,
-        Closed,
-        Failed,
-    };
-
-    ~RecordingFinalizer() { (void) disarm(); }
-
-    void arm(GstElement* fileSink)
-    {
-        QMutexLocker lock(&_mutex);
-        gst_clear_object(&_fileSink);
-        _fileSink = GST_ELEMENT(gst_object_ref(fileSink));
-        _outcome = Outcome::Pending;
-    }
-
-    /// Returns how the recording ended.
-    Outcome disarm()
-    {
-        QMutexLocker lock(&_mutex);
-        gst_clear_object(&_fileSink);
-        return std::exchange(_outcome, Outcome::Pending);
-    }
-
-    Outcome outcome() const
-    {
-        QMutexLocker lock(&_mutex);
-        return _outcome;
-    }
-
-    /// Settles the armed recording with @p outcome unless it already ended. Returns whether this call settled it.
-    bool settle(Outcome outcome)
-    {
-        QMutexLocker lock(&_mutex);
-        return _settleLocked(outcome);
-    }
-
-    /// As settle(), but only when @p source is (inside) the armed file sink. @p belongs reports that membership.
-    bool settleFrom(GstObject* source, Outcome outcome, bool* belongs = nullptr)
-    {
-        QMutexLocker lock(&_mutex);
-        const bool fromRecording =
-            _fileSink && source && gst_object_has_as_ancestor(source, GST_OBJECT_CAST(_fileSink));
-        if (belongs) {
-            *belongs = fromRecording;
-        }
-        return fromRecording && _settleLocked(outcome);
-    }
-
-    /// Blocks until the recording ends or @p deadline expires; returns Pending on timeout.
-    Outcome wait(QDeadlineTimer deadline)
-    {
-        QMutexLocker lock(&_mutex);
-        while (_outcome == Outcome::Pending) {
-            if (!_settled.wait(&_mutex, deadline)) {
-                break;
-            }
-        }
-        return _outcome;
-    }
-
-private:
-    bool _settleLocked(Outcome outcome)
-    {
-        if (!_fileSink || (_outcome != Outcome::Pending)) {
-            return false;
-        }
-        _outcome = outcome;
-        _settled.wakeAll();
-        return true;
-    }
-
-    mutable QMutex _mutex;
-    QWaitCondition _settled;
-    GstElement* _fileSink = nullptr;
-    Outcome _outcome = Outcome::Pending;
-};
 
 GstVideoReceiver::GstVideoReceiver(QObject* parent)
     : VideoReceiver(parent)
@@ -236,8 +115,7 @@ GstVideoReceiver::GstVideoReceiver(QObject* parent)
     , _workerContext(new QObject())
     , _watchdogTimer(new QTimer(_workerContext))
     , _reconnectTimer(new QTimer(_workerContext))
-    , _recordingStopTimer(new QTimer(_workerContext))
-    , _recordingFinalizer(std::make_unique<RecordingFinalizer>())
+    , _recordingBranch(*this, _workerContext)
 {
     qCDebug(GstVideoReceiverLog) << this;
 
@@ -248,9 +126,6 @@ GstVideoReceiver::GstVideoReceiver(QObject* parent)
     _reconnectTimer->setTimerType(Qt::PreciseTimer);
     (void) connect(_watchdogTimer, &QTimer::timeout, _workerContext, [this]() { _onWatchdogTick(); });
     (void) connect(_reconnectTimer, &QTimer::timeout, _workerContext, [this]() { _reconnect(); });
-    _recordingStopTimer->setSingleShot(true);
-    _recordingStopTimer->setInterval(kEosTimeout);
-    (void) connect(_recordingStopTimer, &QTimer::timeout, _workerContext, [this]() { _onRecordingStopTimeout(); });
 
     _workerContext->moveToThread(_workerThread);
     (void) connect(_workerThread, &QThread::finished, _workerContext, &QObject::deleteLater);
@@ -327,17 +202,26 @@ void GstVideoReceiver::_startPipeline(const StartConfig& config)
                                  << _config.timeoutSec;
 
     bool running = false;
-    bool pipelineUp = false;
-
-    GstElement *decoderQueue = nullptr;
-    GstElement *recorderQueue = nullptr;
 
     do {
+        GstElement* pipeline = gst_pipeline_new("receiver");
+        if (!pipeline) {
+            qCCritical(GstVideoReceiverLog) << "gst_pipeline_new() failed";
+            break;
+        }
+        _pipeline = pipeline;
+        // Before anything can post: the context bridges in the handler must see NEED_CONTEXT, which upstream
+        // queries during PAUSED->PLAYING.
+        _attachBusHandler();
+
+        g_object_set(_pipeline, "message-forward", TRUE, nullptr);
+
         _tee = gst_element_factory_make("tee", nullptr);
         if (!_tee)  {
             qCCritical(GstVideoReceiverLog) << "gst_element_factory_make('tee') failed";
             break;
         }
+        (void) gst_bin_add(GST_BIN(_pipeline), _tee);
 
         GstPad *pad = gst_element_get_static_pad(_tee, "sink");
         if (!pad) {
@@ -354,14 +238,14 @@ void GstVideoReceiver::_startPipeline(const StartConfig& config)
             break;
         }
 
-        decoderQueue = gst_element_factory_make("queue", nullptr);
+        GstElement* decoderQueue = gst_element_factory_make("queue", nullptr);
         if (!decoderQueue)  {
             qCCritical(GstVideoReceiverLog) << "gst_element_factory_make('queue') failed";
             break;
         }
 
         // leaky=downstream (2) + tiny depth: the live-display branch must drop the oldest
-        // buffer on backpressure, not stall the streaming thread. Recording branch (below)
+        // buffer on backpressure, not stall the streaming thread. The recording branch
         // keeps default non-leaky semantics so every frame reaches the muxer.
         g_object_set(decoderQueue,
                      "leaky", 2,
@@ -369,6 +253,7 @@ void GstVideoReceiver::_startPipeline(const StartConfig& config)
                      "max-size-bytes", 0,
                      "max-size-time", G_GUINT64_CONSTANT(0),
                      nullptr);
+        (void) gst_bin_add(GST_BIN(_pipeline), decoderQueue);
 
         _decoderValve = gst_element_factory_make("valve", nullptr);
         if (!_decoderValve)  {
@@ -379,39 +264,16 @@ void GstVideoReceiver::_startPipeline(const StartConfig& config)
         g_object_set(_decoderValve,
                      "drop", TRUE,
                      nullptr);
+        (void) gst_bin_add(GST_BIN(_pipeline), _decoderValve);
 
-        recorderQueue = gst_element_factory_make("queue", nullptr);
-        if (!recorderQueue)  {
-            qCCritical(GstVideoReceiverLog) << "gst_element_factory_make('queue') failed";
+        if (!gst_element_link_many(_tee, decoderQueue, _decoderValve, nullptr)) {
+            qCCritical(GstVideoReceiverLog) << "Unable to link decoder queue";
             break;
         }
 
-        _recorderValve = gst_element_factory_make("valve", nullptr);
-        if (!_recorderValve) {
-            qCCritical(GstVideoReceiverLog) << "gst_element_factory_make('valve') failed";
+        if (!_recordingBranch.build(_pipeline, _tee)) {
             break;
         }
-
-        g_object_set(_recorderValve,
-                     "drop", TRUE,
-                     nullptr);
-        // Preserve stream-start/caps/segment events while buffers are dropped. When recording
-        // starts later, the newly linked parser receives the negotiated codec configuration.
-        gst_util_set_object_arg(G_OBJECT(_recorderValve), "drop-mode", "forward-sticky-events");
-
-        GstElement* pipeline = gst_pipeline_new("receiver");
-        if (!pipeline) {
-            qCCritical(GstVideoReceiverLog) << "gst_pipeline_new() failed";
-            break;
-        }
-        _pipeline = pipeline;
-        // Before anything can post: the context bridges in the handler must see NEED_CONTEXT, which upstream
-        // queries during PAUSED->PLAYING.
-        _attachBusHandler();
-
-        g_object_set(_pipeline,
-                     "message-forward", TRUE,
-                     nullptr);
 
         GStreamer::SourceFactory::Config sourceConfig;
         sourceConfig.jitterBuffer = _config.lowLatency ? GStreamer::SourceFactory::JitterBuffer::None
@@ -426,10 +288,7 @@ void GstVideoReceiver::_startPipeline(const StartConfig& config)
             qCCritical(GstVideoReceiverLog) << "SourceFactory::create() failed";
             break;
         }
-
-        gst_bin_add_many(GST_BIN(_pipeline), _source, _tee, decoderQueue, _decoderValve, recorderQueue, _recorderValve, nullptr);
-
-        pipelineUp = true;
+        (void) gst_bin_add(GST_BIN(_pipeline), _source);
 
         GstPad *srcPad = nullptr;
         (void) gst_element_foreach_src_pad(_source, grabFirstSrcPad, &srcPad);
@@ -441,34 +300,12 @@ void GstVideoReceiver::_startPipeline(const StartConfig& config)
             (void) g_signal_connect(_source, "pad-added", G_CALLBACK(_onNewPad), this);
         }
 
-        if (!gst_element_link_many(_tee, decoderQueue, _decoderValve, nullptr)) {
-            qCCritical(GstVideoReceiverLog) << "Unable to link decoder queue";
-            break;
-        }
-
-        if (!gst_element_link_many(_tee, recorderQueue, _recorderValve, nullptr)) {
-            qCCritical(GstVideoReceiverLog) << "Unable to link recorder queue";
-            break;
-        }
-
         _dotDumper.dump(_pipeline, "pipeline-initial");
         running = (gst_element_set_state(_pipeline, GST_STATE_PLAYING) != GST_STATE_CHANGE_FAILURE);
     } while(0);
 
     if (!running) {
         qCWarning(GstVideoReceiverLog) << "Failed to start" << _redactedUri();
-
-        if (!pipelineUp) {
-            // Not yet owned by the pipeline; the tee probe dies with the tee.
-            gst_clear_object(&_recorderValve);
-            gst_clear_object(&recorderQueue);
-            gst_clear_object(&_decoderValve);
-            gst_clear_object(&decoderQueue);
-            gst_clear_object(&_tee);
-            gst_clear_object(&_source);
-            _teeProbeId = 0;
-        }
-
         _resetPipelineState();
 
         emit onStartComplete(STATUS_FAIL);
@@ -503,32 +340,7 @@ bool GstVideoReceiver::_stopPipeline()
 
     qCDebug(GstVideoReceiverLog) << "Stopping" << _redactedUri();
 
-    if (_recordingState == RecordingState::Recording) {
-        // EOS at the tee drains the recorder queue into the file. Not sent to the pipeline: a source handles that
-        // EOS under its streaming thread's stream lock, which a thread held downstream would never release.
-        if (GstPad* teeSink = gst_element_get_static_pad(_tee, "sink")) {
-            (void) gst_pad_send_event(teeSink, gst_event_new_eos());
-            gst_object_unref(teeSink);
-        }
-    }
-
-    // Also waits for a stopRecording() still in flight; its EOS is already in the branch.
-    if (_recordingState != RecordingState::Idle) {
-        switch (_recordingFinalizer->wait(QDeadlineTimer(kEosTimeout))) {
-            case RecordingFinalizer::Outcome::Closed:
-                qCDebug(GstVideoReceiverLog) << "Recording finalized";
-                break;
-            case RecordingFinalizer::Outcome::Failed:
-                qCWarning(GstVideoReceiverLog) << "Recording failed while finalizing";
-                break;
-            case RecordingFinalizer::Outcome::Pending:
-                qCWarning(GstVideoReceiverLog)
-                    << "Recording not finalized within" << std::chrono::milliseconds(kEosTimeout).count()
-                    << "ms — forcing pipeline NULL (recording may be truncated; "
-                    << "MP4/MOV stay playable up to the last moov update)";
-                break;
-        }
-    }
+    _recordingBranch.finishForTeardown();
 
     _resetPipelineState();
 
@@ -574,7 +386,6 @@ void GstVideoReceiver::_detachBusHandler()
 void GstVideoReceiver::_resetPipelineState()
 {
     _watchdogTimer->stop();
-    _recordingStopTimer->stop();
 
     if (_pipeline) {
         (void) gst_element_set_state(_pipeline, GST_STATE_NULL);
@@ -597,9 +408,7 @@ void GstVideoReceiver::_resetPipelineState()
 
     _removeSourceEosProbe();
 
-    if (_fileSink) {
-        _shutdownRecordingBranch();
-    }
+    _recordingBranch.reset();
 
     // The video sink outlives the pipeline (owned by the caller of startDecoding), so its probe
     // and pipeline membership must be dropped even when start() failed before decoding began.
@@ -612,7 +421,6 @@ void GstVideoReceiver::_resetPipelineState()
     gst_clear_object(&_pipeline);
 
     // Owned by the (now released) pipeline.
-    _recorderValve = nullptr;
     _decoderValve = nullptr;
     _tee = nullptr;
     _source = nullptr;
@@ -728,109 +536,7 @@ void GstVideoReceiver::startRecording(const QString &videoFile, FILE_FORMAT form
         return;
     }
 
-    qCDebug(GstVideoReceiverLog) << "Starting recording" << _redactedUri();
-
-    if (!_pipeline) {
-        qCDebug(GstVideoReceiverLog) << "Streaming is not active!" << _redactedUri();
-        emit onStartRecordingComplete(STATUS_INVALID_STATE);
-        return;
-    }
-
-    if (_recordingState != RecordingState::Idle) {
-        qCDebug(GstVideoReceiverLog) << "Already recording!" << _redactedUri();
-        emit onStartRecordingComplete(STATUS_INVALID_STATE);
-        return;
-    }
-
-    qCDebug(GstVideoReceiverLog) << "New video file:" << videoFile << _redactedUri();
-
-    GstPad* probepad = gst_element_get_static_pad(_recorderValve, "src");
-    if (!probepad) {
-        qCCritical(GstVideoReceiverLog) << "gst_element_get_static_pad() failed" << _redactedUri();
-        emit onStartRecordingComplete(STATUS_FAIL);
-        return;
-    }
-
-    const auto failRecordingStart = [this, &probepad]() {
-        gst_clear_object(&probepad);
-        if (_fileSink) {
-            (void) gst_element_set_state(_fileSink, GST_STATE_NULL);
-            // Safe before and after a successful link. Removing a still-linked bin leaves the
-            // valve's src pad attached to a finalized peer and breaks every later retry.
-            gst_element_unlink(_recorderValve, _fileSink);
-            GstObject* parent = gst_element_get_parent(_fileSink);
-            if (parent) {
-                (void) gst_bin_remove(GST_BIN(parent), _fileSink);
-                gst_clear_object(&parent);
-            }
-            gst_clear_object(&_fileSink);
-        }
-        // Only once the sink is out of the pipeline: until then its errors must still count as the recorder's.
-        (void) _recordingFinalizer->disarm();
-        emit onStartRecordingComplete(STATUS_FAIL);
-    };
-
-    // forward-sticky-events preserves the exact negotiated caps while the valve is closed. Fall
-    // back to a proxied caps query during the narrow startup window before negotiation completes.
-    GstCaps* inputCaps = gst_pad_get_current_caps(probepad);
-    if (!inputCaps) {
-        inputCaps = gst_pad_query_caps(probepad, nullptr);
-    }
-    _fileSink = _makeFileSink(videoFile, format, inputCaps);
-    gst_clear_caps(&inputCaps);
-    if (!_fileSink) {
-        qCCritical(GstVideoReceiverLog) << "_makeFileSink() failed" << _redactedUri();
-        failRecordingStart();
-        return;
-    }
-
-    // Armed before the sink can post, so the bus handler attributes its messages (e.g. a failure to open the
-    // file) to this recording instead of to the pipeline.
-    _recordingFinalizer->arm(_fileSink);
-
-    if (!gst_bin_add(GST_BIN(_pipeline), _fileSink)) {
-        qCCritical(GstVideoReceiverLog) << "gst_bin_add(file sink) failed" << _redactedUri();
-        failRecordingStart();
-        return;
-    }
-    (void) gst_object_ref(_fileSink);  // Keep a reference in addition to the pipeline's ownership.
-
-    if (!gst_element_link(_recorderValve, _fileSink)) {
-        qCWarning(GstVideoReceiverLog) << "Failed to link valve and file sink" << _redactedUri();
-        failRecordingStart();
-        return;
-    }
-
-    if (!gst_element_sync_state_with_parent(_fileSink)) {
-        qCWarning(GstVideoReceiverLog) << "Recording sink failed to start" << _redactedUri();
-        failRecordingStart();
-        return;
-    }
-
-    _dotDumper.dump(_pipeline, "pipeline-with-filesink");
-
-    // Install a probe on the recording branch to drop buffers until we hit our first keyframe
-    // When we hit our first keyframe, we can offset the timestamps appropriately according to the first keyframe time
-    // This will ensure the first frame is a keyframe at t=0, and decoding can begin immediately on playback
-    _recordingOutput = videoFile;
-    _keyframeWatchId =
-        gst_pad_add_probe(probepad, GST_PAD_PROBE_TYPE_BUFFER, _keyframeWatch, new KeyframeWatch{this, videoFile},
-                          [](gpointer watch) { delete static_cast<KeyframeWatch*>(watch); });
-    if (_keyframeWatchId == 0) {
-        qCCritical(GstVideoReceiverLog) << "gst_pad_add_probe(_keyframeWatch) failed" << _redactedUri();
-        failRecordingStart();
-        return;
-    }
-    gst_clear_object(&probepad);
-
-    g_object_set(_recorderValve,
-                 "drop", FALSE,
-                 nullptr);
-
-    _recordingState = RecordingState::Recording;
-    qCDebug(GstVideoReceiverLog) << "Recording started" << _redactedUri();
-    emit onStartRecordingComplete(STATUS_OK);
-    emit recordingChanged(true);
+    _recordingBranch.start(videoFile, format);
 }
 
 void GstVideoReceiver::stopRecording()
@@ -840,25 +546,7 @@ void GstVideoReceiver::stopRecording()
         return;
     }
 
-    qCDebug(GstVideoReceiverLog) << "Stopping recording" << _redactedUri();
-
-    if (!_pipeline || (_recordingState != RecordingState::Recording)) {
-        qCDebug(GstVideoReceiverLog) << "Not recording!" << _redactedUri();
-        emit onStopRecordingComplete(STATUS_INVALID_STATE);
-        return;
-    }
-
-    g_object_set(_recorderValve,
-                 "drop", TRUE,
-                 nullptr);
-
-    // The EOS drains parser -> muxer -> file; _onRecordingFinalized completes the stop once the file is closed, the
-    // timer if that is never reported.
-    _recordingState = RecordingState::Stopping;
-    _recordingStopTimer->start();
-    if (!_unlinkBranch(_recorderValve) || (_recordingFinalizer->outcome() != RecordingFinalizer::Outcome::Pending)) {
-        _shutdownRecordingBranch();
-    }
+    _recordingBranch.stop();
 }
 
 void GstVideoReceiver::takeScreenshot(const QString &imageFile)
@@ -956,144 +644,6 @@ GstElement *GstVideoReceiver::_makeDecoder()
         qCCritical(GstVideoReceiverLog) << "gst_element_factory_make('decodebin3') failed";
     }
     return decoder;
-}
-
-GstElement* GstVideoReceiver::_makeFileSink(const QString& videoFile, FILE_FORMAT format, const GstCaps* inputCaps)
-{
-    GstElement *fileSink = nullptr;
-    GstElement *splitmux = nullptr;
-    GstElement* parser = nullptr;
-    GstElement *bin = nullptr;
-    GstPad *videopad = nullptr;
-    GstPad* parserSrcPad = nullptr;
-    GstPad* parserSinkPad = nullptr;
-    GstPad *ghostpad = nullptr;
-
-    do {
-        if (!isValidFileFormat(format)) {
-            qCCritical(GstVideoReceiverLog) << "Unsupported file format";
-            break;
-        }
-
-        const char* parserFactory = recordingParserFactory(inputCaps);
-        if (parserFactory) {
-            parser = gst_element_factory_make(parserFactory, nullptr);
-            if (!parser) {
-                qCCritical(GstVideoReceiverLog) << "gst_element_factory_make() failed for" << parserFactory;
-                break;
-            }
-            g_object_set(parser, "config-interval", -1, nullptr);
-        }
-
-        // splitmuxsink owns its own muxer + filesink internally, handles request-pad
-        // lifetime, and finalizes asynchronously so EOS no longer wedges the worker
-        // thread (replaces the manual qtmux/matroskamux+filesink combo + "stuck muxer"
-        // bounded-wait in stop()). max-size-time=0 keeps single-file behaviour.
-        splitmux = gst_element_factory_make("splitmuxsink", nullptr);
-        if (!splitmux) {
-            qCCritical(GstVideoReceiverLog) << "gst_element_factory_make('splitmuxsink') failed";
-            break;
-        }
-
-        g_object_set(splitmux,
-                     "location", qPrintable(videoFile),
-                     "muxer-factory", _kFileMux[format],
-                     "max-size-time", G_GUINT64_CONSTANT(0),
-                     "max-size-bytes", G_GUINT64_CONSTANT(0),
-                     "async-finalize", TRUE,
-                     // Surface "splitmuxsink-fragment-closed" element messages on the pipeline bus so
-                     // stop() can wait on the precise per-fragment finalize signal instead of EOS
-                     // (gstsplitmuxsink.c:send_fragment_opened_closed_msg posts this per fragment,
-                     // including the final fragment torn down on EOS).
-                     "message-forward", TRUE,
-                     nullptr);
-
-        // Crash-safe MP4/MOV via robust muxing. faststart is deliberately off: it spools the whole
-        // recording to a temp file and writes the real file only at EOS. matroskamux is naturally
-        // streamable; skip the GstStructure dance.
-        if (format == FILE_FORMAT_MP4 || format == FILE_FORMAT_MOV) {
-            GstStructure* muxerProps =
-                gst_structure_new("properties", "reserved-max-duration", G_TYPE_UINT64, kRecordingReservedMaxDurationNs,
-                                  "reserved-moov-update-period", G_TYPE_UINT64, kRecordingMoovUpdatePeriodNs, nullptr);
-            g_object_set(splitmux, "muxer-properties", muxerProps, nullptr);
-            gst_structure_free(muxerProps);
-        }
-
-        bin = gst_bin_new("sinkbin");
-        if (!bin) {
-            qCCritical(GstVideoReceiverLog) << "gst_bin_new('sinkbin') failed";
-            break;
-        }
-
-        // splitmuxsink's video sink pad is a request pad — request once during construction
-        // and ghost it as "sink" so the existing recorderValve→fileSink link works unchanged.
-        // request_pad_simple (1.20+) does the pad-template lookup internally.
-        videopad = gst_element_request_pad_simple(splitmux, "video");
-        if (!videopad) {
-            qCCritical(GstVideoReceiverLog) << "gst_element_request_pad_simple(splitmuxsink, video) failed";
-            break;
-        }
-
-        GstElement* binParser = nullptr;
-        if (parser) {
-            if (!gst_bin_add(GST_BIN(bin), parser)) {
-                qCCritical(GstVideoReceiverLog) << "gst_bin_add(parser) failed";
-                break;
-            }
-            binParser = parser;
-            parser = nullptr;  // bin now owns it
-        }
-
-        if (!gst_bin_add(GST_BIN(bin), splitmux)) {
-            qCCritical(GstVideoReceiverLog) << "gst_bin_add(splitmuxsink) failed";
-            break;
-        }
-        splitmux = nullptr;  // bin now owns it
-
-        GstPad* ghostTarget = videopad;
-        if (binParser) {
-            parserSrcPad = gst_element_get_static_pad(binParser, "src");
-            parserSinkPad = gst_element_get_static_pad(binParser, "sink");
-            if (!parserSrcPad || !parserSinkPad) {
-                qCCritical(GstVideoReceiverLog) << "gst_element_get_static_pad(parser) failed";
-                break;
-            }
-
-            const GstPadLinkReturn linkResult = gst_pad_link(parserSrcPad, videopad);
-            if (linkResult != GST_PAD_LINK_OK) {
-                qCCritical(GstVideoReceiverLog)
-                    << "Failed to link parser and splitmuxsink:" << gst_pad_link_get_name(linkResult);
-                break;
-            }
-            ghostTarget = parserSinkPad;
-        }
-
-        ghostpad = gst_ghost_pad_new("sink", ghostTarget);
-        if (!ghostpad) {
-            qCCritical(GstVideoReceiverLog) << "gst_ghost_pad_new() failed";
-            break;
-        }
-
-        if (!gst_element_add_pad(bin, ghostpad)) {
-            qCCritical(GstVideoReceiverLog) << "gst_element_add_pad(ghost) failed";
-            break;
-        }
-        ghostpad = nullptr;  // bin now owns it
-
-        fileSink = bin;
-        bin = nullptr;
-    } while(0);
-
-    gst_clear_object(&ghostpad);
-    gst_clear_object(&parserSinkPad);
-    gst_clear_object(&parserSrcPad);
-    // No release_request_pad: on success splitmux is already NULL (owned by bin), and on failure the
-    // bin/splitmux unref below finalizes splitmuxsink, which reclaims its "video" request pad itself.
-    gst_clear_object(&videopad);
-    gst_clear_object(&splitmux);
-    gst_clear_object(&parser);
-    gst_clear_object(&bin);
-    return fileSink;
 }
 
 void GstVideoReceiver::_onNewSourcePad(GstPad *pad)
@@ -1310,45 +860,6 @@ void GstVideoReceiver::_onFirstVideoFrame()
     emit decodingChanged(true);
 }
 
-bool GstVideoReceiver::_unlinkBranch(GstElement *from)
-{
-    GstPad *src = gst_element_get_static_pad(from, "src");
-    if (!src) {
-        qCCritical(GstVideoReceiverLog) << "gst_element_get_static_pad() failed";
-        return false;
-    }
-
-    GstPad *sink = gst_pad_get_peer(src);
-    if (!sink) {
-        gst_clear_object(&src);
-        qCWarning(GstVideoReceiverLog) << "Branch is not linked";
-        return false;
-    }
-
-    if (!gst_pad_unlink(src, sink)) {
-        gst_clear_object(&src);
-        gst_clear_object(&sink);
-        qCWarning(GstVideoReceiverLog) << "gst_pad_unlink() failed";
-        return false;
-    }
-
-    gst_clear_object(&src);
-
-    // Send EOS at the beginning of the branch
-    const gboolean ret = gst_pad_send_event(sink, gst_event_new_eos());
-
-    gst_clear_object(&sink);
-
-    if (!ret) {
-        qCWarning(GstVideoReceiverLog) << "Branch EOS was NOT sent";
-        return false;
-    }
-
-    qCDebug(GstVideoReceiverLog) << "Branch EOS was sent";
-
-    return true;
-}
-
 void GstVideoReceiver::_shutdownDecodingBranch()
 {
     if (_decoder) {
@@ -1403,40 +914,6 @@ void GstVideoReceiver::_removeSourceEosProbe()
     gst_clear_object(&_eosProbePad);
 }
 
-void GstVideoReceiver::_shutdownRecordingBranch()
-{
-    _recordingStopTimer->stop();
-
-    const gulong keyframeWatchId = _keyframeWatchId.exchange(0);
-    if (keyframeWatchId != 0 && _recorderValve) {
-        GstPad *probepad = gst_element_get_static_pad(_recorderValve, "src");
-        if (probepad) {
-            gst_pad_remove_probe(probepad, keyframeWatchId);
-            gst_clear_object(&probepad);
-        }
-    }
-
-    if (_fileSink) {
-        // Removed before going NULL, so nothing it posts while stopping reaches the bus as a pipeline error.
-        gst_bin_remove(GST_BIN(_pipeline), _fileSink);
-        gst_element_set_state(_fileSink, GST_STATE_NULL);
-        (void) gst_element_get_state(_fileSink, nullptr, nullptr, GST_CLOCK_TIME_NONE);
-        gst_clear_object(&_fileSink);
-    }
-    const RecordingFinalizer::Outcome outcome = _recordingFinalizer->disarm();
-
-    const RecordingState state = std::exchange(_recordingState, RecordingState::Idle);
-    if (state != RecordingState::Idle) {
-        qCDebug(GstVideoReceiverLog) << "Recording stopped";
-        emit recordingChanged(false);
-    }
-    if (state == RecordingState::Stopping) {
-        emit onStopRecordingComplete((outcome == RecordingFinalizer::Outcome::Closed) ? STATUS_OK : STATUS_FAIL);
-    }
-
-    _dotDumper.dump(_pipeline, "pipeline-recording-stopped");
-}
-
 GstBusSyncReply GstVideoReceiver::_onBusSyncMessage(GstBus* bus, GstMessage* message, gpointer user_data)
 {
     // The context bridges answer NEED_CONTEXT synchronously and consume (unref) the requests they handle.
@@ -1453,10 +930,7 @@ GstBusSyncReply GstVideoReceiver::_onBusSyncMessage(GstBus* bus, GstMessage* mes
             logBusWarning(message);
             break;
         case GST_MESSAGE_EOS:
-            // Every branch drained, the recorder included: the fallback for a missed fragment-closed.
-            if (self->_recordingFinalizer->settle(RecordingFinalizer::Outcome::Closed)) {
-                self->_runOnWorkerForPipeline([self]() { self->_onRecordingFinalized(); });
-            }
+            self->_recordingBranch.onBusEos();
             break;
         case GST_MESSAGE_ELEMENT:
             self->_onBusElement(message);
@@ -1511,18 +985,7 @@ void GstVideoReceiver::_onBusError(GstMessage* message)
         return;
     }
 
-    bool fromRecording = false;
-    const bool settled =
-        _recordingFinalizer->settleFrom(GST_MESSAGE_SRC(message), RecordingFinalizer::Outcome::Failed, &fromRecording);
-    if (fromRecording) {
-        // A recorder failure (disk full, header reservation overrun) ends the recording, not the stream. Closing the
-        // valve now, before the failing element returns its flow error, keeps that error out of the tee: the valve
-        // reports OK for a push that fails after drop was set.
-        qCWarning(GstVideoReceiverLog) << "Recording error:" << text;
-        g_object_set(_recorderValve, "drop", TRUE, nullptr);
-        if (settled) {
-            _runOnWorkerForPipeline([this]() { _onRecorderError(); });
-        }
+    if (_recordingBranch.onBusError(message, text)) {
         return;
     }
 
@@ -1564,25 +1027,7 @@ void GstVideoReceiver::_onBusElement(GstMessage* message)
         return;
     }
 
-    // splitmuxsink posts fragment-closed once the muxer has written the file and passed EOS to its sink.
-    GstObject* closedSource = nullptr;
-    if (gst_structure_has_name(structure, "splitmuxsink-fragment-closed")) {
-        closedSource = GST_MESSAGE_SRC(message);
-    }
-
-    // Branch EOS (pipeline message-forward); only the recorder's needs handling.
-    GstMessage* forwarded = nullptr;
-    if (gst_structure_has_name(structure, "GstBinForwarded")) {
-        gst_structure_get(structure, "message", GST_TYPE_MESSAGE, &forwarded, nullptr);
-        if (forwarded && (GST_MESSAGE_TYPE(forwarded) == GST_MESSAGE_EOS)) {
-            closedSource = GST_MESSAGE_SRC(forwarded);
-        }
-    }
-
-    if (closedSource && _recordingFinalizer->settleFrom(closedSource, RecordingFinalizer::Outcome::Closed)) {
-        _runOnWorkerForPipeline([this]() { _onRecordingFinalized(); });
-    }
-    gst_clear_message(&forwarded);
+    _recordingBranch.onBusElement(message);
 }
 
 void GstVideoReceiver::_onBusQos(GstMessage* message)
@@ -1639,41 +1084,6 @@ void GstVideoReceiver::_onPipelineError()
     _dotDumper.snapshot(_pipeline, QStringLiteral("pipeline-error"));
 
     _onStreamFailure("pipeline error");
-}
-
-void GstVideoReceiver::_onRecordingFinalized()
-{
-    // Recording: the source ended and the file closed with it; stop() collects it. Idle: already handled.
-    if (_recordingState != RecordingState::Stopping) {
-        return;
-    }
-    qCDebug(GstVideoReceiverLog) << "Recording finalized" << _redactedUri();
-    _shutdownRecordingBranch();
-}
-
-void GstVideoReceiver::_onRecorderError()
-{
-    // Idle: startRecording() already reported the failure.
-    if (_recordingState == RecordingState::Idle) {
-        return;
-    }
-    _shutdownRecordingBranch();
-
-    // Adding the sink made the live pipeline wait for it to preroll; a sink that failed first leaves that
-    // PAUSED->PLAYING commit failed, and later sinks would sync to PAUSED. With the sink gone, resume PLAYING.
-    if (gst_element_set_state(_pipeline, GST_STATE_PLAYING) == GST_STATE_CHANGE_FAILURE) {
-        qCWarning(GstVideoReceiverLog) << "Pipeline did not resume after the recording failed" << _redactedUri();
-    }
-}
-
-void GstVideoReceiver::_onRecordingStopTimeout()
-{
-    if (_recordingState != RecordingState::Stopping) {
-        return;
-    }
-    qCWarning(GstVideoReceiverLog) << "Recording not finalized within" << std::chrono::milliseconds(kEosTimeout).count()
-                                   << "ms; closing it (MP4/MOV stay playable up to the last moov update)";
-    _shutdownRecordingBranch();
 }
 
 void GstVideoReceiver::_onNewPad(GstElement *element, GstPad *pad, gpointer data)
@@ -1739,47 +1149,4 @@ GstPadProbeReturn GstVideoReceiver::_eosProbe(GstPad *pad, GstPadProbeInfo *info
     }
 
     return GST_PAD_PROBE_OK;
-}
-
-GstPadProbeReturn GstVideoReceiver::_keyframeWatch(GstPad *pad, GstPadProbeInfo *info, gpointer user_data)
-{
-    if (!info || !user_data) {
-        qCCritical(GstVideoReceiverLog) << "Invalid arguments";
-        return GST_PAD_PROBE_DROP;
-    }
-
-    // Upstream of the tee is always a parser (GstBaseParse), which pushes single buffers, never lists.
-    GstBuffer *buf = gst_pad_probe_info_get_buffer(info);
-    if (!buf || GST_BUFFER_FLAG_IS_SET(buf, GST_BUFFER_FLAG_DELTA_UNIT) || !GST_BUFFER_PTS_IS_VALID(buf)) {
-        // wait for a timestamped keyframe
-        return GST_PAD_PROBE_DROP;
-    }
-
-    // The pad offset shifts running time (gst_segment_offset_running_time), so subtract the
-    // keyframe's running time, not its PTS; they differ when the segment doesn't start at 0.
-    GstClockTime runningTime = GST_CLOCK_TIME_NONE;
-    if (GstEvent* segmentEvent = gst_pad_get_sticky_event(pad, GST_EVENT_SEGMENT, 0)) {
-        const GstSegment* segment = nullptr;
-        gst_event_parse_segment(segmentEvent, &segment);
-        if (segment && (segment->format == GST_FORMAT_TIME)) {
-            runningTime = gst_segment_to_running_time(segment, GST_FORMAT_TIME, GST_BUFFER_PTS(buf));
-        }
-        gst_event_unref(segmentEvent);
-    }
-    if (!GST_CLOCK_TIME_IS_VALID(runningTime)) {
-        return GST_PAD_PROBE_DROP;
-    }
-
-    // set media file '0' offset to current timeline position - we don't want to touch other elements in the graph, except these which are downstream!
-    gst_pad_set_offset(pad, -static_cast<gint64>(runningTime));
-
-    qCDebug(GstVideoReceiverLog) << "Got keyframe, stop dropping buffers";
-
-    const auto* watch = static_cast<const KeyframeWatch*>(user_data);
-    emit watch->receiver->recordingStarted(watch->file);
-
-    // Returning REMOVE drops the probe; forget its id so _shutdownRecordingBranch doesn't remove it again.
-    gulong ownId = GST_PAD_PROBE_INFO_ID(info);
-    (void) watch->receiver->_keyframeWatchId.compare_exchange_strong(ownId, 0);
-    return GST_PAD_PROBE_REMOVE;
 }

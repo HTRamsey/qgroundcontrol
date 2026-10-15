@@ -6,7 +6,6 @@
 #include <gst/gstbus.h>
 #include <gst/gstelement.h>
 #include <gst/gstpad.h>
-#include <memory>
 #include <utility>
 
 #include <QtCore/QLoggingCategory>
@@ -16,6 +15,7 @@
 #include <QtCore/QString>
 
 #include "PipelineDotDumper.h"
+#include "RecordingBranch.h"
 #include "StreamWatchdog.h"
 #include "VideoReceiver.h"
 
@@ -68,6 +68,7 @@ signals:
 private:
     friend class GStreamerTest;
     friend class GstVideoReceiverTest;
+    friend class RecordingBranch;
 
     /// Settings a pipeline is started with, captured on the caller's thread so the worker and
     /// streaming threads never read members the GUI thread writes.
@@ -79,15 +80,6 @@ private:
         bool lowLatency = false;
         int rtpJitterLatencyMs = 0;
     };
-
-    enum class RecordingState
-    {
-        Idle,
-        Recording,
-        Stopping,  ///< stopRecording() sent EOS into the branch; waiting for the file to be finalized
-    };
-
-    class RecordingFinalizer;
 
     /// Queues @p task on the worker thread, which owns the pipeline and all receiver state not marked atomic.
     template <typename Task>
@@ -113,7 +105,6 @@ private:
 
     QString _redactedUri() const;
     GstElement *_makeDecoder();
-    static GstElement* _makeFileSink(const QString& videoFile, FILE_FORMAT format, const GstCaps* inputCaps);
 
     void _startPipeline(const StartConfig& config);
     void _startDecoding(GstElement* videoSink, bool hasWidget);
@@ -126,11 +117,7 @@ private:
     void _noteTeeFrame();
     void _noteVideoSinkFrame();
     void _onFirstVideoFrame();
-    /// -Unlink the branch from the src pad
-    /// -Send an EOS event at the beginning of that branch
-    bool _unlinkBranch(GstElement *from);
     void _shutdownDecodingBranch();
-    void _shutdownRecordingBranch();
     void _removeSourceEosProbe();
     /// Tears down the running pipeline (finalizing an active recording first) and resets all
     /// pipeline state. Returns false when nothing was running.
@@ -145,9 +132,6 @@ private:
     void _detachBusHandler();
     void _onPipelineError();
     void _onPipelinePlaying();
-    void _onRecordingFinalized();
-    void _onRecorderError();
-    void _onRecordingStopTimeout();
 
     /// Tears down a pipeline that failed (error, watchdog, end of stream), reports it with
     /// onStopComplete(STATUS_FAIL) and schedules a reconnect.
@@ -169,22 +153,17 @@ private:
     static GstPadProbeReturn _teeProbe(GstPad *pad, GstPadProbeInfo *info, gpointer user_data);
     static GstPadProbeReturn _videoSinkProbe(GstPad *pad, GstPadProbeInfo *info, gpointer user_data);
     static GstPadProbeReturn _eosProbe(GstPad *pad, GstPadProbeInfo *info, gpointer user_data);
-    static GstPadProbeReturn _keyframeWatch(GstPad *pad, GstPadProbeInfo *info, gpointer user_data);
 
     QThread* _workerThread = nullptr;
     /// Lives on _workerThread; tasks and the timers below run there. Deleted when the thread finishes.
     QObject* _workerContext = nullptr;
     QTimer* _watchdogTimer = nullptr;
     QTimer* _reconnectTimer = nullptr;
-    /// Bounds stopRecording(): completes it when the file isn't reported finalized in time.
-    QTimer* _recordingStopTimer = nullptr;
 
     StartConfig _config;
     GstElement *_decoder = nullptr;
     GstElement *_decoderValve = nullptr;
-    GstElement *_fileSink = nullptr;
     GstElement *_pipeline = nullptr;
-    GstElement *_recorderValve = nullptr;
     GstElement *_source = nullptr;
     GstElement *_tee = nullptr;
     GstElement *_videoSink = nullptr;
@@ -198,10 +177,7 @@ private:
     gulong _eosProbeId = 0;
     // Ref-held source pad carrying _eosProbeId; released with the pipeline, not the decode branch.
     GstPad* _eosProbePad = nullptr;
-    std::atomic<gulong> _keyframeWatchId = 0;  // cleared by _keyframeWatch (streaming thread) when it removes itself
-    RecordingState _recordingState = RecordingState::Idle;
-    /// Signalled from the bus handler; the pointer is fixed for the receiver's lifetime.
-    const std::unique_ptr<RecordingFinalizer> _recordingFinalizer;
+    RecordingBranch _recordingBranch;
 
     int _statsTickCounter = 0;
     bool _streaming = false;
@@ -217,10 +193,4 @@ private:
     std::atomic<double>  _qosProportion{1.0};
     std::atomic<int>     _qosQuality{1000000};
     std::atomic<bool> _qosStatsDirty{false};  // set per QOS message, drained by the 1 Hz watchdog tick
-
-    static constexpr const char *_kFileMux[FILE_FORMAT_MAX + 1] = {
-        "matroskamux",
-        "qtmux",
-        "mp4mux"
-    };
 };

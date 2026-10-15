@@ -13,4 +13,7 @@ private slots:
     void _testStallDetection_data();
     void _testStallDetection();
     void _testSourceTimeoutStartsAtFirstCheck();
+    void _testFinalizerSettlesOnlyFromArmedRecording_data();
+    void _testFinalizerSettlesOnlyFromArmedRecording();
+    void _testFinalizerKeepsFirstOutcome();
 };
