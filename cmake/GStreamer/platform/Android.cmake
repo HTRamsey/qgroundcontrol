@@ -135,7 +135,7 @@ function(_qgc_gst_android_find_plugin_archives out_var)
         message(STATUS "[GstMobile] Requested plugins: ${_plugins}")
     endif()
 
-    _gst_save_find_suffixes()
+    _gst_set_find_suffixes()
     set(_found "")
     foreach(_p IN LISTS _plugins)
         if(TARGET GStreamer::${_p})
@@ -149,7 +149,6 @@ function(_qgc_gst_android_find_plugin_archives out_var)
             endif()
         endif()
     endforeach()
-    _gst_restore_find_suffixes()
 
     if(GStreamer_DEBUG)
         message(STATUS "[GstMobile] Found plugins with .a: ${_found}")
@@ -199,24 +198,21 @@ function(_qgc_gst_android_link_gio_modules target)
     set(_gio_modules_path "${GStreamer_ROOT_DIR}/lib/gio/modules")
     add_library(GStreamer::gio_modules INTERFACE IMPORTED)
 
-    _gst_save_find_suffixes()
+    _gst_set_find_suffixes()
     foreach(_gio_lib IN LISTS _gio_module_libs)
         string(MAKE_C_IDENTIFIER "_gst_${CMAKE_ANDROID_ARCH_ABI}_${_gio_lib}" _gio_cache_var)
-        if(NOT ${_gio_cache_var})
-            find_library(
-                ${_gio_cache_var}
-                NAMES ${_gio_lib}
-                HINTS ${_gio_modules_path}
-                NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH
-            )
-        endif()
+        find_library(
+            ${_gio_cache_var}
+            NAMES ${_gio_lib}
+            HINTS ${_gio_modules_path}
+            NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH
+        )
         if(${_gio_cache_var})
             target_link_libraries(GStreamer::gio_modules INTERFACE "${${_gio_cache_var}}")
         else()
             message(WARNING "GStreamerMobile: GIO module '${_gio_lib}' not found in ${_gio_modules_path}")
         endif()
     endforeach()
-    _gst_restore_find_suffixes()
 
     if("openssl" IN_LIST G_IO_MODULES)
         target_link_directories(GStreamer::gio_modules INTERFACE "${GStreamer_ROOT_DIR}/lib"
