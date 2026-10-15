@@ -6,8 +6,8 @@
 # GStreamer_ROOT_DIR, QGC_GST_VERSION, GStreamer_USE_{STATIC_LIBS,FRAMEWORK} and PKG_CONFIG_ARGN.
 # Sets, in the including directory: GStreamer_ROOT_DIR (resolved), GStreamer_VERSION, GStreamer_AUTO_DOWNLOADED,
 # GStreamer_USE_{STATIC_LIBS,FRAMEWORK,MERGED_STATIC}, GSTREAMER_{LIB,PLUGIN,INCLUDE}_PATH, GSTREAMER_APIS,
-# GSTREAMER_PLUGINS, GSTREAMER_STATIC_PLUGINS (static layouts), G_IO_MODULES (mobile), GStreamer_<component>_FOUND,
-# GST_PLUGIN_<plugin>_FOUND, QGC_GST_HAS_DMABUF (Linux) and the SDK's pkg-config view (PKG_CONFIG_EXECUTABLE and
+# GSTREAMER_PLUGINS, GSTREAMER_STATIC_PLUGINS (static layouts), G_IO_MODULES (mobile), GStreamer_<component>_FOUND
+# (optional components), QGC_GST_HAS_DMABUF (Linux) and the SDK's pkg-config view (PKG_CONFIG_EXECUTABLE and
 # PKG_CONFIG_ARGN normal variables plus the environment), which qgc_gst_restore_pkgconfig_env undoes.
 
 include("${CMAKE_CURRENT_LIST_DIR}/Helpers.cmake")
@@ -90,7 +90,6 @@ include("${CMAKE_CURRENT_LIST_DIR}/platform/Linux.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/platform/Android.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/platform/MacOS.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/platform/IOS.cmake")
-include("${CMAKE_CURRENT_LIST_DIR}/platform/PkgConfigTargets.cmake")
 
 cmake_language(CALL ${_qgc_gst_platform_DISCOVER})
 
@@ -219,7 +218,7 @@ endif()
 # Mandatory registry rows (GSTREAMER_COMPONENT_REGISTRY in cmake/GStreamer/Components.cmake)
 # are hard requirements: the sources include their headers unconditionally, so fail here
 # rather than at compile time when one was not found.
-gstreamer_mandatory_components(_qgc_gst_mandatory _qgc_gst_mandatory_apis)
+gstreamer_mandatory_components(_ _qgc_gst_mandatory_apis)
 set(_qgc_gst_missing_mandatory "")
 foreach(_api IN LISTS _qgc_gst_mandatory_apis)
     if(NOT TARGET GStreamer::${_api})
@@ -234,11 +233,7 @@ if(_qgc_gst_missing_mandatory)
                         "or point GStreamer_ROOT_DIR at a complete SDK."
     )
 endif()
-foreach(_comp IN LISTS _qgc_gst_mandatory)
-    set(GStreamer_${_comp}_FOUND TRUE)
-endforeach()
 unset(_qgc_gst_missing_mandatory)
-unset(_qgc_gst_mandatory)
 unset(_qgc_gst_mandatory_apis)
 # User-requested optional components: mark FOUND only if the corresponding
 # api_ target was actually created (Targets.cmake, or the iOS targets).
@@ -297,13 +292,6 @@ foreach(_gst_plugin IN LISTS GSTREAMER_PLUGINS)
     if(TARGET GStreamer::${_gst_plugin})
         list(APPEND _gst_available_plugins "${_gst_plugin}")
     endif()
-endforeach()
-
-# Alternate-aware: e.g. videoconvert+videoscale satisfy videoconvertscale.
-foreach(_gst_plugin IN LISTS GSTREAMER_PLUGINS)
-    gstreamer_plugin_satisfied(PLUGIN "${_gst_plugin}" AVAILABLE ${_gst_available_plugins} OUT_VAR
-                               GST_PLUGIN_${_gst_plugin}_FOUND
-    )
 endforeach()
 
 # Static layouts register GSTREAMER_STATIC_PLUGINS in a generated gst_init_static_plugins(); the Android and iOS

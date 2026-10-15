@@ -140,7 +140,7 @@ function(_qgc_gst_android_find_plugin_archives out_var)
     _gst_save_find_suffixes()
     set(_found "")
     foreach(_p IN LISTS _plugins)
-        if(GStreamer_${_p}_FOUND)
+        if(TARGET GStreamer::${_p})
             find_library(
                 _gst_plugin_lib_${CMAKE_ANDROID_ARCH_ABI}_${_p} gst${_p}
                 HINTS "${GStreamer_ROOT_DIR}/lib/gstreamer-1.0"
@@ -361,11 +361,6 @@ endfunction()
 function(_qgc_gst_create_android_mobile_target)
     if(NOT GStreamer_USE_STATIC_LIBS)
         message(FATAL_ERROR "Shared library GStreamer is not supported on mobile platforms")
-    endif()
-    if(NOT TARGET GStreamer::GStreamer)
-        message(FATAL_ERROR "qgc_gst_create_pkgconfig_targets() must run before "
-                            "_qgc_gst_create_android_mobile_target()."
-        )
     endif()
     set(_ndk_build "${GStreamer_ROOT_DIR}/share/gst-android/ndk-build")
     # GStreamer.java is not consumed (init runs in C++); used only as a stable
