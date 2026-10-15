@@ -233,14 +233,29 @@ else()
     _qgc_create_pkgconfig_targets()
 endif()
 
-# Mark mandatory components found unconditionally — drives the registry
-# (GSTREAMER_COMPONENT_REGISTRY in cmake/GStreamer/Components.cmake), so adding
-# a new always-present API doesn't require editing this file.
+# Mandatory registry rows (GSTREAMER_COMPONENT_REGISTRY in cmake/GStreamer/Components.cmake)
+# are hard requirements: the sources include their headers unconditionally, so fail here
+# rather than at compile time when one was not found.
 gstreamer_mandatory_components(_qgc_gst_mandatory _qgc_gst_mandatory_apis)
+set(_qgc_gst_missing_mandatory "")
+foreach(_api IN LISTS _qgc_gst_mandatory_apis)
+    if(NOT TARGET GStreamer::${_api})
+        gstreamer_resolve_component("${_api}" _ _ _qgc_gst_missing_pc _)
+        list(APPEND _qgc_gst_missing_mandatory "${_qgc_gst_missing_pc}")
+    endif()
+endforeach()
+if(_qgc_gst_missing_mandatory)
+    string(REPLACE ";" ", " _qgc_gst_missing_mandatory "${_qgc_gst_missing_mandatory}")
+    message(FATAL_ERROR "GStreamer: mandatory pkg-config modules not found for the SDK at ${GStreamer_ROOT_DIR}: "
+                        "${_qgc_gst_missing_mandatory}\nInstall the GStreamer development packages (gst-plugins-base) "
+                        "or point GStreamer_ROOT_DIR at a complete SDK."
+    )
+endif()
 foreach(_comp IN LISTS _qgc_gst_mandatory)
     set(QGCGStreamer_${_comp}_FOUND TRUE)
     set(GStreamer_${_comp}_FOUND TRUE)
 endforeach()
+unset(_qgc_gst_missing_mandatory)
 unset(_qgc_gst_mandatory)
 unset(_qgc_gst_mandatory_apis)
 # User-requested optional components: mark FOUND only if the corresponding
