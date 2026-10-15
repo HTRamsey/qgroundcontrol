@@ -135,43 +135,21 @@ function(_qgc_compute_android_mobile_target plugins_out apis_out found_component
         message(STATUS "[GstMobile] Requested APIs: ${_gst_mobile_apis}")
     endif()
 
-    # Resolve each plugin to a static .a; drop those without one.
+    # Resolve each plugin to a static .a; Orchestrator.cmake reports the requested plugins left out.
     _gst_save_find_suffixes()
     set(_gst_found_plugins)
-    set(_gst_dropped_plugins)
     foreach(_p IN LISTS _gst_mobile_plugins)
         if(GStreamer_${_p}_FOUND)
             find_library(_gst_plugin_lib_${CMAKE_ANDROID_ARCH_ABI}_${_p} gst${_p}
                 HINTS "${GStreamer_ROOT_DIR}/lib/gstreamer-1.0"
                 NO_DEFAULT_PATH
             )
-            if(NOT _gst_plugin_lib_${CMAKE_ANDROID_ARCH_ABI}_${_p})
-                message(WARNING "GStreamerMobile: Plugin '${_p}' has pkg-config but no static library, excluding from init")
-                list(APPEND _gst_dropped_plugins ${_p})
-                continue()
+            if(_gst_plugin_lib_${CMAKE_ANDROID_ARCH_ABI}_${_p})
+                list(APPEND _gst_found_plugins ${_p})
             endif()
-            list(APPEND _gst_found_plugins ${_p})
-        else()
-            message(WARNING "GStreamerMobile: Plugin '${_p}' not found in SDK, excluding from init")
-            list(APPEND _gst_dropped_plugins ${_p})
         endif()
     endforeach()
     _gst_restore_find_suffixes()
-
-    # Backstop: fail configure if a runtime-required plugin was dropped (partial
-    # per-ABI SDK). Alternate-aware: videoconvert+videoscale satisfies videoconvertscale.
-    if(_gst_dropped_plugins)
-        gstreamer_runtime_required_plugins(_gst_required)
-        gstreamer_missing_required(REQUIRED ${_gst_required} AVAILABLE ${_gst_found_plugins} OUT_VAR
-                                   _gst_missing_required
-        )
-        if(_gst_missing_required)
-            list(JOIN _gst_missing_required ", " _gst_missing_required_str)
-            message(FATAL_ERROR "GStreamerMobile: runtime-required plugins missing static libraries "
-                "for ABI ${CMAKE_ANDROID_ARCH_ABI}: ${_gst_missing_required_str}. "
-                "The GStreamer Android SDK is incomplete or corrupt — re-download it.")
-        endif()
-    endif()
     set(_gst_mobile_plugins ${_gst_found_plugins})
 
     if(GStreamer_DEBUG)
