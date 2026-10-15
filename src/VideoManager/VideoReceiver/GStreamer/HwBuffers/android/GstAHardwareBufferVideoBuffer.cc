@@ -43,12 +43,6 @@ constexpr const char* kNativeBufferExt = "EGL_ANDROID_image_native_buffer";
 
 std::atomic<bool> s_loggedNoFenceSync{false};
 
-PFNEGLDESTROYIMAGEKHRPROC eglDestroyImageFn()
-{
-    static const auto fn = reinterpret_cast<PFNEGLDESTROYIMAGEKHRPROC>(eglGetProcAddress("eglDestroyImageKHR"));
-    return fn;
-}
-
 // LRU cache (QRhi, AHardwareBuffer, EGLDisplay) -> (EGLImage, GL texture): MediaCodec recycles the same AHB so the
 // import stays valid, saving ~50-200 us/frame on Mali/Adreno.
 struct AhbCacheKey
@@ -71,8 +65,8 @@ struct AhbImport
 
 void destroyAhbImport(AhbImport& e)
 {
-    if (e.image != EGL_NO_IMAGE_KHR && e.display != EGL_NO_DISPLAY && eglDestroyImageFn()) {
-        eglDestroyImageFn()(e.display, e.image);
+    if (e.image != EGL_NO_IMAGE_KHR && e.display != EGL_NO_DISPLAY && GstEglHelpers::destroyImageKHR()) {
+        GstEglHelpers::destroyImageKHR()(e.display, e.image);
     }
     if (e.textureName != 0) {
         if (QOpenGLContext* ctx = QOpenGLContext::currentContext()) {
@@ -235,9 +229,8 @@ QVideoFrameTexturesUPtr GstAHardwareBufferVideoBuffer::mapTextures(QRhi& rhi, QV
         reinterpret_cast<PFNEGLGETNATIVECLIENTBUFFERANDROIDPROC>(eglGetProcAddress("eglGetNativeClientBufferANDROID"));
     static const auto eglCreateImageKHR_ =
         reinterpret_cast<PFNEGLCREATEIMAGEKHRPROC>(eglGetProcAddress("eglCreateImageKHR"));
-    const auto eglDestroyImageKHR_ = eglDestroyImageFn();
-    static const auto glEGLImageTargetTexture2DOES_ =
-        reinterpret_cast<PFNGLEGLIMAGETARGETTEXTURE2DOESPROC>(eglGetProcAddress("glEGLImageTargetTexture2DOES"));
+    const auto eglDestroyImageKHR_ = GstEglHelpers::destroyImageKHR();
+    const auto glEGLImageTargetTexture2DOES_ = GstEglHelpers::imageTargetTexture2D();
 
     if (!eglGetNativeClientBufferANDROID_ || !eglCreateImageKHR_ || !eglDestroyImageKHR_ ||
         !glEGLImageTargetTexture2DOES_) {

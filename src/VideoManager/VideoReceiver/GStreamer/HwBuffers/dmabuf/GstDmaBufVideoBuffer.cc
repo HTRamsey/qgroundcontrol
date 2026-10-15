@@ -476,8 +476,6 @@ struct EglImageBinder
 
 EglImageBinder eglImageBinder(const QOpenGLContext& ctx)
 {
-    static const auto targetTexture2D =
-        reinterpret_cast<PFNGLEGLIMAGETARGETTEXTURE2DOESPROC>(eglGetProcAddress("glEGLImageTargetTexture2DOES"));
     static const auto targetTexStorage =
         reinterpret_cast<PFNGLEGLIMAGETARGETTEXSTORAGEEXTPROC>(eglGetProcAddress("glEGLImageTargetTexStorageEXT"));
     // Desktop GL with GL_EXT_EGL_image_storage: bind DMABuf via immutable storage to skip the per-frame texture-storage
@@ -485,7 +483,7 @@ EglImageBinder eglImageBinder(const QOpenGLContext& ctx)
     // ext isn't reliably exposed and the OES bind is the contract there.
     const bool useTexStorage =
         texStorageImportAllowed(ctx.isOpenGLES(), ctx.hasExtension(QByteArrayLiteral("GL_EXT_EGL_image_storage")));
-    return {targetTexture2D, useTexStorage ? targetTexStorage : nullptr};
+    return {GstEglHelpers::imageTargetTexture2D(), useTexStorage ? targetTexStorage : nullptr};
 }
 
 /// Per-frame state shared by the single-fd and per-plane EGLImage imports. Both import LINEAR buffers only:
