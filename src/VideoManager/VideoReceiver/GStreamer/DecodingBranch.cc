@@ -7,7 +7,9 @@
 
 #include "GStreamerHelpers.h"
 #include "GstVideoReceiver.h"
+#include "HwBuffers/common/HwBuffers.h"
 #include "QGCQVideoSinkController.h"
+#include "gstqgc/gstqgcvideosinkbin.h"
 
 namespace {
 
@@ -99,6 +101,7 @@ void DecodingBranch::start(GstElement* videoSink, bool hasWidget, bool streaming
 
     // The caller keeps its own (non-floating) reference; ours is dropped in _shutdown().
     _videoSink = GStreamer::adoptElement(GST_ELEMENT(gst_object_ref(videoSink)));
+    _sinkStatsAtStart = _readSinkStats();
 
     if (!streaming) {
         emit _receiver.onStartDecodingComplete(VideoReceiver::STATUS_OK);
@@ -179,6 +182,27 @@ QString DecodingBranch::decoderName() const
 {
     QMutexLocker locker(&_decoderNameMutex);
     return _decoderName;
+}
+
+HwBuffers::PathStats DecodingBranch::sinkPathStats() const
+{
+    const GStreamer::GstStructurePtr stats = _readSinkStats();
+    return HwBuffers::formatSinkStats(stats.get(), _sinkStatsAtStart.get());
+}
+
+GStreamer::GstStructurePtr DecodingBranch::_readSinkStats() const
+{
+    if (!_videoSink || !GST_IS_QGC_VIDEO_SINK_BIN(_videoSink.get())) {
+        return {};
+    }
+    const GStreamer::GstElementPtr qvideosink =
+        GStreamer::adoptElement(gst_qgc_video_sink_bin_get_qvideosink(GST_QGC_VIDEO_SINK_BIN(_videoSink.get())));
+    if (!qvideosink) {
+        return {};
+    }
+    GstStructure* stats = nullptr;
+    g_object_get(qvideosink.get(), "stats", &stats, nullptr);
+    return GStreamer::adoptStructure(stats);
 }
 
 bool DecodingBranch::_insertDecoder()
@@ -302,6 +326,7 @@ void DecodingBranch::_shutdown()
         GStreamer::disposeChild(GST_BIN(_pipeline), _videoSink.get());
         _videoSink.reset();
     }
+    _sinkStatsAtStart.reset();
 
     if (_decoding.exchange(false)) {
         qCDebug(GstVideoReceiverLog) << "Decoding stopped";

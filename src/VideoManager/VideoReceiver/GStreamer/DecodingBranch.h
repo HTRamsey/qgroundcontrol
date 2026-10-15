@@ -11,6 +11,10 @@
 
 class GstVideoReceiver;
 
+namespace HwBuffers {
+struct PathStats;
+}
+
 /// \brief The display branch behind GstVideoReceiver's tee: leaky queue ! valve [! decodebin3 ! video sink].
 ///
 /// Holds the caller's video sink until the source streams, then inserts decodebin3 and links its pad to the sink.
@@ -47,7 +51,12 @@ public:
 
     QString decoderName() const;
 
+    /// The frames the video sink delivered since start() took it, from qgcqvideosink's "stats"; empty for other sinks.
+    HwBuffers::PathStats sinkPathStats() const;
+
 private:
+    /// The qgcqvideosink's "stats" when the video sink is a qgcvideosinkbin.
+    GStreamer::GstStructurePtr _readSinkStats() const;
     /// Puts the video sink into the pipeline and decodebin3 between it and the valve, then opens the valve.
     bool _insertDecoder();
     bool _addDecoder();
@@ -66,6 +75,8 @@ private:
     // Our refs, besides the pipeline's while they are inside it.
     GStreamer::GstElementPtr _decoder;
     GStreamer::GstElementPtr _videoSink;
+    // The sink's "stats" when start() took it: the sink outlives sessions and its counters don't restart.
+    GStreamer::GstStructurePtr _sinkStatsAtStart;
     gulong _sinkProbeId = 0;
     std::atomic<bool> _decoding = false;  ///< Read by the receiver's tee probe log.
 
