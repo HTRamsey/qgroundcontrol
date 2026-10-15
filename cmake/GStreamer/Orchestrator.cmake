@@ -60,8 +60,9 @@ _qgc_gst_select_sdk_root(GStreamer_ROOT_DIR GStreamer_AUTO_DOWNLOADED "${_qgc_gs
                          "${GStreamer_FIND_VERSION}"
 )
 
-# Per-platform discovery macros — extracted to keep this file focused on orchestration.
-# _qgc_validate_expanded_pkg lives in platform/Apple.cmake (used only by Mac+iOS).
+# Per-platform discovery functions, named by the platform descriptor; each sets GStreamer_ROOT_DIR, the
+# GSTREAMER_*_PATH layout variables and its pkg-config setup in this scope. Shared Mac+iOS helpers live in
+# platform/Apple.cmake.
 include("${CMAKE_CURRENT_LIST_DIR}/platform/Apple.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/platform/Windows.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/platform/Linux.cmake")
@@ -160,21 +161,9 @@ if(IOS)
     endforeach()
 endif()
 
-if(ANDROID)
-    set(G_IO_MODULES openssl)
-    set(G_IO_MODULES_PATH "${GStreamer_ROOT_DIR}/lib/gio/modules")
-    set(GStreamer_NDK_BUILD_PATH "${GStreamer_ROOT_DIR}/share/gst-android/ndk-build")
-    # Plugin Java sources and fonts/CA assets are staged in these build-directory trees, which android/build.gradle
-    # adds to the APK; androiddeployqt deletes files written into android-build/ itself.
-    if(NOT QGC_ANDROID_EXTRA_JAVA_SOURCES_DIR OR NOT QGC_ANDROID_EXTRA_ASSETS_DIR)
-        message(FATAL_ERROR "GStreamer: QGC_ANDROID_EXTRA_JAVA_SOURCES_DIR and QGC_ANDROID_EXTRA_ASSETS_DIR must be "
-                            "set (cmake/platform/Android.cmake) before GStreamer is configured."
-        )
-    endif()
-    set(GStreamer_JAVA_SRC_DIR "${QGC_ANDROID_EXTRA_JAVA_SOURCES_DIR}")
-    set(GStreamer_ASSETS_DIR "${QGC_ANDROID_EXTRA_ASSETS_DIR}")
-elseif(IOS)
-    # The merged archive also carries the static GIO modules.
+# Mobile apps register the OpenSSL GIO module (TLS) statically along with their plugins; on iOS the merged
+# archive carries it.
+if(ANDROID OR IOS)
     set(G_IO_MODULES openssl)
 endif()
 

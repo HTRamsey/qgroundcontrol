@@ -67,7 +67,15 @@ function(_qgc_gst_ios_extract staging pkg)
     _qgc_pkgutil_expand_and_validate("${pkg}" "${staging}/expanded" "iOS")
 endfunction()
 
-macro(_qgc_discover_ios_sdk)
+# _qgc_discover_ios_sdk()
+# Uses the GStreamer.xcframework or GStreamer.framework at or under GStreamer_ROOT_DIR, else the system iPhone.sdk,
+# else downloads the official iOS package, and selects its single merged static archive. Sets GStreamer_ROOT_DIR,
+# GStreamer_AUTO_DOWNLOADED, GStreamer_USE_{XCFRAMEWORK,FRAMEWORK,STATIC_LIBS}, GSTREAMER_XCFRAMEWORK_LIB,
+# GStreamer_IOS_INFO_PLIST, GSTREAMER_{LIB,PLUGIN,INCLUDE,XCFRAMEWORK}_PATH and the GStreamer_IOS_CA_BUNDLE cache
+# entry.
+# cmakelang 0.6.13 predates return(PROPAGATE).
+# cmake-lint: disable=C0103,E1121
+function(_qgc_discover_ios_sdk)
     if(NOT CMAKE_HOST_APPLE)
         message(FATAL_ERROR "GStreamer for iOS can only be built on macOS")
     endif()
@@ -279,7 +287,21 @@ macro(_qgc_discover_ios_sdk)
 
     # iOS SDK ships no CA bundle reachable from libgioopenssl; fetch Mozilla NSS.
     _qgc_download_ios_ca_bundle()
-endmacro()
+    return(
+        PROPAGATE
+        GStreamer_ROOT_DIR
+        GStreamer_AUTO_DOWNLOADED
+        GStreamer_USE_XCFRAMEWORK
+        GStreamer_USE_FRAMEWORK
+        GStreamer_USE_STATIC_LIBS
+        GSTREAMER_XCFRAMEWORK_LIB
+        GStreamer_IOS_INFO_PLIST
+        GSTREAMER_LIB_PATH
+        GSTREAMER_PLUGIN_PATH
+        GSTREAMER_INCLUDE_PATH
+        GSTREAMER_XCFRAMEWORK_PATH
+    )
+endfunction()
 
 # Downloads ca-certificates.crt to the iOS SDK cache and sets
 # GStreamer_IOS_CA_BUNDLE (cache var) to its absolute path. Re-uses the same
