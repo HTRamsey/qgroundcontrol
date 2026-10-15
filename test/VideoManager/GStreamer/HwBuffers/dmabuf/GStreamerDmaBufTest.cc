@@ -340,15 +340,9 @@ void GStreamerTest::_testDmaBufRejectsNonLinearDirectImport()
 void GStreamerTest::_testDmaBufTiledImportAvoidsTexStorage()
 {
 #if defined(QGC_HAS_GST_DMABUF_GPU_PATH)
-    constexpr guint64 kLinearModifier = 0;
-    constexpr guint64 kIntelTileYModifier = 0x0100000000000009ULL;
-
-    QVERIFY(GstDmaBufVideoBuffer::texStorageImportAllowedForTest(false, true, kLinearModifier));
-    QVERIFY2(!GstDmaBufVideoBuffer::texStorageImportAllowedForTest(false, true, kIntelTileYModifier),
-             "Tiled DMABuf EGLImages must avoid GL_EXT_EGL_image_storage; Mesa/Gallium can segfault while "
-             "binding a tiled VA image through glEGLImageTargetTexStorageEXT");
-    QVERIFY(!GstDmaBufVideoBuffer::texStorageImportAllowedForTest(true, true, kLinearModifier));
-    QVERIFY(!GstDmaBufVideoBuffer::texStorageImportAllowedForTest(false, false, kLinearModifier));
+    QVERIFY(GstDmaBufVideoBuffer::texStorageImportAllowedForTest(false, true));
+    QVERIFY(!GstDmaBufVideoBuffer::texStorageImportAllowedForTest(true, true));
+    QVERIFY(!GstDmaBufVideoBuffer::texStorageImportAllowedForTest(false, false));
 #else
     QSKIP("DMABuf unavailable in this build");
 #endif
@@ -514,13 +508,10 @@ GstSample* makeMemfdDmaBufSample(GstVideoFormat format, GstVideoInfo& info)
 void GStreamerTest::_testDmaBufEglBadMatchLatch_data()
 {
     QTest::addColumn<bool>("singleFd");
-    QTest::addColumn<quint64>("drmModifier");
     QTest::addColumn<bool>("expectDisabled");
 
-    constexpr quint64 kIntelTileYModifier = 0x0100000000000009ULL;
-    QTest::newRow("single-fd LINEAR keeps per-plane import") << true << quint64(0) << false;
-    QTest::newRow("single-fd tiled has no fallback") << true << kIntelTileYModifier << true;
-    QTest::newRow("per-plane disables path") << false << quint64(0) << true;
+    QTest::newRow("single-fd keeps per-plane import") << true << false;
+    QTest::newRow("per-plane disables path") << false << true;
 }
 
 void GStreamerTest::_testDmaBufEglBadMatchLatch()
@@ -529,7 +520,6 @@ void GStreamerTest::_testDmaBufEglBadMatchLatch()
     QSKIP("DMABuf GPU path not compiled in this build");
 #else
     QFETCH(bool, singleFd);
-    QFETCH(quint64, drmModifier);
     QFETCH(bool, expectDisabled);
 
     GstDmaBufVideoBuffer::resetCachedState();
@@ -547,7 +537,7 @@ void GStreamerTest::_testDmaBufEglBadMatchLatch()
         expectLogMessage("Video.GStreamer.HwBuffers.GstDmaBuf", QtWarningMsg,
                          QRegularExpression(QStringLiteral("EGL_BAD_MATCH.*disabling DMABuf zero-copy")));
     }
-    GstDmaBufVideoBuffer::recordEglBadMatchForTest(singleFd, drmModifier);
+    GstDmaBufVideoBuffer::recordEglBadMatchForTest(singleFd);
     if (expectDisabled) {
         verifyExpectedLogMessage();
     }

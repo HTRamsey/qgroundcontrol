@@ -245,7 +245,7 @@ set(_qgc_gpu_row_Vulkan
     LIBS ${_qgc_vulkan_loader_libs}
     DEFINE QGC_HAS_GST_VULKAN_GPU_PATH
     SOURCES vulkan/GstVulkanVideoBuffer.cc vulkan/GstVulkanVideoBuffer.h vulkan/GstVulkanContextBridge.cc
-            vulkan/GstVulkanContextBridge.h vulkan/GstVulkanImport.cc vulkan/GstVulkanImport.h)
+            vulkan/GstVulkanContextBridge.h)
 # cmake-format: on
 
 set(_qgc_gpu_rows
@@ -326,7 +326,6 @@ target_sources(
             ${CMAKE_CURRENT_SOURCE_DIR}/common/GstHwImportCache.h
             ${CMAKE_CURRENT_SOURCE_DIR}/common/GstHwImportPreflight.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/common/GstHwImportPreflight.h
-            ${CMAKE_CURRENT_SOURCE_DIR}/vulkan/GstVulkanFrameTextures.h
             ${CMAKE_CURRENT_SOURCE_DIR}/common/GstHwVideoBuffer.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/common/GstHwVideoBuffer.h
             ${CMAKE_CURRENT_SOURCE_DIR}/common/GstContextBridgeBase.cc

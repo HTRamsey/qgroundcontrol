@@ -115,8 +115,7 @@ Unset the variable, or set it to `1`, to restore the default behavior.
 
 QGC also switches to per-plane import on its own when the single-EGLImage
 importer fails with `EGL_BAD_MATCH`. It disables DMABuf zero-copy for the
-session only when per-plane import fails the same way, or when a tiled buffer
-(which has no per-plane fallback) does.
+session only when per-plane import fails the same way.
 
 `QGC_GST_DMABUF_CACHE=1` keeps each pooled buffer's EGLImages across frames
 instead of importing them every frame. It is off by default because no test or
