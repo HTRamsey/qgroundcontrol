@@ -10,6 +10,7 @@
 #include "GstHwPathTelemetry.h"
 #include "GstHwVideoBuffer.h"
 #include "GstVulkanFrameTextures.h"
+#include "GstVulkanImport.h"
 #include "HwBuffers.h"
 #include "QGCRhiCapture.h"
 
@@ -107,6 +108,7 @@ void handleEglBadMatch(EGLDisplay eglDpy, int plane, EglImportStage stage, guint
 std::atomic<EGLDisplay> s_cachedDisplay{EGL_NO_DISPLAY};
 std::atomic<bool> s_loggedSingleFdDisabled{false};
 std::atomic<bool> s_loggedProducerWaitTimeout{false};
+std::atomic<bool> s_loggedVulkanSyncRefused{false};
 
 // First-import-per-epoch bind validation: glGetError flushes the pipeline, so steady-state frames skip it.
 std::atomic<bool> s_bindValidated{false};
@@ -849,9 +851,10 @@ QVideoFrameTexturesUPtr GstDmaBufVideoBuffer::mapTextures(QRhi& rhi, QVideoFrame
 
 #if defined(QGC_HAS_GST_VULKAN_GPU_PATH)
     if (vulkan) {
-        // Vulkan does not wait on implicit fences of imported dma-buf memory, so import only after the producer's
-        // writes are confirmed complete (same policy as GstVulkanVideoBuffer: no import without producer sync).
-        if (!waitForProducerWrites(buffer)) {
+        // Vulkan does not wait on implicit fences of imported dma-buf memory: import only once the poll() barrier
+        // confirms the producer's writes completed.
+        if (!GstVulkanImport::admitImport(HwVideoBufferPath::DmaBuf, waitForProducerWrites(buffer), GstDmaBufLog(),
+                                          s_loggedVulkanSyncRefused)) {
             return GstHwPathTelemetry::fail(HwVideoBufferPath::DmaBuf);
         }
         return importVulkan(rhi, old);
