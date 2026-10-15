@@ -162,35 +162,17 @@ QVideoFrameTexturesUPtr GstGlVideoBuffer::mapTextures(QRhi& rhi, QVideoFrameText
 
     gst_video_frame_unmap(&frame);
 
-    if (auto* prev = GstHwFrameTexturesBase::reusableBundle<FrameTextures>(old, HwVideoBufferPath::GlMemory)) {
-        if (prev->matches(&rhi, _format.frameSize(), _format.pixelFormat(), names, planeCount)) {
-            GstHwPathTelemetry::recordTextureReuse(HwVideoBufferPath::GlMemory);
-            prev->setSourceSample(takeSample());
-            QVideoFrameTexturesUPtr reused = std::move(old);
-            return reused;
-        }
-    }
-
-    // Pre-flight the per-plane RHI format/size before createFrom() so an unsupported import demotes to CPU on a cheap
-    // capability query instead of a driver error.
-    if (!GstHwImportPreflight::preflightOrRecord(&rhi, HwVideoBufferPath::GlMemory, _format.pixelFormat(),
-                                                 _format.frameSize())) {
-        return GstHwPathTelemetry::fail(HwVideoBufferPath::GlMemory);
-    }
-
-    auto textures =
-        std::make_unique<FrameTextures>(&rhi, _format.frameSize(), _format.pixelFormat(), names, planeCount);
-    // For NV12/I420 chroma can fail while luma succeeds; must verify all planes, not just plane 0.
-    for (int i = 0; i < planeCount; ++i) {
-        if (!textures->texture(static_cast<uint>(i))) {
-            qCWarning(GstGlBufLog) << "createFrom failed for plane" << i << "format=" << _format.pixelFormat();
-            GstHwPathTelemetry::recordFallbackReason(HwVideoBufferPath::GlMemory,
-                                                     GstHwPathTelemetry::HwFallbackReason::MapFailed);
-            return GstHwPathTelemetry::fail(HwVideoBufferPath::GlMemory);
-        }
-    }
-    textures->setSourceSample(takeSample());
-    return textures;
+    const GstHwMapTail tail{.path = HwVideoBufferPath::GlMemory,
+                            .frameSize = _format.frameSize(),
+                            .pixelFormat = _format.pixelFormat(),
+                            .log = &GstGlBufLog(),
+                            .diag = &s_diag};
+    return GstHwFrameTexturesBase::finishMap<FrameTextures>(
+        *this, rhi, old, tail,
+        [&](const FrameTextures& prev) {
+            return prev.matches(&rhi, tail.frameSize, tail.pixelFormat, names, planeCount);
+        },
+        [&] { return std::make_unique<FrameTextures>(&rhi, tail.frameSize, tail.pixelFormat, names, planeCount); });
 }
 
 #endif  // QGC_HAS_GST_GLMEMORY_GPU_PATH

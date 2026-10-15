@@ -521,10 +521,14 @@ QVideoFrameTexturesUPtr GstD3D12VideoBuffer::mapTextures(QRhi& rhi, QVideoFrameT
         return GstHwPathTelemetry::fail(HwVideoBufferPath::D3D12);
     }
 
-    return GstD3DVideoBufferCommon::mapResolvedTextures(*this, rhi, old, HwVideoBufferPath::D3D12, _resources,
-                                                        _resolvedCount, _format.frameSize(), _format.pixelFormat(),
-                                                        s_diag.loggedFirstSuccess, s_diag.loggedTextureCreateFail,
-                                                        GstD3D12Log, "D3D12", _stagingLeases);
+    const GstHwMapTail tail{.path = HwVideoBufferPath::D3D12,
+                            .frameSize = _format.frameSize(),
+                            .pixelFormat = _format.pixelFormat(),
+                            .log = &GstD3D12Log(),
+                            .diag = &s_diag,
+                            .successTag = "D3D12"};
+    return GstD3DVideoBufferCommon::mapResolvedTextures(*this, rhi, old, tail, _resources, _resolvedCount,
+                                                        _stagingLeases);
 }
 
 #endif  // Q_OS_WIN && QGC_HAS_GST_D3D12_GPU_PATH

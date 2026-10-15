@@ -4,10 +4,7 @@
 
 #if defined(Q_OS_WIN) && (defined(QGC_HAS_GST_D3D11_GPU_PATH) || defined(QGC_HAS_GST_D3D12_GPU_PATH))
 
-#include <QtCore/QLoggingCategory>
-#include <QtCore/QSize>
-#include <QtMultimedia/QVideoFrame>
-#include <QtMultimedia/QVideoFrameFormat>
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cstddef>
@@ -16,9 +13,14 @@
 #include <private/qhwvideobuffer_p.h>
 #include <private/qvideotexturehelper_p.h>
 #include <rhi/qrhi.h>
+#include <span>
+
+#include <QtCore/QLoggingCategory>
+#include <QtCore/QSize>
+#include <QtMultimedia/QVideoFrame>
+#include <QtMultimedia/QVideoFrameFormat>
 
 #include "GstHwFrameTexturesBase.h"
-#include "GstHwImportPreflight.h"
 #include "GstHwPathTelemetry.h"
 #include "GstHwVideoBuffer.h"
 
@@ -107,20 +109,11 @@ public:
                   std::array<HandleT*, kMaxPlanes> handles, int count)
         : _handles(handles), _path(path), _rhi(rhi), _size(size), _pixelFormat(pixelFormat)
     {
-        _count = count;
-        const auto* desc = QVideoTextureHelper::textureDescription(pixelFormat);
-        if (!desc)
-            return;
-        for (int i = 0; i < _count; ++i) {
-            const QSize planeSize = desc->rhiPlaneSize(size, i, rhi);
-            // Native import: a substituted fallback format would misread the resource's real layout.
-            _textures[i].reset(rhi->newTexture(
-                desc->rhiTextureFormat(i, rhi, QVideoTextureHelper::TextureDescription::FallbackPolicy::Disable),
-                planeSize, 1, {}));
-            if (_textures[i] && !_textures[i]->createFrom({reinterpret_cast<quint64>(handles[i]), 0})) {
-                _textures[i].reset();
-            }
-        }
+        std::array<quint64, kMaxPlanes> native{};
+        std::transform(handles.begin(), handles.end(), native.begin(),
+                       [](HandleT* handle) { return reinterpret_cast<quint64>(handle); });
+        wrapPlanes(rhi, size, pixelFormat,
+                   std::span<const quint64>(native.data(), std::size_t(std::clamp(count, 0, kMaxPlanes))));
     }
 
     ~FrameTextures() override
@@ -161,30 +154,25 @@ private:
     QVideoFrameFormat::PixelFormat _pixelFormat = QVideoFrameFormat::Format_Invalid;
 };
 
-/// Shared D3D11/D3D12 render-thread tail run after the streaming-thread resolve: reuse the prior bundle when the pooled
-/// staging handles match, else AddRef the handles, build a fresh FrameTextures, verify every plane, and log first
-/// success. The caller guarantees `_resolved` and passes its resolved handle array + count. `HandleT` is deduced from
-/// the array (ID3D11Texture2D / ID3D12Resource); `catFn` is the logging-category accessor (e.g. GstD3D11Log) so the
-/// qCWarning-based once-logging macro keeps working. Monomorphized per backend; no virtual dispatch added.
-template <class HandleT, class CatFn>
+/// Shared D3D11/D3D12 render-thread tail run after the streaming-thread resolve: aliases a single NV12/P010 resource
+/// across its planes, then reuses the prior bundle when the pooled staging handles match or builds a fresh one over
+/// AddRef'd handles. `HandleT` is deduced from the resolved handle array (ID3D11Texture2D / ID3D12Resource).
+template <class HandleT>
 QVideoFrameTexturesUPtr mapResolvedTextures(GstHwVideoBuffer& self, QRhi& rhi, QVideoFrameTexturesUPtr& old,
-                                            HwVideoBufferPath path,
+                                            const GstHwMapTail& tail,
                                             const std::array<HandleT*, kMaxPlanes>& resolvedHandles, int resolvedCount,
-                                            QSize frameSize, QVideoFrameFormat::PixelFormat pixelFormat,
-                                            std::atomic<bool>& loggedFirstSuccess,
-                                            std::atomic<bool>& loggedTextureCreateFail, CatFn catFn, const char* tag,
                                             const std::shared_ptr<void>& keepAlive = {})
 {
     using BundleT = FrameTextures<HandleT>;
 
-    const auto* desc = QVideoTextureHelper::textureDescription(pixelFormat);
+    const auto* desc = QVideoTextureHelper::textureDescription(tail.pixelFormat);
     if (!desc || desc->nplanes <= 0) {
-        return GstHwPathTelemetry::fail(path);
+        return GstHwPathTelemetry::fail(tail.path);
     }
 
     const int textureCount = (std::min)(desc->nplanes, kMaxPlanes);
     if (resolvedCount <= 0 || resolvedCount > kMaxPlanes) {
-        return GstHwPathTelemetry::fail(path);
+        return GstHwPathTelemetry::fail(tail.path);
     }
 
     std::array<HandleT*, kMaxPlanes> handles{};
@@ -193,8 +181,8 @@ QVideoFrameTexturesUPtr mapResolvedTextures(GstHwVideoBuffer& self, QRhi& rhi, Q
     }
 
     if (resolvedCount < textureCount) {
-        if (resolvedCount != 1 || !handles[0] || !canAliasSingleResourceAcrossPlanes(pixelFormat)) {
-            return GstHwPathTelemetry::fail(path);
+        if (resolvedCount != 1 || !handles[0] || !canAliasSingleResourceAcrossPlanes(tail.pixelFormat)) {
+            return GstHwPathTelemetry::fail(tail.path);
         }
         // D3D NV12/P010 output can expose one texture with multiple shader-resource planes.
         for (int i = resolvedCount; i < textureCount; ++i) {
@@ -202,43 +190,26 @@ QVideoFrameTexturesUPtr mapResolvedTextures(GstHwVideoBuffer& self, QRhi& rhi, Q
         }
     }
 
-    if (auto* prev = GstHwFrameTexturesBase::reusableBundle<BundleT>(old, path)) {
-        if (prev->matches(&rhi, frameSize, pixelFormat, handles, textureCount)) {
-            GstHwPathTelemetry::recordTextureReuse(path);
-            prev->setSourceSample(self.takeSample());
-            prev->setKeepAlive(keepAlive);
-            QVideoFrameTexturesUPtr reused = std::move(old);
-            return reused;
-        }
-    }
-
-    // Pre-flight RHI format/size support before createFrom() so an unsupported import demotes to CPU on a query.
-    if (!GstHwImportPreflight::preflightOrRecord(&rhi, path, pixelFormat, frameSize)) {
-        return GstHwPathTelemetry::fail(path);
-    }
-
-    // FrameTextures takes ownership of AddRef'd refs; the buffer dtor releases the originals independently.
-    for (int i = 0; i < textureCount; ++i) {
-        if (handles[i])
-            handles[i]->AddRef();
-    }
-
-    auto textures = std::make_unique<BundleT>(path, &rhi, frameSize, pixelFormat, handles, textureCount);
-    // Check all planes: NV12 chroma can fail while luma succeeds, and a partial bundle renders with missing planes.
-    for (int i = 0; i < textureCount; ++i) {
-        if (!textures->texture(static_cast<uint>(i))) {
-            QGC_HW_WARN_ONCE(catFn, loggedTextureCreateFail,
-                             "mapTextures: QRhiTexture::createFrom failed plane="
-                                 << i << " (size=" << frameSize << " format=" << int(pixelFormat)
-                                 << " planes=" << textureCount << ")");
-            return GstHwPathTelemetry::fail(path);
-        }
-    }
-
-    GstHwVideoBuffer::logFirstSuccess(loggedFirstSuccess, catFn(), tag, frameSize, pixelFormat, textureCount);
-    textures->setSourceSample(self.takeSample());
-    textures->setKeepAlive(keepAlive);
-    return textures;
+    return GstHwFrameTexturesBase::finishMap<BundleT>(
+        self, rhi, old, tail,
+        [&](BundleT& prev) {
+            if (!prev.matches(&rhi, tail.frameSize, tail.pixelFormat, handles, textureCount)) {
+                return false;
+            }
+            prev.setKeepAlive(keepAlive);
+            return true;
+        },
+        [&] {
+            // The bundle owns these AddRef'd refs; the buffer dtor releases the originals independently.
+            for (int i = 0; i < textureCount; ++i) {
+                if (handles[i])
+                    handles[i]->AddRef();
+            }
+            auto textures =
+                std::make_unique<BundleT>(tail.path, &rhi, tail.frameSize, tail.pixelFormat, handles, textureCount);
+            textures->setKeepAlive(keepAlive);
+            return textures;
+        });
 }
 
 }  // namespace GstD3DVideoBufferCommon

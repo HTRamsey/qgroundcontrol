@@ -265,9 +265,13 @@ QVideoFrameTexturesUPtr GstD3D11VideoBuffer::mapTextures(QRhi& rhi, QVideoFrameT
         return GstHwPathTelemetry::fail(HwVideoBufferPath::D3D11);
     }
 
-    return GstD3DVideoBufferCommon::mapResolvedTextures(
-        *this, rhi, old, HwVideoBufferPath::D3D11, _textures, _resolvedCount, _format.frameSize(),
-        _format.pixelFormat(), s_diag.loggedFirstSuccess, s_diag.loggedTextureCreateFail, GstD3D11Log, "D3D11");
+    const GstHwMapTail tail{.path = HwVideoBufferPath::D3D11,
+                            .frameSize = _format.frameSize(),
+                            .pixelFormat = _format.pixelFormat(),
+                            .log = &GstD3D11Log(),
+                            .diag = &s_diag,
+                            .successTag = "D3D11"};
+    return GstD3DVideoBufferCommon::mapResolvedTextures(*this, rhi, old, tail, _textures, _resolvedCount);
 }
 
 #endif  // Q_OS_WIN && QGC_HAS_GST_D3D11_GPU_PATH

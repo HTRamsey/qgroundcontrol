@@ -12,6 +12,7 @@
 #include <private/qvideotexturehelper_p.h>
 #include <rhi/qrhi.h>
 #include <rhi/qrhi_platform.h>
+#include <span>
 
 #include <QtCore/QLoggingCategory>
 #include <QtCore/QMutex>
@@ -25,7 +26,6 @@
 #include "GstEglHelpers.h"
 #include "GstHwFrameTexturesBase.h"
 #include "GstHwImportCache.h"
-#include "GstHwImportPreflight.h"
 #include "GstHwPathTelemetry.h"
 #include "GstHwVideoBuffer.h"
 #include "QGCLoggingCategory.h"
@@ -37,9 +37,7 @@ QGC_LOGGING_CATEGORY(GstAHWBufLog, "Video.GStreamer.HwBuffers.GstAHWBuf")
 
 namespace {
 
-using GstHw::kMaxPlanes;
-
-std::atomic<bool> s_loggedBadBackend{false};
+GstHw::MapDiagnostics s_diag;
 
 constexpr const char* kNativeBufferExt = "EGL_ANDROID_image_native_buffer";
 
@@ -128,22 +126,10 @@ public:
             const QMutexLocker lock(&s_imageCacheMutex);
             s_imageCache.pin(_entry);
         }
-        _count = 1;
-        const auto* desc = QVideoTextureHelper::textureDescription(pixelFormat);
-        if (!desc) {
-            qCWarning(GstAHWBufLog) << "no QVideoTextureHelper description for format" << pixelFormat;
-            return;
-        }
-        const QSize planeSize = desc->rhiPlaneSize(size, 0, rhi);
         // ExternalOES: bind GL_TEXTURE_EXTERNAL_OES + emit SamplerExternalOES, else OES_EGL_image_external samples
         // black on GLES2.
-        _textures[0].reset(rhi->newTexture(
-            desc->rhiTextureFormat(0, rhi, QVideoTextureHelper::TextureDescription::FallbackPolicy::Disable), planeSize,
-            1, QRhiTexture::ExternalOES));
-        if (_textures[0] && !_textures[0]->createFrom({name, 0})) {
-            qCWarning(GstAHWBufLog) << "QRhiTexture::createFrom failed for AHardwareBuffer plane 0";
-            _textures[0].reset();
-        }
+        const quint64 handle = name;
+        wrapPlanes(rhi, size, pixelFormat, std::span<const quint64>(&handle, 1), 0, QRhiTexture::ExternalOES);
     }
 
     ~FrameTextures() override
@@ -243,41 +229,21 @@ const AhbCacheResetRegistrar s_ahbCacheResetRegistrar;
 
 QVideoFrameTexturesUPtr GstAHardwareBufferVideoBuffer::mapTextures(QRhi& rhi, QVideoFrameTexturesUPtr& old)
 {
-    // Qt's contract: mapTextures runs on the QRhi (render) thread. Bail rather than crash if ever called off-thread.
-    if (!rhi.thread()->isCurrentThread()) {
+    GstBuffer* buffer = nullptr;
+    if (!checkMapPreconditions(rhi, static_cast<int>(QRhi::OpenGLES2), GstAHWBufLog(), s_diag, buffer)) {
         return GstHwPathTelemetry::fail(HwVideoBufferPath::AHardwareBuffer);
     }
 
-    if (!_sample) {
-        return GstHwPathTelemetry::fail(HwVideoBufferPath::AHardwareBuffer);
-    }
-    if (rhi.backend() != QRhi::OpenGLES2) {
-        if (!s_loggedBadBackend.exchange(true, std::memory_order_relaxed)) {
-            qCWarning(GstAHWBufLog) << "QRhi backend is not OpenGLES2; AHardwareBuffer path unsupported";
-        }
-        return GstHwPathTelemetry::fail(HwVideoBufferPath::AHardwareBuffer);
-    }
-
-    // Bind Qt's GL context before any EGL/GL call, else the calls silently no-op into a foreign/null context.
-    rhi.makeThreadLocalNativeContextCurrent();
-
-    const auto* nativeHandles = static_cast<const QRhiGles2NativeHandles*>(rhi.nativeHandles());
-    if (!nativeHandles || !nativeHandles->context) {
+    QOpenGLContext* glContext = GstEglHelpers::bindRhiContext(rhi);
+    if (!glContext) {
         qCWarning(GstAHWBufLog) << "QRhi exposes no GL context";
         return GstHwPathTelemetry::fail(HwVideoBufferPath::AHardwareBuffer);
     }
-
-    // Prefer QEGLContext::display() — sampling on a foreign display silently returns black.
-    EGLDisplay eglDpy = GstEglHelpers::resolveEglDisplay(nativeHandles->context);
-    if (eglDpy == EGL_NO_DISPLAY)
-        eglDpy = _eglDisplay;
+    // Sampling an EGLImage created on a foreign display silently returns black.
+    const EGLDisplay eglDpy = GstEglHelpers::renderDisplay(glContext, _eglDisplay);
     if (eglDpy == EGL_NO_DISPLAY) {
         return GstHwPathTelemetry::fail(HwVideoBufferPath::AHardwareBuffer);
     }
-
-    GstBuffer* buffer = gst_sample_get_buffer(_sample);
-    if (!buffer)
-        return GstHwPathTelemetry::fail(HwVideoBufferPath::AHardwareBuffer);
 
     GstMemory* mem0 = gst_buffer_peek_memory(buffer, 0);
     if (!mem0 || !gst_is_ahardware_buffer_memory(mem0)) {
@@ -315,7 +281,7 @@ QVideoFrameTexturesUPtr GstAHardwareBufferVideoBuffer::mapTextures(QRhi& rhi, QV
     // Block until the producer's GPU write completes before importing/sampling the recycled AHB.
     waitProducerComplete(buffer);
 
-    QOpenGLFunctions functions(nativeHandles->context);
+    QOpenGLFunctions functions(glContext);
 
     const AhbCacheKey key{&rhi, ahwb, eglDpy};
     GLuint name = 0;
@@ -367,8 +333,7 @@ QVideoFrameTexturesUPtr GstAHardwareBufferVideoBuffer::mapTextures(QRhi& rhi, QV
             entry = existing.id;
         } else {
             AHardwareBuffer_acquire(ahwb);
-            const auto inserted =
-                s_imageCache.insert(key, AhbImport{nativeHandles->context, ahwb, eglDpy, image, name});
+            const auto inserted = s_imageCache.insert(key, AhbImport{glContext, ahwb, eglDpy, image, name});
             if (inserted) {
                 entry = inserted.id;
                 // Keyed: registered once per QRhi however many entries it inserts.
@@ -393,30 +358,16 @@ QVideoFrameTexturesUPtr GstAHardwareBufferVideoBuffer::mapTextures(QRhi& rhi, QV
         s_imageCache.drainDeferred();
     });
 
-    if (auto* prev = GstHwFrameTexturesBase::reusableBundle<FrameTextures>(old, HwVideoBufferPath::AHardwareBuffer)) {
-        if (prev->matches(&rhi, _format.frameSize(), QVideoFrameFormat::Format_SamplerExternalOES, name)) {
-            GstHwPathTelemetry::recordTextureReuse(HwVideoBufferPath::AHardwareBuffer);
-            prev->setSourceSample(takeSample());
-            QVideoFrameTexturesUPtr reused = std::move(old);
-            return reused;
-        }
-    }
-
-    // Pre-flight the external-OES RHI format/size before createFrom() so an unsupported import demotes to CPU on a query.
-    if (!GstHwImportPreflight::preflightOrRecord(&rhi, HwVideoBufferPath::AHardwareBuffer,
-                                                 QVideoFrameFormat::Format_SamplerExternalOES, _format.frameSize(),
-                                                 QRhiTexture::ExternalOES)) {
-        return GstHwPathTelemetry::fail(HwVideoBufferPath::AHardwareBuffer);
-    }
-
-    auto textures = std::make_unique<FrameTextures>(&rhi, _format.frameSize(),
-                                                    QVideoFrameFormat::Format_SamplerExternalOES, name, entry);
-    if (!textures->texture(0)) {
-        qCWarning(GstAHWBufLog) << "createFrom failed for plane 0 (SamplerExternalOES)";
-        return GstHwPathTelemetry::fail(HwVideoBufferPath::AHardwareBuffer);
-    }
-    textures->setSourceSample(takeSample());
-    return textures;
+    const GstHwMapTail tail{.path = HwVideoBufferPath::AHardwareBuffer,
+                            .frameSize = _format.frameSize(),
+                            .pixelFormat = QVideoFrameFormat::Format_SamplerExternalOES,
+                            .textureFlags = QRhiTexture::ExternalOES,
+                            .log = &GstAHWBufLog(),
+                            .diag = &s_diag};
+    return GstHwFrameTexturesBase::finishMap<FrameTextures>(
+        *this, rhi, old, tail,
+        [&](const FrameTextures& prev) { return prev.matches(&rhi, tail.frameSize, tail.pixelFormat, name); },
+        [&] { return std::make_unique<FrameTextures>(&rhi, tail.frameSize, tail.pixelFormat, name, entry); });
 }
 
 #endif  // QGC_HAS_GST_AHARDWAREBUFFER_GPU_PATH
