@@ -51,11 +51,11 @@ Per-platform zero-copy import of decoded GPU frames, all sharing `GstHwFrameText
 - **`GstHwPathTelemetry`** tracks process-wide render-time counters (map failures, reuse hits, sync waits) for fallback
   diagnostics. A receiver's `HW path stats` debug line pairs its own sink's `frame-stats` with them.
 - **`CpuVideoFramePool`** recycles CPU-backed `QVideoFrame` storage (WebRTC-style slab) for the software-fallback path, avoiding per-frame allocation.
-- **Build options**: `HwBuffers/CMakeLists.txt` probes one table row per path; each compiled path can be dropped with
-  `QGC_GST_ENABLE_<PATH>=OFF` (`DMABUF`, `CUDA`, `GLMEMORY`, `IOSURFACE`, `D3D11`, `D3D12`, `AHARDWAREBUFFER`, `VULKAN`;
-  all `ON` by default). Configure lists compiled paths that the sink can't reach at runtime: the glupload bin (Linux and
-  Android with gst-gl) offers only GLMemory caps, and no bin advertises CUDAMemory or VulkanImage caps. On Linux,
-  `QGC_GST_ENABLE_GLMEMORY=OFF` switches the bin to direct DMABuf import.
+- **Build options**: `HwBuffers/CMakeLists.txt` probes one table row per path; the `QGC_GST_ENABLE_<PATH>` switches
+  that compile a path out are listed in [`cmake/README.md`](../../../../cmake/README.md#gstreamer). Configure lists
+  compiled paths that the sink can't reach at runtime: the glupload bin (Linux and Android with gst-gl) offers only
+  GLMemory caps, and no bin advertises CUDAMemory or VulkanImage caps. On Linux, `QGC_GST_ENABLE_GLMEMORY=OFF` switches
+  the bin to direct DMABuf import.
 
 ## Build Configuration
 
