@@ -1,7 +1,8 @@
 # Pkg-config target creation — shared by Linux/Windows/macOS/Android
 # (everything except iOS xcframework). Pkg-config env management lives in
-# cmake/GStreamer/PkgConfig.cmake (gstreamer_apply_pkgconfig_env). Macro form
-# is required so GStreamer_FOUND / IMPORTED targets / cache vars propagate to
+# cmake/GStreamer/PkgConfig.cmake (gstreamer_apply_pkgconfig_env), target creation
+# in cmake/GStreamer/Targets.cmake. Macro form is required so GStreamer_VERSION /
+# GStreamer_<component>_FOUND and the Android mobile-target variables propagate to
 # the caller.
 
 include_guard(GLOBAL)
@@ -29,20 +30,23 @@ list(PREPEND CMAKE_PREFIX_PATH "${GStreamer_ROOT_DIR}")
 # --define-variable=…) propagate to the cache; guards above prevent duplicate appends.
 set(PKG_CONFIG_ARGN "${PKG_CONFIG_ARGN}" CACHE STRING "Arguments to supply to pkg-config" FORCE)
 
-# CPM creates a stub gstreamer-config.cmake that shadows our vendored module
-if(DEFINED CMAKE_FIND_PACKAGE_REDIRECTS_DIR)
-    file(REMOVE
-        "${CMAKE_FIND_PACKAGE_REDIRECTS_DIR}/gstreamer-config.cmake"
-        "${CMAKE_FIND_PACKAGE_REDIRECTS_DIR}/gstreamer-config-version.cmake"
-        "${CMAKE_FIND_PACKAGE_REDIRECTS_DIR}/GStreamerConfig.cmake"
-        "${CMAKE_FIND_PACKAGE_REDIRECTS_DIR}/GStreamerConfigVersion.cmake"
-    )
+set(_qgc_gst_static_flag "")
+if(GStreamer_USE_STATIC_LIBS)
+    set(_qgc_gst_static_flag STATIC)
 endif()
-unset(GStreamer_FOUND CACHE)
-unset(GStreamer_FOUND)
-# Use the per-platform version chosen at the top of this file as the floor — Linux honors the distro
+# GStreamer_FIND_VERSION is the per-platform floor chosen by Orchestrator.cmake — Linux honors the distro
 # minimum (1.20), bundled-SDK platforms enforce ≥1.28 so a downgraded SDK fails configure loudly.
-find_package(GStreamer ${GStreamer_FIND_VERSION} REQUIRED MODULE)
+qgc_gst_create_pkgconfig_targets(
+    ROOT
+    "${GStreamer_ROOT_DIR}"
+    VERSION
+    "${GStreamer_FIND_VERSION}"
+    APIS
+    ${GSTREAMER_APIS}
+    PLUGINS
+    ${GSTREAMER_PLUGINS}
+    ${_qgc_gst_static_flag}
+)
 
 # Apple framework overlay — defined in platform/MacOS.cmake; iOS uses xcframework.
 if(MACOS AND GStreamer_USE_FRAMEWORK AND TARGET GStreamer::GStreamer)

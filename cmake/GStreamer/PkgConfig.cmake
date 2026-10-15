@@ -1,8 +1,7 @@
 # Unified pkg-config env management for GStreamer discovery — single mutator
-# for PKG_CONFIG_PATH / PKG_CONFIG_LIBDIR / PKG_CONFIG_DONT_DEFINE_PREFIX,
-# used by FindGStreamer.cmake (SDK fallback), platform/Linux.cmake
-# (system-augment), and platform/PkgConfigTargets.cmake (SDK lock-in for
-# Windows/macOS/Android).
+# for PKG_CONFIG_PATH / PKG_CONFIG_LIBDIR / --dont-define-prefix, used by the
+# platform discovery macros: platform/Linux.cmake (system-augment) and
+# platform/{Windows,MacOS,Android}.cmake (SDK lock-in).
 
 include_guard(GLOBAL)
 

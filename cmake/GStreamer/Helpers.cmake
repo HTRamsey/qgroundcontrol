@@ -19,6 +19,8 @@
 #                  _gst_resolve_and_link_libraries
 #   Layout       — gstreamer_create_layout_target (FLAT / FRAMEWORK /
 #                  XCFRAMEWORK / STATIC_TARBALL → GStreamer::Layout)
+#   Targets      — qgc_gst_create_pkgconfig_targets (GStreamer::GStreamer /
+#                  deps / api_* / static plugin targets from pkg-config)
 #   Probe        — qgc_check_gst_header (header/symbol check_cxx_source_compiles
 #                  helper)
 #   PkgConfig    — gstreamer_apply_pkgconfig_env (MODE SDK |
@@ -42,6 +44,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/Json.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/Components.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/Link.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/Layout.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/Targets.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/Probe.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/PkgConfig.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/Download.cmake")
