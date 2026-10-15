@@ -34,6 +34,8 @@
 #   Install      — gstreamer_install_{plugins,gio_modules,libs} +
 #                  gstreamer_install_{linux,windows,macos}_sdk +
 #                  gstreamer_install_platform_sdk dispatcher
+#   StaticInit   — qgc_gst_generate_static_init (gst_init_static_plugins() source
+#                  for static layouts, from gst_static_plugins.c.in)
 #   SdkState     — resolved-SDK cache entries, _qgc_gst_sdk_pc_version,
 #                  fingerprint-based invalidation of cached probe results and
 #                  cleanup of legacy cached pkg-config flags
@@ -51,4 +53,5 @@ include("${CMAKE_CURRENT_LIST_DIR}/PkgConfig.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/Download.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/PluginPolicy.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/Install.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/StaticInit.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/SdkState.cmake")

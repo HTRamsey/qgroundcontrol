@@ -196,8 +196,9 @@ if(ANDROID)
     set(GStreamer_JAVA_SRC_DIR "${_gst_android_build_dir}/src")
     set(GStreamer_ASSETS_DIR "${_gst_android_build_dir}/assets")
 elseif(IOS)
-    # xcframework bundles GIO modules and assets into libGStreamer.a — no separate paths needed.
+    # The merged archive also carries the static GIO modules.
     set(GStreamer_Mobile_MODULE_NAME gstreamer_mobile)
+    set(G_IO_MODULES openssl)
     set(GStreamer_ASSETS_DIR "${CMAKE_BINARY_DIR}/assets")
 endif()
 
@@ -327,6 +328,25 @@ foreach(_gst_plugin IN LISTS GSTREAMER_PLUGINS)
                                GST_PLUGIN_${_gst_plugin}_FOUND
     )
 endforeach()
+
+if(GStreamer_USE_STATIC_LIBS AND NOT ANDROID)
+    # Desktop static layouts register every requested plugin that has a GStreamer::<plugin> target (Android
+    # and iOS resolve GSTREAMER_STATIC_PLUGINS while creating their targets).
+    set(GSTREAMER_STATIC_PLUGINS "")
+    foreach(_gst_plugin IN LISTS GSTREAMER_PLUGINS)
+        if(TARGET GStreamer::${_gst_plugin})
+            list(APPEND GSTREAMER_STATIC_PLUGINS "${_gst_plugin}")
+        endif()
+    endforeach()
+    gstreamer_missing_required(REQUIRED ${GSTREAMER_PLUGINS} AVAILABLE ${GSTREAMER_STATIC_PLUGINS} OUT_VAR
+                               _gst_missing_plugins
+    )
+    if(_gst_missing_plugins)
+        message(WARNING "GStreamer (static): requested plugins not found as targets and omitted from static "
+                        "registration: ${_gst_missing_plugins}"
+        )
+    endif()
+endif()
 
 if(_gst_plugins_scanned)
     gstreamer_missing_required(REQUIRED ${GSTREAMER_PLUGINS} AVAILABLE ${_gst_available_plugins} OUT_VAR
