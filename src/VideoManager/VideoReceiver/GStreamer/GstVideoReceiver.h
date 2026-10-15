@@ -2,17 +2,15 @@
 
 #include <atomic>
 #include <glib.h>
-#include <gst/gstbin.h>
-#include <gst/gstbus.h>
 #include <gst/gstelement.h>
 #include <gst/gstpad.h>
 #include <utility>
 
 #include <QtCore/QLoggingCategory>
 #include <QtCore/QMetaObject>
-#include <QtCore/QSemaphore>
 #include <QtCore/QString>
 
+#include "BusMessageRouter.h"
 #include "DecodingBranch.h"
 #include "PipelineDotDumper.h"
 #include "RecordingBranch.h"
@@ -73,6 +71,7 @@ signals:
 private:
     friend class GStreamerTest;
     friend class GstVideoReceiverTest;
+    friend class BusMessageRouter;
     friend class DecodingBranch;
     friend class RecordingBranch;
 
@@ -123,9 +122,6 @@ private:
     /// signals. Safe on a partially built pipeline (failed start()).
     void _resetPipelineState();
     void _onWatchdogTick();
-    void _attachBusHandler();
-    /// Returns once no thread is inside the bus handler any more, so no bus callback can reach `this`.
-    void _detachBusHandler();
     void _onPipelineError();
     void _onPipelinePlaying();
 
@@ -137,12 +133,6 @@ private:
     void _scheduleReconnect(const char *reason);
     void _reconnect();
 
-    /// The pipeline's only bus consumer. Runs on whichever thread posts: lets the HwBuffers context bridges answer
-    /// NEED_CONTEXT, does the cheap per-type work inline, queues the rest on the worker, and drops every message.
-    static GstBusSyncReply _onBusSyncMessage(GstBus* bus, GstMessage* message, gpointer user_data);
-    void _onBusError(GstMessage* message);
-    void _onBusElement(GstMessage* message);
-    void _onBusStateChanged(GstMessage* message);
     static void _onNewPad(GstElement *element, GstPad *pad, gpointer data);
     static GstPadProbeReturn _teeProbe(GstPad *pad, GstPadProbeInfo *info, gpointer user_data);
     static GstPadProbeReturn _eosProbe(GstPad *pad, GstPadProbeInfo *info, gpointer user_data);
@@ -160,14 +150,13 @@ private:
     /// Identifies the current pipeline; bumped on every teardown (stop() or failed start()) once its callbacks have
     /// stopped. Written on the worker, read by callbacks on streaming threads.
     std::atomic<quint64> _pipelineGeneration = 0;
-    bool _busHandlerAttached = false;
-    QSemaphore _busHandlerReleased;  ///< Released by GStreamer once the detached bus handler is no longer running.
     gulong _teeProbeId = 0;
     gulong _eosProbeId = 0;
     // Ref-held source pad carrying _eosProbeId; released with the pipeline, not the decode branch.
     GstPad* _eosProbePad = nullptr;
     RecordingBranch _recordingBranch;
     DecodingBranch _decodingBranch;
+    BusMessageRouter _busRouter;
 
     int _statsTickCounter = 0;
     bool _streaming = false;

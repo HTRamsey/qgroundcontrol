@@ -17,8 +17,6 @@
 #include <QtCore/QDeadlineTimer>
 #include <QtCore/QThread>
 #include <QtCore/QTimer>
-#include <QtCore/QUrl>
-#include <QtQuick/QQuickItem>
 
 #include "GStreamerHelpers.h"
 #include "GstScoped.h"
@@ -26,7 +24,6 @@
 #include "HwBuffers/common/HwBuffers.h"
 #include "QGCLoggingCategory.h"
 #include "QGCNetworkHelper.h"
-#include "QGCQVideoSinkController.h"
 
 QGC_LOGGING_CATEGORY(GstVideoReceiverLog, "Video.GStreamer.GstVideoReceiver")
 
@@ -35,43 +32,6 @@ namespace {
 // abandoned.
 constexpr std::chrono::seconds kWorkerShutdownTimeout = RecordingBranch::kFinalizeTimeout + std::chrono::seconds{2};
 constexpr std::chrono::milliseconds kWatchdogInterval{1000};
-
-void logBusWarning(GstMessage* message)
-{
-    // GStreamer posts WARNING for caps mismatches, decoder fallbacks, clock drift — surfacing keeps these
-    // visible without escalating to STATUS_FAIL.
-    gchar* debug = nullptr;
-    GError* error = nullptr;
-    gst_message_parse_warning(message, &error, &debug);
-    qCWarning(GstVideoReceiverLog) << "GStreamer warning:" << (error ? error->message : "(no message)")
-                                   << "debug:" << (debug ? debug : "(none)");
-    g_clear_error(&error);
-    g_clear_pointer(&debug, g_free);
-}
-
-/// Selecting only video keeps decodebin3 from instantiating audio decoder branches. Done synchronously so the
-/// selection is in place before decodebin3 falls back to its default one.
-void selectVideoStreams(GstMessage* message)
-{
-    GstStreamCollection* collection = nullptr;
-    gst_message_parse_stream_collection(message, &collection);
-    if (!collection) {
-        return;
-    }
-    GList* selectedIds = nullptr;
-    const guint nStreams = gst_stream_collection_get_size(collection);
-    for (guint i = 0; i < nStreams; ++i) {
-        GstStream* stream = gst_stream_collection_get_stream(collection, i);
-        if (gst_stream_get_stream_type(stream) & GST_STREAM_TYPE_VIDEO) {
-            selectedIds = g_list_append(selectedIds, g_strdup(gst_stream_get_stream_id(stream)));
-        }
-    }
-    if (selectedIds) {
-        (void) gst_element_send_event(GST_ELEMENT(GST_MESSAGE_SRC(message)), gst_event_new_select_streams(selectedIds));
-        g_list_free_full(selectedIds, g_free);
-    }
-    gst_object_unref(collection);
-}
 
 using GstElementRef = std::unique_ptr<GstElement, GStreamer::GstObjectDeleter>;
 using GstPadRef = std::unique_ptr<GstPad, GStreamer::GstObjectDeleter>;
@@ -90,22 +50,6 @@ gboolean grabFirstSrcPad(GstElement * /*element*/, GstPad *pad, gpointer userDat
     return FALSE;
 }
 
-bool isRecoverableH265PaciError(GstMessage *msg, const GError *error, const gchar *debug)
-{
-    if (!msg || !error || (error->domain != GST_STREAM_ERROR) || (error->code != GST_STREAM_ERROR_FORMAT) ||
-        !debug || !g_strrstr(debug, "NAL unit type 50 not supported yet")) {
-        return false;
-    }
-
-    GstObject *src = GST_MESSAGE_SRC(msg);
-    if (!src || !GST_IS_ELEMENT(src)) {
-        return false;
-    }
-
-    GstElementFactory *factory = gst_element_get_factory(GST_ELEMENT(src));
-    return factory && (g_strcmp0(GST_OBJECT_NAME(factory), "rtph265depay") == 0);
-}
-
 }  // namespace
 
 GstVideoReceiver::GstVideoReceiver(QObject* parent)
@@ -116,6 +60,7 @@ GstVideoReceiver::GstVideoReceiver(QObject* parent)
     , _reconnectTimer(new QTimer(_workerContext))
     , _recordingBranch(*this, _workerContext)
     , _decodingBranch(*this)
+    , _busRouter(*this)
 {
     qCDebug(GstVideoReceiverLog) << this;
 
@@ -210,9 +155,7 @@ void GstVideoReceiver::_startPipeline(const StartConfig& config)
             break;
         }
         _pipeline = pipeline;
-        // Before anything can post: the context bridges in the handler must see NEED_CONTEXT, which upstream
-        // queries during PAUSED->PLAYING.
-        _attachBusHandler();
+        _busRouter.attach(_pipeline);
 
         g_object_set(_pipeline, "message-forward", TRUE, nullptr);
 
@@ -325,35 +268,6 @@ bool GstVideoReceiver::_stopPipeline()
     return true;
 }
 
-void GstVideoReceiver::_attachBusHandler()
-{
-    GstBus* bus = gst_pipeline_get_bus(GST_PIPELINE(_pipeline));
-    if (!bus) {
-        qCCritical(GstVideoReceiverLog) << "gst_pipeline_get_bus() failed";
-        return;
-    }
-    gst_bus_set_sync_handler(bus, _onBusSyncMessage, this, [](gpointer receiver) {
-        static_cast<GstVideoReceiver*>(receiver)->_busHandlerReleased.release();
-    });
-    gst_object_unref(bus);
-    _busHandlerAttached = true;
-}
-
-void GstVideoReceiver::_detachBusHandler()
-{
-    if (!_busHandlerAttached) {
-        return;
-    }
-    _busHandlerAttached = false;
-
-    if (GstBus* bus = gst_pipeline_get_bus(GST_PIPELINE(_pipeline))) {
-        gst_bus_set_sync_handler(bus, nullptr, nullptr, nullptr);
-        gst_object_unref(bus);
-    }
-    // GStreamer refcounts the handler per post and releases it once the last in-flight call has returned.
-    _busHandlerReleased.acquire();
-}
-
 void GstVideoReceiver::_resetPipelineState()
 {
     _watchdogTimer->stop();
@@ -365,7 +279,7 @@ void GstVideoReceiver::_resetPipelineState()
 
     // Callbacks have stopped: streaming threads are joined and no thread is left in the bus handler. Work they
     // queued for this pipeline is now stale.
-    _detachBusHandler();
+    _busRouter.detach();
     _pipelineGeneration.fetch_add(1, std::memory_order_relaxed);
 
     if (_teeProbeId != 0 && _tee) {
@@ -570,116 +484,6 @@ void GstVideoReceiver::_removeSourceEosProbe()
     }
     _eosProbeId = 0;
     gst_clear_object(&_eosProbePad);
-}
-
-GstBusSyncReply GstVideoReceiver::_onBusSyncMessage(GstBus* bus, GstMessage* message, gpointer user_data)
-{
-    // The context bridges answer NEED_CONTEXT synchronously and consume (unref) the requests they handle.
-    if (HwBuffers::onBusSyncMessage(bus, message, nullptr) == GST_BUS_DROP) {
-        return GST_BUS_DROP;
-    }
-
-    auto* self = static_cast<GstVideoReceiver*>(user_data);
-    switch (GST_MESSAGE_TYPE(message)) {
-        case GST_MESSAGE_ERROR:
-            self->_onBusError(message);
-            break;
-        case GST_MESSAGE_WARNING:
-            logBusWarning(message);
-            break;
-        case GST_MESSAGE_EOS:
-            self->_recordingBranch.onBusEos();
-            break;
-        case GST_MESSAGE_ELEMENT:
-            self->_onBusElement(message);
-            break;
-        case GST_MESSAGE_STREAM_COLLECTION:
-            selectVideoStreams(message);
-            break;
-        case GST_MESSAGE_QOS:
-            self->_decodingBranch.onBusQos(message);
-            break;
-        case GST_MESSAGE_STATE_CHANGED:
-            self->_onBusStateChanged(message);
-            break;
-        case GST_MESSAGE_LATENCY:
-            self->_runOnWorkerForPipeline([self]() { (void) gst_bin_recalculate_latency(GST_BIN(self->_pipeline)); });
-            // Re-prime sink-side latency tracking after the pipeline recalculation (e.g. RTSP
-            // jitter-buffer reconfigure). Controllers live on the GUI thread; hop there to query.
-            QMetaObject::invokeMethod(
-                self,
-                [self]() {
-                    for (auto* c : QGCQVideoSinkController::controllersOf(self)) {
-                        c->refreshLatency();
-                    }
-                },
-                Qt::QueuedConnection);
-            break;
-        default:
-            break;
-    }
-
-    // Every message is handled above and nothing pops this bus; queueing it would grow the bus for the
-    // pipeline's lifetime. A sync handler that drops a message owns it.
-    gst_message_unref(message);
-    return GST_BUS_DROP;
-}
-
-void GstVideoReceiver::_onBusError(GstMessage* message)
-{
-    gchar* debug = nullptr;
-    GError* error = nullptr;
-    gst_message_parse_error(message, &error, &debug);
-    const bool recoverableH265PaciError = isRecoverableH265PaciError(message, error, debug);
-    const QString text = QString::fromUtf8(error ? error->message : "(no message)");
-    if (debug) {
-        qCDebug(GstVideoReceiverLog) << "GStreamer debug:" << debug;
-    }
-    g_clear_error(&error);
-    g_clear_pointer(&debug, g_free);
-
-    if (recoverableH265PaciError) {
-        qCWarning(GstVideoReceiverLog) << "Ignoring unsupported H.265 RTP PACI packet from rtph265depay:" << text;
-        return;
-    }
-
-    if (_recordingBranch.onBusError(message, text)) {
-        return;
-    }
-
-    qCWarning(GstVideoReceiverLog) << "GStreamer error:" << text;
-    // Drops cached GPU devices on a device-loss error.
-    HwBuffers::dispatchBusMessage(message);
-    // A failing pipeline usually posts several ERRORs; the first one's teardown makes the rest stale.
-    _runOnWorkerForPipeline([this]() { _onPipelineError(); });
-}
-
-void GstVideoReceiver::_onBusElement(GstMessage* message)
-{
-    const GstStructure* structure = gst_message_get_structure(message);
-    if (!structure) {
-        return;
-    }
-
-    if (gst_structure_has_name(structure, "qgc-caps-info")) {
-        _decodingBranch.onBusCapsInfo(message);
-        return;
-    }
-
-    _recordingBranch.onBusElement(message);
-}
-
-void GstVideoReceiver::_onBusStateChanged(GstMessage* message)
-{
-    // Only our pipeline is a GstPipeline on its own bus.
-    if (!GST_IS_PIPELINE(GST_MESSAGE_SRC(message))) {
-        return;
-    }
-    GstState oldState = GST_STATE_NULL, newState = GST_STATE_NULL;
-    gst_message_parse_state_changed(message, &oldState, &newState, nullptr);
-    if ((newState == GST_STATE_PLAYING) && (oldState != GST_STATE_PLAYING)) {
-        _runOnWorkerForPipeline([this]() { _onPipelinePlaying(); });
-    }
 }
 
 void GstVideoReceiver::_onPipelinePlaying()
