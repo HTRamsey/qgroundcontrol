@@ -14,10 +14,7 @@ from ._packages import get_macos_packages
 
 def get_gstreamer_macos_urls(version: str) -> tuple[str, str]:
     """Get GStreamer download URLs for macOS."""
-    base_url = f"https://gstreamer.freedesktop.org/data/pkg/osx/{version}"
-    runtime = f"{base_url}/gstreamer-1.0-{version}-universal.pkg"
-    devel = f"{base_url}/gstreamer-1.0-devel-{version}-universal.pkg"
-    return runtime, devel
+    return _c.package_url("macos", version), _c.package_url("macos_devel", version)
 
 
 def install_macos(dry_run: bool = False) -> bool:
