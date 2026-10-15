@@ -82,7 +82,7 @@ void DecodingBranch::start(GstElement* videoSink, bool hasWidget, bool streaming
         _shutdown();
     }
 
-    if (_videoSink || _decoding) {
+    if (_videoSink) {
         qCDebug(GstVideoReceiverLog) << "Already decoding!" << _receiver._redactedUri();
         emit _receiver.onStartDecodingComplete(VideoReceiver::STATUS_INVALID_STATE);
         return;
@@ -163,17 +163,16 @@ void DecodingBranch::onBusCapsInfo(GstMessage* message)
     const QSize resolution(w, h);
     // src compared by address only on the GUI thread; never dereferenced (may be gone by then).
     void* src = GST_MESSAGE_SRC(message);
-    GstVideoReceiver* const receiver = &_receiver;
     QMetaObject::invokeMethod(
-        receiver,
-        [receiver, format, resolution, src]() {
-            for (auto* c : QGCQVideoSinkController::controllersOf(receiver)) {
+        &_receiver,
+        [this, format, resolution, src]() {
+            for (auto* c : QGCQVideoSinkController::controllersOf(&_receiver)) {
                 if (static_cast<const void*>(c->element()) == src) {
                     c->updateNegotiation(format, resolution);
                 }
             }
             // The sink's negotiated raw caps are always fixed, unlike the encoded caps upstream of the decoder.
-            emit receiver->videoSizeChanged(resolution);
+            emit _receiver.videoSizeChanged(resolution);
         },
         Qt::QueuedConnection);
 }
@@ -339,11 +338,10 @@ void DecodingBranch::_shutdown()
 
 void DecodingBranch::_releaseDisplayedFrame()
 {
-    GstVideoReceiver* const receiver = &_receiver;
     QMetaObject::invokeMethod(
-        receiver,
-        [receiver]() {
-            for (auto* c : QGCQVideoSinkController::controllersOf(receiver)) {
+        &_receiver,
+        [this]() {
+            for (auto* c : QGCQVideoSinkController::controllersOf(&_receiver)) {
                 c->releaseFrame();
             }
         },
@@ -385,9 +383,8 @@ void DecodingBranch::_onDecoderElementAdded(GstBin* /*decodebin*/, GstBin* /*sub
             }
             self->_decoderName = decoderName;
         }
-        GstVideoReceiver* const receiver = &self->_receiver;
         (void) QMetaObject::invokeMethod(
-            receiver, [receiver]() { emit receiver->decoderNameChanged(); }, Qt::QueuedConnection);
+            &self->_receiver, [self]() { emit self->_receiver.decoderNameChanged(); }, Qt::QueuedConnection);
     });
 }
 

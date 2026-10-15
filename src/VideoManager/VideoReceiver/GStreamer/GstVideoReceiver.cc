@@ -167,11 +167,6 @@ GstVideoReceiver::~GstVideoReceiver()
     qCDebug(GstVideoReceiverLog) << this;
 }
 
-bool GstVideoReceiver::_onWorkerThread() const
-{
-    return QThread::currentThread() == _workerThread;
-}
-
 QString GstVideoReceiver::_redactedUri() const
 {
     return _config.redactedUri;
@@ -369,8 +364,6 @@ void GstVideoReceiver::_resetPipelineState()
     _tee = nullptr;
     _source = nullptr;
 
-    _watchdog.stop();
-
     if (std::exchange(_streaming, false)) {
         qCDebug(GstVideoReceiverLog) << "Streaming stopped" << _redactedUri();
         emit streamingChanged(false);
@@ -390,32 +383,17 @@ void GstVideoReceiver::startDecoding(void* sink)
 
 void GstVideoReceiver::stopDecoding()
 {
-    if (!_onWorkerThread()) {
-        _runOnWorker([this]() { stopDecoding(); });
-        return;
-    }
-
-    _decodingBranch.stop();
+    _runOnWorker([this]() { _decodingBranch.stop(); });
 }
 
 void GstVideoReceiver::startRecording(const QString &videoFile, FILE_FORMAT format)
 {
-    if (!_onWorkerThread()) {
-        _runOnWorker([this, videoFile, format]() { startRecording(videoFile, format); });
-        return;
-    }
-
-    _recordingBranch.start(videoFile, format);
+    _runOnWorker([this, videoFile, format]() { _recordingBranch.start(videoFile, format); });
 }
 
 void GstVideoReceiver::stopRecording()
 {
-    if (!_onWorkerThread()) {
-        _runOnWorker([this]() { stopRecording(); });
-        return;
-    }
-
-    _recordingBranch.stop();
+    _runOnWorker([this]() { _recordingBranch.stop(); });
 }
 
 void GstVideoReceiver::takeScreenshot(const QString& imageFile)

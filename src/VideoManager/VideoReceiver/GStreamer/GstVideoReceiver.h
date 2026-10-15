@@ -21,7 +21,6 @@
 
 class QThread;
 class QTimer;
-class GStreamerTest;
 class GstVideoReceiverTest;
 
 /// Shared by GstVideoReceiver and its components.
@@ -60,7 +59,6 @@ signals:
     void decoderNameChanged();
 
 private:
-    friend class GStreamerTest;
     friend class GstVideoReceiverTest;
     friend class DecodingBranch;
     friend class RecordingBranch;
@@ -96,8 +94,6 @@ private:
             }
         });
     }
-
-    bool _onWorkerThread() const;
 
     QString _redactedUri() const;
 
