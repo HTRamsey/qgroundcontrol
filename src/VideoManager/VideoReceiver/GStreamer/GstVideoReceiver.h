@@ -12,6 +12,7 @@
 
 #include "BusMessageRouter.h"
 #include "DecodingBranch.h"
+#include "GstScoped.h"
 #include "PipelineDotDumper.h"
 #include "RecordingBranch.h"
 #include "StreamWatchdog.h"
@@ -132,7 +133,8 @@ private:
     QTimer* _reconnectTimer = nullptr;
 
     StartConfig _config;
-    GstElement *_pipeline = nullptr;
+    GStreamer::GstElementPtr _pipeline;
+    // Both owned by _pipeline.
     GstElement *_source = nullptr;
     GstElement *_tee = nullptr;
     /// Identifies the current pipeline; bumped on every teardown (stop() or failed start()) once its callbacks have
@@ -140,8 +142,8 @@ private:
     std::atomic<quint64> _pipelineGeneration = 0;
     gulong _teeProbeId = 0;
     gulong _eosProbeId = 0;
-    // Ref-held source pad carrying _eosProbeId; released with the pipeline, not the decode branch.
-    GstPad* _eosProbePad = nullptr;
+    /// Source pad carrying _eosProbeId; released with the pipeline, not the decode branch.
+    GStreamer::GstPadPtr _eosProbePad;
     RecordingBranch _recordingBranch;
     DecodingBranch _decodingBranch;
     BusMessageRouter _busRouter;

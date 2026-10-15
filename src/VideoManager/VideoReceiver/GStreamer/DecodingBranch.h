@@ -7,6 +7,8 @@
 #include <QtCore/QMutex>
 #include <QtCore/QString>
 
+#include "GstScoped.h"
+
 class GstVideoReceiver;
 
 /// \brief The display branch behind GstVideoReceiver's tee: leaky queue ! valve [! decodebin3 ! video sink].
@@ -36,7 +38,7 @@ public:
     void onSourceStreaming();
     void onDecoderPad(GstPad* pad);
 
-    GstElement* decoder() const { return _decoder; }
+    GstElement* decoder() const { return _decoder.get(); }
 
     bool isDecoding() const { return _decoding.load(std::memory_order_relaxed); }
 
@@ -58,10 +60,12 @@ private:
     static GstPadProbeReturn _sinkProbe(GstPad* pad, GstPadProbeInfo* info, gpointer user_data);
 
     GstVideoReceiver& _receiver;
+    // Borrowed: the receiver owns the pipeline, the pipeline the valve.
     GstElement* _pipeline = nullptr;
     GstElement* _valve = nullptr;
-    GstElement* _decoder = nullptr;
-    GstElement* _videoSink = nullptr;
+    // Our refs, besides the pipeline's while they are inside it.
+    GStreamer::GstElementPtr _decoder;
+    GStreamer::GstElementPtr _videoSink;
     gulong _sinkProbeId = 0;
     std::atomic<bool> _decoding = false;  ///< Read by the receiver's tee probe log.
 
