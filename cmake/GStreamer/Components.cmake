@@ -17,16 +17,28 @@ function(gstreamer_platform_plugin_attrs EXT_OUT PREFIX_OUT GLOB_OUT)
         set(_ext "so")
         set(_prefix "libgst")
     endif()
-    set(${EXT_OUT}    "${_ext}"             PARENT_SCOPE)
-    set(${PREFIX_OUT} "${_prefix}"          PARENT_SCOPE)
-    set(${GLOB_OUT}   "${_prefix}*.${_ext}" PARENT_SCOPE)
+    set(${EXT_OUT}
+        "${_ext}"
+        PARENT_SCOPE
+    )
+    set(${PREFIX_OUT}
+        "${_prefix}"
+        PARENT_SCOPE
+    )
+    set(${GLOB_OUT}
+        "${_prefix}*.${_ext}"
+        PARENT_SCOPE
+    )
 endfunction()
 
 # Returns plugin basenames (e.g. "videoconvert", "x264") found in PLUGIN_PATH,
 # stripped of the platform's lib prefix and extension. Empty string if path missing.
 function(gstreamer_scan_plugin_basenames OUTPUT_VAR PLUGIN_PATH)
     if(NOT EXISTS "${PLUGIN_PATH}")
-        set(${OUTPUT_VAR} "" PARENT_SCOPE)
+        set(${OUTPUT_VAR}
+            ""
+            PARENT_SCOPE
+        )
         return()
     endif()
     gstreamer_platform_plugin_attrs(_ext _prefix _glob)
@@ -41,7 +53,10 @@ function(gstreamer_scan_plugin_basenames OUTPUT_VAR PLUGIN_PATH)
         endif()
     endforeach()
     list(REMOVE_DUPLICATES _names)
-    set(${OUTPUT_VAR} "${_names}" PARENT_SCOPE)
+    set(${OUTPUT_VAR}
+        "${_names}"
+        PARENT_SCOPE
+    )
 endfunction()
 
 # Component registry — SINGLE source of truth for the
@@ -59,7 +74,7 @@ endfunction()
 # entry here. Gl/GlPrototypes are optional: a sysroot whose x11 .pc files are
 # incomplete fails their pkg-config checks, and only the GL GPU path needs them.
 set(GSTREAMER_COMPONENT_REGISTRY
-    "Core:::1"                                                   # umbrella; gstreamer-1.0 is queried directly
+    "Core:::1" # umbrella; gstreamer-1.0 is queried directly
     "Base:api_base:gstreamer-base-1.0:1"
     "Gl:api_gl:gstreamer-gl-1.0:0"
     "GlPrototypes:api_gl_prototypes:gstreamer-gl-prototypes-1.0:0"
@@ -78,17 +93,32 @@ function(_qgc_gst_registry_split ENTRY OUT_NAME OUT_API OUT_PC OUT_MAND)
     string(REPLACE ":" ";" _parts "${ENTRY}")
     list(LENGTH _parts _n)
     if(NOT _n EQUAL 4)
-        message(FATAL_ERROR "GSTREAMER_COMPONENT_REGISTRY: malformed entry '${ENTRY}' (need exactly 4 colon-separated fields, got ${_n})")
+        message(
+            FATAL_ERROR
+                "GSTREAMER_COMPONENT_REGISTRY: malformed entry '${ENTRY}' (need exactly 4 colon-separated fields, got ${_n})"
+        )
     endif()
     list(GET _parts 0 _name)
     list(GET _parts 1 _api)
     list(GET _parts 2 _pc)
     list(GET _parts 3 _mand)
     string(STRIP "${_mand}" _mand)
-    set(${OUT_NAME} "${_name}" PARENT_SCOPE)
-    set(${OUT_API}  "${_api}"  PARENT_SCOPE)
-    set(${OUT_PC}   "${_pc}"   PARENT_SCOPE)
-    set(${OUT_MAND} "${_mand}" PARENT_SCOPE)
+    set(${OUT_NAME}
+        "${_name}"
+        PARENT_SCOPE
+    )
+    set(${OUT_API}
+        "${_api}"
+        PARENT_SCOPE
+    )
+    set(${OUT_PC}
+        "${_pc}"
+        PARENT_SCOPE
+    )
+    set(${OUT_MAND}
+        "${_mand}"
+        PARENT_SCOPE
+    )
 endfunction()
 
 # gstreamer_resolve_component(<query> <out_name> <out_api> <out_pc> <out_mandatory>)
@@ -100,26 +130,62 @@ function(gstreamer_resolve_component QUERY OUT_NAME OUT_API OUT_PC OUT_MANDATORY
     foreach(_entry IN LISTS GSTREAMER_COMPONENT_REGISTRY)
         _qgc_gst_registry_split("${_entry}" _name _api _pc _mand)
         if(QUERY STREQUAL _name OR (_api AND QUERY STREQUAL _api))
-            set(${OUT_NAME}      "${_name}" PARENT_SCOPE)
-            set(${OUT_API}       "${_api}"  PARENT_SCOPE)
-            set(${OUT_PC}        "${_pc}"   PARENT_SCOPE)
-            set(${OUT_MANDATORY} "${_mand}" PARENT_SCOPE)
+            set(${OUT_NAME}
+                "${_name}"
+                PARENT_SCOPE
+            )
+            set(${OUT_API}
+                "${_api}"
+                PARENT_SCOPE
+            )
+            set(${OUT_PC}
+                "${_pc}"
+                PARENT_SCOPE
+            )
+            set(${OUT_MANDATORY}
+                "${_mand}"
+                PARENT_SCOPE
+            )
             return()
         endif()
     endforeach()
     # Fallback for unknown api_foo_bar queries: gstreamer-foo-bar-1.0.
     if(QUERY MATCHES "^api_(.+)$")
         string(REPLACE "_" "-" _pc "${CMAKE_MATCH_1}")
-        set(${OUT_NAME}      ""                       PARENT_SCOPE)
-        set(${OUT_API}       "${QUERY}"               PARENT_SCOPE)
-        set(${OUT_PC}        "gstreamer-${_pc}-1.0"   PARENT_SCOPE)
-        set(${OUT_MANDATORY} "0"                      PARENT_SCOPE)
+        set(${OUT_NAME}
+            ""
+            PARENT_SCOPE
+        )
+        set(${OUT_API}
+            "${QUERY}"
+            PARENT_SCOPE
+        )
+        set(${OUT_PC}
+            "gstreamer-${_pc}-1.0"
+            PARENT_SCOPE
+        )
+        set(${OUT_MANDATORY}
+            "0"
+            PARENT_SCOPE
+        )
         return()
     endif()
-    set(${OUT_NAME}      "" PARENT_SCOPE)
-    set(${OUT_API}       "" PARENT_SCOPE)
-    set(${OUT_PC}        "" PARENT_SCOPE)
-    set(${OUT_MANDATORY} "" PARENT_SCOPE)
+    set(${OUT_NAME}
+        ""
+        PARENT_SCOPE
+    )
+    set(${OUT_API}
+        ""
+        PARENT_SCOPE
+    )
+    set(${OUT_PC}
+        ""
+        PARENT_SCOPE
+    )
+    set(${OUT_MANDATORY}
+        ""
+        PARENT_SCOPE
+    )
 endfunction()
 
 # gstreamer_mandatory_components(<out_names_list> <out_apis_list>)
@@ -138,8 +204,14 @@ function(gstreamer_mandatory_components OUT_NAMES OUT_APIS)
             endif()
         endif()
     endforeach()
-    set(${OUT_NAMES} "${_names}" PARENT_SCOPE)
-    set(${OUT_APIS}  "${_apis}"  PARENT_SCOPE)
+    set(${OUT_NAMES}
+        "${_names}"
+        PARENT_SCOPE
+    )
+    set(${OUT_APIS}
+        "${_apis}"
+        PARENT_SCOPE
+    )
 endfunction()
 
 # gstreamer_component_to_api(<component> <out_var>)
@@ -147,7 +219,10 @@ endfunction()
 function(gstreamer_component_to_api COMPONENT OUT_VAR)
     string(REGEX REPLACE "([a-z0-9])([A-Z])" "\\1_\\2" _snake "${COMPONENT}")
     string(TOLOWER "${_snake}" _snake)
-    set(${OUT_VAR} "api_${_snake}" PARENT_SCOPE)
+    set(${OUT_VAR}
+        "api_${_snake}"
+        PARENT_SCOPE
+    )
 endfunction()
 
 # gstreamer_build_apis(<apis_out> <component>...)
@@ -181,5 +256,8 @@ function(gstreamer_build_apis APIS_OUT)
         endif()
     endforeach()
 
-    set(${APIS_OUT} "${_apis}" PARENT_SCOPE)
+    set(${APIS_OUT}
+        "${_apis}"
+        PARENT_SCOPE
+    )
 endfunction()

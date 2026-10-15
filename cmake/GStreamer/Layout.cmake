@@ -34,14 +34,13 @@ include_guard(GLOBAL)
 # gets eaten by the keyword recognizer).
 function(gstreamer_create_layout_target)
     cmake_parse_arguments(PARSE_ARGV 0 GCLT ""
-        "SDK_ROOT;TYPE;LIB_PATH;INCLUDE_PATH;FRAMEWORK_BUNDLE;XCFRAMEWORK_BUNDLE" "")
+                          "SDK_ROOT;TYPE;LIB_PATH;INCLUDE_PATH;FRAMEWORK_BUNDLE;XCFRAMEWORK_BUNDLE" ""
+    )
     if(GCLT_KEYWORDS_MISSING_VALUES)
-        message(FATAL_ERROR
-            "gstreamer_create_layout_target: missing values for: ${GCLT_KEYWORDS_MISSING_VALUES}")
+        message(FATAL_ERROR "gstreamer_create_layout_target: missing values for: ${GCLT_KEYWORDS_MISSING_VALUES}")
     endif()
     if(GCLT_UNPARSED_ARGUMENTS)
-        message(FATAL_ERROR
-            "gstreamer_create_layout_target: unknown arguments: ${GCLT_UNPARSED_ARGUMENTS}")
+        message(FATAL_ERROR "gstreamer_create_layout_target: unknown arguments: ${GCLT_UNPARSED_ARGUMENTS}")
     endif()
 
     if(NOT GCLT_SDK_ROOT)
@@ -54,13 +53,17 @@ function(gstreamer_create_layout_target)
     cmake_path(SET _gclt_root NORMALIZE "${GCLT_SDK_ROOT}")
     if(NOT EXISTS "${_gclt_root}")
         message(FATAL_ERROR "GStreamer: SDK not found at '${_gclt_root}' — "
-            "check installation or set GStreamer_ROOT_DIR")
+                            "check installation or set GStreamer_ROOT_DIR"
+        )
     endif()
-    set(GStreamer_ROOT_DIR "${_gclt_root}" PARENT_SCOPE)
+    set(GStreamer_ROOT_DIR
+        "${_gclt_root}"
+        PARENT_SCOPE
+    )
 
     if(GCLT_TYPE STREQUAL "MERGED_STATIC")
         # The archive's directory IS the lib root; no lib/ subdir exists.
-        set(_gclt_lib     "${_gclt_root}")
+        set(_gclt_lib "${_gclt_root}")
         set(_gclt_plugins "${_gclt_root}")
         set(_gclt_include "${GCLT_INCLUDE_PATH}")
         if(NOT _gclt_include)
@@ -69,9 +72,12 @@ function(gstreamer_create_layout_target)
         if(GCLT_XCFRAMEWORK_BUNDLE AND NOT EXISTS "${GCLT_XCFRAMEWORK_BUNDLE}")
             message(FATAL_ERROR "GStreamer: xcframework not found at ${GCLT_XCFRAMEWORK_BUNDLE}")
         endif()
-        set(GSTREAMER_XCFRAMEWORK_PATH "${GCLT_XCFRAMEWORK_BUNDLE}" PARENT_SCOPE)
+        set(GSTREAMER_XCFRAMEWORK_PATH
+            "${GCLT_XCFRAMEWORK_BUNDLE}"
+            PARENT_SCOPE
+        )
     elseif(GCLT_TYPE STREQUAL "FRAMEWORK")
-        set(_gclt_lib     "${_gclt_root}/lib")
+        set(_gclt_lib "${_gclt_root}/lib")
         set(_gclt_plugins "${_gclt_root}/lib/gstreamer-1.0")
         if(GCLT_INCLUDE_PATH)
             set(_gclt_include "${GCLT_INCLUDE_PATH}")
@@ -84,7 +90,10 @@ function(gstreamer_create_layout_target)
             endif()
         endforeach()
         if(GCLT_FRAMEWORK_BUNDLE)
-            set(GSTREAMER_FRAMEWORK_PATH "${GCLT_FRAMEWORK_BUNDLE}" PARENT_SCOPE)
+            set(GSTREAMER_FRAMEWORK_PATH
+                "${GCLT_FRAMEWORK_BUNDLE}"
+                PARENT_SCOPE
+            )
         endif()
     elseif(GCLT_TYPE STREQUAL "FLAT" OR GCLT_TYPE STREQUAL "STATIC_TARBALL")
         if(GCLT_LIB_PATH)
@@ -104,12 +113,24 @@ function(gstreamer_create_layout_target)
             endif()
         endforeach()
     else()
-        message(FATAL_ERROR "gstreamer_create_layout_target: unknown TYPE \'${GCLT_TYPE}\' — must be FLAT, FRAMEWORK, MERGED_STATIC, or STATIC_TARBALL")
+        message(
+            FATAL_ERROR
+                "gstreamer_create_layout_target: unknown TYPE \'${GCLT_TYPE}\' — must be FLAT, FRAMEWORK, MERGED_STATIC, or STATIC_TARBALL"
+        )
     endif()
 
-    set(GSTREAMER_LIB_PATH     "${_gclt_lib}"     PARENT_SCOPE)
-    set(GSTREAMER_PLUGIN_PATH  "${_gclt_plugins}" PARENT_SCOPE)
-    set(GSTREAMER_INCLUDE_PATH "${_gclt_include}" PARENT_SCOPE)
+    set(GSTREAMER_LIB_PATH
+        "${_gclt_lib}"
+        PARENT_SCOPE
+    )
+    set(GSTREAMER_PLUGIN_PATH
+        "${_gclt_plugins}"
+        PARENT_SCOPE
+    )
+    set(GSTREAMER_INCLUDE_PATH
+        "${_gclt_include}"
+        PARENT_SCOPE
+    )
 
     # Target creation is not scriptable (cmake -P) — guard so cmake -P unit tests
     # can exercise scalar-path computation without a full configure context.
@@ -117,20 +138,19 @@ function(gstreamer_create_layout_target)
         if(NOT TARGET GStreamer::Layout)
             add_library(GStreamer::Layout INTERFACE IMPORTED GLOBAL)
         endif()
-        set_target_properties(GStreamer::Layout PROPERTIES
-            GSTREAMER_LAYOUT_TYPE    "${GCLT_TYPE}"
-            GSTREAMER_SDK_ROOT       "${_gclt_root}"
-            GSTREAMER_LIB_DIR        "${_gclt_lib}"
-            GSTREAMER_PLUGIN_DIR     "${_gclt_plugins}"
-            GSTREAMER_INCLUDE_DIR    "${_gclt_include}"
+        set_target_properties(
+            GStreamer::Layout
+            PROPERTIES GSTREAMER_LAYOUT_TYPE "${GCLT_TYPE}"
+                       GSTREAMER_SDK_ROOT "${_gclt_root}"
+                       GSTREAMER_LIB_DIR "${_gclt_lib}"
+                       GSTREAMER_PLUGIN_DIR "${_gclt_plugins}"
+                       GSTREAMER_INCLUDE_DIR "${_gclt_include}"
         )
         if(GCLT_TYPE STREQUAL "MERGED_STATIC" AND GCLT_XCFRAMEWORK_BUNDLE)
-            set_target_properties(GStreamer::Layout PROPERTIES
-                GSTREAMER_XCFRAMEWORK_PATH "${GCLT_XCFRAMEWORK_BUNDLE}")
+            set_target_properties(GStreamer::Layout PROPERTIES GSTREAMER_XCFRAMEWORK_PATH "${GCLT_XCFRAMEWORK_BUNDLE}")
         endif()
         if(GCLT_TYPE STREQUAL "FRAMEWORK" AND GCLT_FRAMEWORK_BUNDLE)
-            set_target_properties(GStreamer::Layout PROPERTIES
-                GSTREAMER_FRAMEWORK_BUNDLE "${GCLT_FRAMEWORK_BUNDLE}")
+            set_target_properties(GStreamer::Layout PROPERTIES GSTREAMER_FRAMEWORK_BUNDLE "${GCLT_FRAMEWORK_BUNDLE}")
         endif()
     endif()
 endfunction()
@@ -142,14 +162,23 @@ endfunction()
 # automatically.
 function(gstreamer_layout_get KEY OUT_VAR)
     if(NOT TARGET GStreamer::Layout)
-        set(${OUT_VAR} "" PARENT_SCOPE)
+        set(${OUT_VAR}
+            ""
+            PARENT_SCOPE
+        )
         return()
     endif()
     get_target_property(_val GStreamer::Layout "GSTREAMER_${KEY}")
     if(_val STREQUAL "_val-NOTFOUND" OR NOT _val)
-        set(${OUT_VAR} "" PARENT_SCOPE)
+        set(${OUT_VAR}
+            ""
+            PARENT_SCOPE
+        )
     else()
-        set(${OUT_VAR} "${_val}" PARENT_SCOPE)
+        set(${OUT_VAR}
+            "${_val}"
+            PARENT_SCOPE
+        )
     endif()
 endfunction()
 
@@ -162,7 +191,10 @@ function(gstreamer_layout_set KEY VALUE)
         return()
     endif()
     if(NOT TARGET GStreamer::Layout)
-        message(FATAL_ERROR "gstreamer_layout_set: GStreamer::Layout target does not exist; call gstreamer_create_layout_target first.")
+        message(
+            FATAL_ERROR
+                "gstreamer_layout_set: GStreamer::Layout target does not exist; call gstreamer_create_layout_target first."
+        )
     endif()
     set_target_properties(GStreamer::Layout PROPERTIES "GSTREAMER_${KEY}" "${VALUE}")
 endfunction()

@@ -3,11 +3,8 @@
 include_guard(GLOBAL)
 
 function(_qgc_gst_windows_sdk_complete ROOT_DIR OUT_VAR)
-    set(_required_paths
-        "bin/pkg-config.exe"
-        "include/gstreamer-1.0"
-        "lib/gstreamer-1.0"
-        "lib/pkgconfig/gstreamer-1.0.pc"
+    set(_required_paths "bin/pkg-config.exe" "include/gstreamer-1.0" "lib/gstreamer-1.0"
+                        "lib/pkgconfig/gstreamer-1.0.pc"
     )
 
     set(_is_complete TRUE)
@@ -18,12 +15,18 @@ function(_qgc_gst_windows_sdk_complete ROOT_DIR OUT_VAR)
         endif()
     endforeach()
 
-    set(${OUT_VAR} "${_is_complete}" PARENT_SCOPE)
+    set(${OUT_VAR}
+        "${_is_complete}"
+        PARENT_SCOPE
+    )
 endfunction()
 
 function(_qgc_gst_find_windows_sdk_root EXTRACTED_DIR OUT_VAR)
     if(EXISTS "${EXTRACTED_DIR}/bin/pkg-config.exe")
-        set(${OUT_VAR} "${EXTRACTED_DIR}" PARENT_SCOPE)
+        set(${OUT_VAR}
+            "${EXTRACTED_DIR}"
+            PARENT_SCOPE
+        )
         return()
     endif()
     file(GLOB_RECURSE _pkg_config_files "${EXTRACTED_DIR}/pkg-config.exe")
@@ -41,16 +44,23 @@ function(_qgc_gst_find_windows_sdk_root EXTRACTED_DIR OUT_VAR)
             string(TOLOWER "${_first_pkg_config}" _first_pkg_config_lc)
             if(_shortest_depth EQUAL -1
                OR _candidate_depth LESS _shortest_depth
-               OR (_candidate_depth EQUAL _shortest_depth AND _candidate_lc STRLESS "${_first_pkg_config_lc}"))
+               OR (_candidate_depth EQUAL _shortest_depth AND _candidate_lc STRLESS "${_first_pkg_config_lc}")
+            )
                 set(_first_pkg_config "${_candidate}")
                 set(_shortest_depth ${_candidate_depth})
             endif()
         endforeach()
         cmake_path(GET _first_pkg_config PARENT_PATH _bin_dir)
         cmake_path(GET _bin_dir PARENT_PATH _found_root)
-        set(${OUT_VAR} "${_found_root}" PARENT_SCOPE)
+        set(${OUT_VAR}
+            "${_found_root}"
+            PARENT_SCOPE
+        )
     else()
-        set(${OUT_VAR} "" PARENT_SCOPE)
+        set(${OUT_VAR}
+            ""
+            PARENT_SCOPE
+        )
     endif()
 endfunction()
 

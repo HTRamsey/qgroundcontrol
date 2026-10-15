@@ -1,18 +1,34 @@
 include_guard(GLOBAL)
 
 function(qgc_parse_expected_hash _HASH_VALUE _OUT_ALGO _OUT_EXPECTED)
-    if(NOT ARGC EQUAL 3 OR NOT _OUT_ALGO MATCHES "^[A-Za-z_][A-Za-z0-9_]*$" OR
-       NOT _OUT_EXPECTED MATCHES "^[A-Za-z_][A-Za-z0-9_]*$"
+    if(NOT ARGC EQUAL 3
+       OR NOT _OUT_ALGO MATCHES "^[A-Za-z_][A-Za-z0-9_]*$"
+       OR NOT _OUT_EXPECTED MATCHES "^[A-Za-z_][A-Za-z0-9_]*$"
     )
-        message(FATAL_ERROR
-            "qgc_parse_expected_hash: expected HASH_VALUE OUT_ALGORITHM OUT_DIGEST")
+        message(FATAL_ERROR "qgc_parse_expected_hash: expected HASH_VALUE OUT_ALGORITHM OUT_DIGEST")
     endif()
-    set(_valid MD5 SHA1 SHA224 SHA256 SHA384 SHA512 SHA3_224 SHA3_256 SHA3_384 SHA3_512)
+    set(_valid
+        MD5
+        SHA1
+        SHA224
+        SHA256
+        SHA384
+        SHA512
+        SHA3_224
+        SHA3_256
+        SHA3_384
+        SHA3_512
+    )
     string(REGEX MATCH "^([A-Za-z0-9_]+)=(.+)$" _match "${_HASH_VALUE}")
     if(NOT _match)
-        message(FATAL_ERROR "qgc_parse_expected_hash: Invalid EXPECTED_HASH format '${_HASH_VALUE}' (expected ALGO=hex)")
+        message(
+            FATAL_ERROR "qgc_parse_expected_hash: Invalid EXPECTED_HASH format '${_HASH_VALUE}' (expected ALGO=hex)"
+        )
     endif()
-    set(${_OUT_ALGO} "${CMAKE_MATCH_1}" PARENT_SCOPE)
+    set(${_OUT_ALGO}
+        "${CMAKE_MATCH_1}"
+        PARENT_SCOPE
+    )
     # file(<algorithm>) reports lowercase hex; accept digests written in either case.
     string(TOLOWER "${CMAKE_MATCH_2}" _expected_digest)
     set(${_OUT_EXPECTED}
@@ -26,13 +42,17 @@ function(qgc_parse_expected_hash _HASH_VALUE _OUT_ALGO _OUT_EXPECTED)
 endfunction()
 
 function(qgc_resilient_download)
-    cmake_parse_arguments(PARSE_ARGV 0 ARG "ALLOW_FAILURE"
+    cmake_parse_arguments(
+        PARSE_ARGV
+        0
+        ARG
+        "ALLOW_FAILURE"
         "FILENAME;DESTINATION_DIR;RESULT_VAR;TIMEOUT;INACTIVITY_TIMEOUT;RETRIES;RETRY_BACKOFF;EXPECTED_HASH;LOG_TAG;FAILURE_HINT"
-        "URLS")
+        "URLS"
+    )
 
     if(ARG_KEYWORDS_MISSING_VALUES)
-        message(FATAL_ERROR
-            "qgc_resilient_download: missing values for: ${ARG_KEYWORDS_MISSING_VALUES}")
+        message(FATAL_ERROR "qgc_resilient_download: missing values for: ${ARG_KEYWORDS_MISSING_VALUES}")
     endif()
     if(ARG_UNPARSED_ARGUMENTS)
         message(FATAL_ERROR "qgc_resilient_download: unknown arguments: ${ARG_UNPARSED_ARGUMENTS}")
@@ -46,7 +66,10 @@ function(qgc_resilient_download)
     if(NOT ARG_URLS)
         message(FATAL_ERROR "qgc_resilient_download: at least one URL is required")
     endif()
-    if(IS_ABSOLUTE "${ARG_FILENAME}" OR ARG_FILENAME MATCHES "[/\\\\]" OR ARG_FILENAME MATCHES "^[.][.]?$")
+    if(IS_ABSOLUTE "${ARG_FILENAME}"
+       OR ARG_FILENAME MATCHES "[/\\\\]"
+       OR ARG_FILENAME MATCHES "^[.][.]?$"
+    )
         message(FATAL_ERROR "qgc_resilient_download: FILENAME must be a basename")
     endif()
     if(NOT ARG_RESULT_VAR MATCHES "^[A-Za-z_][A-Za-z0-9_]*$")
@@ -109,12 +132,18 @@ function(qgc_resilient_download)
                 message(STATUS "${ARG_LOG_TAG}: Cached ${ARG_FILENAME} failed ${_hash_algo} check, re-downloading")
                 file(REMOVE "${_dest}")
             else()
-                set(${ARG_RESULT_VAR} "${_dest}" PARENT_SCOPE)
+                set(${ARG_RESULT_VAR}
+                    "${_dest}"
+                    PARENT_SCOPE
+                )
                 return()
             endif()
         else()
             message(STATUS "${ARG_LOG_TAG}: Using cached ${ARG_FILENAME} (no checksum verification)")
-            set(${ARG_RESULT_VAR} "${_dest}" PARENT_SCOPE)
+            set(${ARG_RESULT_VAR}
+                "${_dest}"
+                PARENT_SCOPE
+            )
             return()
         endif()
     endif()
@@ -131,8 +160,11 @@ function(qgc_resilient_download)
         endif()
         set(_attempt 1)
         while(_attempt LESS_EQUAL ARG_RETRIES)
-            message(STATUS "${ARG_LOG_TAG}: Downloading ${ARG_FILENAME} from ${_url} (attempt ${_attempt}/${ARG_RETRIES})")
-            file(DOWNLOAD "${_url}" "${_tmp}"
+            message(
+                STATUS "${ARG_LOG_TAG}: Downloading ${ARG_FILENAME} from ${_url} (attempt ${_attempt}/${ARG_RETRIES})"
+            )
+            file(
+                DOWNLOAD "${_url}" "${_tmp}"
                 STATUS _status
                 ${_progress_opt}
                 TIMEOUT ${ARG_TIMEOUT}
@@ -149,27 +181,45 @@ function(qgc_resilient_download)
                         if(ARG_ALLOW_FAILURE)
                             # Optional artifact: soft-fail like a network error rather than
                             # abort, but still don't shop mirrors with a pinned checksum.
-                            message(WARNING "${ARG_LOG_TAG}: ${_hash_algo} mismatch for ${ARG_FILENAME} from ${_url} (expected ${_expected}, got ${_actual_hash}); skipping (failure allowed).")
-                            set(${ARG_RESULT_VAR} "" PARENT_SCOPE)
+                            message(
+                                WARNING
+                                    "${ARG_LOG_TAG}: ${_hash_algo} mismatch for ${ARG_FILENAME} from ${_url} (expected ${_expected}, got ${_actual_hash}); skipping (failure allowed)."
+                            )
+                            set(${ARG_RESULT_VAR}
+                                ""
+                                PARENT_SCOPE
+                            )
                             return()
                         endif()
-                        message(FATAL_ERROR "${ARG_LOG_TAG}: ${_hash_algo} mismatch for ${ARG_FILENAME} from ${_url} (expected ${_expected}, got ${_actual_hash}). Refusing to fall back to other mirrors with a pinned checksum.")
+                        message(
+                            FATAL_ERROR
+                                "${ARG_LOG_TAG}: ${_hash_algo} mismatch for ${ARG_FILENAME} from ${_url} (expected ${_expected}, got ${_actual_hash}). Refusing to fall back to other mirrors with a pinned checksum."
+                        )
                     endif()
                 endif()
                 file(RENAME "${_tmp}" "${_dest}")
-                set(${ARG_RESULT_VAR} "${_dest}" PARENT_SCOPE)
+                set(${ARG_RESULT_VAR}
+                    "${_dest}"
+                    PARENT_SCOPE
+                )
                 return()
             endif()
             list(GET _status 1 _error)
             file(REMOVE "${_tmp}")
             if(_attempt LESS ARG_RETRIES)
                 math(EXPR _backoff "${_attempt} * ${ARG_RETRY_BACKOFF}")
-                message(WARNING "${ARG_LOG_TAG}: attempt ${_attempt}/${ARG_RETRIES} failed for ${ARG_FILENAME} from ${_url}: ${_error}. Retrying in ${_backoff}s...")
+                message(
+                    WARNING
+                        "${ARG_LOG_TAG}: attempt ${_attempt}/${ARG_RETRIES} failed for ${ARG_FILENAME} from ${_url}: ${_error}. Retrying in ${_backoff}s..."
+                )
                 if(_backoff GREATER 0)
                     execute_process(COMMAND "${CMAKE_COMMAND}" -E sleep "${_backoff}")
                 endif()
             else()
-                message(WARNING "${ARG_LOG_TAG}: Failed to download ${ARG_FILENAME} from ${_url} after ${ARG_RETRIES} attempts: ${_error}")
+                message(
+                    WARNING
+                        "${ARG_LOG_TAG}: Failed to download ${ARG_FILENAME} from ${_url} after ${ARG_RETRIES} attempts: ${_error}"
+                )
             endif()
             math(EXPR _attempt "${_attempt} + 1")
         endwhile()
@@ -177,8 +227,14 @@ function(qgc_resilient_download)
     endforeach()
 
     if(ARG_ALLOW_FAILURE)
-        message(STATUS "${ARG_LOG_TAG}: All download URLs failed for ${ARG_FILENAME} (allowing failure). Tried: ${_tried_urls}")
-        set(${ARG_RESULT_VAR} "" PARENT_SCOPE)
+        message(
+            STATUS
+                "${ARG_LOG_TAG}: All download URLs failed for ${ARG_FILENAME} (allowing failure). Tried: ${_tried_urls}"
+        )
+        set(${ARG_RESULT_VAR}
+            ""
+            PARENT_SCOPE
+        )
         return()
     endif()
 

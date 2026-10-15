@@ -29,12 +29,14 @@ function(_qgc_gst_filter_plugin_paths PREFIX PATHS OUT_VAR)
             endif()
         endforeach()
     endforeach()
-    set(${OUT_VAR} "${_filtered}" PARENT_SCOPE)
+    set(${OUT_VAR}
+        "${_filtered}"
+        PARENT_SCOPE
+    )
 endfunction()
 
 function(_qgc_gst_install_glob LABEL)
-    cmake_parse_arguments(PARSE_ARGV 1 ARG "REQUIRE_NONEMPTY"
-        "SOURCE_DIR;DEST_DIR;GLOB_PATTERN;FILTER_PREFIX" "")
+    cmake_parse_arguments(PARSE_ARGV 1 ARG "REQUIRE_NONEMPTY" "SOURCE_DIR;DEST_DIR;GLOB_PATTERN;FILTER_PREFIX" "")
     if(ARG_KEYWORDS_MISSING_VALUES)
         message(FATAL_ERROR "${LABEL}: missing values for: ${ARG_KEYWORDS_MISSING_VALUES}")
     endif()
@@ -59,64 +61,71 @@ function(_qgc_gst_install_glob LABEL)
     elseif(ARG_REQUIRE_NONEMPTY)
         # Empty here means a missing/unexpanded SDK — fail loudly rather than ship
         # a video build with zero plugins.
-        message(FATAL_ERROR
-            "${LABEL}: glob '${ARG_GLOB_PATTERN}' in '${ARG_SOURCE_DIR}' matched no files. "
-            "The GStreamer SDK must be fully expanded at configure time before install. "
-            "Re-run cmake configure against a complete SDK.")
+        message(FATAL_ERROR "${LABEL}: glob '${ARG_GLOB_PATTERN}' in '${ARG_SOURCE_DIR}' matched no files. "
+                            "The GStreamer SDK must be fully expanded at configure time before install. "
+                            "Re-run cmake configure against a complete SDK."
+        )
     endif()
 endfunction()
 
 function(gstreamer_install_gio_modules)
     cmake_parse_arguments(PARSE_ARGV 0 ARG "" "SOURCE_DIR;DEST_DIR;EXTENSION" "")
     if(ARG_KEYWORDS_MISSING_VALUES)
-        message(FATAL_ERROR
-            "gstreamer_install_gio_modules: missing values for: ${ARG_KEYWORDS_MISSING_VALUES}")
+        message(FATAL_ERROR "gstreamer_install_gio_modules: missing values for: ${ARG_KEYWORDS_MISSING_VALUES}")
     endif()
     if(ARG_UNPARSED_ARGUMENTS)
-        message(FATAL_ERROR
-            "gstreamer_install_gio_modules: unknown arguments: ${ARG_UNPARSED_ARGUMENTS}")
+        message(FATAL_ERROR "gstreamer_install_gio_modules: unknown arguments: ${ARG_UNPARSED_ARGUMENTS}")
     endif()
     foreach(_required IN ITEMS SOURCE_DIR DEST_DIR EXTENSION)
         if(NOT ARG_${_required})
             message(FATAL_ERROR "gstreamer_install_gio_modules: ${_required} is required")
         endif()
     endforeach()
-    _qgc_gst_install_glob("gstreamer_install_gio_modules"
-        SOURCE_DIR "${ARG_SOURCE_DIR}" DEST_DIR "${ARG_DEST_DIR}"
-        GLOB_PATTERN "*.${ARG_EXTENSION}")
+    _qgc_gst_install_glob(
+        "gstreamer_install_gio_modules"
+        SOURCE_DIR
+        "${ARG_SOURCE_DIR}"
+        DEST_DIR
+        "${ARG_DEST_DIR}"
+        GLOB_PATTERN
+        "*.${ARG_EXTENSION}"
+    )
 endfunction()
 
 function(gstreamer_install_plugins)
     cmake_parse_arguments(PARSE_ARGV 0 ARG "" "SOURCE_DIR;DEST_DIR;EXTENSION;PREFIX" "")
     if(ARG_KEYWORDS_MISSING_VALUES)
-        message(FATAL_ERROR
-            "gstreamer_install_plugins: missing values for: ${ARG_KEYWORDS_MISSING_VALUES}")
+        message(FATAL_ERROR "gstreamer_install_plugins: missing values for: ${ARG_KEYWORDS_MISSING_VALUES}")
     endif()
     if(ARG_UNPARSED_ARGUMENTS)
-        message(FATAL_ERROR
-            "gstreamer_install_plugins: unknown arguments: ${ARG_UNPARSED_ARGUMENTS}")
+        message(FATAL_ERROR "gstreamer_install_plugins: unknown arguments: ${ARG_UNPARSED_ARGUMENTS}")
     endif()
     foreach(_required IN ITEMS SOURCE_DIR DEST_DIR EXTENSION PREFIX)
         if(NOT ARG_${_required})
             message(FATAL_ERROR "gstreamer_install_plugins: ${_required} is required")
         endif()
     endforeach()
-    _qgc_gst_install_glob("gstreamer_install_plugins"
-        SOURCE_DIR "${ARG_SOURCE_DIR}" DEST_DIR "${ARG_DEST_DIR}"
-        GLOB_PATTERN "${ARG_PREFIX}*.${ARG_EXTENSION}"
-        FILTER_PREFIX "${ARG_PREFIX}"
-        REQUIRE_NONEMPTY)
+    _qgc_gst_install_glob(
+        "gstreamer_install_plugins"
+        SOURCE_DIR
+        "${ARG_SOURCE_DIR}"
+        DEST_DIR
+        "${ARG_DEST_DIR}"
+        GLOB_PATTERN
+        "${ARG_PREFIX}*.${ARG_EXTENSION}"
+        FILTER_PREFIX
+        "${ARG_PREFIX}"
+        REQUIRE_NONEMPTY
+    )
 endfunction()
 
 function(gstreamer_install_libs)
     cmake_parse_arguments(PARSE_ARGV 0 ARG "" "SOURCE_DIR;DEST_DIR;EXTENSION" "")
     if(ARG_KEYWORDS_MISSING_VALUES)
-        message(FATAL_ERROR
-            "gstreamer_install_libs: missing values for: ${ARG_KEYWORDS_MISSING_VALUES}")
+        message(FATAL_ERROR "gstreamer_install_libs: missing values for: ${ARG_KEYWORDS_MISSING_VALUES}")
     endif()
     if(ARG_UNPARSED_ARGUMENTS)
-        message(FATAL_ERROR
-            "gstreamer_install_libs: unknown arguments: ${ARG_UNPARSED_ARGUMENTS}")
+        message(FATAL_ERROR "gstreamer_install_libs: unknown arguments: ${ARG_UNPARSED_ARGUMENTS}")
     endif()
     foreach(_required IN ITEMS SOURCE_DIR DEST_DIR EXTENSION)
         if(NOT ARG_${_required})
@@ -131,10 +140,10 @@ function(gstreamer_install_libs)
 
     _qgc_gst_is_blocked_lib_copy_source("${ARG_SOURCE_DIR}" _blocked_lib_source)
     if(_blocked_lib_source)
-        message(FATAL_ERROR
-            "gstreamer_install_libs: refusing to copy from system/shared prefix '${ARG_SOURCE_DIR}'.\n"
-            "This function copies ALL shared libraries unfiltered. Use an auto-downloaded SDK "
-            "or set GStreamer_ROOT_DIR to an isolated installation.")
+        message(FATAL_ERROR "gstreamer_install_libs: refusing to copy from system/shared prefix '${ARG_SOURCE_DIR}'.\n"
+                            "This function copies ALL shared libraries unfiltered. Use an auto-downloaded SDK "
+                            "or set GStreamer_ROOT_DIR to an isolated installation."
+        )
     endif()
 
     # Deliberately copies every lib in the isolated SDK dir — shared transitive deps are
@@ -147,9 +156,9 @@ function(gstreamer_install_libs)
     else()
         # An isolated SDK lib/bin dir with zero matching libraries means the SDK
         # is missing or not yet expanded — fail rather than ship a libless bundle.
-        message(FATAL_ERROR
-            "gstreamer_install_libs: no *.${ARG_EXTENSION} found in '${ARG_SOURCE_DIR}'. "
-            "The GStreamer SDK must be fully expanded at configure time before install.")
+        message(FATAL_ERROR "gstreamer_install_libs: no *.${ARG_EXTENSION} found in '${ARG_SOURCE_DIR}'. "
+                            "The GStreamer SDK must be fully expanded at configure time before install."
+        )
     endif()
 endfunction()
 
@@ -167,21 +176,21 @@ function(_qgc_gst_windows_runtime_dependency_dirs ROOT_DIR OUT_VAR)
         endif()
     endforeach()
 
-    set(${OUT_VAR} "${_runtime_dirs}" PARENT_SCOPE)
+    set(${OUT_VAR}
+        "${_runtime_dirs}"
+        PARENT_SCOPE
+    )
 endfunction()
 
 function(_qgc_gst_is_blocked_lib_copy_source SOURCE_DIR OUT_VAR)
-    set(_blocked_prefixes
-        /usr/lib /usr/local/lib /opt/homebrew/lib /opt/homebrew/opt)
+    set(_blocked_prefixes /usr/lib /usr/local/lib /opt/homebrew/lib /opt/homebrew/opt)
     set(_allowed_prefixes)
 
     if(WIN32)
-        list(APPEND _blocked_prefixes
-            "C:/Windows" "C:/Program Files" "C:/Program Files (x86)")
+        list(APPEND _blocked_prefixes "C:/Windows" "C:/Program Files" "C:/Program Files (x86)")
         # The official GStreamer MSVC SDK installs here by default; it is an SDK
         # root, not an arbitrary shared system DLL directory.
-        list(APPEND _allowed_prefixes
-            "C:/Program Files/gstreamer" "C:/Program Files (x86)/gstreamer")
+        list(APPEND _allowed_prefixes "C:/Program Files/gstreamer" "C:/Program Files (x86)/gstreamer")
     endif()
 
     # Normalize case + separators so the guard isn't bypassed by C:\Windows or c:/windows.
@@ -195,14 +204,20 @@ function(_qgc_gst_is_blocked_lib_copy_source SOURCE_DIR OUT_VAR)
             string(TOLOWER "${_prefix}" _prefix)
             string(FIND "${_src_norm}/" "${_prefix}/" _is_allowed_pos)
             if(_is_allowed_pos EQUAL 0)
-                set(${OUT_VAR} FALSE PARENT_SCOPE)
+                set(${OUT_VAR}
+                    FALSE
+                    PARENT_SCOPE
+                )
                 return()
             endif()
             continue()
         endif()
         cmake_path(IS_PREFIX _prefix "${_src_norm}" NORMALIZE _is_allowed)
         if(_is_allowed)
-            set(${OUT_VAR} FALSE PARENT_SCOPE)
+            set(${OUT_VAR}
+                FALSE
+                PARENT_SCOPE
+            )
             return()
         endif()
     endforeach()
@@ -212,18 +227,27 @@ function(_qgc_gst_is_blocked_lib_copy_source SOURCE_DIR OUT_VAR)
             string(TOLOWER "${_prefix}" _prefix)
             string(FIND "${_src_norm}/" "${_prefix}/" _is_system_pos)
             if(_is_system_pos EQUAL 0)
-                set(${OUT_VAR} TRUE PARENT_SCOPE)
+                set(${OUT_VAR}
+                    TRUE
+                    PARENT_SCOPE
+                )
                 return()
             endif()
             continue()
         endif()
         cmake_path(IS_PREFIX _prefix "${_src_norm}" NORMALIZE _is_system)
         if(_is_system)
-            set(${OUT_VAR} TRUE PARENT_SCOPE)
+            set(${OUT_VAR}
+                TRUE
+                PARENT_SCOPE
+            )
             return()
         endif()
     endforeach()
-    set(${OUT_VAR} FALSE PARENT_SCOPE)
+    set(${OUT_VAR}
+        FALSE
+        PARENT_SCOPE
+    )
 endfunction()
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -236,30 +260,32 @@ endfunction()
 function(gstreamer_install_linux_sdk app_name plugin_dest_out)
     set(_plugin_dest "lib/gstreamer-1.0")
     gstreamer_install_plugins(
-        SOURCE_DIR "${GSTREAMER_PLUGIN_PATH}"
-        DEST_DIR "${_plugin_dest}"
-        EXTENSION "so"
-        PREFIX "libgst"
+        SOURCE_DIR
+        "${GSTREAMER_PLUGIN_PATH}"
+        DEST_DIR
+        "${_plugin_dest}"
+        EXTENSION
+        "so"
+        PREFIX
+        "libgst"
     )
-    gstreamer_install_gio_modules(
-        SOURCE_DIR "${GSTREAMER_LIB_PATH}/gio/modules"
-        DEST_DIR "lib/gio/modules"
-        EXTENSION "so"
+    gstreamer_install_gio_modules(SOURCE_DIR "${GSTREAMER_LIB_PATH}/gio/modules" DEST_DIR "lib/gio/modules" EXTENSION
+                                  "so"
     )
     # Helper binary path varies by distro: Debian lib/<multiarch>/gstreamer1.0/,
     # Fedora libexec/gstreamer-1.0/, Arch lib/gstreamer-1.0/.
-    set(_gst_helper_search_paths
-        "${GSTREAMER_LIB_PATH}/gstreamer1.0/gstreamer-1.0"
-        "${GStreamer_ROOT_DIR}/libexec/gstreamer-1.0"
-        "${GSTREAMER_PLUGIN_PATH}"
+    set(_gst_helper_search_paths "${GSTREAMER_LIB_PATH}/gstreamer1.0/gstreamer-1.0"
+                                 "${GStreamer_ROOT_DIR}/libexec/gstreamer-1.0" "${GSTREAMER_PLUGIN_PATH}"
     )
     foreach(_helper IN ITEMS gst-plugin-scanner gst-ptp-helper)
         string(MAKE_C_IDENTIFIER "_GST_${_helper}_PROG" _helper_var)
-        find_program(${_helper_var} ${_helper}
-            PATHS ${_gst_helper_search_paths} NO_DEFAULT_PATH)
+        find_program(
+            ${_helper_var} ${_helper}
+            PATHS ${_gst_helper_search_paths}
+            NO_DEFAULT_PATH
+        )
         if(${_helper_var})
-            install(PROGRAMS "${${_helper_var}}"
-                DESTINATION "lib/gstreamer1.0/gstreamer-1.0")
+            install(PROGRAMS "${${_helper_var}}" DESTINATION "lib/gstreamer1.0/gstreamer-1.0")
         elseif(_helper STREQUAL "gst-plugin-scanner")
             message(WARNING "gst-plugin-scanner not found; AppImage video may not work")
         endif()
@@ -272,48 +298,42 @@ endfunction()
 
 function(gstreamer_install_windows_sdk app_name plugin_dest_out)
     set(_plugin_dest "${CMAKE_INSTALL_LIBDIR}/gstreamer-1.0")
-    gstreamer_install_libs(
-        SOURCE_DIR "${GStreamer_ROOT_DIR}/bin"
-        DEST_DIR "${CMAKE_INSTALL_BINDIR}"
-        EXTENSION "dll"
-    )
+    gstreamer_install_libs(SOURCE_DIR "${GStreamer_ROOT_DIR}/bin" DEST_DIR "${CMAKE_INSTALL_BINDIR}" EXTENSION "dll")
     _qgc_gst_windows_runtime_dependency_dirs("${GStreamer_ROOT_DIR}" _gst_win_runtime_dependency_dirs)
     foreach(_dependency_dir IN LISTS _gst_win_runtime_dependency_dirs)
-        gstreamer_install_libs(
-            SOURCE_DIR "${_dependency_dir}"
-            DEST_DIR "${CMAKE_INSTALL_BINDIR}"
-            EXTENSION "dll"
-        )
+        gstreamer_install_libs(SOURCE_DIR "${_dependency_dir}" DEST_DIR "${CMAKE_INSTALL_BINDIR}" EXTENSION "dll")
     endforeach()
-    gstreamer_install_gio_modules(
-        SOURCE_DIR "${GSTREAMER_LIB_PATH}/gio/modules"
-        DEST_DIR "${CMAKE_INSTALL_LIBDIR}/gio/modules"
-        EXTENSION "dll"
+    gstreamer_install_gio_modules(SOURCE_DIR "${GSTREAMER_LIB_PATH}/gio/modules" DEST_DIR
+                                  "${CMAKE_INSTALL_LIBDIR}/gio/modules" EXTENSION "dll"
     )
     gstreamer_install_plugins(
-        SOURCE_DIR "${GSTREAMER_PLUGIN_PATH}"
-        DEST_DIR "${_plugin_dest}"
-        EXTENSION "dll"
-        PREFIX "gst"
+        SOURCE_DIR
+        "${GSTREAMER_PLUGIN_PATH}"
+        DEST_DIR
+        "${_plugin_dest}"
+        EXTENSION
+        "dll"
+        PREFIX
+        "gst"
     )
     install(
         DIRECTORY "${GStreamer_ROOT_DIR}/libexec/gstreamer-1.0/"
         DESTINATION "${CMAKE_INSTALL_LIBEXECDIR}/gstreamer-1.0"
-        FILE_PERMISSIONS
-            OWNER_READ OWNER_WRITE OWNER_EXECUTE
-            GROUP_READ             GROUP_EXECUTE
-            WORLD_READ             WORLD_EXECUTE
+        FILE_PERMISSIONS OWNER_READ
+                         OWNER_WRITE
+                         OWNER_EXECUTE
+                         GROUP_READ
+                         GROUP_EXECUTE
+                         WORLD_READ
+                         WORLD_EXECUTE
         FILES_MATCHING
-            PATTERN "*.exe"
+        PATTERN "*.exe"
     )
     # CA bundle for gioopenssl.dll — OpenSSL's compiled-in default path is
     # relative to the SDK root; ship the bundle so HTTPS/RTSPS sources can
     # verify certs after install (paired with SSL_CERT_FILE wiring at startup).
     if(EXISTS "${GStreamer_ROOT_DIR}/etc/ssl/certs/ca-certificates.crt")
-        install(
-            FILES "${GStreamer_ROOT_DIR}/etc/ssl/certs/ca-certificates.crt"
-            DESTINATION etc/ssl/certs
-        )
+        install(FILES "${GStreamer_ROOT_DIR}/etc/ssl/certs/ca-certificates.crt" DESTINATION etc/ssl/certs)
     endif()
     set(${plugin_dest_out}
         "${_plugin_dest}"
@@ -358,7 +378,8 @@ function(gstreamer_install_macos_framework_sdk app_name plugin_dest_out)
         REGEX ".*/lib/gstreamer-1.0/libgst.*" EXCLUDE
     )
 
-    install(CODE "
+    install(
+        CODE "
         set(_fw \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${_gst_fw_dest}\")
         if(NOT EXISTS \"\${_fw}/Versions/1.0/GStreamer\")
             message(FATAL_ERROR \"GStreamer framework: Versions/1.0/GStreamer not found — SDK layout may have changed\")
@@ -368,14 +389,19 @@ function(gstreamer_install_macos_framework_sdk app_name plugin_dest_out)
         if(IS_DIRECTORY \"\${_fw}/Versions/1.0/Resources\")
             file(CREATE_LINK Versions/Current/Resources \"\${_fw}/Resources\" SYMBOLIC)
         endif()
-    ")
+    "
+    )
 
     set(_plugin_dest "${_gst_fw_dest}/Versions/1.0/lib/gstreamer-1.0")
     gstreamer_install_plugins(
-        SOURCE_DIR "${_gst_framework_real}/Versions/1.0/lib/gstreamer-1.0"
-        DEST_DIR "${_plugin_dest}"
-        EXTENSION "dylib"
-        PREFIX "libgst"
+        SOURCE_DIR
+        "${_gst_framework_real}/Versions/1.0/lib/gstreamer-1.0"
+        DEST_DIR
+        "${_plugin_dest}"
+        EXTENSION
+        "dylib"
+        PREFIX
+        "libgst"
     )
     set(${plugin_dest_out}
         "${_plugin_dest}"
@@ -392,13 +418,11 @@ function(gstreamer_install_macos_flat_sdk app_name plugin_dest_out)
     set(_mac_libexec_dest "${app_name}.app/Contents/libexec/gstreamer-1.0")
 
     if(GStreamer_AUTO_DOWNLOADED)
-        gstreamer_install_libs(
-            SOURCE_DIR "${GSTREAMER_LIB_PATH}"
-            DEST_DIR "${_mac_fw_dest}"
-            EXTENSION "dylib"
-        )
+        gstreamer_install_libs(SOURCE_DIR "${GSTREAMER_LIB_PATH}" DEST_DIR "${_mac_fw_dest}" EXTENSION "dylib")
     else()
-        file(GLOB _gst_libs
+        file(
+            GLOB
+            _gst_libs
             "${GSTREAMER_LIB_PATH}/libgst*.dylib"
             "${GSTREAMER_LIB_PATH}/libglib*.dylib"
             "${GSTREAMER_LIB_PATH}/libgobject*.dylib"
@@ -416,23 +440,25 @@ function(gstreamer_install_macos_flat_sdk app_name plugin_dest_out)
         if(_gst_libs)
             install(FILES ${_gst_libs} DESTINATION "${_mac_fw_dest}")
         else()
-            message(FATAL_ERROR
-                "gstreamer_install_macos_flat_sdk: no GStreamer/GLib dylibs found in "
-                "'${GSTREAMER_LIB_PATH}'. The SDK lib dir must be populated at configure "
-                "time before install.")
+            message(FATAL_ERROR "gstreamer_install_macos_flat_sdk: no GStreamer/GLib dylibs found in "
+                                "'${GSTREAMER_LIB_PATH}'. The SDK lib dir must be populated at configure "
+                                "time before install."
+            )
         endif()
     endif()
     set(_plugin_dest "${_mac_lib_dest}/gstreamer-1.0")
     gstreamer_install_plugins(
-        SOURCE_DIR "${GSTREAMER_PLUGIN_PATH}"
-        DEST_DIR "${_plugin_dest}"
-        EXTENSION "dylib"
-        PREFIX "libgst"
+        SOURCE_DIR
+        "${GSTREAMER_PLUGIN_PATH}"
+        DEST_DIR
+        "${_plugin_dest}"
+        EXTENSION
+        "dylib"
+        PREFIX
+        "libgst"
     )
-    gstreamer_install_gio_modules(
-        SOURCE_DIR "${GSTREAMER_LIB_PATH}/gio/modules"
-        DEST_DIR "${_mac_lib_dest}/gio/modules"
-        EXTENSION "dylib"
+    gstreamer_install_gio_modules(SOURCE_DIR "${GSTREAMER_LIB_PATH}/gio/modules" DEST_DIR
+                                  "${_mac_lib_dest}/gio/modules" EXTENSION "dylib"
     )
 
     # Stage libexec helpers BEFORE the rpath fixup — install() runs in declaration
@@ -441,27 +467,32 @@ function(gstreamer_install_macos_flat_sdk app_name plugin_dest_out)
         install(
             DIRECTORY "${GStreamer_ROOT_DIR}/libexec/gstreamer-1.0/"
             DESTINATION "${_mac_libexec_dest}"
-            FILE_PERMISSIONS
-                OWNER_READ OWNER_WRITE OWNER_EXECUTE
-                GROUP_READ             GROUP_EXECUTE
-                WORLD_READ             WORLD_EXECUTE
+            FILE_PERMISSIONS OWNER_READ
+                             OWNER_WRITE
+                             OWNER_EXECUTE
+                             GROUP_READ
+                             GROUP_EXECUTE
+                             WORLD_READ
+                             WORLD_EXECUTE
             FILES_MATCHING
-                PATTERN "gst-plugin-scanner"
-                PATTERN "gst-ptp-helper"
+            PATTERN "gst-plugin-scanner"
+            PATTERN "gst-ptp-helper"
         )
     endif()
 
     # Entry "<dir>:<rpath>:<glob>" — libexec helpers are extensionless, so * not *.dylib.
-    foreach(_rpath_dir IN ITEMS
-        "${_plugin_dest}:@loader_path/../../Frameworks:*.dylib"
-        "${_mac_lib_dest}/gio/modules:@loader_path/../../../Frameworks:*.dylib"
-        "${_mac_libexec_dest}:@loader_path/../../Frameworks:*"
+    foreach(
+        _rpath_dir IN
+        ITEMS "${_plugin_dest}:@loader_path/../../Frameworks:*.dylib"
+              "${_mac_lib_dest}/gio/modules:@loader_path/../../../Frameworks:*.dylib"
+              "${_mac_libexec_dest}:@loader_path/../../Frameworks:*"
     )
         string(REPLACE ":" ";" _parts "${_rpath_dir}")
         list(GET _parts 0 _dir)
         list(GET _parts 1 _rpath)
         list(GET _parts 2 _glob)
-        install(CODE "
+        install(
+            CODE "
             file(GLOB _libs \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/${_dir}/${_glob}\")
             foreach(_lib \${_libs})
                 if(IS_DIRECTORY \"\${_lib}\")
@@ -491,7 +522,8 @@ function(gstreamer_install_macos_flat_sdk app_name plugin_dest_out)
                     endif()
                 endif()
             endforeach()
-        ")
+        "
+        )
     endforeach()
 
     # CA bundle for libgioopenssl.so — Cerbero's compiled-in OpenSSL trust
@@ -536,12 +568,10 @@ function(gstreamer_install_platform_sdk PROJECT_NAME)
     endif()
     cmake_parse_arguments(PARSE_ARGV 1 GIPS "" "" "REQUIRED_PLUGINS")
     if(GIPS_KEYWORDS_MISSING_VALUES)
-        message(FATAL_ERROR
-            "gstreamer_install_platform_sdk: missing values for: ${GIPS_KEYWORDS_MISSING_VALUES}")
+        message(FATAL_ERROR "gstreamer_install_platform_sdk: missing values for: ${GIPS_KEYWORDS_MISSING_VALUES}")
     endif()
     if(GIPS_UNPARSED_ARGUMENTS)
-        message(FATAL_ERROR
-            "gstreamer_install_platform_sdk: unknown arguments: ${GIPS_UNPARSED_ARGUMENTS}")
+        message(FATAL_ERROR "gstreamer_install_platform_sdk: unknown arguments: ${GIPS_UNPARSED_ARGUMENTS}")
     endif()
     qgc_gst_platform(_gips_platform)
     qgc_gst_platform_descriptor("${_gips_platform}" _gips_platform)
