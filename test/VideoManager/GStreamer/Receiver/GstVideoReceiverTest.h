@@ -18,4 +18,8 @@ private slots:
     void _testRecordingPlayableWhileInProgress();
     void _testDestroyWhileRecordingFinalizesFile();
     void _testSecondRecordingIsNotTruncated();
+    void _testStopDecodingBeforeFirstFrame();
+    void _testStopWhileStoppingRecordingFinalizesFile();
+    void _testRecordingErrorKeepsStreaming();
+    void _testBusDoesNotQueueMessages();
 };
