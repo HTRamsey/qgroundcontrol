@@ -381,8 +381,6 @@ void GstVideoReceiver::_onWatchdogTick()
         }
     }
 
-    _decodingBranch.publishQosStats();
-
     const StreamWatchdog::Result result = _watchdog.check(StreamWatchdog::now(), _decodingBranch.isDecoding());
     if (result.stall == StreamWatchdog::Stall::None) {
         return;
@@ -442,7 +440,6 @@ void GstVideoReceiver::dumpPipelineGraph(const QString &tag)
 
 void GstVideoReceiver::_onNewSourcePad(GstPad *pad)
 {
-    // FIXME: check for caps - if this is not video stream (and preferably - one of these which we have to support) then simply skip it
     GstPad* teeSink = gst_element_get_static_pad(_tee, "sink");
     const GstPadLinkReturn linkResult = teeSink ? gst_pad_link(pad, teeSink) : GST_PAD_LINK_WRONG_HIERARCHY;
     gst_clear_object(&teeSink);

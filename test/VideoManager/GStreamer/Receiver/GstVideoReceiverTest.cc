@@ -815,12 +815,12 @@ void GstVideoReceiverTest::_testDecoderQosDisabledAndReported()
     auto* gstReceiver = qobject_cast<GstVideoReceiver*>(receiver.get());
     QVERIFY(gstReceiver);
     QSignalSpy decodingSpy(receiver.get(), &VideoReceiver::decodingChanged);
-    QSignalSpy statsSpy(gstReceiver, &GstVideoReceiver::decoderStatsChanged);
+    QSignalSpy decoderNameSpy(gstReceiver, &GstVideoReceiver::decoderNameChanged);
 
     receiver->start(kWatchdogTimeoutSec);
     receiver->startDecoding(videoSink);
     QVERIFY_SIGNAL_COUNT_WAIT(decodingSpy, 1, TestTimeout::mediumMs());
-    QVERIFY_SIGNAL_COUNT_WAIT(statsSpy, 1, TestTimeout::mediumMs());
+    QVERIFY_SIGNAL_COUNT_WAIT(decoderNameSpy, 1, TestTimeout::mediumMs());
     QVERIFY(!gstReceiver->decoderName().isEmpty());
 
     // The decoders decodebin3 plugged, inspected on the worker that owns the pipeline.

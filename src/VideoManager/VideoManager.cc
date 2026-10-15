@@ -402,7 +402,6 @@ void VideoManager::grabImage(const QString &imageFile)
 
     for (VideoReceiver *receiver : std::as_const(_videoReceivers)) {
         receiver->takeScreenshot(_imageFile);
-        // QSharedPointer<QQuickItemGrabResult> result = receiver->widget()->grabToImage(const QSize &targetSize = QSize())
     }
 }
 

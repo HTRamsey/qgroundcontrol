@@ -28,28 +28,14 @@ Q_DECLARE_LOGGING_CATEGORY(GstVideoReceiverLog)
 class GstVideoReceiver : public VideoReceiver
 {
     Q_OBJECT
-    Q_PROPERTY(QString decoderName       READ decoderName       NOTIFY decoderStatsChanged)
-    Q_PROPERTY(quint64 processedFrames   READ processedFrames   NOTIFY decoderStatsChanged)
-    Q_PROPERTY(quint64 droppedFrames     READ droppedFrames     NOTIFY decoderStatsChanged)
-    Q_PROPERTY(qint64  currentJitterNs   READ currentJitterNs   NOTIFY decoderStatsChanged)
-    Q_PROPERTY(double  qosProportion     READ qosProportion     NOTIFY decoderStatsChanged)
-    Q_PROPERTY(int     qosQuality        READ qosQuality        NOTIFY decoderStatsChanged)
+    Q_PROPERTY(QString decoderName READ decoderName NOTIFY decoderNameChanged)
 
 public:
     explicit GstVideoReceiver(QObject *parent = nullptr);
     ~GstVideoReceiver();
 
+    /// Factory name of the decoder decodebin3 plugged last, empty before the first one.
     QString decoderName() const { return _decodingBranch.decoderName(); }
-
-    quint64 processedFrames() const { return _decodingBranch.processedFrames(); }
-
-    quint64 droppedFrames() const { return _decodingBranch.droppedFrames(); }
-
-    qint64 currentJitterNs() const { return _decodingBranch.currentJitterNs(); }
-
-    double qosProportion() const { return _decodingBranch.qosProportion(); }
-
-    int qosQuality() const { return _decodingBranch.qosQuality(); }
 
 public slots:
     void start(uint32_t timeout) override;
@@ -66,7 +52,8 @@ public slots:
     Q_INVOKABLE void dumpPipelineGraph(const QString &tag = QStringLiteral("manual"));
 
 signals:
-    void decoderStatsChanged();
+    /// Emitted on the receiver's own thread.
+    void decoderNameChanged();
 
 private:
     friend class GStreamerTest;

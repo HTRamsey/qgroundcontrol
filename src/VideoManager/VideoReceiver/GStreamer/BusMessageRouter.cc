@@ -115,9 +115,6 @@ GstBusSyncReply BusMessageRouter::_onSyncMessage(GstBus* bus, GstMessage* messag
         case GST_MESSAGE_STREAM_COLLECTION:
             selectVideoStreams(message);
             break;
-        case GST_MESSAGE_QOS:
-            self->_receiver._decodingBranch.onBusQos(message);
-            break;
         case GST_MESSAGE_STATE_CHANGED:
             self->_onStateChanged(message);
             break;

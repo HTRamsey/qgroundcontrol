@@ -180,31 +180,6 @@ void DecodingBranch::onBusCapsInfo(GstMessage* message)
         Qt::QueuedConnection);
 }
 
-void DecodingBranch::onBusQos(GstMessage* message)
-{
-    guint64 processed = 0, dropped = 0;
-    gst_message_parse_qos_stats(message, nullptr, &processed, &dropped);
-
-    gint64 jitter = 0;
-    gdouble proportion = 0;
-    gint quality = 0;
-    gst_message_parse_qos_values(message, &jitter, &proportion, &quality);
-
-    _processedFrames.store(processed, std::memory_order_relaxed);
-    _droppedFrames.store(dropped, std::memory_order_relaxed);
-    _currentJitterNs.store(jitter, std::memory_order_relaxed);
-    _qosProportion.store(proportion, std::memory_order_relaxed);
-    _qosQuality.store(quality, std::memory_order_relaxed);
-    _qosStatsDirty.store(true, std::memory_order_release);
-}
-
-void DecodingBranch::publishQosStats()
-{
-    if (_qosStatsDirty.exchange(false, std::memory_order_acq_rel)) {
-        _notifyStatsChanged();
-    }
-}
-
 QString DecodingBranch::decoderName() const
 {
     QMutexLocker locker(&_decoderNameMutex);
@@ -324,13 +299,6 @@ void DecodingBranch::_onFirstFrame()
     emit _receiver.decodingChanged(true);
 }
 
-void DecodingBranch::_notifyStatsChanged()
-{
-    // Emitted on the receiver's own thread, where its QML consumers live.
-    GstVideoReceiver* const receiver = &_receiver;
-    QMetaObject::invokeMethod(receiver, [receiver]() { emit receiver->decoderStatsChanged(); }, Qt::QueuedConnection);
-}
-
 void DecodingBranch::_shutdown()
 {
     if (_decoder) {
@@ -411,7 +379,9 @@ void DecodingBranch::_onDecoderElementAdded(GstBin* /*decodebin*/, GstBin* /*sub
             }
             self->_decoderName = decoderName;
         }
-        self->_notifyStatsChanged();
+        GstVideoReceiver* const receiver = &self->_receiver;
+        (void) QMetaObject::invokeMethod(
+            receiver, [receiver]() { emit receiver->decoderNameChanged(); }, Qt::QueuedConnection);
     });
 }
 
