@@ -249,9 +249,10 @@ endfunction()
 
 # _qgc_gst_android_stage_sdk_files(<ndk_build_dir> <plugin>...)
 # Copies the <plugin>s' Java sources under QGC_ANDROID_EXTRA_JAVA_SOURCES_DIR and the SDK's fonts and CA bundle under
-# QGC_ANDROID_EXTRA_ASSETS_DIR when the app builds; android/build.gradle adds both build-directory trees to the APK
-# (androiddeployqt deletes files written into android-build/ itself). Earlier builds copied these files into
-# QGC_ANDROID_PACKAGE_SOURCE_DIR, where they would now duplicate the staged copies, so those copies are removed.
+# QGC_ANDROID_EXTRA_ASSETS_DIR at configure time, like src/Android/CMakeLists.txt does for its Java sources;
+# android/build.gradle adds both build-directory trees to the APK (androiddeployqt deletes files written into
+# android-build/ itself). Earlier builds copied these files into QGC_ANDROID_PACKAGE_SOURCE_DIR, where they would now
+# duplicate the staged copies, so those copies are removed.
 # cmake-lint: disable=C0113
 function(_qgc_gst_android_stage_sdk_files ndk_build)
     if(NOT QGC_ANDROID_EXTRA_JAVA_SOURCES_DIR OR NOT QGC_ANDROID_EXTRA_ASSETS_DIR)
@@ -285,7 +286,6 @@ function(_qgc_gst_android_stage_sdk_files ndk_build)
         list(APPEND _files "${_ca_bundle}|${_asset_dirs}|ssl/certs/ca-certificates.crt")
     endif()
 
-    set(_outputs "")
     set(_legacy_copies "")
     foreach(_file IN LISTS _files)
         string(REPLACE "|" ";" _file "${_file}")
@@ -295,15 +295,8 @@ function(_qgc_gst_android_stage_sdk_files ndk_build)
         list(GET _file 3 _relative)
         set(_output "${_staging_dir}/${_relative}")
         cmake_path(GET _output PARENT_PATH _output_dir)
-        add_custom_command(
-            OUTPUT "${_output}"
-            COMMAND "${CMAKE_COMMAND}" -E make_directory "${_output_dir}"
-            COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${_source}" "${_output}"
-            DEPENDS "${_source}"
-            COMMENT "Staging GStreamer ${_relative}"
-            VERBATIM
-        )
-        list(APPEND _outputs "${_output}")
+        file(MAKE_DIRECTORY "${_output_dir}")
+        file(COPY_FILE "${_source}" "${_output}" ONLY_IF_DIFFERENT)
         set(_legacy_copy "${QGC_ANDROID_PACKAGE_SOURCE_DIR}/${_package_dir}/${_relative}")
         if(QGC_ANDROID_PACKAGE_SOURCE_DIR AND EXISTS "${_legacy_copy}")
             list(APPEND _legacy_copies "${_legacy_copy}")
@@ -315,14 +308,6 @@ function(_qgc_gst_android_stage_sdk_files ndk_build)
                        "${_legacy_copies}"
         )
         file(REMOVE ${_legacy_copies})
-    endif()
-    if(NOT _outputs)
-        return()
-    endif()
-    add_custom_target(gstreamer_android_files_${CMAKE_ANDROID_ARCH_ABI} DEPENDS ${_outputs})
-    # INTERFACE GStreamer::mobile cannot carry build dependencies; attach the staging to the app.
-    if(TARGET ${CMAKE_PROJECT_NAME})
-        add_dependencies(${CMAKE_PROJECT_NAME} gstreamer_android_files_${CMAKE_ANDROID_ARCH_ABI})
     endif()
 endfunction()
 
