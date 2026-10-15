@@ -341,56 +341,9 @@ function(_qgc_gst_download_ios_ca_bundle)
         set(_ca_dir "${CMAKE_BINARY_DIR}/_deps/gstreamer-ios-ca")
     endif()
 
-    set(_ca_url "")
-    set(_ca_hash_arg "")
-    if(QGC_BUILD_CONFIG_CONTENT)
-        string(
-            JSON
-            _ca_url
-            ERROR_VARIABLE
-            _ca_url_error
-            GET
-            "${QGC_BUILD_CONFIG_CONTENT}"
-            "gstreamer"
-            "ca_bundle_url"
-        )
-        string(
-            JSON
-            _ca_sha256
-            ERROR_VARIABLE
-            _ca_err
-            GET
-            "${QGC_BUILD_CONFIG_CONTENT}"
-            "gstreamer"
-            "ca_bundle_sha256"
-        )
-        if(_ca_sha256 AND NOT _ca_err)
-            set(_ca_hash_arg EXPECTED_HASH "SHA256=${_ca_sha256}")
-        endif()
-    endif()
-    if(NOT _ca_url
-       OR _ca_url_error
-       OR NOT _ca_hash_arg
-    )
-        # This bundle becomes the app's TLS trust root; an unpinned fetch lets a
-        # MITM inject one. Pinning is default — opt out via QGC_GST_ALLOW_UNVERIFIED_CA.
-        if(NOT QGC_GST_ALLOW_UNVERIFIED_CA)
-            message(
-                FATAL_ERROR "GStreamer: gstreamer.ca_bundle_url or gstreamer.ca_bundle_sha256 is missing from "
-                            "build-config.json, so the iOS CA bundle (the app's TLS trust root) cannot be "
-                            "verified. Pin a dated snapshot and its checksum from https://curl.se/docs/caextract.html. "
-                            "To fetch the bundle UNVERIFIED anyway (NOT for CI/release builds), set "
-                            "-DQGC_GST_ALLOW_UNVERIFIED_CA=ON."
-            )
-        endif()
-        set(_ca_url "https://curl.se/ca/cacert.pem")
-        set(_ca_hash_arg "")
-        message(WARNING "GStreamer: CA bundle URL or checksum missing from build-config.json and "
-                        "QGC_GST_ALLOW_UNVERIFIED_CA is set; the mutable iOS CA bundle will be fetched "
-                        "UNVERIFIED. Pin a dated snapshot from https://curl.se/docs/caextract.html"
-        )
-    endif()
-
+    # The bundle becomes the app's TLS trust root, so it is only fetched against its pinned checksum.
+    qgc_config_read(_ca_url gstreamer ca_bundle_url)
+    qgc_config_read(_ca_sha256 gstreamer ca_bundle_sha256)
     qgc_resilient_download(
         FILENAME
         ca-certificates.crt
@@ -404,7 +357,8 @@ function(_qgc_gst_download_ios_ca_bundle)
         "iOS CA bundle"
         FAILURE_HINT
         "Network is required at first iOS configure to fetch the Mozilla CA bundle from curl.se."
-        ${_ca_hash_arg}
+        EXPECTED_HASH
+        "SHA256=${_ca_sha256}"
     )
 
     set(GStreamer_IOS_CA_BUNDLE
