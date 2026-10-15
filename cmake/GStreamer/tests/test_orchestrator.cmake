@@ -311,6 +311,72 @@ elseif(SCENARIO STREQUAL "android-mobile")
     )
         message(FATAL_ERROR "ASSERT [hidden core dependencies]: missing archive or --exclude-libs:\n${_link}")
     endif()
+elseif(SCENARIO STREQUAL "install-macos")
+    # The macOS bundle installers run on any host: everything must land under DESTDIR and the --prefix given at
+    # install time, and nothing under the prefix known at configure time.
+    _qgc_write_fake_sdk("${_sdk_a}" 1.24.0)
+    foreach(
+        _file IN
+        ITEMS lib/libgstreamer-1.0.dylib lib/gstreamer-1.0/libgstcoreelements.dylib lib/gio/modules/libgioopenssl.dylib
+              libexec/gstreamer-1.0/gst-plugin-scanner etc/ssl/certs/ca-certificates.crt
+    )
+        file(WRITE "${_sdk_a}/${_file}" "")
+    endforeach()
+    set(_framework "${WORK_DIR}/GStreamer.framework")
+    foreach(_file IN ITEMS GStreamer lib/gstreamer-1.0/libgstcoreelements.dylib Resources/Info.plist)
+        file(WRITE "${_framework}/Versions/1.0/${_file}" "")
+    endforeach()
+    set(_configured_prefix "-DCMAKE_INSTALL_PREFIX=${WORK_DIR}/configured-prefix")
+    set(_bundle "${WORK_DIR}/stage/opt/qgc/QGCFake.app/Contents")
+
+    _qgc_configure_ok("macOS framework install rules" --fresh "-DGStreamer_ROOT_DIR=${_sdk_a}" ${_configured_prefix}
+                      "-DQGC_TEST_INSTALL_MACOS_FRAMEWORK=${_framework}"
+    )
+    _qgc_install()
+    if(NOT _qgc_result EQUAL 0)
+        message(FATAL_ERROR "ASSERT [framework install]: install failed\n${_qgc_output}")
+    endif()
+    set(_fw "${_bundle}/Frameworks/GStreamer.framework")
+    foreach(_file IN ITEMS Versions/1.0/GStreamer Versions/1.0/lib/gstreamer-1.0/libgstcoreelements.dylib)
+        if(NOT EXISTS "${_fw}/${_file}")
+            message(FATAL_ERROR "ASSERT [framework install]: ${_file} is not under DESTDIR/prefix\n${_qgc_output}")
+        endif()
+    endforeach()
+    foreach(_link IN ITEMS "Versions/Current|1.0" "GStreamer|Versions/Current/GStreamer"
+                           "Resources|Versions/Current/Resources"
+    )
+        string(REPLACE "|" ";" _link "${_link}")
+        list(GET _link 0 _name)
+        list(GET _link 1 _target)
+        file(READ_SYMLINK "${_fw}/${_name}" _actual)
+        qgc_test_assert_streq("framework symlink ${_name}" "${_target}" "${_actual}")
+    endforeach()
+
+    _qgc_configure_ok("macOS flat install rules" --fresh "-DGStreamer_ROOT_DIR=${_sdk_a}" ${_configured_prefix}
+                      -DQGC_TEST_INSTALL_MACOS_FLAT=ON
+    )
+    _qgc_install()
+    if(NOT _qgc_result EQUAL 0)
+        message(FATAL_ERROR "ASSERT [flat install]: install failed\n${_qgc_output}")
+    endif()
+    foreach(
+        _file IN
+        ITEMS Frameworks/libgstreamer-1.0.dylib lib/gstreamer-1.0/libgstcoreelements.dylib
+              lib/gio/modules/libgioopenssl.dylib libexec/gstreamer-1.0/gst-plugin-scanner
+              Resources/etc/ssl/certs/ca-certificates.crt
+    )
+        if(NOT EXISTS "${_bundle}/${_file}")
+            message(FATAL_ERROR "ASSERT [flat install]: ${_file} is not under DESTDIR/prefix\n${_qgc_output}")
+        endif()
+    endforeach()
+    # The rpath fixup visits the installed copies; without otool on this host it warns about each one.
+    string(REGEX REPLACE "[ \t\r\n]+" " " _normalized "${_qgc_output}")
+    if(NOT _normalized MATCHES "otool -l failed for ${_bundle}/lib/gstreamer-1.0/libgstcoreelements.dylib")
+        message(FATAL_ERROR "ASSERT [rpath fixup]: the installed plugins were not visited\n${_qgc_output}")
+    endif()
+    if(EXISTS "${WORK_DIR}/configured-prefix" OR EXISTS "${WORK_DIR}/stage${WORK_DIR}/configured-prefix")
+        message(FATAL_ERROR "ASSERT [install prefix]: files were installed under the configure-time prefix")
+    endif()
 elseif(SCENARIO STREQUAL "install")
     # videoconvert+videoscale stand in for the fused videoconvertscale the verifier requires.
     _qgc_write_fake_sdk("${_sdk_a}" 1.24.0)

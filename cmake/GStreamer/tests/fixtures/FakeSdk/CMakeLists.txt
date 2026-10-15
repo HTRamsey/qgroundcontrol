@@ -125,6 +125,14 @@ if(QGC_TEST_INSTALL_REQUIRED_PLUGINS)
     string(REPLACE "," ";" _qgc_required_plugins "${QGC_TEST_INSTALL_REQUIRED_PLUGINS}")
     gstreamer_install_platform_sdk(QGCFake REQUIRED_PLUGINS ${_qgc_required_plugins})
 endif()
+# QGC_TEST_INSTALL_MACOS_FRAMEWORK: install this GStreamer.framework into a QGCFake.app bundle.
+# QGC_TEST_INSTALL_MACOS_FLAT: install the SDK's .dylib files into a QGCFake.app bundle.
+if(QGC_TEST_INSTALL_MACOS_FRAMEWORK)
+    gstreamer_layout_set(FRAMEWORK_BUNDLE "${QGC_TEST_INSTALL_MACOS_FRAMEWORK}")
+    gstreamer_install_macos_framework_sdk(QGCFake)
+elseif(QGC_TEST_INSTALL_MACOS_FLAT)
+    gstreamer_install_macos_flat_sdk(QGCFake)
+endif()
 
 if(NOT DEFINED EXPECT_ROOT)
     return()
