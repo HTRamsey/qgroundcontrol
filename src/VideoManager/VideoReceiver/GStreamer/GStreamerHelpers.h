@@ -37,6 +37,9 @@ GstPadPtr firstSrcPad(GstElement* element);
 
 bool isHardwareDecoderFactory(GstElementFactory* factory);
 
+/// "[HW|SW] <plugin>/<factory> rank=<rank> (<klass>)" for decoder logs.
+QString describeDecoderFactory(GstElementFactory* factory);
+
 /// ForceVideoDecoder* family that claims decoder factory @p factoryName by name prefix, or
 /// ForceVideoDecoderDefault when it belongs to no user-selectable hardware family.
 VideoDecoderOptions decoderFamilyForFactory(const char* factoryName);

@@ -4,17 +4,12 @@
 #include <QtCore/QString>
 #include <QtQuick/QQuickWindow>
 #include <QtQuick/QSGRendererInterface>
-#include <array>
 #include <gst/rtsp/gstrtspurl.h>
-#include <span>
 
-#ifdef Q_OS_WIN
-#include <iterator>
-#if defined(QGC_HAS_ANY_GPU_PATH)
+#if defined(Q_OS_WIN) && defined(QGC_HAS_ANY_GPU_PATH)
 #include <rhi/qrhi.h>
 
 #include "HwBuffers/common/QGCRhiCapture.h"
-#endif
 #endif
 
 #include "GStreamer.h"
@@ -212,6 +207,18 @@ bool isHardwareDecoderFactory(GstElementFactory* factory)
            containsHardware(gst_element_factory_get_metadata(factory, GST_ELEMENT_METADATA_DESCRIPTION));
 }
 
+QString describeDecoderFactory(GstElementFactory* factory)
+{
+    GstPluginFeature* const feature = GST_PLUGIN_FEATURE(factory);
+    const GstObjectPtr plugin = adoptObject(GST_OBJECT(gst_plugin_feature_get_plugin(feature)));
+    return QStringLiteral("[%1] %2/%3 rank=%4 (%5)")
+        .arg(isHardwareDecoderFactory(factory) ? QStringLiteral("HW") : QStringLiteral("SW"),
+             plugin ? QString::fromUtf8(gst_plugin_get_name(GST_PLUGIN(plugin.get()))) : QStringLiteral("?"),
+             QString::fromUtf8(gst_plugin_feature_get_name(feature)))
+        .arg(gst_plugin_feature_get_rank(feature))
+        .arg(QString::fromUtf8(gst_element_factory_get_klass(factory)));
+}
+
 namespace {
 
 void setFeatureRank(GstPluginFeature* feature, uint16_t rank)
@@ -293,9 +300,25 @@ void prioritizeByHardwareClass(uint16_t prioritizedRank, bool requireHardware)
     lowerDecoderRanksByClass(!requireHardware);
 }
 
+#if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
+// Above the PRIMARY + 1 the ForceVideoDecoder* options give, so the GPU-memory decoders win autoplug.
+constexpr uint16_t kZeroCopyRank = GST_RANK_PRIMARY + 2;
+
+// Ranks every installed video decoder whose factory name starts with @p prefix.
+void applyPrefixRank(const char* prefix, uint16_t rank)
+{
+    forEachVideoDecoderFactory(GST_RANK_NONE, [prefix, rank](GstElementFactory* factory) {
+        GstPluginFeature* const feature = GST_PLUGIN_FEATURE(factory);
+        if (g_str_has_prefix(gst_plugin_feature_get_name(feature), prefix)) {
+            setFeatureRank(feature, rank);
+        }
+    });
+}
+#endif
+
 #ifdef Q_OS_WIN
 // A decoder whose D3D family mismatches the active QRhi backend can't be sampled zero-copy and drops to a CPU copy.
-void alignD3DDecoderRanksToRhi(GstRegistry* registry, bool promoteMatchedFamily)
+void alignD3DDecoderRanksToRhi(bool promoteMatchedFamily)
 {
     // Prefer the resolved QRhi backend; ranks usually apply before the scene graph resolves, so cachedRhi() is often
     // null here and graphicsApi() Unknown — fall back to QSG_RHI_BACKEND (Qt's D3D11 default) in that Windows case.
@@ -323,55 +346,30 @@ void alignD3DDecoderRanksToRhi(GstRegistry* registry, bool promoteMatchedFamily)
                 break;
         }
     }
-    static constexpr const char* kD3D11Decoders[] = {"d3d11av1dec",   "d3d11h264dec", "d3d11h265dec",
-                                                     "d3d11mpeg2dec", "d3d11vp8dec",  "d3d11vp9dec"};
-    static constexpr const char* kD3D12Decoders[] = {"d3d12av1dec",   "d3d12h264dec", "d3d12h265dec",
-                                                     "d3d12mpeg2dec", "d3d12vp8dec",  "d3d12vp9dec"};
-    const char* const* matched = wantD3D12 ? kD3D12Decoders : kD3D11Decoders;
-    const char* const* mismatched = wantD3D12 ? kD3D11Decoders : kD3D12Decoders;
+    const char* const matched = wantD3D12 ? "d3d12" : "d3d11";
+    const char* const mismatched = wantD3D12 ? "d3d11" : "d3d12";
     qCDebug(GStreamerHelpersLog) << "Aligning D3D decoder ranks to" << (wantD3D12 ? "D3D12" : "D3D11")
                                  << "RHI - demoting the mismatched decoder family";
-    static_assert(std::size(kD3D11Decoders) == std::size(kD3D12Decoders));
     if (promoteMatchedFamily) {
-        static constexpr uint16_t ZeroCopyRank = GST_RANK_PRIMARY + 2;
-        for (size_t i = 0; i < std::size(kD3D11Decoders); ++i) {
-            changeFeatureRank(registry, matched[i], ZeroCopyRank);
-        }
+        applyPrefixRank(matched, kZeroCopyRank);
     }
-    for (size_t i = 0; i < std::size(kD3D11Decoders); ++i) {
-        changeFeatureRank(registry, mismatched[i], GST_RANK_NONE);
-    }
+    applyPrefixRank(mismatched, GST_RANK_NONE);
 }
 #endif  // Q_OS_WIN
 
 #ifdef Q_OS_LINUX
-void applyRanks(GstRegistry* registry, std::span<const char* const> features, uint16_t rank)
-{
-    for (const char* name : features) {
-        changeFeatureRank(registry, name, rank);
-    }
-}
-
-constexpr std::array<const char* const, 8> kLegacyVaapiDecoders = {"vaapiav1dec",  "vaapih264dec",  "vaapih265dec",
-                                                                   "vaapijpegdec", "vaapimpeg2dec", "vaapivp8dec",
-                                                                   "vaapivp9dec",  "vaapidecodebin"};
-constexpr std::array<const char* const, 6> kV4l2StatelessDecoders = {
-    "v4l2slh264dec", "v4l2slh265dec", "v4l2slvp8dec", "v4l2slvp9dec", "v4l2slav1dec", "v4l2slmpeg2dec"};
-
 // Steer autoplug toward zero-copy GPU-memory decoders (DMABuf/DMA_DRM) over system-memory ones. Rank-only and
 // additive: absent factories no-op, va/v4l2 self-demote at runtime without a device, software fallback untouched.
-void preferZeroCopyDecoders(GstRegistry* registry)
+void preferZeroCopyDecoders()
 {
-    static constexpr uint16_t ZeroCopyRank = GST_RANK_PRIMARY + 2;
-
     // Legacy gstreamer-vaapi negotiates GstVaapiMemory the qgcqvideosink/HwBuffers paths can't import
     // zero-copy; demote it so the modern va plugin (clean DMABuf/DMA_DRM output) wins when both exist.
-    applyRanks(registry, kLegacyVaapiDecoders, GST_RANK_NONE);
+    applyPrefixRank("vaapi", GST_RANK_NONE);
 
     // Modern va decoders (gst-va, supersedes gstreamer-vaapi) emit DMABuf/DMA_DRM, and V4L2 stateless
     // decoders expose DMA_DRM caps on 1.26+; bump both above software so the zero-copy allocator is picked.
-    applyFamilyRank(ForceVideoDecoderVAAPI, ZeroCopyRank);
-    applyRanks(registry, kV4l2StatelessDecoders, ZeroCopyRank);
+    applyFamilyRank(ForceVideoDecoderVAAPI, kZeroCopyRank);
+    applyPrefixRank("v4l2sl", kZeroCopyRank);
 }
 #endif  // Q_OS_LINUX
 
@@ -389,9 +387,7 @@ void setCodecPriorities(int rawOption)
 
 void setCodecPriorities(VideoDecoderOptions option)
 {
-    GstRegistry* registry = gst_registry_get();
-
-    if (!registry) {
+    if (!gst_registry_get()) {
         qCCritical(GStreamerHelpersLog) << "Failed to get gstreamer registry.";
         return;
     }
@@ -402,7 +398,7 @@ void setCodecPriorities(VideoDecoderOptions option)
         case ForceVideoDecoderDefault:
             // HW-decoder GPU caps (GLMemory/DMABuf/VAMemory) auto-plug to system memory via gldownload/vapostproc.
 #ifdef Q_OS_LINUX
-            preferZeroCopyDecoders(registry);
+            preferZeroCopyDecoders();
 #endif
             break;
         case ForceVideoDecoderSoftware:
@@ -430,7 +426,7 @@ void setCodecPriorities(VideoDecoderOptions option)
     // backend so a D3D12 decoder never wins over D3D11 on Qt's default Windows RHI (and vice-versa).
     const bool promoteMatchingD3D = (option == ForceVideoDecoderDefault) || (option == ForceVideoDecoderHardware) ||
                                     (option == ForceVideoDecoderDirectX3D);
-    alignD3DDecoderRanksToRhi(registry, promoteMatchingD3D);
+    alignD3DDecoderRanksToRhi(promoteMatchingD3D);
 #endif
 }
 

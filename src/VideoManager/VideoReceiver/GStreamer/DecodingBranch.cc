@@ -316,17 +316,9 @@ void DecodingBranch::_onDecoderElementAdded(GstBin* /*decodebin*/, GstBin* /*sub
         g_object_set(element, "qos", FALSE, nullptr);
     }
 
-    GstPluginFeature* feature = GST_PLUGIN_FEATURE(factory);
-    const QString decoderName = QString::fromUtf8(gst_plugin_feature_get_name(feature));
-    QString pluginName = decoderName;
-    if (const GStreamer::GstObjectPtr plugin =
-            GStreamer::adoptObject(GST_OBJECT(gst_plugin_feature_get_plugin(feature)))) {
-        pluginName = QString::fromUtf8(gst_plugin_get_name(GST_PLUGIN(plugin.get())));
-    }
-    qCDebug(GstVideoReceiverLog) << "Decodebin3 selected codec:rank -" << pluginName << "/" << decoderName << "-"
-                                 << gst_element_factory_get_klass(factory)
-                                 << (GStreamer::isHardwareDecoderFactory(factory) ? "(HW)" : "(SW)") << ":"
-                                 << gst_plugin_feature_get_rank(feature) << "- QoS disabled";
+    qCDebug(GstVideoReceiverLog).noquote()
+        << "Decodebin3 selected" << GStreamer::describeDecoderFactory(factory) << "- QoS disabled";
+    const QString decoderName = QString::fromUtf8(gst_plugin_feature_get_name(GST_PLUGIN_FEATURE(factory)));
 
     auto* self = static_cast<DecodingBranch*>(data);
     self->_receiver._runOnWorkerForPipeline([self, decoderName]() {
