@@ -1,22 +1,10 @@
 include("${CMAKE_CURRENT_LIST_DIR}/Helpers.cmake")
 
+qgc_gst_platform(_qgc_gst_platform)
+qgc_gst_platform_descriptor("${_qgc_gst_platform}" _qgc_gst_platform)
+
 if(NOT DEFINED GStreamer_FIND_VERSION)
-    if(LINUX AND NOT ANDROID)
-        set(GStreamer_FIND_VERSION ${QGC_CONFIG_GSTREAMER_MIN_VERSION})
-    elseif(WIN32 AND NOT ANDROID)
-        set(GStreamer_FIND_VERSION ${QGC_CONFIG_GSTREAMER_WIN_VERSION})
-    elseif(ANDROID)
-        set(GStreamer_FIND_VERSION ${QGC_CONFIG_GSTREAMER_ANDROID_VERSION})
-    elseif(IOS)
-        set(GStreamer_FIND_VERSION ${QGC_CONFIG_GSTREAMER_IOS_VERSION})
-    elseif(MACOS)
-        set(GStreamer_FIND_VERSION ${QGC_CONFIG_GSTREAMER_MACOS_VERSION})
-    else()
-        # Defense-in-depth: every supported platform is covered above; this
-        # fires only if a new platform bool is added without a version branch.
-        message(WARNING "GStreamer: unrecognized platform — using fallback version ${QGC_CONFIG_GSTREAMER_VERSION}")
-        set(GStreamer_FIND_VERSION ${QGC_CONFIG_GSTREAMER_VERSION})
-    endif()
+    set(GStreamer_FIND_VERSION ${${_qgc_gst_platform_VERSION_VAR}})
 endif()
 
 if(NOT GStreamer_FIND_VERSION)
@@ -82,18 +70,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/platform/MacOS.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/platform/IOS.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/platform/PkgConfigTargets.cmake")
 
-# Dispatch to the appropriate platform discovery macro
-if(WIN32 AND NOT ANDROID)
-    _qgc_discover_windows_sdk()
-elseif(LINUX AND NOT ANDROID)
-    _qgc_discover_linux_sdk()
-elseif(ANDROID)
-    _qgc_discover_android_sdk()
-elseif(MACOS AND NOT IOS)
-    _qgc_discover_macos_sdk()
-elseif(IOS)
-    _qgc_discover_ios_sdk()
-endif()
+cmake_language(CALL ${_qgc_gst_platform_DISCOVER})
 
 # Post-dispatch invariant: at most one of the three layout modes may be ON.
 set(_qgc_gst_active_modes)
@@ -166,9 +143,7 @@ gstreamer_build_apis(GSTREAMER_APIS ${QGCGStreamer_FIND_COMPONENTS})
 # GStreamerPluginPolicy and applied below in the missing-plugin scan.
 # Always recompute (see GSTREAMER_APIS above) — never carry a stale plugin list
 # across reconfigures.
-gstreamer_current_platform_key(_qgc_gst_plat_key)
-gstreamer_plugins_for(PLATFORM "${_qgc_gst_plat_key}" OUT_VAR GSTREAMER_PLUGINS)
-unset(_qgc_gst_plat_key)
+gstreamer_plugins_for(PLATFORM "${_qgc_gst_platform_PLUGIN_KEY}" OUT_VAR GSTREAMER_PLUGINS)
 
 # Mobile builds have no filesystem plugin scan — only statically registered plugins exist at
 # runtime. Add the encode-side plugins the Debug-only MockLink video stream server
