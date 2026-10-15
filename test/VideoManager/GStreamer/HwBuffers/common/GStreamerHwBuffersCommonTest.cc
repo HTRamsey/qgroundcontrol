@@ -728,7 +728,7 @@ void GStreamerTest::_testHwVideoBufferCpuMapFallback()
         sample, info, QVideoFrameFormat(QSize(4, 2), QVideoFrameFormat::Format_BGRA8888));
     gst_sample_unref(sample);
     // A bundle from an earlier successful import takes its own sample ref; the CPU view must survive that.
-    gst_sample_unref(hw->takeSample());
+    gst_sample_unref(hw->refSample());
     QVideoFrame frame(std::move(hw));
 
     // Qt's createTextures() falls back to uploading map() when mapTextures() fails.
