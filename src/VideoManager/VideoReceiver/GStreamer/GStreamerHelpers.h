@@ -56,4 +56,8 @@ void setCodecPriorities(int rawOption);
 /// Walk every plugin in the GStreamer registry, invoking @p visitor for each; frees the GList
 /// internally. The plugin pointer is valid only for the duration of the call (don't ref it).
 void forEachPlugin(GstRegistry* registry, const std::function<void(GstPlugin*)>& visitor);
+
+/// Invokes @p visitor for every video decoder factory of at least @p minRank in the default registry. The factory is
+/// valid only for the duration of the call.
+void forEachVideoDecoderFactory(GstRank minRank, const std::function<void(GstElementFactory*)>& visitor);
 }  // namespace GStreamer
