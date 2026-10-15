@@ -220,8 +220,7 @@ bool validateVulkanPlaneLayouts(const GstVideoInfo& videoInfo, GstVideoMeta* vme
 
     constexpr quint64 kMaxVkDeviceSize = static_cast<quint64>((std::numeric_limits<VkDeviceSize>::max)());
     for (int p = 0; p < planeCount; ++p) {
-        const gsize offset = vmeta ? vmeta->offset[p] : GST_VIDEO_INFO_PLANE_OFFSET(&videoInfo, p);
-        const gint stride = vmeta ? vmeta->stride[p] : GST_VIDEO_INFO_PLANE_STRIDE(&videoInfo, p);
+        const auto [offset, stride] = GstHw::planeLayout(videoInfo, vmeta, p);
         const int planeWidth = GST_VIDEO_INFO_COMP_WIDTH(&videoInfo, p);
         const int planeHeight = GST_VIDEO_INFO_COMP_HEIGHT(&videoInfo, p);
         const int pixelStride = GST_VIDEO_INFO_COMP_PSTRIDE(&videoInfo, p);
