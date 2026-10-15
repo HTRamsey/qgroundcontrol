@@ -325,6 +325,7 @@ void DecodingBranch::_shutdown()
     if (_videoSink) {
         GStreamer::disposeChild(GST_BIN(_pipeline), _videoSink.get());
         _videoSink.reset();
+        _releaseDisplayedFrame();
     }
     _sinkStatsAtStart.reset();
 
@@ -334,6 +335,19 @@ void DecodingBranch::_shutdown()
     }
 
     _receiver._dotDumper.dump(_pipeline, "pipeline-decoding-stopped");
+}
+
+void DecodingBranch::_releaseDisplayedFrame()
+{
+    GstVideoReceiver* const receiver = &_receiver;
+    QMetaObject::invokeMethod(
+        receiver,
+        [receiver]() {
+            for (auto* c : QGCQVideoSinkController::controllersOf(receiver)) {
+                c->releaseFrame();
+            }
+        },
+        Qt::QueuedConnection);
 }
 
 void DecodingBranch::_onDecoderElementAdded(GstBin* /*decodebin*/, GstBin* /*subBin*/, GstElement* element,

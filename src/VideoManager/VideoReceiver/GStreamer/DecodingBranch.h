@@ -19,8 +19,9 @@ struct PathStats;
 ///
 /// Holds the caller's video sink until the source streams, then inserts decodebin3 and links its pad to the sink.
 /// The caller keeps its own ref on the sink; the branch takes one more, and the pipeline its own while the sink is
-/// inside. Decoding is reported from the first frame that reaches the sink. Also keeps the name of the decoder
-/// decodebin3 plugged, which the receiver exposes. Reports through the receiver's signals.
+/// inside. Decoding is reported from the first frame that reaches the sink; taking the sink out again clears the frame
+/// its QVideoSink displays. Also keeps the name of the decoder decodebin3 plugged, which the receiver exposes. Reports
+/// through the receiver's signals.
 ///
 /// Threading: the receiver's worker, except the sink probe and the decoder-added callback (streaming threads) and
 /// onBusCapsInfo() (whichever thread posts). decoderName() is thread-safe.
@@ -64,6 +65,8 @@ private:
     bool _addVideoSink(GstPad* pad);
     void _onFirstFrame();
     void _shutdown();
+    /// Has the receiver's QVideoSink controllers drop the frame on display, which pins the last decoder buffer.
+    void _releaseDisplayedFrame();
 
     static void _onDecoderElementAdded(GstBin* decodebin, GstBin* subBin, GstElement* element, gpointer data);
     static GstPadProbeReturn _sinkProbe(GstPad* pad, GstPadProbeInfo* info, gpointer user_data);
