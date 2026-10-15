@@ -9,7 +9,12 @@ include("${QGC_MODULE_DIR}/GStreamer/tests/_assert.cmake")
 
 # Stand-ins for BuildConfig.cmake, which reads build-config.json from the top-level source dir.
 set(QGC_CONFIG_GSTREAMER_MIN_VERSION 1.20.0)
-set(QGC_BUILD_CONFIG_CONTENT [=[{"gstreamer": {"plugins": {"common": ["coreelements"]}}}]=])
+# QGC_TEST_PLUGINS: comma-separated plugin allowlist, default coreelements.
+if(NOT QGC_TEST_PLUGINS)
+    set(QGC_TEST_PLUGINS coreelements)
+endif()
+string(REPLACE "," "\", \"" _qgc_test_plugins_json "${QGC_TEST_PLUGINS}")
+set(QGC_BUILD_CONFIG_CONTENT "{\"gstreamer\": {\"plugins\": {\"common\": [\"${_qgc_test_plugins_json}\"]}}}")
 # The fake SDK's libraries are empty files, so feature probes must compile without linking.
 set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
 
@@ -96,6 +101,12 @@ foreach(_var IN ITEMS QGC_GST_RESOLVED_ROOT QGC_GST_RESOLVED_VERSION QGC_GST_RES
     string(APPEND _qgc_state "${_var}=$CACHE{${_var}}\n")
 endforeach()
 file(WRITE "${CMAKE_BINARY_DIR}/gst-state.txt" "${_qgc_state}")
+
+# QGC_TEST_INSTALL_REQUIRED_PLUGINS: comma-separated plugins the install rules must verify.
+if(QGC_TEST_INSTALL_REQUIRED_PLUGINS)
+    string(REPLACE "," ";" _qgc_required_plugins "${QGC_TEST_INSTALL_REQUIRED_PLUGINS}")
+    gstreamer_install_platform_sdk(QGCFake REQUIRED_PLUGINS ${_qgc_required_plugins})
+endif()
 
 if(NOT DEFINED EXPECT_ROOT)
     return()

@@ -125,6 +125,7 @@ if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
               legacy-pkg-config-args
               missing-mandatory
               missing-gl
+              install
     )
         add_test(
             NAME "FindModule.test_orchestrator.${_qgc_scenario}"

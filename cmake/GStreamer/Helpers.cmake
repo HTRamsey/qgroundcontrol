@@ -26,7 +26,8 @@
 #   PkgConfig    — gstreamer_apply_pkgconfig_env (MODE SDK |
 #                  SYSTEM_AUGMENT) — single PKG_CONFIG_PATH/LIBDIR
 #                  mutator — and qgc_gst_restore_pkgconfig_env
-#   PluginPolicy — gstreamer_plugins_for / gstreamer_filter_alternates /
+#   PluginPolicy — gstreamer_plugins_for / gstreamer_plugin_satisfied /
+#                  gstreamer_missing_required /
 #                  gstreamer_runtime_required_plugins / gstreamer_xcfw_skip /
 #                  gstreamer_current_platform_key (alternate groups, runtime
 #                  required, xcfw skip)

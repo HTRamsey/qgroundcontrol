@@ -158,10 +158,10 @@ elseif(GStreamer_USE_STATIC_LIBS)
         endif()
     endforeach()
     _gst_emit_static_plugin_registration(_qgc_found_static _qgc_decl _qgc_reg)
-    if(_qgc_missing_static)
-        # AVAILABLE = what was found, not the full request, else real gaps are hidden.
-        gstreamer_filter_alternates(IN_OUT_PLUGINS _qgc_missing_static AVAILABLE ${_qgc_found_static})
-    endif()
+    # AVAILABLE = what was found, not the full request, else real gaps are hidden.
+    gstreamer_missing_required(REQUIRED ${_qgc_missing_static} AVAILABLE ${_qgc_found_static} OUT_VAR
+                               _qgc_missing_static
+    )
     if(_qgc_missing_static)
         message(WARNING "GStreamer (static): requested plugins not found as targets and omitted from static registration: ${_qgc_missing_static}")
     endif()
