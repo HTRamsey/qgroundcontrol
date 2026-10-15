@@ -159,7 +159,7 @@ endif()
 
 # Always recompute from the current component set — a stale list from a prior
 # configure would miss a newly-requested component.
-gstreamer_build_apis_and_deps(GSTREAMER_APIS GSTREAMER_EXTRA_DEPS ${QGCGStreamer_FIND_COMPONENTS})
+gstreamer_build_apis(GSTREAMER_APIS ${QGCGStreamer_FIND_COMPONENTS})
 
 # Plugin list lives in .github/build-config.json. Alternate groups (e.g. the
 # videoconvertscale↔videoconvert+videoscale 1.22 split) are owned by
@@ -186,7 +186,6 @@ if(IOS)
 endif()
 
 if(ANDROID)
-    set(GStreamer_Mobile_MODULE_NAME gstreamer_android)
     set(G_IO_MODULES openssl)
     set(G_IO_MODULES_PATH "${GStreamer_ROOT_DIR}/lib/gio/modules")
     set(GStreamer_NDK_BUILD_PATH "${GStreamer_ROOT_DIR}/share/gst-android/ndk-build")
@@ -201,9 +200,7 @@ if(ANDROID)
     set(GStreamer_ASSETS_DIR "${QGC_ANDROID_EXTRA_ASSETS_DIR}")
 elseif(IOS)
     # The merged archive also carries the static GIO modules.
-    set(GStreamer_Mobile_MODULE_NAME gstreamer_mobile)
     set(G_IO_MODULES openssl)
-    set(GStreamer_ASSETS_DIR "${CMAKE_BINARY_DIR}/assets")
 endif()
 
 # Cached pkg-config, find_library and try-compile results describe one SDK: drop them when the
@@ -254,7 +251,6 @@ if(_qgc_gst_missing_mandatory)
     )
 endif()
 foreach(_comp IN LISTS _qgc_gst_mandatory)
-    set(QGCGStreamer_${_comp}_FOUND TRUE)
     set(GStreamer_${_comp}_FOUND TRUE)
 endforeach()
 unset(_qgc_gst_missing_mandatory)
@@ -276,7 +272,6 @@ foreach(_comp IN LISTS QGCGStreamer_FIND_COMPONENTS)
     # Require the api to be one we actually built, not just any same-named
     # imported target, before reporting the component FOUND.
     if(TARGET GStreamer::${_api} AND _api IN_LIST GSTREAMER_APIS)
-        set(QGCGStreamer_${_comp}_FOUND TRUE)
         set(GStreamer_${_comp}_FOUND TRUE)
     elseif(NOT _registry_known AND NOT TARGET GStreamer::${_api})
         # Neither a registry entry nor a target — almost always a typo'd or
@@ -291,24 +286,15 @@ endforeach()
 if(GStreamer_USE_STATIC_LIBS)
     target_compile_definitions(GStreamer::GStreamer INTERFACE QGC_GST_STATIC_BUILD)
     if(ANDROID)
-        # Cerbero gstreamer-1.0.mk linker flags, per-ABI from platform/Android.cmake:
-        # -Bsymbolic (all ABIs) keeps FFmpeg's page-relative relocations valid,
-        # -z text (armv7/x86) hard-errors residual text relocations, --export-dynamic
-        # (all ABIs) re-exports symbols for dlopen'd GIO modules/plugins. Global-property
-        # guard because link options aren't deduped and this reruns on reconfigure.
-        get_property(_gst_android_linkopts_done GLOBAL PROPERTY _qgc_gst_android_linkopts_applied)
-        if(NOT _gst_android_linkopts_done)
-            _qgc_android_abi_info("${CMAKE_ANDROID_ARCH_ABI}" _GST_ABI)
-            set(_gst_android_link_opts "-Wl,--export-dynamic")
-            if(_GST_ABI_NEEDS_BSYMBOLIC_FIX)
-                list(APPEND _gst_android_link_opts "-Wl,-Bsymbolic")
-            endif()
-            if(_GST_ABI_NEEDS_TEXTREL_ERROR)
-                list(APPEND _gst_android_link_opts "-Wl,-z,text")
-            endif()
-            target_link_options(GStreamer::GStreamer INTERFACE ${_gst_android_link_opts})
-            set_property(GLOBAL PROPERTY _qgc_gst_android_linkopts_applied TRUE)
+        # Cerbero gstreamer-1.0.mk linker flags: --export-dynamic re-exports symbols for dlopen'd GIO
+        # modules/plugins and -Bsymbolic keeps FFmpeg's page-relative relocations valid (both every ABI);
+        # -z text hard-errors residual text relocations (armv7/x86, from platform/Android.cmake).
+        _qgc_android_abi_info("${CMAKE_ANDROID_ARCH_ABI}" _GST_ABI)
+        set(_gst_android_link_opts "-Wl,--export-dynamic" "-Wl,-Bsymbolic")
+        if(_GST_ABI_NEEDS_TEXTREL_ERROR)
+            list(APPEND _gst_android_link_opts "-Wl,-z,text")
         endif()
+        target_link_options(GStreamer::GStreamer INTERFACE ${_gst_android_link_opts})
     endif()
 endif()
 
@@ -454,37 +440,8 @@ else()
 endif()
 message(STATUS "QGCGStreamer: version=${GStreamer_VERSION} path=${_qgc_gst_path} root=${GStreamer_ROOT_DIR} plugins=${_qgc_gst_plugin_count}/${_qgc_gst_plugin_total} auto_downloaded=${GStreamer_AUTO_DOWNLOADED}")
 
-# Name the discovery macro that should have set these, for a clear failure.
-if(WIN32 AND NOT ANDROID)
-    set(_qgc_disco_macro "_qgc_discover_windows_sdk (platform/Windows.cmake)")
-elseif(LINUX AND NOT ANDROID)
-    set(_qgc_disco_macro "_qgc_discover_linux_sdk (platform/Linux.cmake)")
-elseif(ANDROID)
-    set(_qgc_disco_macro "_qgc_discover_android_sdk (platform/Android.cmake)")
-elseif(IOS)
-    set(_qgc_disco_macro "_qgc_discover_ios_sdk (platform/IOS.cmake)")
-elseif(MACOS)
-    set(_qgc_disco_macro "_qgc_discover_macos_sdk (platform/MacOS.cmake)")
-else()
-    set(_qgc_disco_macro "the platform discovery dispatch")
-endif()
-set(_qgc_required_vars GStreamer_ROOT_DIR)
-if(NOT GStreamer_USE_XCFRAMEWORK)
-    list(APPEND _qgc_required_vars GSTREAMER_LIB_PATH GSTREAMER_PLUGIN_PATH)
-endif()
-foreach(_qgc_req IN LISTS _qgc_required_vars)
-    if(NOT ${_qgc_req})
-        message(FATAL_ERROR "QGCGStreamer: required variable ${_qgc_req} is not set after "
-            "platform discovery — ${_qgc_disco_macro} failed to set it.")
-    endif()
-endforeach()
-unset(_qgc_required_vars)
-unset(_qgc_disco_macro)
-
 # Post-configure tooling (.github/scripts/verify_executable.py, the Windows workflow) reads
 # QGC_GST_RESOLVED_ROOT from CMakeCache.txt; PrintSummary reads the GStreamer::Layout properties.
 _qgc_gst_record_resolved_sdk("${GStreamer_ROOT_DIR}" "${GStreamer_FIND_VERSION}" "${GStreamer_AUTO_DOWNLOADED}")
 gstreamer_layout_set(VERSION "${GStreamer_VERSION}")
 gstreamer_layout_set(AUTO_DOWNLOADED "${GStreamer_AUTO_DOWNLOADED}")
-
-set(QGCGStreamer_FOUND TRUE)

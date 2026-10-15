@@ -15,31 +15,26 @@
 
 include_guard(GLOBAL)
 
-# Single source of truth for Android ABI → cerbero dir + textrel/bsymbolic flags.
-# Sets, in PARENT_SCOPE: <PFX>_DIR, <PFX>_NEEDS_TEXTREL_ERROR, <PFX>_NEEDS_BSYMBOLIC_FIX.
+# Single source of truth for Android ABI → cerbero dir + textrel flag.
+# Sets, in PARENT_SCOPE: <PFX>_DIR, <PFX>_NEEDS_TEXTREL_ERROR.
 function(_qgc_android_abi_info ABI PFX)
     if(ABI STREQUAL "armeabi-v7a")
         set(_dir "armv7")
         set(_textrel TRUE)
-        set(_bsym TRUE)
     elseif(ABI STREQUAL "arm64-v8a")
         set(_dir "arm64")
         set(_textrel FALSE)
-        set(_bsym TRUE)  # Cerbero marks every ABI NEEDS_BSYMBOLIC_FIX
     elseif(ABI STREQUAL "x86")
         set(_dir "x86")
         set(_textrel TRUE)
-        set(_bsym TRUE)
     elseif(ABI STREQUAL "x86_64")
         set(_dir "x86_64")
         set(_textrel FALSE)
-        set(_bsym TRUE)
     else()
         message(FATAL_ERROR "Unsupported Android ABI: ${ABI}")
     endif()
     set(${PFX}_DIR "${_dir}" PARENT_SCOPE)
     set(${PFX}_NEEDS_TEXTREL_ERROR "${_textrel}" PARENT_SCOPE)
-    set(${PFX}_NEEDS_BSYMBOLIC_FIX "${_bsym}" PARENT_SCOPE)
 endfunction()
 
 # _qgc_gst_android_extract(<staging> <archive> <abi_dir>)
