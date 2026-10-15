@@ -62,6 +62,17 @@ foreach(_case IN LISTS _missing_cases)
 endforeach()
 qgc_test_pass("missing_required honours alternate sets")
 
+# plugin|expected alternatives, "|"-separated
+foreach(_case IN ITEMS "coreelements|coreelements" "videoconvertscale|videoconvertscale|videoconvert+videoscale"
+                       "videoscale|videoscale|videoconvertscale|videoconvert+videoscale"
+)
+    string(REPLACE "|" ";" _parts "${_case}")
+    list(POP_FRONT _parts _plugin)
+    gstreamer_plugin_alternatives(${_plugin} _alternatives)
+    qgc_test_assert_streq("alternatives of ${_plugin}" "${_parts}" "${_alternatives}")
+endforeach()
+qgc_test_pass("plugin_alternatives")
+
 gstreamer_runtime_required_plugins(_required)
 foreach(
     _p IN

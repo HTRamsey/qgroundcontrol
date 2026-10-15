@@ -21,12 +21,13 @@ endif()
 set(GSTREAMER_PLUGIN_ALTERNATES "videoconvertscale|videoconvert+videoscale")
 
 # Structural plugins guaranteed to exist post-install — the install verifier
-# fails the build if any are missing; _verifyPlugins() (GStreamer.cc) mirrors this list.
+# fails the build if any are missing, and GStreamer.cc fails initialization
+# (QGC_GST_RUNTIME_REQUIRED_PLUGINS, set by src/.../GStreamer/CMakeLists.txt).
 # Codec implementations (openh264/libav) are intentionally excluded: distro
 # bundles may omit one while shipping another usable decode path.
 # opengl supplies glupload/glcolorconvert (GL zero-copy video path);
 # multifile (splitmuxsink), isomp4 (qtmux/mp4mux), and matroska (matroskamux)
-# are load-bearing for video recording (GstVideoReceiver _kFileMux).
+# are load-bearing for video recording (kFileMux, RecordingBranch.cc).
 set(GSTREAMER_RUNTIME_REQUIRED_PLUGINS
     coreelements
     isomp4
@@ -102,6 +103,26 @@ function(gstreamer_runtime_required_plugins out_var)
     )
 endfunction()
 
+# gstreamer_plugin_alternatives(<plugin> <out_var>)
+# Sets <out_var> to the plugin sets, each "+"-joined, that satisfy <plugin>: <plugin> itself, then the alternates of its
+# GSTREAMER_PLUGIN_ALTERNATES group.
+function(gstreamer_plugin_alternatives plugin out_var)
+    set(_alternatives "${plugin}")
+    foreach(_group IN LISTS GSTREAMER_PLUGIN_ALTERNATES)
+        string(REGEX REPLACE "[|+]" ";" _group_plugins "${_group}")
+        if(plugin IN_LIST _group_plugins)
+            string(REPLACE "|" ";" _group_alternatives "${_group}")
+            list(APPEND _alternatives ${_group_alternatives})
+            list(REMOVE_DUPLICATES _alternatives)
+            break()
+        endif()
+    endforeach()
+    set(${out_var}
+        "${_alternatives}"
+        PARENT_SCOPE
+    )
+endfunction()
+
 # gstreamer_missing_required(REQUIRED <plugin>... AVAILABLE <plugin>... OUT_VAR <var>)
 # Sets <var> to the REQUIRED plugins, in order, that are not AVAILABLE. A member of a GSTREAMER_PLUGIN_ALTERNATES group
 # is also satisfied by any alternate of its group whose plugins are all AVAILABLE, so the install verifier accepts
@@ -116,14 +137,7 @@ function(gstreamer_missing_required)
     endif()
     set(_missing "")
     foreach(_plugin IN LISTS ARG_REQUIRED)
-        set(_alternates "${_plugin}")
-        foreach(_group IN LISTS GSTREAMER_PLUGIN_ALTERNATES)
-            string(REGEX REPLACE "[|+]" ";" _group_plugins "${_group}")
-            if(_plugin IN_LIST _group_plugins)
-                string(REPLACE "|" ";" _alternates "${_plugin}|${_group}")
-                break()
-            endif()
-        endforeach()
+        gstreamer_plugin_alternatives("${_plugin}" _alternates)
         set(_satisfied FALSE)
         foreach(_alternate IN LISTS _alternates)
             string(REPLACE "+" ";" _alternate_plugins "${_alternate}")
