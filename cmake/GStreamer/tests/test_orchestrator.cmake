@@ -150,6 +150,23 @@ elseif(SCENARIO STREQUAL "static-targets")
     _qgc_configure_ok("static targets" --fresh "-DGStreamer_ROOT_DIR=${_sdk_a}" -DGStreamer_USE_STATIC_LIBS=ON
                       ${_expect}
     )
+elseif(SCENARIO STREQUAL "legacy-pkg-config-args")
+    # Older configures FORCE-cached the derived flags; a stale prefix would point pkg-config at the
+    # wrong SDK, so only the user's own flags may survive.
+    _qgc_write_fake_sdk("${_sdk_a}" 1.24.0)
+    _qgc_expect(_expect "${_sdk_a}" 1.24.0 OFF)
+    file(WRITE "${WORK_DIR}/legacy-cache.cmake"
+         "set(PKG_CONFIG_ARGN \"--short-errors;--static;--define-variable=prefix=${_sdk_b}\" CACHE STRING \"\")\n"
+    )
+    _qgc_configure_ok(
+        "legacy cached flags"
+        --fresh
+        -C
+        "${WORK_DIR}/legacy-cache.cmake"
+        "-DGStreamer_ROOT_DIR=${_sdk_a}"
+        -DEXPECT_CACHED_PKG_CONFIG_ARGN=--short-errors
+        ${_expect}
+    )
 elseif(SCENARIO STREQUAL "idempotent")
     _qgc_write_fake_sdk("${_sdk_a}" 1.24.0)
     _qgc_configure_ok("first configure" --fresh "-DGStreamer_ROOT_DIR=${_sdk_a}")

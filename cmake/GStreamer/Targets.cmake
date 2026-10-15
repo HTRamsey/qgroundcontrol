@@ -188,8 +188,9 @@ function(_qgc_gst_create_core_targets minimum_version static version_var)
 endfunction()
 
 # qgc_gst_create_pkgconfig_targets(ROOT <sdk_root> VERSION <minimum> APIS <api>... [PLUGINS <plugin>...]
-#                                  [STATIC])
-# Creates INTERFACE IMPORTED targets from pkg-config, which must already be set up for the SDK:
+#                                  [STATIC] [FRAMEWORK_PATH <dir>])
+# Creates INTERFACE IMPORTED targets from pkg-config, which must already be set up for the SDK
+# (<sdk_root> and FRAMEWORK_PATH are only added to the search paths of this call):
 #   GStreamer::GStreamer  gstreamer-1.0 >= <minimum>, linking GStreamer::deps and every target below;
 #   GStreamer::deps       the core's link dependencies;
 #   GStreamer::<api>      gstreamer-<api>-1.0 for each api_<api> found (api_gl_prototypes ->
@@ -198,7 +199,7 @@ endfunction()
 #                         runtime and never link them).
 # Sets GStreamer_VERSION and GStreamer_<api|plugin>_FOUND for each module probed in the caller's scope.
 function(qgc_gst_create_pkgconfig_targets)
-    cmake_parse_arguments(PARSE_ARGV 0 ARG "STATIC" "ROOT;VERSION" "APIS;PLUGINS")
+    cmake_parse_arguments(PARSE_ARGV 0 ARG "STATIC" "ROOT;VERSION;FRAMEWORK_PATH" "APIS;PLUGINS")
     if(ARG_KEYWORDS_MISSING_VALUES)
         message(FATAL_ERROR "qgc_gst_create_pkgconfig_targets: missing values for: ${ARG_KEYWORDS_MISSING_VALUES}")
     endif()
@@ -219,6 +220,11 @@ function(qgc_gst_create_pkgconfig_targets)
     else()
         set(_static FALSE)
         set(_plugins "")
+    endif()
+
+    list(PREPEND CMAKE_PREFIX_PATH "${ARG_ROOT}")
+    if(ARG_FRAMEWORK_PATH)
+        list(APPEND CMAKE_FRAMEWORK_PATH "${ARG_FRAMEWORK_PATH}")
     endif()
 
     find_package(PkgConfig REQUIRED QUIET)
