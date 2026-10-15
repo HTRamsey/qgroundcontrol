@@ -23,6 +23,7 @@
 #include "HwBuffers/common/HwBuffers.h"
 #include "QGCLoggingCategory.h"
 #include "QGCNetworkHelper.h"
+#include "gstqgc/gstqgcqvideosink.h"
 
 QGC_LOGGING_CATEGORY(GstVideoReceiverLog, "Video.GStreamer.GstVideoReceiver")
 
@@ -96,12 +97,6 @@ bool isRecoverableH265PaciError(GstMessage* msg, const GError* error, const gcha
 
     GstElementFactory* factory = gst_element_get_factory(GST_ELEMENT(src));
     return factory && (g_strcmp0(GST_OBJECT_NAME(factory), "rtph265depay") == 0);
-}
-
-bool isCapsInfo(GstMessage* message)
-{
-    const GstStructure* structure = gst_message_get_structure(message);
-    return structure && gst_structure_has_name(structure, "qgc-caps-info");
 }
 
 bool pipelineEnteredPlaying(GstMessage* message)
@@ -311,7 +306,7 @@ bool GstVideoReceiver::_stopPipeline()
     _recordingBranch.finishForTeardown();
 
     // Before the teardown releases the video sink.
-    const HwBuffers::PathStats hwStats = _decodingBranch.sinkPathStats();
+    const GstQgc::PathStats hwStats = _decodingBranch.sinkPathStats();
 
     _resetPipelineState();
 
@@ -393,7 +388,7 @@ void GstVideoReceiver::_onWatchdogTick()
 
     if (++_statsTickCounter >= kHwStatsLogIntervalTicks) {
         _statsTickCounter = 0;
-        if (const HwBuffers::PathStats hwStats = _decodingBranch.sinkPathStats(); hwStats.totalDelivered > 0) {
+        if (const GstQgc::PathStats hwStats = _decodingBranch.sinkPathStats(); hwStats.totalDelivered > 0) {
             qCDebug(GstVideoReceiverLog).noquote() << "HW path live" << _redactedUri() << hwStats.line;
         }
     }
@@ -553,7 +548,7 @@ GstBusSyncReply GstVideoReceiver::_onBusSyncMessage(GstBus* /*bus*/, GstMessage*
             self->_recordingBranch.onBusEos();
             break;
         case GST_MESSAGE_ELEMENT:
-            if (isCapsInfo(message)) {
+            if (gst_message_has_name(message, GstQgc::kCapsInfoMessage)) {
                 self->_decodingBranch.onBusCapsInfo(message);
             } else {
                 self->_recordingBranch.onBusElement(message);
@@ -608,8 +603,7 @@ void GstVideoReceiver::_onBusError(GstMessage* message)
         GST_MESSAGE_SRC(message) ? gst_object_get_path_string(GST_MESSAGE_SRC(message)) : nullptr);
     qCWarning(GstVideoReceiverLog) << "GStreamer error from" << (sourcePath ? sourcePath.get() : "(unknown)") << ":"
                                    << text;
-    // Drops cached GPU devices on a device-loss error.
-    HwBuffers::dispatchBusMessage(message);
+    HwBuffers::onPipelineError(error.get(), debug.get());
     // A failing pipeline usually posts several ERRORs; the first one's teardown makes the rest stale.
     _runOnWorkerForPipeline([this]() { _onPipelineError(); });
 }

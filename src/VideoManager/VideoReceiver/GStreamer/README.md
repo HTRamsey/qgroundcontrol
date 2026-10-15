@@ -31,7 +31,7 @@ A QGC-owned plugin (`gstqgc/`) bridging the pipeline into Qt:
 - **`qgcqvideosink`** — a `GstVideoSink` that pushes decoded frames into a Qt `QVideoSink`. Delivery keeps only the
   latest frame, so a stalled GUI thread never holds more than one undelivered frame (or the decoder buffer behind it).
   Its construct-only `gpu-zerocopy` property (passed down by the bin) enables zero-copy import of GPU memory, and its
-  `frame-stats` property reports that sink's own frame counts per delivery path (`HwBuffers::formatSinkStats` formats
+  `frame-stats` property reports that sink's own frame counts per delivery path (`GstQgc::formatSinkStats` formats
   them); GstBaseSink's standard `stats` property is left as is.
 - **`qgcvideosinkbin`** — a bin wrapping a format-restriction capsfilter plus `qgcqvideosink`.
 - **`QGCQVideoSinkController`** — GUI-thread companion that mirrors negotiation/telemetry from the sink into QGC, and

@@ -3,13 +3,11 @@
 #include <gst/gst.h>
 
 #include <QtCore/QMutexLocker>
-#include <QtCore/QSize>
 
 #include "GStreamerHelpers.h"
 #include "GstVideoReceiver.h"
-#include "HwBuffers/common/HwBuffers.h"
 #include "QGCQVideoSinkController.h"
-#include "gstqgc/gstqgcvideosinkbin.h"
+#include "gstqgc/gstqgcqvideosink.h"
 
 namespace {
 
@@ -85,7 +83,7 @@ void DecodingBranch::start(GstElement* videoSink, bool hasWidget, bool streaming
     (void) _sinkFrameProbe.add(pad.get(), GST_PAD_PROBE_TYPE_BUFFER, _sinkProbe, this);
 
     _videoSink = GStreamer::adoptElement(GST_ELEMENT(gst_object_ref(videoSink)));
-    _sinkStatsAtStart = _readSinkStats();
+    _sinkStatsAtStart = GstQgc::frameStats(_videoSink.get());
 
     if (!streaming) {
         emit _receiver.onStartDecodingComplete(VideoReceiver::STATUS_OK);
@@ -138,25 +136,19 @@ void DecodingBranch::onDecoderPad(GstPad* pad)
 
 void DecodingBranch::onBusCapsInfo(GstMessage* message)
 {
-    const GstStructure* structure = gst_message_get_structure(message);
-    gint w = 0, h = 0;
-    const gchar* fmt = gst_structure_get_string(structure, "format");
-    gst_structure_get_int(structure, "width", &w);
-    gst_structure_get_int(structure, "height", &h);
-    const QString format = QString::fromUtf8(fmt ? fmt : "");
-    const QSize resolution(w, h);
+    const GstQgc::CapsInfo info = GstQgc::parseCapsInfo(message);
     // src compared by address only on the GUI thread; never dereferenced (may be gone by then).
     void* src = GST_MESSAGE_SRC(message);
     QMetaObject::invokeMethod(
         &_receiver,
-        [this, format, resolution, src]() {
+        [this, info, src]() {
             for (auto* c : QGCQVideoSinkController::controllersOf(&_receiver)) {
                 if (static_cast<const void*>(c->element()) == src) {
-                    c->updateNegotiation(format, resolution);
+                    c->updateNegotiation(info.format, info.size);
                 }
             }
-            // The sink's negotiated raw caps are always fixed, unlike the encoded caps upstream of the decoder.
-            emit _receiver.videoSizeChanged(resolution);
+            // Unlike the encoded caps upstream of the decoder, the sink's are always fixed.
+            emit _receiver.videoSizeChanged(info.size);
         },
         Qt::QueuedConnection);
 }
@@ -167,25 +159,10 @@ QString DecodingBranch::decoderName() const
     return _decoderName;
 }
 
-HwBuffers::PathStats DecodingBranch::sinkPathStats() const
+GstQgc::PathStats DecodingBranch::sinkPathStats() const
 {
-    const GStreamer::GstStructurePtr stats = _readSinkStats();
-    return HwBuffers::formatSinkStats(stats.get(), _sinkStatsAtStart.get());
-}
-
-GStreamer::GstStructurePtr DecodingBranch::_readSinkStats() const
-{
-    if (!_videoSink || !GST_IS_QGC_VIDEO_SINK_BIN(_videoSink.get())) {
-        return {};
-    }
-    const GStreamer::GstElementPtr qvideosink =
-        GStreamer::adoptElement(gst_qgc_video_sink_bin_get_qvideosink(GST_QGC_VIDEO_SINK_BIN(_videoSink.get())));
-    if (!qvideosink) {
-        return {};
-    }
-    GstStructure* stats = nullptr;
-    g_object_get(qvideosink.get(), "frame-stats", &stats, nullptr);
-    return GStreamer::adoptStructure(stats);
+    const GStreamer::GstStructurePtr stats = GstQgc::frameStats(_videoSink.get());
+    return GstQgc::formatSinkStats(stats.get(), _sinkStatsAtStart.get());
 }
 
 bool DecodingBranch::_insertDecoder()
