@@ -48,10 +48,9 @@ void resetCachedGpuResources() noexcept;
 /// Wire the main QQuickWindow into the RHI-capture path so snapshots follow its QRhi; no-op without GPU.
 void connectMainWindow(QQuickWindow* window) noexcept;
 
-#if defined(QGC_HAS_ANY_GPU_PATH)
-/// Populate the per-pipeline HwVideoBufferContext (EGL displays, gpu-enabled flag) the factory needs.
+/// Populate the per-pipeline HwVideoBufferContext (EGL displays, gpu-enabled flag) the factory needs. GPU stays disabled
+/// in builds without a GPU path. Safe off the GUI thread.
 HwVideoBufferContext makeAdapterContext(bool gpuEnabled) noexcept;
-#endif
 
 /// Synchronously answer GST_QUERY_CONTEXT (gst.gl.GLDisplay/app_context); false -> let bus NEED_CONTEXT run.
 bool answerSinkBinContextQuery(GstQuery* query) noexcept;

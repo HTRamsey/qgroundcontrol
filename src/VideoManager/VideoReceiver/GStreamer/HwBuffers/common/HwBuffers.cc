@@ -178,10 +178,10 @@ void connectMainWindow(QQuickWindow* window) noexcept
 #endif
 }
 
-#if defined(QGC_HAS_ANY_GPU_PATH)
 HwVideoBufferContext makeAdapterContext(bool gpuEnabled) noexcept
 {
     HwVideoBufferContext ctx;
+#if defined(QGC_HAS_ANY_GPU_PATH)
     ctx.gpuEnabled = gpuEnabled;
     if (!gpuEnabled) {
         return ctx;
@@ -232,10 +232,12 @@ HwVideoBufferContext makeAdapterContext(bool gpuEnabled) noexcept
 #if defined(QGC_HAS_GST_VULKAN_GPU_PATH)
     qCInfo(HwBuffersFacadeLog) << "Vulkan zero-copy path available (active only when QRhi uses the Vulkan backend)";
 #endif
+#else
+    Q_UNUSED(gpuEnabled);
+#endif  // QGC_HAS_ANY_GPU_PATH
 
     return ctx;
 }
-#endif  // QGC_HAS_ANY_GPU_PATH
 
 bool answerSinkBinContextQuery(GstQuery* query) noexcept
 {
