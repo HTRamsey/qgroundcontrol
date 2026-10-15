@@ -330,8 +330,8 @@ target_sources(
             ${CMAKE_CURRENT_SOURCE_DIR}/common/GstHwVideoBuffer.h
             ${CMAKE_CURRENT_SOURCE_DIR}/common/GstContextBridgeBase.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/common/GstContextBridgeBase.h
-            ${CMAKE_CURRENT_SOURCE_DIR}/common/GstContextBridgeRegistry.cc
-            ${CMAKE_CURRENT_SOURCE_DIR}/common/GstContextBridgeRegistry.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/common/GstHwPathRegistry.cc
+            ${CMAKE_CURRENT_SOURCE_DIR}/common/GstHwPathRegistry.h
             ${CMAKE_CURRENT_SOURCE_DIR}/common/GstHwVideoBufferFactory.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/common/QGCRhiCapture.cc
             ${CMAKE_CURRENT_SOURCE_DIR}/common/QGCRhiCapture.h
