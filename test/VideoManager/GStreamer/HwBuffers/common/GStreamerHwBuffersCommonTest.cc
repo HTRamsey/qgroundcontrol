@@ -340,13 +340,13 @@ void GStreamerTest::_testHwBufferFactoryDispatchSystemMemory()
 
     HwVideoBufferContext ctxGpu;
     ctxGpu.gpuEnabled = true;
-    auto buf = makeHwVideoBuffer(sample, info, fmt, ctxGpu, path);
+    auto buf = makeHwVideoBuffer(gst_sample_get_buffer(sample), caps, info, fmt, ctxGpu, path);
     QVERIFY(!buf);
     QCOMPARE(path, HwVideoBufferPath::None);
 
     HwVideoBufferContext ctxCpu;
     ctxCpu.gpuEnabled = false;
-    auto buf2 = makeHwVideoBuffer(sample, info, fmt, ctxCpu, path);
+    auto buf2 = makeHwVideoBuffer(gst_sample_get_buffer(sample), caps, info, fmt, ctxCpu, path);
     QVERIFY(!buf2);
 
     gst_sample_unref(sample);
@@ -597,7 +597,6 @@ struct TestPathState
     bool admits = true;
     bool constructs = true;
     int constructed = 0;
-    int importFailures = 0;
 };
 
 TestPathState s_testPathA;
@@ -616,7 +615,6 @@ const HwPathDescriptor kTestSelectPathA = {
     .admits = [] { return s_testPathA.admits; },
     .construct = [](GstSample* sample, const GstVideoInfo& info, QVideoFrameFormat format,
                     const HwVideoBufferContext&) { return constructTestBuffer(s_testPathA, sample, info, format); },
-    .onImportFailed = [] { ++s_testPathA.importFailures; },
 };
 
 const HwPathDescriptor kTestSelectPathB = {
@@ -637,17 +635,16 @@ void GStreamerTest::_testHwPathRegistrySelection_data()
     QTest::addColumn<int>("cachedPath");
     QTest::addColumn<int>("expectedPath");
     QTest::addColumn<int>("expectedBConstructed");
-    QTest::addColumn<int>("expectedAImportFailures");
 
     // Path A (GL) is registered before path B (Vulkan); B always matches and imports.
     const int none = int(HwVideoBufferPath::None);
     const int gl = int(HwVideoBufferPath::GlMemory);
     const int vulkan = int(HwVideoBufferPath::Vulkan);
-    QTest::newRow("first-registered-match-wins") << true << true << true << none << gl << 0 << 0;
-    QTest::newRow("non-matching-path-skipped") << false << true << true << none << vulkan << 1 << 0;
-    QTest::newRow("declining-path-sends-frame-to-cpu") << true << false << true << none << none << 0 << 0;
-    QTest::newRow("failed-import-notifies-its-path") << true << true << false << none << none << 0 << 1;
-    QTest::newRow("validated-path-tried-first") << true << true << true << vulkan << vulkan << 1 << 0;
+    QTest::newRow("first-registered-match-wins") << true << true << true << none << gl << 0;
+    QTest::newRow("non-matching-path-skipped") << false << true << true << none << vulkan << 1;
+    QTest::newRow("declining-path-sends-frame-to-cpu") << true << false << true << none << none << 0;
+    QTest::newRow("failed-import-sends-frame-to-cpu") << true << true << false << none << none << 0;
+    QTest::newRow("validated-path-tried-first") << true << true << true << vulkan << vulkan << 1;
 }
 
 void GStreamerTest::_testHwPathRegistrySelection()
@@ -661,7 +658,6 @@ void GStreamerTest::_testHwPathRegistrySelection()
     QFETCH(int, cachedPath);
     QFETCH(int, expectedPath);
     QFETCH(int, expectedBConstructed);
-    QFETCH(int, expectedAImportFailures);
 
     s_testPathA = {.matches = aMatches, .admits = aAdmits, .constructs = aConstructs};
     s_testPathB = {.matches = true};
@@ -683,8 +679,9 @@ void GStreamerTest::_testHwPathRegistrySelection()
         expectLogMessage("Video.GStreamer.HwBuffers.Factory", QtWarningMsg,
                          QRegularExpression(QStringLiteral("failed plane-handle validation")));
     }
-    const auto buffer = makeHwVideoBuffer(
-        sample, info, QVideoFrameFormat(QSize(16, 16), QVideoFrameFormat::Format_NV12), context, path, &cache);
+    const auto buffer =
+        makeHwVideoBuffer(gst_sample_get_buffer(sample), gst_sample_get_caps(sample), info,
+                          QVideoFrameFormat(QSize(16, 16), QVideoFrameFormat::Format_NV12), context, path, &cache);
     if (!aConstructs) {
         verifyExpectedLogMessage();
     }
@@ -693,7 +690,6 @@ void GStreamerTest::_testHwPathRegistrySelection()
     QCOMPARE(bool(buffer), expectedPath != int(HwVideoBufferPath::None));
     QCOMPARE(cache.validated, expectedPath != int(HwVideoBufferPath::None));
     QCOMPARE(s_testPathB.constructed, expectedBConstructed);
-    QCOMPARE(s_testPathA.importFailures, expectedAImportFailures);
 #endif
 }
 
@@ -913,8 +909,6 @@ void GStreamerTest::_testTelemetryMapFailuresReportedInExtraStats()
     constexpr HwVideoBufferPath path = HwVideoBufferPath::Vulkan;
 #endif
 
-    // takeExtraPathStats() reports registered paths only; the qgc plugin registers them when it loads.
-    HwBuffers::initializeOnce();
     (void) HwBuffers::takeExtraPathStats();
 
     GstHwPathTelemetry::recordMapFailure(path);

@@ -43,9 +43,9 @@ Per-platform zero-copy import of decoded GPU frames, all sharing `GstHwFrameText
 
 - **Platforms**: `dmabuf` (Linux/VA-API), `gl`, `vulkan`, `d3d` (D3D11/D3D12), `cuda`, `apple` (IOSurface), `android` (AHardwareBuffer).
 - **`HwPathDescriptor`**: each backend describes its path once (memory match, buffer construction, cache reset,
-  pool proposal, context bridge). `HwBuffers::initializeOnce()` registers the compiled ones in `GstHwPathRegistry`
-  when the qgc plugin loads. The factory selects the first registered path whose descriptor matches a frame's memory,
-  and the facade loops over the registry for bus messages, context queries, restarts and resets.
+  pool proposal, context bridge). `GstHwPathRegistry` lists the compiled ones in a constant array. The factory selects
+  the first path whose descriptor matches a frame's memory, and the facade loops over the list for bus messages,
+  context queries, restarts and resets.
 - **`GstContextBridgeBase`**: GL, Vulkan, D3D11 and D3D12 bridges hand Qt's GPU device to GStreamer elements through
   `NEED_CONTEXT` and context queries.
 - **`GstHwPathTelemetry`** tracks process-wide render-time counters (map failures, reuse hits, sync waits) for fallback

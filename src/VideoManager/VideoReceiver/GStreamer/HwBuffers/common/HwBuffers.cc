@@ -20,38 +20,9 @@ QGC_LOGGING_CATEGORY(HwBuffersFacadeLog, "Video.GStreamer.HwBuffers.Facade")
 
 namespace {
 
-// Every compiled GPU path in selection order: a frame takes the first one whose matches() accepts its memory. CUDA
-// precedes DMABuf because it exports CUDA memory to the DMABuf importer.
-constexpr const HwPathDescriptor* kCompiledPaths[] = {
-#if defined(QGC_HAS_GST_CUDA_GPU_PATH)
-    &GstHwPaths::kCuda,
-#endif
-#if defined(QGC_HAS_GST_DMABUF_GPU_PATH)
-    &GstHwPaths::kDmaBuf,
-#endif
-#if defined(QGC_HAS_GST_GLMEMORY_GPU_PATH)
-    &GstHwPaths::kGlMemory,
-#endif
-#if defined(Q_OS_WIN) && defined(QGC_HAS_GST_D3D11_GPU_PATH)
-    &GstHwPaths::kD3D11,
-#endif
-#if defined(Q_OS_WIN) && defined(QGC_HAS_GST_D3D12_GPU_PATH)
-    &GstHwPaths::kD3D12,
-#endif
-#if defined(QGC_HAS_GST_VULKAN_GPU_PATH)
-    &GstHwPaths::kVulkan,
-#endif
-#if defined(QGC_HAS_GST_IOSURFACE_GPU_PATH)
-    &GstHwPaths::kIOSurface,
-#endif
-#if defined(QGC_HAS_GST_AHARDWAREBUFFER_GPU_PATH)
-    &GstHwPaths::kAHardwareBuffer,
-#endif
-};
-
-/// Calls @p fn for every registered GPU path in HwVideoBufferPath order (the stats order), once per path.
+/// Calls @p fn for every compiled GPU path in HwVideoBufferPath order (the stats order), once per path.
 template <class Fn>
-void forEachRegisteredPath(Fn&& fn)
+void forEachCompiledPath(Fn&& fn)
 {
     for (std::size_t i = 1; i < GstHw::kPathCount; ++i) {
         const auto path = static_cast<HwVideoBufferPath>(i);
@@ -87,18 +58,6 @@ void dispatchBusMessage(GstMessage* msg) noexcept
 
     if (deviceLost)
         resetCachedGpuResources();
-}
-
-void initializeOnce() noexcept
-{
-#if defined(QGC_HAS_ANY_GPU_PATH)
-    [[maybe_unused]] static const bool s_registered = [] {
-        for (const HwPathDescriptor* path : kCompiledPaths) {
-            GstHwPathRegistry::add(*path);
-        }
-        return true;
-    }();
-#endif
 }
 
 HwBufferEnvConfig readHwBufferEnvConfig() noexcept
@@ -195,7 +154,7 @@ HwVideoBufferContext makeAdapterContext(bool gpuEnabled) noexcept
         return ctx;
     }
     QString available;
-    forEachRegisteredPath(
+    forEachCompiledPath(
         [&available](HwVideoBufferPath path) { available += QLatin1Char(' ') + QLatin1String(GstHw::toString(path)); });
     qCDebug(HwBuffersFacadeLog).noquote()
         << "zero-copy paths compiled:" << available.trimmed() << "— actual path chosen at caps negotiation";
@@ -308,7 +267,7 @@ QString takeExtraPathStats() noexcept
         {GstHwPathTelemetry::HwFallbackReason::VulkanNoSync, "vulkan-no-sync"},
         {GstHwPathTelemetry::HwFallbackReason::ImportUnsupported, "import-unsupported"},
     };
-    forEachRegisteredPath([&out](HwVideoBufferPath path) {
+    forEachCompiledPath([&out](HwVideoBufferPath path) {
         const QLatin1String pathLabel(GstHw::toString(path));
         const quint64 mapFailures = GstHwPathTelemetry::takeMapFailureCount(path);
         if (mapFailures > 0) {

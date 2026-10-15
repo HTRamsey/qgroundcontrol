@@ -422,10 +422,6 @@ void GStreamerTest::_testHwBufferFactoryCacheRejectsMemoryTypeChange()
     QVERIFY(caps);
     const auto capsGuard = qScopeGuard([&] { gst_caps_unref(caps); });
 
-    GstSample* sample = gst_sample_new(buffer, caps, nullptr, nullptr);
-    QVERIFY(sample);
-    const auto sampleGuard = qScopeGuard([&] { gst_sample_unref(sample); });
-
     HwVideoBufferContext context;
     context.gpuEnabled = true;
     context.dmaBufEglDisplay = reinterpret_cast<EGLDisplay>(quintptr(1));
@@ -437,7 +433,7 @@ void GStreamerTest::_testHwBufferFactoryCacheRejectsMemoryTypeChange()
     HwVideoBufferPath path = HwVideoBufferPath::None;
     QVideoFrameFormat format(QSize(4, 4), QVideoFrameFormat::Format_BGRA8888);
 
-    auto hwBuffer = makeHwVideoBuffer(sample, info, format, context, path, &cache);
+    auto hwBuffer = makeHwVideoBuffer(buffer, caps, info, format, context, path, &cache);
     QVERIFY2(!hwBuffer, "Cached DMABuf path must reject a system-memory buffer and fall back to CPU mapping");
     QCOMPARE(path, HwVideoBufferPath::None);
     QVERIFY(!cache.validated);

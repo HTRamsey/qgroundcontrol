@@ -167,7 +167,8 @@ void testD3DMemoryDispatch(const char* uploadElement, const char* capsFilter, Hw
     QVideoFrameFormat format(QSize(GST_VIDEO_INFO_WIDTH(&sample.info), GST_VIDEO_INFO_HEIGHT(&sample.info)),
                              QVideoFrameFormat::Format_RGBA8888);
 
-    auto buffer = makeHwVideoBuffer(sample.sample, sample.info, format, context, path, &cache);
+    auto buffer = makeHwVideoBuffer(gst_sample_get_buffer(sample.sample), gst_sample_get_caps(sample.sample),
+                                    sample.info, format, context, path, &cache);
 
     QVERIFY2(buffer, "D3D memory sample did not create a hardware video buffer");
     QCOMPARE(path, expectedPath);
@@ -191,7 +192,8 @@ void testD3DMapTextures(QRhi& rhi, const char* inputCaps, const char* uploadElem
     QVideoFrameFormat format(QSize(GST_VIDEO_INFO_WIDTH(&sample.info), GST_VIDEO_INFO_HEIGHT(&sample.info)),
                              pixelFormat);
 
-    auto buffer = makeHwVideoBuffer(sample.sample, sample.info, format, context, path, &cache);
+    auto buffer = makeHwVideoBuffer(gst_sample_get_buffer(sample.sample), gst_sample_get_caps(sample.sample),
+                                    sample.info, format, context, path, &cache);
 
     QVERIFY2(buffer, "D3D memory sample did not create a hardware video buffer");
     QCOMPARE(path, expectedPath);

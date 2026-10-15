@@ -17,10 +17,6 @@ class QQuickWindow;
 
 namespace HwBuffers {
 
-/// Registers the compiled GPU paths (factory selection, context bridges, cache resets) in selection order. Called from
-/// the qgc plugin's init, before any pipeline exists; later calls do nothing.
-void initializeOnce() noexcept;
-
 /// Process-wide QGC_GST_* runtime toggles, parsed once and logged at first access so operators can paste the
 /// effective config into bug reports. Semantics match the historical per-call-site g_getenv reads.
 struct HwBufferEnvConfig
