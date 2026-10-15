@@ -17,6 +17,8 @@
 
 #include <QtCore/QDeadlineTimer>
 #include <QtCore/QMutexLocker>
+#include <QtCore/QThread>
+#include <QtCore/QTimer>
 #include <QtCore/QUrl>
 #include <QtQuick/QQuickItem>
 
@@ -35,6 +37,10 @@ constexpr std::chrono::seconds kEosTimeout{3};
 // Destructor wait for the worker. Must exceed kEosTimeout so a finalizing recording isn't abandoned.
 constexpr std::chrono::seconds kWorkerShutdownTimeout = kEosTimeout + std::chrono::seconds{2};
 constexpr qint64 kMinWatchdogTimeoutMs = 1000;
+constexpr std::chrono::milliseconds kWatchdogInterval{1000};
+// Reconnect backoff: 1 s, 2 s, 4 s, ... capped at 30 s. The cap bounds worst-case recovery after a long
+// RF outage and stays below a typical RTSP server keepalive (60 s).
+constexpr int kMaxReconnectBackoffSec = 30;
 
 // MP4/MOV robust muxing: qtmux reserves header space at the start of the file and rewrites the moov
 // there every update period, so a crash or power loss leaves a file playable up to the last update.
@@ -108,58 +114,96 @@ const char* recordingParserFactory(const GstCaps* caps)
 
 } // namespace
 
-GstVideoReceiver::GstVideoReceiver(QObject *parent)
+GstVideoReceiver::GstVideoReceiver(QObject* parent)
     : VideoReceiver(parent)
-    , _worker(new GstVideoWorker(this))
+    , _workerThread(new QThread(this))
+    , _workerContext(new QObject())
+    , _watchdogTimer(new QTimer(_workerContext))
+    , _reconnectTimer(new QTimer(_workerContext))
 {
     qCDebug(GstVideoReceiverLog) << this;
 
-    _worker->start();
-    (void) connect(&_watchdogTimer, &QTimer::timeout, this, &GstVideoReceiver::_watchdog);
+    _workerThread->setObjectName(QStringLiteral("GstVideoReceiver"));
+    _watchdogTimer->setInterval(kWatchdogInterval);
+    _reconnectTimer->setSingleShot(true);
+    // Backoff delays are asserted by tests; a coarse timer may fire up to 5% early.
+    _reconnectTimer->setTimerType(Qt::PreciseTimer);
+    (void) connect(_watchdogTimer, &QTimer::timeout, _workerContext, [this]() { _onWatchdogTick(); });
+    (void) connect(_reconnectTimer, &QTimer::timeout, _workerContext, [this]() { _reconnect(); });
+
+    _workerContext->moveToThread(_workerThread);
+    (void) connect(_workerThread, &QThread::finished, _workerContext, &QObject::deleteLater);
+    _workerThread->start();
 }
 
 GstVideoReceiver::~GstVideoReceiver()
 {
-    _watchdogTimer.stop();
-
     // Tear down synchronously: queued tasks and pipeline callbacks capture `this`, so the worker
     // must be idle and the pipeline gone before members are destroyed. No onStopComplete here;
     // listeners must not be handed a receiver that is being destroyed.
-    _worker->dispatch([this]() { (void) _stopPipeline(); });
-    _worker->shutdown();
+    _runOnWorker([this]() {
+        _reconnectTimer->stop();
+        (void) _stopPipeline();
+        _workerThread->quit();
+    });
+
+    if (!_workerThread->wait(QDeadlineTimer(kWorkerShutdownTimeout))) {
+        // Destroying a running QThread aborts the process, and queued tasks still reference this receiver.
+        qCWarning(GstVideoReceiverLog) << "Worker still busy after"
+                                       << std::chrono::milliseconds(kWorkerShutdownTimeout).count()
+                                       << "ms; waiting for it to finish";
+        (void) _workerThread->wait();
+    }
 
     qCDebug(GstVideoReceiverLog) << this;
 }
 
+bool GstVideoReceiver::_onWorkerThread() const
+{
+    return QThread::currentThread() == _workerThread;
+}
+
 QString GstVideoReceiver::_redactedUri() const
 {
-    return QGCNetworkHelper::redactedUrlForLogging(_uri);
+    return _config.redactedUri;
 }
 
 void GstVideoReceiver::start(uint32_t timeout)
 {
-    if (_needDispatch()) {
-        _worker->dispatch([this, timeout]() { start(timeout); });
-        return;
-    }
+    const StartConfig config{
+        .uri = _uri,
+        .redactedUri = QGCNetworkHelper::redactedUrlForLogging(_uri),
+        .timeoutSec = timeout,
+        .lowLatency = _lowLatency,
+        .rtpJitterLatencyMs = _rtpJitterLatencyMs,
+    };
+    _runOnWorker([this, config]() {
+        // A user start supersedes any pending reconnect and restarts the backoff.
+        _reconnectTimer->stop();
+        _reconnectAttempts = 0;
+        _startPipeline(config);
+    });
+}
 
+void GstVideoReceiver::_startPipeline(const StartConfig& config)
+{
     if (_pipeline) {
         qCDebug(GstVideoReceiverLog) << "Already running!" << _redactedUri();
         emit onStartComplete(STATUS_INVALID_STATE);
         return;
     }
 
-    if (_uri.isEmpty()) {
+    if (config.uri.isEmpty()) {
         qCDebug(GstVideoReceiverLog) << "Failed because URI is not specified";
         emit onStartComplete(STATUS_INVALID_URL);
         return;
     }
 
-    _timeout = timeout;
-    _buffer = lowLatency() ? -1 : 0;
+    _config = config;
+    _sourceFrameCount.store(0, std::memory_order_relaxed);
 
-    qCDebug(GstVideoReceiverLog) << "Starting" << _redactedUri() << ", lowLatency" << lowLatency()
-                                << ", timeout" << _timeout;
+    qCDebug(GstVideoReceiverLog) << "Starting" << _redactedUri() << ", lowLatency" << _config.lowLatency << ", timeout"
+                                 << _config.timeoutSec;
 
     // GST_DEBUG_BIN_TO_DOT_FILE is a no-op unless GST_DEBUG_DUMP_DOT_DIR is set; surface that
     // once per process so field debugging doesn't require re-reading the source.
@@ -262,16 +306,14 @@ void GstVideoReceiver::start(uint32_t timeout)
                      nullptr);
 
         GStreamer::SourceFactory::Config sourceConfig;
-        sourceConfig.jitterBuffer = (_buffer < 0)
-            ? GStreamer::SourceFactory::JitterBuffer::None
-            : (_buffer == 0
-                ? GStreamer::SourceFactory::JitterBuffer::DropOnLatency
-                : GStreamer::SourceFactory::JitterBuffer::Buffered);
-        sourceConfig.latencyMs = _rtpJitterLatencyMs;
+        sourceConfig.jitterBuffer = _config.lowLatency ? GStreamer::SourceFactory::JitterBuffer::None
+                                                       : GStreamer::SourceFactory::JitterBuffer::DropOnLatency;
+        sourceConfig.latencyMs = _config.rtpJitterLatencyMs;
         // do-retransmission needs ≥40 ms latency headroom over the default 20 ms rtx-delay;
         // forcibly disable for sub-frame latency configurations to avoid retransmit storms.
-        sourceConfig.doRetransmission = (_rtpJitterLatencyMs >= 40) && (sourceConfig.jitterBuffer != GStreamer::SourceFactory::JitterBuffer::None);
-        _source = GStreamer::SourceFactory::create(_uri, sourceConfig);
+        sourceConfig.doRetransmission = (_config.rtpJitterLatencyMs >= 40) &&
+                                        (sourceConfig.jitterBuffer != GStreamer::SourceFactory::JitterBuffer::None);
+        _source = GStreamer::SourceFactory::create(_config.uri, sourceConfig);
         if (!_source) {
             qCCritical(GstVideoReceiverLog) << "SourceFactory::create() failed";
             break;
@@ -337,21 +379,19 @@ void GstVideoReceiver::start(uint32_t timeout)
         GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(_pipeline), GST_DEBUG_GRAPH_SHOW_ALL, "pipeline-started");
         qCDebug(GstVideoReceiverLog) << "Started" << _redactedUri();
 
-        // _watchdogTimer lives on `this` (GUI thread); the emit runs synchronously on the
-        // worker thread, so the timer start has to be queued separately or QObject warns.
-        QMetaObject::invokeMethod(this, [this]() { _watchdogTimer.start(1000); }, Qt::QueuedConnection);
+        _watchdogTimer->start();
         emit onStartComplete(STATUS_OK);
     }
 }
 
 void GstVideoReceiver::stop()
 {
-    if (_needDispatch()) {
-        _worker->dispatch([this]() { stop(); });
-        return;
-    }
-
-    emit onStopComplete(_stopPipeline() ? STATUS_OK : STATUS_INVALID_STATE);
+    _runOnWorker([this]() {
+        // A user stop also cancels a pending reconnect.
+        _reconnectTimer->stop();
+        _reconnectAttempts = 0;
+        emit onStopComplete(_stopPipeline() ? STATUS_OK : STATUS_INVALID_STATE);
+    });
 }
 
 bool GstVideoReceiver::_stopPipeline()
@@ -454,8 +494,7 @@ void GstVideoReceiver::_resetPipelineState()
 {
     // Supersede queued reconnects and ERROR handlers for this pipeline before it disappears.
     _reconnectEpoch.fetch_add(1, std::memory_order_relaxed);
-    // The timer lives on `this` (GUI thread).
-    QMetaObject::invokeMethod(this, [this]() { _watchdogTimer.stop(); }, Qt::QueuedConnection);
+    _watchdogTimer->stop();
 
     if (_pipeline) {
         detachBusHandler(_pipeline, this);
@@ -516,18 +555,19 @@ void GstVideoReceiver::_resetPipelineState()
 void GstVideoReceiver::startDecoding(void *sink)
 {
     if (!sink) {
-        qCCritical(GstVideoReceiverLog) << "VideoSink is NULL" << _redactedUri();
+        qCCritical(GstVideoReceiverLog) << "VideoSink is NULL";
         return;
     }
 
-    if (_needDispatch()) {
-        _worker->dispatch([this, sink]() mutable { startDecoding(sink); });
-        return;
-    }
+    const bool hasWidget = (_widget != nullptr);
+    _runOnWorker([this, sink, hasWidget]() { _startDecoding(GST_ELEMENT(sink), hasWidget); });
+}
 
+void GstVideoReceiver::_startDecoding(GstElement* videoSink, bool hasWidget)
+{
     qCDebug(GstVideoReceiverLog) << "Starting decoding" << _redactedUri();
 
-    if (!_widget) {
+    if (!hasWidget) {
         qCDebug(GstVideoReceiverLog) << "Video Widget is NULL" << _redactedUri();
         emit onStartDecodingComplete(STATUS_FAIL);
         return;
@@ -544,7 +584,6 @@ void GstVideoReceiver::startDecoding(void *sink)
         return;
     }
 
-    GstElement *videoSink = GST_ELEMENT(sink);
     GstPad *pad = gst_element_get_static_pad(videoSink, "sink");
     if (!pad) {
         qCCritical(GstVideoReceiverLog) << "Unable to find sink pad of video sink" << _redactedUri();
@@ -553,7 +592,6 @@ void GstVideoReceiver::startDecoding(void *sink)
     }
 
     _lastVideoFrameTime = 0;
-    _resetVideoSink = true;
 
     _videoSinkProbeId = gst_pad_add_probe(pad, GST_PAD_PROBE_TYPE_BUFFER, _videoSinkProbe, this, nullptr);
     gst_clear_object(&pad);
@@ -588,8 +626,8 @@ void GstVideoReceiver::startDecoding(void *sink)
 
 void GstVideoReceiver::stopDecoding()
 {
-    if (_needDispatch()) {
-        _worker->dispatch([this]() { stopDecoding(); });
+    if (!_onWorkerThread()) {
+        _runOnWorker([this]() { stopDecoding(); });
         return;
     }
 
@@ -620,9 +658,8 @@ void GstVideoReceiver::stopDecoding()
 
 void GstVideoReceiver::startRecording(const QString &videoFile, FILE_FORMAT format)
 {
-    if (_needDispatch()) {
-        const QString cachedVideoFile = videoFile;
-        _worker->dispatch([this, cachedVideoFile, format]() { startRecording(cachedVideoFile, format); });
+    if (!_onWorkerThread()) {
+        _runOnWorker([this, videoFile, format]() { startRecording(videoFile, format); });
         return;
     }
 
@@ -728,8 +765,8 @@ void GstVideoReceiver::startRecording(const QString &videoFile, FILE_FORMAT form
 
 void GstVideoReceiver::stopRecording()
 {
-    if (_needDispatch()) {
-        _worker->dispatch([this]() { stopRecording(); });
+    if (!_onWorkerThread()) {
+        _runOnWorker([this]() { stopRecording(); });
         return;
     }
 
@@ -760,9 +797,8 @@ void GstVideoReceiver::stopRecording()
 
 void GstVideoReceiver::takeScreenshot(const QString &imageFile)
 {
-    if (_needDispatch()) {
-        const QString cachedImageFile = imageFile;
-        _worker->dispatch([this, cachedImageFile]() { takeScreenshot(cachedImageFile); });
+    if (!_onWorkerThread()) {
+        _runOnWorker([this, imageFile]() { takeScreenshot(imageFile); });
         return;
     }
 
@@ -772,135 +808,105 @@ void GstVideoReceiver::takeScreenshot(const QString &imageFile)
     emit onTakeScreenshotComplete(STATUS_NOT_IMPLEMENTED);
 }
 
-void GstVideoReceiver::_watchdog()
+void GstVideoReceiver::_onWatchdogTick()
 {
-    _worker->dispatch([this]() {
-        if (!_pipeline) {
-            return;
+    if (!_pipeline) {
+        return;
+    }
+
+    const qint64 now = monotonicMs();
+    // start(0) would otherwise trip on every tick.
+    const qint64 timeoutMs = std::max(static_cast<qint64>(_config.timeoutSec) * 1000, kMinWatchdogTimeoutMs);
+    qint64 lastSourceFrameTime = _lastSourceFrameTime.load(std::memory_order_relaxed);
+    if (lastSourceFrameTime == 0) {
+        lastSourceFrameTime = now;
+        _lastSourceFrameTime.store(now, std::memory_order_relaxed);
+    }
+
+    if (++_statsTickCounter >= 10) {
+        _statsTickCounter = 0;
+        if (const HwBuffers::PathStats hwStats = HwBuffers::formatPathStats(false); hwStats.totalDelivered > 0) {
+            qCDebug(GstVideoReceiverLog).noquote() << "HW path live" << _redactedUri() << hwStats.line;
+        }
+    }
+
+    // Drain QoS updates accumulated since the last tick (see GST_MESSAGE_QOS).
+    if (_qosStatsDirty.exchange(false, std::memory_order_acq_rel)) {
+        emit decoderStatsChanged();
+    }
+
+    qint64 elapsed = now - lastSourceFrameTime;
+    if (elapsed > timeoutMs) {
+        qCDebug(GstVideoReceiverLog) << "Stream timeout, no frames for" << elapsed << "ms" << _redactedUri();
+        GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(_pipeline), GST_DEBUG_GRAPH_SHOW_ALL, "pipeline-watchdog-timeout");
+        emit timeout();
+        _scheduleReconnect("source watchdog");
+        return;
+    }
+
+    if (_decoding && !_removingDecoder) {
+        qint64 lastVideoFrameTime = _lastVideoFrameTime.load(std::memory_order_relaxed);
+        if (lastVideoFrameTime == 0) {
+            lastVideoFrameTime = now;
+            _lastVideoFrameTime.store(now, std::memory_order_relaxed);
         }
 
-        const qint64 now = monotonicMs();
-        // start(0) would otherwise trip on every tick.
-        const qint64 timeoutMs = std::max(static_cast<qint64>(_timeout) * 1000, kMinWatchdogTimeoutMs);
-        qint64 lastSourceFrameTime = _lastSourceFrameTime.load(std::memory_order_relaxed);
-        if (lastSourceFrameTime == 0) {
-            lastSourceFrameTime = now;
-            _lastSourceFrameTime.store(now, std::memory_order_relaxed);
-        }
-
-        if (++_statsTickCounter >= 10) {
-            _statsTickCounter = 0;
-            if (const HwBuffers::PathStats hwStats = HwBuffers::formatPathStats(false); hwStats.totalDelivered > 0) {
-                qCDebug(GstVideoReceiverLog).noquote() << "HW path live" << _redactedUri() << hwStats.line;
-            }
-        }
-
-        // Drain QoS updates accumulated since the last tick (see GST_MESSAGE_QOS).
-        if (_qosStatsDirty.exchange(false, std::memory_order_acq_rel)) {
-            emit decoderStatsChanged();
-        }
-
-        qint64 elapsed = now - lastSourceFrameTime;
-        if (elapsed > timeoutMs) {
-            qCDebug(GstVideoReceiverLog) << "Stream timeout, no frames for" << elapsed << "ms" << _redactedUri();
+        elapsed = now - lastVideoFrameTime;
+        if (elapsed > (timeoutMs * 2)) {
+            qCDebug(GstVideoReceiverLog) << "Video decoder timeout, no frames for" << elapsed << "ms" << _redactedUri();
             GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(_pipeline), GST_DEBUG_GRAPH_SHOW_ALL, "pipeline-watchdog-timeout");
             emit timeout();
-            _scheduleReconnect("source watchdog");
-            return;
+            _scheduleReconnect("decoder watchdog");
         }
-
-        if (_decoding && !_removingDecoder) {
-            qint64 lastVideoFrameTime = _lastVideoFrameTime.load(std::memory_order_relaxed);
-            if (lastVideoFrameTime == 0) {
-                lastVideoFrameTime = now;
-                _lastVideoFrameTime.store(now, std::memory_order_relaxed);
-            }
-
-            elapsed = now - lastVideoFrameTime;
-            if (elapsed > (timeoutMs * 2)) {
-                qCDebug(GstVideoReceiverLog)
-                    << "Video decoder timeout, no frames for" << elapsed << "ms" << _redactedUri();
-                GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(_pipeline), GST_DEBUG_GRAPH_SHOW_ALL, "pipeline-watchdog-timeout");
-                emit timeout();
-                _scheduleReconnect("decoder watchdog");
-            }
-        }
-    });
+    }
 }
 
 void GstVideoReceiver::_scheduleReconnect(const char *reason)
 {
+    // A pipeline that delivered frames recovered; the next failure starts the backoff over.
+    if (_sourceFrameCount.load(std::memory_order_relaxed) > 0) {
+        _reconnectAttempts = 0;
+    }
+
     // Always tear down — even when autoReconnect is off we still want a clean stop.
-    // stop() bumps _reconnectEpoch, so any prior singleShot lambda becomes a no-op.
-    stop();
-    // Captured here, on the worker, so a later stop()/start() cycle supersedes this reconnect.
-    const quint64 epoch = _reconnectEpoch.load(std::memory_order_relaxed);
+    emit onStopComplete(_stopPipeline() ? STATUS_OK : STATUS_INVALID_STATE);
 
     if (!_autoReconnect) {
         qCDebug(GstVideoReceiverLog) << "Auto-reconnect disabled — not retrying after" << reason;
         return;
     }
 
-    if (_uri.isEmpty()) {
+    ++_reconnectAttempts;
+    const int delaySec = std::min(1 << std::min(_reconnectAttempts - 1, 5), kMaxReconnectBackoffSec);
+    qCDebug(GstVideoReceiverLog) << "Scheduling reconnect #" << _reconnectAttempts << "in" << delaySec << "s after"
+                                 << reason << _redactedUri();
+    _reconnectTimer->start(std::chrono::seconds(delaySec));
+}
+
+void GstVideoReceiver::_reconnect()
+{
+    if (!_autoReconnect) {
+        qCDebug(GstVideoReceiverLog) << "Auto-reconnect disabled while waiting; not reconnecting" << _redactedUri();
         return;
     }
 
-    // Snapshot on the worker thread — where start() last wrote _timeout and where _uri reads
-    // are already sequenced — so the GUI-thread lambdas below don't read racy members.
-    const uint32_t reconnectTimeout = (_timeout != 0) ? _timeout : 8;
-    const QString uri = _uri;
-
-    // Schedule on the GUI thread (QTimer::singleShot requires its receiver's thread). Worker
-    // is the only caller today, but route through invokeMethod so a future direct GUI-thread
-    // call (e.g. user-initiated retry) stays correct.
-    QMetaObject::invokeMethod(
-        this,
-        [this, reason, reconnectTimeout, uri, epoch]() {
-            if (epoch != _reconnectEpoch.load(std::memory_order_relaxed)) {
-                return;  // superseded before it was even scheduled; don't count an attempt
-            }
-            const int next = std::min(_reconnectAttempts.load(std::memory_order_relaxed) + 1, 30);
-            _reconnectAttempts.store(next, std::memory_order_relaxed);
-            // 1s → 2s → 4s → 8s → 16s, capped at 30s. Capping bounds worst-case "vehicle in flight,
-            // RF down for 5 min" recovery; lower than typical RTSP server keepalive (60s).
-            const int delaySec = std::min(1 << std::min(next - 1, 5), 30);
-            const int attempts = next;
-            qCInfo(GstVideoReceiverLog) << "Scheduling reconnect #" << attempts << "in" << delaySec << "s after"
-                                        << reason << QGCNetworkHelper::redactedUrlForLogging(uri);
-            QTimer::singleShot(delaySec * 1000, this, [this, epoch, attempts, reconnectTimeout, uri]() {
-                if (epoch != _reconnectEpoch.load(std::memory_order_relaxed))
-                    return;  // superseded by stop()
-                // _pipeline is mutated by the worker under _pipelineMutex; a bare deref here (GUI
-                // thread) races teardown, so probe liveness through the mutex-guarded accessor.
-                GstElement* livePipeline = _acquirePipelineRef();
-                const bool pipelineUp = (livePipeline != nullptr);
-                if (livePipeline)
-                    gst_object_unref(livePipeline);
-                if (uri.isEmpty() || pipelineUp)
-                    return;  // pipeline already came back
-                qCInfo(GstVideoReceiverLog)
-                    << "Reconnecting (attempt" << attempts << ")" << QGCNetworkHelper::redactedUrlForLogging(uri);
-                start(reconnectTimeout);
-            });
-        },
-        Qt::QueuedConnection);
+    qCDebug(GstVideoReceiverLog) << "Reconnecting (attempt" << _reconnectAttempts << ")" << _redactedUri();
+    _startPipeline(_config);
 }
 
 void GstVideoReceiver::dumpPipelineGraph(const QString &tag)
 {
-    _worker->dispatch([this, tag]() {
-        GstElement *pipelineRef = _acquirePipelineRef();
-        if (!pipelineRef) {
+    _runOnWorker([this, tag]() {
+        if (!_pipeline) {
             qCDebug(GstVideoReceiverLog) << "dumpPipelineGraph: pipeline not running";
             return;
         }
         const QByteArray tagUtf8 = tag.toUtf8();
-        GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(pipelineRef), GST_DEBUG_GRAPH_SHOW_ALL, tagUtf8.constData());
-        const QString dotPath = GStreamer::writePipelineDot(pipelineRef, tagUtf8.constData());
+        GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(_pipeline), GST_DEBUG_GRAPH_SHOW_ALL, tagUtf8.constData());
+        const QString dotPath = GStreamer::writePipelineDot(_pipeline, tagUtf8.constData());
         if (!dotPath.isEmpty()) {
-            qCInfo(GstVideoReceiverLog) << "Pipeline graph saved to" << dotPath;
+            qCDebug(GstVideoReceiverLog) << "Pipeline graph saved to" << dotPath;
         }
-        gst_object_unref(pipelineRef);
     });
 }
 
@@ -911,7 +917,7 @@ void GstVideoReceiver::_handleEOS()
     }
 
     if (_endOfStream) {
-        stop();
+        emit onStopComplete(_stopPipeline() ? STATUS_OK : STATUS_INVALID_STATE);
     } else if (_decoding && _removingDecoder) {
         _shutdownDecodingBranch();
     } else if (_recording && _removingRecorder) {
@@ -1228,9 +1234,7 @@ void GstVideoReceiver::_ensureVideoSinkInPipeline()
         return;
     }
 
-    g_object_set(_videoSink,
-                 "sync", (_buffer >= 0),
-                 NULL);
+    g_object_set(_videoSink, "sync", !_config.lowLatency, NULL);
 
     // The sink is never floating here, so the bin takes its own reference; removal drops only that one.
     (void) gst_bin_add(GST_BIN(_pipeline), _videoSink);
@@ -1330,17 +1334,9 @@ bool GstVideoReceiver::_addVideoSink(GstPad *pad)
 void GstVideoReceiver::_noteTeeFrame()
 {
     _lastSourceFrameTime.store(monotonicMs(), std::memory_order_relaxed);
-    // Successful frame arrival: drop the reconnect backoff so the next failure starts at 1 s,
-    // not minutes-into-the-curve. This probe runs on the streaming thread while the backoff
-    // increment runs on the GUI thread; post the reset there too so all mutation of
-    // _reconnectAttempts is single-threaded and the increment can't clobber the reset.
-    if (_reconnectAttempts.load(std::memory_order_relaxed) != 0) {
-        QMetaObject::invokeMethod(
-            this, [this]() { _reconnectAttempts.store(0, std::memory_order_relaxed); }, Qt::QueuedConnection);
-    }
     const quint64 sourceFrames = _sourceFrameCount.fetch_add(1, std::memory_order_relaxed) + 1;
     if (sourceFrames == 1) {
-        qCInfo(GstVideoReceiverLog).noquote() << "Source receiving frames (tee):" << _redactedUri();
+        qCDebug(GstVideoReceiverLog).noquote() << "Source receiving frames (tee):" << _redactedUri();
     } else if ((sourceFrames % 300) == 0) {
         qCDebug(GstVideoReceiverLog).noquote()
             << "Source flow: teeFrames=" << sourceFrames << "decoding=" << _decoding << _redactedUri();
@@ -1490,11 +1486,6 @@ void GstVideoReceiver::_shutdownRecordingBranch()
     GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(_pipeline), GST_DEBUG_GRAPH_SHOW_ALL, "pipeline-recording-stopped");
 }
 
-bool GstVideoReceiver::_needDispatch()
-{
-    return _worker->needDispatch();
-}
-
 GstElement *GstVideoReceiver::_acquirePipelineRef() const
 {
     QMutexLocker lock(&_pipelineMutex);
@@ -1559,7 +1550,7 @@ gboolean GstVideoReceiver::_onBusMessage(GstBus * /* bus */, GstMessage *msg, gp
         // A failing pipeline usually posts several ERRORs; only the first one per pipeline
         // lifetime (epoch) acts, the teardown it triggers makes the rest stale.
         const quint64 epoch = pThis->_reconnectEpoch.load(std::memory_order_relaxed);
-        pThis->_worker->dispatch([pThis, epoch]() {
+        pThis->_runOnWorker([pThis, epoch]() {
             if (epoch != pThis->_reconnectEpoch.load(std::memory_order_relaxed)) {
                 return;
             }
@@ -1582,7 +1573,7 @@ gboolean GstVideoReceiver::_onBusMessage(GstBus * /* bus */, GstMessage *msg, gp
         break;
     }
     case GST_MESSAGE_EOS:
-        pThis->_worker->dispatch([pThis]() {
+        pThis->_runOnWorker([pThis]() {
             qCDebug(GstVideoReceiverLog) << "Received EOS";
             pThis->_handleEOS();
         });
@@ -1662,7 +1653,7 @@ gboolean GstVideoReceiver::_onBusMessage(GstBus * /* bus */, GstMessage *msg, gp
         }
 
         if (GST_MESSAGE_TYPE(forward_msg) == GST_MESSAGE_EOS) {
-            pThis->_worker->dispatch([pThis]() {
+            pThis->_runOnWorker([pThis]() {
                 qCDebug(GstVideoReceiverLog) << "Received branch EOS";
                 pThis->_handleEOS();
             });
@@ -1700,7 +1691,7 @@ gboolean GstVideoReceiver::_onBusMessage(GstBus * /* bus */, GstMessage *msg, gp
         break;
     }
     case GST_MESSAGE_LATENCY:
-        pThis->_worker->dispatch([pThis]() {
+        pThis->_runOnWorker([pThis]() {
             GstElement* pipeline = pThis->_acquirePipelineRef();
             if (pipeline) {
                 (void) gst_bin_recalculate_latency(GST_BIN(pipeline));
@@ -1751,37 +1742,7 @@ GstPadProbeReturn GstVideoReceiver::_videoSinkProbe(GstPad *pad, GstPadProbeInfo
     Q_UNUSED(pad); Q_UNUSED(info)
 
     if (user_data) {
-        GstVideoReceiver *pThis = static_cast<GstVideoReceiver*>(user_data);
-
-        if (pThis->_resetVideoSink) {
-            pThis->_resetVideoSink = false;
-
-#if 0 // FIXME: this makes MPEG2-TS playing smooth but breaks RTSP
-           gst_pad_send_event(pad, gst_event_new_flush_start());
-           gst_pad_send_event(pad, gst_event_new_flush_stop(TRUE));
-
-           GstBuffer* buf;
-
-           if ((buf = gst_pad_probe_info_get_buffer(info)) != nullptr) {
-               GstSegment* seg;
-
-               if ((seg = gst_segment_new()) != nullptr) {
-                   gst_segment_init(seg, GST_FORMAT_TIME);
-
-                   seg->start = buf->pts;
-
-                   gst_pad_send_event(pad, gst_event_new_segment(seg));
-
-                   gst_segment_free(seg);
-                   seg = nullptr;
-               }
-
-               gst_pad_set_offset(pad, -static_cast<gint64>(buf->pts));
-           }
-#endif
-        }
-
-        pThis->_noteVideoSinkFrame();
+        static_cast<GstVideoReceiver*>(user_data)->_noteVideoSinkFrame();
     }
 
     return GST_PAD_PROBE_OK;
@@ -1845,62 +1806,4 @@ GstPadProbeReturn GstVideoReceiver::_keyframeWatch(GstPad *pad, GstPadProbeInfo 
     gulong ownId = GST_PAD_PROBE_INFO_ID(info);
     (void) pThis->_keyframeWatchId.compare_exchange_strong(ownId, 0);
     return GST_PAD_PROBE_REMOVE;
-}
-
-GstVideoWorker::GstVideoWorker(QObject *parent)
-    : QThread(parent)
-{
-    qCDebug(GstVideoReceiverLog) << this;
-}
-
-GstVideoWorker::~GstVideoWorker()
-{
-    qCDebug(GstVideoReceiverLog) << this;
-}
-
-bool GstVideoWorker::needDispatch() const
-{
-    return (QThread::currentThread() != this);
-}
-
-void GstVideoWorker::dispatch(Task task)
-{
-    QMutexLocker lock(&_taskQueueSync);
-    _taskQueue.enqueue(task);
-    _taskQueueUpdate.wakeOne();
-}
-
-void GstVideoWorker::shutdown()
-{
-    if (!needDispatch()) {
-        // run() has no event loop (QThread::quit() would be a no-op); it exits after the current task.
-        _shutdown = true;
-        return;
-    }
-
-    dispatch([this]() { _shutdown = true; });
-    if (!wait(QDeadlineTimer(kWorkerShutdownTimeout))) {
-        // Destroying a running QThread aborts the process, and queued tasks still reference their owner.
-        qCWarning(GstVideoReceiverLog) << "Worker still busy after"
-                                       << std::chrono::milliseconds(kWorkerShutdownTimeout).count()
-                                       << "ms; waiting for it to finish";
-        (void) wait();
-    }
-}
-
-void GstVideoWorker::run()
-{
-    while (!_shutdown) {
-        _taskQueueSync.lock();
-
-        while (_taskQueue.isEmpty()) {
-            _taskQueueUpdate.wait(&_taskQueueSync);
-        }
-
-        const Task task = _taskQueue.dequeue();
-
-        _taskQueueSync.unlock();
-
-        task();
-    }
 }

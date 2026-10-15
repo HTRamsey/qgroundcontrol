@@ -1,47 +1,19 @@
 #pragma once
 
 #include <atomic>
-
-#include <QtCore/QMutex>
-#include <QtCore/QQueue>
-#include <QtCore/QThread>
-#include <QtCore/QTimer>
-#include <QtCore/QWaitCondition>
-
 #include <glib.h>
 #include <gst/gstelement.h>
 #include <gst/gstpad.h>
+#include <utility>
+
+#include <QtCore/QMetaObject>
+#include <QtCore/QMutex>
+#include <QtCore/QString>
 
 #include "VideoReceiver.h"
 
-typedef std::function<void()> Task;
-
-/*===========================================================================*/
-
-class GstVideoWorker : public QThread
-{
-    Q_OBJECT
-
-public:
-    explicit GstVideoWorker(QObject *parent = nullptr);
-    ~GstVideoWorker();
-    bool needDispatch() const;
-    void dispatch(Task task);
-    void shutdown();
-
-private:
-    void run() final;
-
-    QWaitCondition _taskQueueUpdate;
-    QMutex _taskQueueSync;
-    QQueue<Task> _taskQueue;
-    bool _shutdown = false;
-};
-
-/*===========================================================================*/
-
-typedef struct _GstElement GstElement;
-
+class QThread;
+class QTimer;
 class GStreamerTest;
 
 class GstVideoReceiver : public VideoReceiver
@@ -82,17 +54,35 @@ public slots:
 signals:
     void decoderStatsChanged();
 
-private slots:
-    void _watchdog();
-    void _handleEOS();
-
 private:
     friend class GStreamerTest;
+
+    /// Settings a pipeline is started with, captured on the caller's thread so the worker and
+    /// streaming threads never read members the GUI thread writes.
+    struct StartConfig
+    {
+        QString uri;
+        QString redactedUri;
+        uint32_t timeoutSec = 0;
+        bool lowLatency = false;
+        int rtpJitterLatencyMs = 0;
+    };
+
+    /// Queues @p task on the worker thread, which owns the pipeline and all receiver state not marked atomic.
+    template <typename Task>
+    void _runOnWorker(Task&& task)
+    {
+        (void) QMetaObject::invokeMethod(_workerContext, std::forward<Task>(task), Qt::QueuedConnection);
+    }
+
+    bool _onWorkerThread() const;
 
     QString _redactedUri() const;
     GstElement *_makeDecoder();
     static GstElement* _makeFileSink(const QString& videoFile, FILE_FORMAT format, const GstCaps* inputCaps);
 
+    void _startPipeline(const StartConfig& config);
+    void _startDecoding(GstElement* videoSink, bool hasWidget);
     void _onNewSourcePad(GstPad *pad);
     void _onNewDecoderPad(GstPad *pad);
     bool _addDecoder(GstElement *src);
@@ -114,13 +104,14 @@ private:
     /// signals. Safe on a partially built pipeline (failed start()).
     void _resetPipelineState();
     void _logDecodebin3SelectedCodec(GstElement *decodebin3);
-
-    bool _needDispatch();
+    void _handleEOS();
+    void _onWatchdogTick();
 
     /// Stop the pipeline and queue a delayed restart with exponential backoff.
     /// `reason` is logged so reconnect storms are diagnosable. No-op when
     /// autoReconnect() is disabled.
     void _scheduleReconnect(const char *reason);
+    void _reconnect();
 
     /// Returns a strong ref to _pipeline (caller must gst_object_unref) or nullptr if torn down.
     /// Bus sync-message callbacks run on the streaming thread concurrent with stop() on the
@@ -134,6 +125,13 @@ private:
     static GstPadProbeReturn _eosProbe(GstPad *pad, GstPadProbeInfo *info, gpointer user_data);
     static GstPadProbeReturn _keyframeWatch(GstPad *pad, GstPadProbeInfo *info, gpointer user_data);
 
+    QThread* _workerThread = nullptr;
+    /// Lives on _workerThread; tasks and the timers below run there. Deleted when the thread finishes.
+    QObject* _workerContext = nullptr;
+    QTimer* _watchdogTimer = nullptr;
+    QTimer* _reconnectTimer = nullptr;
+
+    StartConfig _config;
     GstElement *_decoder = nullptr;
     GstElement *_decoderValve = nullptr;
     GstElement *_fileSink = nullptr;
@@ -143,10 +141,9 @@ private:
     GstElement *_source = nullptr;
     GstElement *_tee = nullptr;
     GstElement *_videoSink = nullptr;
-    GstVideoWorker *_worker = nullptr;
-    std::atomic<int> _reconnectAttempts = 0;     ///< Written on the streaming thread (_noteTeeFrame) and GUI thread (reconnect lambda); atomic.
-    /// Bumped on every teardown (stop() or failed start()); queued reconnect timers and ERROR handlers
-    /// captured under an older epoch become no-ops.
+    int _reconnectAttempts = 0;
+    /// Bumped on every teardown (stop() or failed start()); queued ERROR handlers captured under an
+    /// older epoch become no-ops.
     std::atomic<quint64> _reconnectEpoch = 0;
     std::atomic<quint64> _sourceFrameCount =
         0;  ///< Tee-probe frame tally (streaming thread); drives the source-side flow heartbeat log.
@@ -158,6 +155,18 @@ private:
     std::atomic<gulong> _keyframeWatchId = 0;  // cleared by _keyframeWatch (streaming thread) when it removes itself
     bool _recordingStopRequested = false;
 
+    bool _recording = false;
+    bool _removingDecoder = false;
+    bool _removingRecorder = false;
+    int _statsTickCounter = 0;
+    // Flipped on streaming threads.
+    std::atomic<bool> _decoding = false;
+    std::atomic<bool> _streaming = false;
+    std::atomic<bool> _endOfStream = false;
+    // Monotonic ms. Written on streaming threads (pad probes), read/written by the watchdog on the worker thread.
+    std::atomic<qint64> _lastSourceFrameTime = 0;
+    std::atomic<qint64> _lastVideoFrameTime = 0;
+
     mutable QMutex _decoderNameMutex;  // QString refcount isn't thread-safe across reader/writer threads
     QString _decoderName;
     std::atomic<quint64> _processedFrames{0};   // written on streaming thread (QOS), read on GUI
@@ -165,7 +174,7 @@ private:
     std::atomic<qint64>  _currentJitterNs{0};
     std::atomic<double>  _qosProportion{1.0};
     std::atomic<int>     _qosQuality{1000000};
-    std::atomic<bool>    _qosStatsDirty{false};  // set per QOS message (streaming thread), drained by _watchdog's 1 Hz emit
+    std::atomic<bool> _qosStatsDirty{false};  // set per QOS message, drained by the 1 Hz watchdog tick
 
     static constexpr const char *_kFileMux[FILE_FORMAT_MAX + 1] = {
         "matroskamux",
