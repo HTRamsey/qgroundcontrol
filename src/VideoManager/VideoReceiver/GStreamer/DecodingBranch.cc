@@ -99,7 +99,6 @@ void DecodingBranch::start(GstElement* videoSink, bool hasWidget, bool streaming
 
     _sinkProbeId = gst_pad_add_probe(pad.get(), GST_PAD_PROBE_TYPE_BUFFER, _sinkProbe, this, nullptr);
 
-    // The caller keeps its own (non-floating) reference; ours is dropped in _shutdown().
     _videoSink = GStreamer::adoptElement(GST_ELEMENT(gst_object_ref(videoSink)));
     _sinkStatsAtStart = _readSinkStats();
 
@@ -266,7 +265,6 @@ void DecodingBranch::_ensureVideoSinkInPipeline()
 
     g_object_set(_videoSink.get(), "sync", !_receiver._config.lowLatency, NULL);
 
-    // The sink is never floating here, so the bin takes its own reference; removal drops only that one.
     (void) gst_bin_add(GST_BIN(_pipeline), _videoSink.get());
 
     // PAUSED (not READY) triggers downstream caps negotiation before source data arrives.

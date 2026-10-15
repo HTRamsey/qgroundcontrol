@@ -88,10 +88,6 @@ GStreamer::GstElementPtr RecordingBranch::makeFileSink(const QString& videoFile,
         }
     }
 
-    // splitmuxsink owns its own muxer + filesink internally, handles request-pad
-    // lifetime, and finalizes asynchronously so EOS no longer wedges the worker
-    // thread (replaces the manual qtmux/matroskamux+filesink combo + "stuck muxer"
-    // bounded-wait in stop()). max-size-time=0 keeps single-file behaviour.
     GStreamer::GstElementPtr splitmuxOwner = GStreamer::adoptElement(gst_element_factory_make("splitmuxsink", nullptr));
     if (!splitmuxOwner) {
         qCWarning(GstVideoReceiverLog) << "gst_element_factory_make('splitmuxsink') failed";
@@ -99,17 +95,13 @@ GStreamer::GstElementPtr RecordingBranch::makeFileSink(const QString& videoFile,
     }
     GstElement* const splitmux = splitmuxOwner.get();
 
+    // One file per recording: no size or time limit.
     g_object_set(splitmux, "location", qPrintable(videoFile), "muxer-factory", kFileMux[format], "max-size-time",
                  G_GUINT64_CONSTANT(0), "max-size-bytes", G_GUINT64_CONSTANT(0), "async-finalize", TRUE,
-                 // Surface "splitmuxsink-fragment-closed" element messages on the pipeline bus so
-                 // stop() can wait on the precise per-fragment finalize signal instead of EOS
-                 // (gstsplitmuxsink.c:send_fragment_opened_closed_msg posts this per fragment,
-                 // including the final fragment torn down on EOS).
+                 // Forwards the inner file sink's EOS, which settles the recording like fragment-closed does.
                  "message-forward", TRUE, nullptr);
 
-    // Crash-safe MP4/MOV via robust muxing. faststart is deliberately off: it spools the whole
-    // recording to a temp file and writes the real file only at EOS. matroskamux is naturally
-    // streamable; skip the GstStructure dance.
+    // faststart stays off: it would spool the recording to a temp file and write the real file only at EOS.
     if (format == VideoReceiver::FILE_FORMAT_MP4 || format == VideoReceiver::FILE_FORMAT_MOV) {
         const GStreamer::GstStructurePtr muxerProps = GStreamer::adoptStructure(
             gst_structure_new("properties", "reserved-max-duration", G_TYPE_UINT64, kRecordingReservedMaxDurationNs,
@@ -121,10 +113,7 @@ GStreamer::GstElementPtr RecordingBranch::makeFileSink(const QString& videoFile,
         return nullptr;
     }
 
-    // splitmuxsink's video sink pad is a request pad — request once during construction
-    // and ghost it as "sink" so the existing recorderValve→fileSink link works unchanged.
-    // request_pad_simple (1.20+) does the pad-template lookup internally. No release_request_pad on failure:
-    // finalizing splitmuxsink with the bin reclaims it.
+    // No release_request_pad on failure: finalizing splitmuxsink with the bin reclaims the pad.
     const GStreamer::GstPadPtr videopad = GStreamer::adoptPad(gst_element_request_pad_simple(splitmux, "video"));
     if (!videopad) {
         qCWarning(GstVideoReceiverLog) << "gst_element_request_pad_simple(splitmuxsink, video) failed";
@@ -182,8 +171,7 @@ GstPadProbeReturn keyframeWatch(GstPad* pad, GstPadProbeInfo* info, gpointer use
         return GST_PAD_PROBE_DROP;
     }
 
-    // The pad offset shifts running time (gst_segment_offset_running_time), so subtract the
-    // keyframe's running time, not its PTS; they differ when the segment doesn't start at 0.
+    // The offset applies to running time, which differs from the PTS when the segment doesn't start at 0.
     GstClockTime runningTime = GST_CLOCK_TIME_NONE;
     if (const GStreamer::GstEventPtr segmentEvent =
             GStreamer::adoptEvent(gst_pad_get_sticky_event(pad, GST_EVENT_SEGMENT, 0))) {
@@ -197,8 +185,7 @@ GstPadProbeReturn keyframeWatch(GstPad* pad, GstPadProbeInfo* info, gpointer use
         return GST_PAD_PROBE_DROP;
     }
 
-    // set media file '0' offset to current timeline position - we don't want to touch other elements in the graph,
-    // except these which are downstream!
+    // Starts the file at 0; only the elements downstream of the valve see the offset.
     gst_pad_set_offset(pad, -static_cast<gint64>(runningTime));
 
     qCDebug(GstVideoReceiverLog) << "Got keyframe, stop dropping buffers";
@@ -335,10 +322,8 @@ void RecordingBranch::start(const QString& videoFile, VideoReceiver::FILE_FORMAT
 
     _receiver._dotDumper.dump(_pipeline, "pipeline-with-filesink");
 
-    // Install a probe on the recording branch to drop buffers until we hit our first keyframe
-    // When we hit our first keyframe, we can offset the timestamps appropriately according to the first keyframe time
-    // This will ensure the first frame is a keyframe at t=0, and decoding can begin immediately on playback
     _receiver._recordingOutput = videoFile;
+    // The file starts with a keyframe at t=0, so playback can decode from its first frame.
     _keyframeWatchId = gst_pad_add_probe(probepad.get(), GST_PAD_PROBE_TYPE_BUFFER, keyframeWatch,
                                          new KeyframeWatch{.receiver = &_receiver, .file = videoFile},
                                          [](gpointer watch) { delete static_cast<KeyframeWatch*>(watch); });
