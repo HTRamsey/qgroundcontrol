@@ -9,6 +9,12 @@
 #include "GstVideoReceiver.h"
 #include "QGCQVideoSinkController.h"
 
+namespace {
+
+constexpr guint kDisplayQueueMaxBuffers = 2;
+
+}  // namespace
+
 DecodingBranch::DecodingBranch(GstVideoReceiver& receiver)
     : _receiver(receiver)
 {}
@@ -23,11 +29,12 @@ bool DecodingBranch::build(GstElement* pipeline, GstElement* tee)
         return false;
     }
 
-    // leaky=downstream (2) + tiny depth: the live-display branch must drop the oldest
+    // Leaky downstream + tiny depth: the live-display branch must drop the oldest
     // buffer on backpressure, not stall the streaming thread. The recording branch
     // keeps default non-leaky semantics so every frame reaches the muxer.
-    g_object_set(queue, "leaky", 2, "max-size-buffers", 2, "max-size-bytes", 0, "max-size-time", G_GUINT64_CONSTANT(0),
-                 nullptr);
+    gst_util_set_object_arg(G_OBJECT(queue), "leaky", "downstream");
+    g_object_set(queue, "max-size-buffers", kDisplayQueueMaxBuffers, "max-size-bytes", 0, "max-size-time",
+                 G_GUINT64_CONSTANT(0), nullptr);
     (void) gst_bin_add(GST_BIN(_pipeline), queue);
 
     _valve = gst_element_factory_make("valve", nullptr);

@@ -242,6 +242,7 @@ bool RecordingBranch::build(GstElement* pipeline, GstElement* tee)
     g_object_set(_valve, "drop", TRUE, nullptr);
     // Preserve stream-start/caps/segment events while buffers are dropped. When recording
     // starts later, the newly linked parser receives the negotiated codec configuration.
+    // drop-mode exists since GStreamer 1.20, the oldest version QGC supports.
     gst_util_set_object_arg(G_OBJECT(_valve), "drop-mode", "forward-sticky-events");
     (void) gst_bin_add(GST_BIN(_pipeline), _valve);
 

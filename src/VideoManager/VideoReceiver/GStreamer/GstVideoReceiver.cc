@@ -31,6 +31,13 @@ namespace {
 // abandoned.
 constexpr std::chrono::seconds kWorkerShutdownTimeout = RecordingBranch::kFinalizeTimeout + std::chrono::seconds{2};
 constexpr std::chrono::milliseconds kWatchdogInterval{1000};
+// The live HW path counters are logged every this many watchdog ticks.
+constexpr int kHwStatsLogIntervalTicks = 10;
+// Source flow is logged every this many frames.
+constexpr quint64 kSourceFlowLogIntervalFrames = 300;
+// Retransmission needs playout latency left over after the source factory's 25 ms rtx-delay; with less, recovered
+// packets arrive too late and only add load.
+constexpr int kMinRetransmissionLatencyMs = 40;
 
 // Blocking probe: returning OK keeps the pad blocked until the probe is removed.
 GstPadProbeReturn holdPad(GstPad* /*pad*/, GstPadProbeInfo* /*info*/, gpointer /*userData*/)
@@ -183,9 +190,7 @@ void GstVideoReceiver::_startPipeline(const StartConfig& config)
         sourceConfig.jitterBuffer = _config.lowLatency ? GStreamer::SourceFactory::JitterBuffer::None
                                                        : GStreamer::SourceFactory::JitterBuffer::DropOnLatency;
         sourceConfig.latencyMs = _config.rtpJitterLatencyMs;
-        // do-retransmission needs ≥40 ms latency headroom over the default 20 ms rtx-delay;
-        // forcibly disable for sub-frame latency configurations to avoid retransmit storms.
-        sourceConfig.doRetransmission = (_config.rtpJitterLatencyMs >= 40) &&
+        sourceConfig.doRetransmission = (_config.rtpJitterLatencyMs >= kMinRetransmissionLatencyMs) &&
                                         (sourceConfig.jitterBuffer != GStreamer::SourceFactory::JitterBuffer::None);
         _source = GStreamer::SourceFactory::create(_config.uri, sourceConfig);
         if (!_source) {
@@ -356,7 +361,7 @@ void GstVideoReceiver::_onWatchdogTick()
         return;
     }
 
-    if (++_statsTickCounter >= 10) {
+    if (++_statsTickCounter >= kHwStatsLogIntervalTicks) {
         _statsTickCounter = 0;
         if (const HwBuffers::PathStats hwStats = HwBuffers::formatPathStats(false); hwStats.totalDelivered > 0) {
             qCDebug(GstVideoReceiverLog).noquote() << "HW path live" << _redactedUri() << hwStats.line;
@@ -451,7 +456,7 @@ void GstVideoReceiver::_noteTeeFrame()
     const quint64 sourceFrames = _watchdog.noteSourceFrame(StreamWatchdog::now());
     if (sourceFrames == 1) {
         qCDebug(GstVideoReceiverLog).noquote() << "Source receiving frames (tee):" << _redactedUri();
-    } else if ((sourceFrames % 300) == 0) {
+    } else if ((sourceFrames % kSourceFlowLogIntervalFrames) == 0) {
         qCDebug(GstVideoReceiverLog).noquote() << "Source flow: teeFrames=" << sourceFrames
                                                << "decoding=" << _decodingBranch.isDecoding() << _redactedUri();
     }
@@ -477,8 +482,8 @@ void GstVideoReceiver::_onPipelinePlaying()
     const QString decName = decoderName();
     qCDebug(GstVideoReceiverLog).noquote() << "Pipeline PLAYING:" << _redactedUri()
                                            << "decoder:" << (decName.isEmpty() ? QStringLiteral("(pending)") : decName)
-                                           << "min-latency:" << (min / 1000000) << "ms"
-                                           << "max-latency:" << (max / 1000000) << "ms";
+                                           << "min-latency:" << GST_TIME_AS_MSECONDS(min) << "ms"
+                                           << "max-latency:" << GST_TIME_AS_MSECONDS(max) << "ms";
 }
 
 void GstVideoReceiver::_onPipelineError()
