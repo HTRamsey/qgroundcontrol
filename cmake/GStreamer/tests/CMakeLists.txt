@@ -73,7 +73,6 @@ set(_qgc_gst_argument_failure_cases
     "InstallUnknown|install-unknown|gstreamer_install_plugins: unknown arguments"
     "LayoutUnknown|layout-unknown|gstreamer_create_layout_target: unknown arguments"
     "PkgConfigUnknown|pkgconfig-unknown|gstreamer_apply_pkgconfig_env: unknown arguments"
-    "PluginPolicyUnknown|plugin-policy-unknown|gstreamer_plugin_satisfy_sets: unknown arguments"
     "ProbeUnknown|probe-unknown|qgc_check_gst_header: unknown arguments"
 )
 

@@ -62,7 +62,7 @@ Per-platform zero-copy import of decoded GPU frames, all sharing `GstHwFrameText
 - **Enable/disable**: Set the `QGC_ENABLE_GST_VIDEOSTREAMING` CMake option to `ON`/`OFF`.
 - **Versions, checksums and plugins**: `gstreamer.version.<platform>`, `gstreamer.checksums`, `gstreamer.plugins` and the iOS CA-bundle pin live in [`.github/build-config.json`](../../../../.github/build-config.json), read by [`cmake/BuildConfig.cmake`](../../../../cmake/BuildConfig.cmake). The download URLs (upstream and the QGC S3 mirror) are templated from the version in [`cmake/GStreamer/Download.cmake`](../../../../cmake/GStreamer/Download.cmake). Linux uses the system GStreamer and treats `gstreamer.version.minimum` as its floor.
 - **Configure options**:
-  - `GStreamer_ROOT_DIR`: the SDK to use. Configure never writes it; the SDK it selected is recorded as `QGC_GST_RESOLVED_ROOT` in `CMakeCache.txt` and as the `GSTREAMER_SDK_ROOT` property of `GStreamer::Layout`.
+  - `GStreamer_ROOT_DIR`: the SDK to use. Configure never writes it; the SDK it selected is recorded as `QGC_GST_RESOLVED_ROOT` in `CMakeCache.txt`.
   - `QGC_GST_VERSION`: overrides the build-config version (the minimum on Linux, the SDK to download elsewhere).
   - `GStreamer_USE_STATIC_LIBS` / `GStreamer_USE_FRAMEWORK`: layout preferences with per-platform defaults; discovery overrides them for the SDK it finds.
   - `GStreamer_REQUIRE_CHECKSUM`, `QGC_GST_DOWNLOAD_TIMEOUT`, `QGC_GST_DOWNLOAD_INACTIVITY_TIMEOUT` and `QGC_GST_ALLOW_UNVERIFIED_CA` (iOS CA bundle) control downloads; `GStreamer_DEBUG` traces target creation.
