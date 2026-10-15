@@ -1,5 +1,7 @@
 #pragma once
 
+#include <gst/gst.h>
+
 #include <QtCore/QList>
 #include <QtCore/QMetaObject>
 #include <QtCore/QObject>
@@ -7,7 +9,8 @@
 #include <QtCore/QSize>
 #include <QtCore/QString>
 #include <QtCore/QTimer>
-#include <gst/gst.h>
+
+#include "GstScoped.h"
 
 class QQuickVideoOutput;
 class QVideoSink;
@@ -69,7 +72,7 @@ private:
     void _clearVideoSinkFrame();
     void _onEmitTimer();
 
-    GstElement* _element = nullptr;  // owned ref
+    GStreamer::GstElementPtr _element;
     QPointer<QVideoSink> _videoSink;
     QMetaObject::Connection _sinkDestroyedConnection;
     bool _bindingReleased = false;
