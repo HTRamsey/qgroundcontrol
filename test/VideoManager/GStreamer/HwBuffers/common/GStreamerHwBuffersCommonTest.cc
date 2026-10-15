@@ -878,8 +878,8 @@ void GStreamerTest::_testTelemetryDmaBufExtraStatsDrain()
     QSKIP("DMABuf GPU path not compiled in this build");
 #else
     (void) HwBuffers::takeExtraPathStats();
-    GstHwPathTelemetry::recordFenceTimeout(HwVideoBufferPath::DmaBuf);
-    GstHwPathTelemetry::recordMmapBarrierHit(HwVideoBufferPath::DmaBuf);
+    GstHwPathTelemetry::recordProducerFenceTimeout(HwVideoBufferPath::DmaBuf);
+    GstHwPathTelemetry::recordCpuBarrierWait(HwVideoBufferPath::DmaBuf);
     GstHwPathTelemetry::recordExplicitFenceWait(HwVideoBufferPath::DmaBuf);
     GstHwPathTelemetry::recordImageCacheHit(HwVideoBufferPath::DmaBuf);
     GstHwPathTelemetry::recordImageCacheHit(HwVideoBufferPath::DmaBuf);
@@ -887,13 +887,13 @@ void GStreamerTest::_testTelemetryDmaBufExtraStatsDrain()
 
     const QString first = HwBuffers::takeExtraPathStats();
     QVERIFY(first.contains(QStringLiteral("DMABuf-fence-timeouts:")));
-    QVERIFY(first.contains(QStringLiteral("DMABuf-mmap-barriers:")));
+    QVERIFY(first.contains(QStringLiteral("DMABuf-cpu-barriers:")));
     QVERIFY(first.contains(QStringLiteral("DMABuf-explicit-fence-waits:")));
     QVERIFY2(first.contains(QStringLiteral("DMABuf-image-cache[hit/miss]:2/1")), qPrintable(first));
 
     const QString second = HwBuffers::takeExtraPathStats();
     QVERIFY(second.contains(QStringLiteral("DMABuf-fence-timeouts:0")));
-    QVERIFY(second.contains(QStringLiteral("DMABuf-mmap-barriers:0")));
+    QVERIFY(second.contains(QStringLiteral("DMABuf-cpu-barriers:0")));
     QVERIFY(second.contains(QStringLiteral("DMABuf-explicit-fence-waits:0")));
     QVERIFY(!second.contains(QStringLiteral("image-cache")));
 #endif

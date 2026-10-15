@@ -439,7 +439,7 @@ bool waitForProducerWrites(GstBuffer* buffer)
         } while (ret < 0 && (errno == EINTR || errno == EAGAIN));
         if (ret <= 0) {
             const int pollError = (ret < 0) ? errno : 0;
-            GstHwPathTelemetry::recordFenceTimeout(HwVideoBufferPath::DmaBuf);
+            GstHwPathTelemetry::recordProducerFenceTimeout(HwVideoBufferPath::DmaBuf);
             QGC_HW_WARN_ONCE(GstDmaBufLog, s_loggedProducerWaitTimeout,
                              "dma-buf producer fence wait" << (ret == 0 ? "timed out" : "failed") << "errno="
                                                            << pollError << "— no producer barrier for this frame");
@@ -447,7 +447,7 @@ bool waitForProducerWrites(GstBuffer* buffer)
         }
     }
     GstHwPathTelemetry::recordSyncWait(HwVideoBufferPath::DmaBuf, /*gpuSide=*/false);
-    GstHwPathTelemetry::recordMmapBarrierHit(HwVideoBufferPath::DmaBuf);
+    GstHwPathTelemetry::recordCpuBarrierWait(HwVideoBufferPath::DmaBuf);
     return true;
 }
 

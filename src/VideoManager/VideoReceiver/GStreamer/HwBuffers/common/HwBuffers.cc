@@ -308,9 +308,9 @@ QString takeExtraPathStats() noexcept
         out += QStringLiteral(" Vulkan-wait[gpu/cpu]:%1/%2").arg(vkGpuWaits).arg(vkCpuWaits);
     }
     if (GstHwPathRegistry::has(HwVideoBufferPath::DmaBuf)) {
-        out += QStringLiteral(" DMABuf-fence-timeouts:%1 DMABuf-mmap-barriers:%2 DMABuf-explicit-fence-waits:%3")
-                   .arg(GstHwPathTelemetry::takeFenceTimeouts(HwVideoBufferPath::DmaBuf))
-                   .arg(GstHwPathTelemetry::takeMmapBarrierHits(HwVideoBufferPath::DmaBuf))
+        out += QStringLiteral(" DMABuf-fence-timeouts:%1 DMABuf-cpu-barriers:%2 DMABuf-explicit-fence-waits:%3")
+                   .arg(GstHwPathTelemetry::takeProducerFenceTimeouts(HwVideoBufferPath::DmaBuf))
+                   .arg(GstHwPathTelemetry::takeCpuBarrierWaits(HwVideoBufferPath::DmaBuf))
                    .arg(GstHwPathTelemetry::takeExplicitFenceWaits(HwVideoBufferPath::DmaBuf));
     }
     static constexpr std::pair<GstHwPathTelemetry::HwFallbackReason, const char*> kReasons[] = {
