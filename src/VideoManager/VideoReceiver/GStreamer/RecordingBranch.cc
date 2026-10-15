@@ -62,8 +62,6 @@ GStreamer::GstElementPtr RecordingBranch::makeFileSink(const QString& videoFile,
         return nullptr;
     }
 
-    // The bin is sunk so the caller owns it outright. Its children stay floating until added: gst_bin_add and
-    // gst_element_add_pad consume a floating ref even when they fail, so each owner is released into the call.
     GStreamer::GstElementPtr bin = GStreamer::adoptElement(gst_bin_new("sinkbin"));
     if (!bin) {
         qCWarning(GstVideoReceiverLog) << "gst_bin_new('sinkbin') failed";
@@ -84,9 +82,8 @@ GStreamer::GstElementPtr RecordingBranch::makeFileSink(const QString& videoFile,
             return nullptr;
         }
         g_object_set(parserOwner.get(), "config-interval", -1, nullptr);
-        parser = parserOwner.release();
-        if (!gst_bin_add(GST_BIN(bin.get()), parser)) {
-            qCWarning(GstVideoReceiverLog) << "gst_bin_add(parser) failed";
+        parser = GStreamer::addToBin(bin.get(), std::move(parserOwner), "parser");
+        if (!parser) {
             return nullptr;
         }
     }
@@ -120,8 +117,7 @@ GStreamer::GstElementPtr RecordingBranch::makeFileSink(const QString& videoFile,
         g_object_set(splitmux, "muxer-properties", muxerProps.get(), nullptr);
     }
 
-    if (!gst_bin_add(GST_BIN(bin.get()), splitmuxOwner.release())) {
-        qCWarning(GstVideoReceiverLog) << "gst_bin_add(splitmuxsink) failed";
+    if (!GStreamer::addToBin(bin.get(), std::move(splitmuxOwner), "splitmuxsink")) {
         return nullptr;
     }
 
@@ -292,7 +288,7 @@ void RecordingBranch::start(const QString& videoFile, VideoReceiver::FILE_FORMAT
 
     const auto failRecordingStart = [this]() {
         if (_fileSink) {
-            GStreamer::disposeChild(GST_BIN(_pipeline), _fileSink.get());
+            GStreamer::disposeChild(_fileSink.get());
             _fileSink.reset();
         }
         // Only once the sink is out of the pipeline: until then its errors must still count as the recorder's.
@@ -511,7 +507,7 @@ void RecordingBranch::_shutdown()
 
     if (_fileSink) {
         // Removed before going NULL, so nothing it posts while stopping reaches the bus as a pipeline error.
-        GStreamer::disposeChild(GST_BIN(_pipeline), _fileSink.get());
+        GStreamer::disposeChild(_fileSink.get());
         _fileSink.reset();
     }
     const RecordingFinalizer::Outcome outcome = _finalizer.disarm();

@@ -113,18 +113,29 @@ QString writePipelineDot(GstElement* pipeline, QStringView tag, const QString& d
     return wrote ? fullPath : QString{};
 }
 
-void disposeChild(GstBin* bin, GstElement* element)
+void disposeChild(GstElement* element)
 {
-    if (!bin || !element || !gst_object_has_as_parent(GST_OBJECT(element), GST_OBJECT(bin))) {
+    const GstObjectPtr parent = element ? adoptObject(gst_object_get_parent(GST_OBJECT(element))) : nullptr;
+    if (!parent) {
         return;
     }
 
     // gst_bin_remove drops the bin's ref, which may be the last one, before the element reaches NULL.
     const GstElementPtr keepAlive = adoptElement(GST_ELEMENT(gst_object_ref(element)));
-    (void) gst_bin_remove(bin, element);
+    (void) gst_bin_remove(GST_BIN(parent.get()), element);
     // Synchronous: gst_element_change_state() commits an ASYNC return at once when the target is READY or NULL, so
     // the streaming threads have stopped when this returns.
     (void) gst_element_set_state(element, GST_STATE_NULL);
+}
+
+GstElement* addToBin(GstElement* bin, GstElementPtr element, const char* what)
+{
+    GstElement* const borrowed = element.release();
+    if (!gst_bin_add(GST_BIN(bin), borrowed)) {
+        qCWarning(GStreamerHelpersLog) << "gst_bin_add() failed for" << what;
+        return nullptr;
+    }
+    return borrowed;
 }
 
 GstPadPtr firstSrcPad(GstElement* element)

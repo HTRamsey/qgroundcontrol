@@ -240,7 +240,7 @@ bool DecodingBranch::_addDecoder()
 
     if (!gst_element_link(_valve, _decoder.get())) {
         qCWarning(GstVideoReceiverLog) << "Unable to link decoder";
-        GStreamer::disposeChild(GST_BIN(_pipeline), _decoder.get());
+        GStreamer::disposeChild(_decoder.get());
         _decoder.reset();
         return false;
     }
@@ -284,7 +284,7 @@ bool DecodingBranch::_addVideoSink(GstPad* pad)
         qCWarning(GstVideoReceiverLog) << "Unable to link decoder pad to video sink:" << gst_pad_link_get_name(linkRet);
 
         // _ensureVideoSinkInPipeline() added it before linking; detach for the next retry.
-        GStreamer::disposeChild(GST_BIN(_pipeline), _videoSink.get());
+        GStreamer::disposeChild(_videoSink.get());
         return false;
     }
 
@@ -308,7 +308,7 @@ void DecodingBranch::_onFirstFrame()
 void DecodingBranch::_shutdown()
 {
     if (_decoder) {
-        GStreamer::disposeChild(GST_BIN(_pipeline), _decoder.get());
+        GStreamer::disposeChild(_decoder.get());
         _decoder.reset();
     }
 
@@ -323,7 +323,7 @@ void DecodingBranch::_shutdown()
     _receiver._watchdog.clearSinkFrames();
 
     if (_videoSink) {
-        GStreamer::disposeChild(GST_BIN(_pipeline), _videoSink.get());
+        GStreamer::disposeChild(_videoSink.get());
         _videoSink.reset();
         _releaseDisplayedFrame();
     }
