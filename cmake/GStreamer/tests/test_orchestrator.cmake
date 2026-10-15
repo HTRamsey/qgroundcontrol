@@ -145,6 +145,19 @@ elseif(SCENARIO STREQUAL "reconfigure-version")
     _qgc_write_fake_sdk("${_sdk_a}" 1.26.0 WITH_PROBE_HEADERS)
     _qgc_expect(_expect "${_sdk_a}" 1.26.0 ON)
     _qgc_configure_ok("SDK A upgraded in place to 1.26" ${_expect})
+elseif(SCENARIO STREQUAL "reuse-auto-root")
+    # Linux never downloads, so stand in for a previous configure that auto-downloaded SDK A.
+    _qgc_write_fake_sdk("${_sdk_a}" 1.24.0)
+    _qgc_expect(_expect "${_sdk_a}" 1.24.0 OFF)
+    _qgc_configure_ok(
+        "reused auto-downloaded root"
+        --fresh
+        "-DQGC_GST_RESOLVED_ROOT=${_sdk_a}"
+        -DQGC_GST_RESOLVED_VERSION=1.20.0
+        -DQGC_GST_RESOLVED_AUTO=TRUE
+        ${_expect}
+        -DEXPECT_AUTO=TRUE
+    )
 else()
     message(FATAL_ERROR "Unknown SCENARIO: ${SCENARIO}")
 endif()
