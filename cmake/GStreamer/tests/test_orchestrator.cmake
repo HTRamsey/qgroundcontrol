@@ -271,10 +271,28 @@ elseif(SCENARIO STREQUAL "android-mobile")
     include("${CMAKE_CURRENT_LIST_DIR}/../PluginPolicy.cmake")
     gstreamer_runtime_required_plugins(_plugins)
     list(REMOVE_ITEM _plugins udp)
+    list(APPEND _plugins androidmedia)
     string(REPLACE ";" "," _requested "${_plugins};udp")
-    set(_android -DQGC_TEST_ANDROID_ABI=arm64-v8a "-DQGC_TEST_PLUGINS=${_requested}")
+    set(_package "${WORK_DIR}/android-package")
+    set(_android -DQGC_TEST_ANDROID_ABI=arm64-v8a "-DQGC_TEST_PLUGINS=${_requested}"
+                 "-DQGC_ANDROID_PACKAGE_SOURCE_DIR=${_package}"
+    )
     _qgc_write_fake_sdk("${_sdk_a}" 1.24.0 PLUGINS ${_plugins})
-    file(WRITE "${_sdk_a}/share/gst-android/ndk-build/GStreamer.java" "")
+    # source|path staged under the build directory
+    set(_ndk_build "${_sdk_a}/share/gst-android/ndk-build")
+    set(_java androidmedia/GstAhcCallback.java)
+    set(_staged
+        "${_ndk_build}/${_java}|extra_java_sources/org/freedesktop/gstreamer/${_java}"
+        "${_ndk_build}/fontconfig/fonts.conf|extra_assets/fontconfig/fonts.conf"
+        "${_ndk_build}/fontconfig/fonts/Ubuntu-R.ttf|extra_assets/fontconfig/fonts/truetype/Ubuntu-R.ttf"
+        "${_sdk_a}/etc/ssl/certs/ca-certificates.crt|extra_assets/ssl/certs/ca-certificates.crt"
+    )
+    foreach(_entry IN LISTS _staged)
+        string(REPLACE "|" ";" _entry "${_entry}")
+        list(GET _entry 0 _source)
+        file(WRITE "${_source}" "${_source}\n")
+    endforeach()
+    file(WRITE "${_ndk_build}/GStreamer.java" "")
     file(WRITE "${_sdk_a}/lib/gio/modules/libgioopenssl.a" "")
     foreach(_library IN ITEMS ssl crypto gio-2.0)
         file(WRITE "${_sdk_a}/lib/lib${_library}.a" "")
@@ -290,8 +308,50 @@ elseif(SCENARIO STREQUAL "android-mobile")
     file(READ "${_sdk_a}/lib/pkgconfig/gstcoreelements.pc" _pc)
     string(REPLACE "coreelements" "udp" _pc "${_pc}")
     file(WRITE "${_sdk_a}/lib/pkgconfig/gstudp.pc" "${_pc}")
+    # Copies earlier builds wrote into the package sources would duplicate the staged files; other files stay.
+    set(_legacy_copies "${_package}/src/org/freedesktop/gstreamer/androidmedia/GstAhcCallback.java"
+                       "${_package}/assets/fontconfig/fonts.conf"
+    )
+    foreach(
+        _file IN
+        LISTS _legacy_copies
+        ITEMS "${_package}/assets/keep.txt"
+    )
+        file(WRITE "${_file}" "")
+    endforeach()
     _qgc_configure_ok("Android mobile target" --fresh "-DGStreamer_ROOT_DIR=${_sdk_a}" ${_android})
     _qgc_link_line(_link)
+
+    # Plugin Java sources and fonts/CA assets are staged into the build directory, never the package sources.
+    execute_process(
+        COMMAND "${CMAKE_COMMAND}" --build "${_binary_dir}" --target gstreamer_android_files_arm64-v8a
+        RESULT_VARIABLE _result
+        OUTPUT_VARIABLE _output
+        ERROR_VARIABLE _output
+    )
+    qgc_test_assert_streq("staging build: ${_output}" 0 "${_result}")
+    foreach(_entry IN LISTS _staged)
+        string(REPLACE "|" ";" _entry "${_entry}")
+        list(GET _entry 0 _source)
+        list(GET _entry 1 _path)
+        execute_process(COMMAND "${CMAKE_COMMAND}" -E compare_files "${_source}" "${_binary_dir}/${_path}"
+                        RESULT_VARIABLE _different
+        )
+        qgc_test_assert_streq("staged ${_path}" 0 "${_different}")
+    endforeach()
+    file(
+        GLOB_RECURSE _package_files
+        RELATIVE "${_package}"
+        "${_package}/*"
+    )
+    qgc_test_assert_streq("package sources" assets/keep.txt "${_package_files}")
+    if(GENERATOR MATCHES "Ninja")
+        file(READ "${_binary_dir}/build.ninja" _ninja)
+        set(_app_order_dependencies "build cmake_object_order_depends_target_QGCGStreamerFakeSdk: phony [^\n]*")
+        if(NOT _ninja MATCHES "${_app_order_dependencies}gstreamer_android_files_arm64-v8a")
+            message(FATAL_ERROR "ASSERT [staging dependency]: the app does not depend on the staged files")
+        endif()
+    endif()
 
     # The plugin archive is linked once, whole-archived; a plain occurrence ahead of it would load members twice.
     string(REGEX MATCHALL "[^ ]*libgstcoreelements\\.a" _plugin_archives "${_link}")
