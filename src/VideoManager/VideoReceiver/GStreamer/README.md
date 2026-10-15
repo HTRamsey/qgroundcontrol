@@ -107,7 +107,7 @@ Configure never overwrites `GStreamer_ROOT_DIR`: the SDK it selected is recorded
 
 ### Android
 
-Auto-downloaded during CMake configure. No manual setup required.
+Auto-downloaded during CMake configure. No manual setup required. Each ABI build extracts only its own tree from the universal SDK tarball.
 
 > **Windows users building for Android**: Enable Developer Mode (Settings > System > For developers) to support symbolic links during the build.
 
