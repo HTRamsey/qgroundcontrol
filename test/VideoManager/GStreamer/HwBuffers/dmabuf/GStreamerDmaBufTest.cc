@@ -44,6 +44,7 @@
 
 #include "GstDmaBufVideoBuffer.h"
 #endif
+#include <rhi/qrhi.h>
 #if defined(QGC_HAS_GST_GLMEMORY_GPU_PATH)
 #include <gst/gl/gl.h>
 
@@ -482,6 +483,40 @@ void GStreamerTest::_testDmaBufSingleFdImportEnvGate()
 #endif
 }
 
+#if defined(QGC_HAS_GST_DMABUF_GPU_PATH)
+namespace {
+
+// Single-memory DMABuf sample backed by a memfd: enough for the streaming-thread validatePlaneHandles() gate.
+GstSample* makeMemfdDmaBufSample(GstVideoFormat format, GstVideoInfo& info)
+{
+    gst_video_info_set_format(&info, format, 64, 64);
+    const int fd = memfd_create("qgc-dmabuf-test", MFD_CLOEXEC);
+    if (fd < 0) {
+        return nullptr;
+    }
+    if (ftruncate(fd, static_cast<off_t>(GST_VIDEO_INFO_SIZE(&info))) != 0) {
+        ::close(fd);
+        return nullptr;
+    }
+    GstAllocator* allocator = gst_dmabuf_allocator_new();
+    GstMemory* memory = gst_dmabuf_allocator_alloc(allocator, fd, GST_VIDEO_INFO_SIZE(&info));
+    gst_object_unref(allocator);
+    if (!memory) {
+        ::close(fd);
+        return nullptr;
+    }
+    GstBuffer* buffer = gst_buffer_new();
+    gst_buffer_append_memory(buffer, memory);
+    GstCaps* caps = gst_video_info_to_caps(&info);
+    GstSample* sample = gst_sample_new(buffer, caps, nullptr, nullptr);
+    gst_buffer_unref(buffer);
+    gst_caps_unref(caps);
+    return sample;
+}
+
+}  // namespace
+#endif
+
 void GStreamerTest::_testDmaBufEglBadMatchLatch_data()
 {
     QTest::addColumn<bool>("singleFd");
@@ -507,24 +542,8 @@ void GStreamerTest::_testDmaBufEglBadMatchLatch()
     const auto resetGuard = qScopeGuard([] { GstDmaBufVideoBuffer::resetCachedState(); });
 
     GstVideoInfo info;
-    gst_video_info_set_format(&info, GST_VIDEO_FORMAT_NV12, 64, 64);
-    const int fd = memfd_create("qgc-dmabuf-test", MFD_CLOEXEC);
-    QVERIFY(fd >= 0);
-    if (ftruncate(fd, static_cast<off_t>(GST_VIDEO_INFO_SIZE(&info))) != 0) {
-        ::close(fd);
-        QFAIL("ftruncate on memfd failed");
-    }
-    GstAllocator* allocator = gst_dmabuf_allocator_new();
-    GstMemory* memory = gst_dmabuf_allocator_alloc(allocator, fd, GST_VIDEO_INFO_SIZE(&info));
-    gst_object_unref(allocator);
-    QVERIFY(memory);
-    GstBuffer* buffer = gst_buffer_new();
-    gst_buffer_append_memory(buffer, memory);
-    GstCaps* caps = gst_video_info_to_caps(&info);
-    GstSample* sample = gst_sample_new(buffer, caps, nullptr, nullptr);
-    gst_buffer_unref(buffer);
-    gst_caps_unref(caps);
-
+    GstSample* sample = makeMemfdDmaBufSample(GST_VIDEO_FORMAT_NV12, info);
+    QVERIFY(sample);
     GstDmaBufVideoBuffer frame(sample, info, QVideoFrameFormat(QSize(64, 64), QVideoFrameFormat::Format_NV12),
                                EGL_NO_DISPLAY);
     gst_sample_unref(sample);
@@ -539,6 +558,45 @@ void GStreamerTest::_testDmaBufEglBadMatchLatch()
         verifyExpectedLogMessage();
     }
     QCOMPARE(frame.validatePlaneHandles(), !expectDisabled);
+#endif
+}
+
+void GStreamerTest::_testDmaBufVulkanImportRejectsMultiPlanar_data()
+{
+    QTest::addColumn<int>("format");
+    QTest::addColumn<int>("rhiBackend");
+    QTest::addColumn<bool>("expectAccepted");
+
+    QTest::newRow("NV12 under Vulkan") << int(GST_VIDEO_FORMAT_NV12) << int(QRhi::Vulkan) << false;
+    QTest::newRow("P010 under Vulkan") << int(GST_VIDEO_FORMAT_P010_10LE) << int(QRhi::Vulkan) << false;
+    QTest::newRow("I420 under Vulkan") << int(GST_VIDEO_FORMAT_I420) << int(QRhi::Vulkan) << false;
+    QTest::newRow("RGBA under Vulkan") << int(GST_VIDEO_FORMAT_RGBA) << int(QRhi::Vulkan) << true;
+    QTest::newRow("BGRA under Vulkan") << int(GST_VIDEO_FORMAT_BGRA) << int(QRhi::Vulkan) << true;
+    QTest::newRow("NV12 under OpenGL") << int(GST_VIDEO_FORMAT_NV12) << int(QRhi::OpenGLES2) << true;
+}
+
+void GStreamerTest::_testDmaBufVulkanImportRejectsMultiPlanar()
+{
+#if !defined(QGC_HAS_GST_DMABUF_GPU_PATH) || !defined(QGC_HAS_GST_VULKAN_GPU_PATH)
+    QSKIP("DMABuf->Vulkan import not compiled in this build");
+#else
+    QFETCH(int, format);
+    QFETCH(int, rhiBackend);
+    QFETCH(bool, expectAccepted);
+
+    auto& snapshotBackend = QGCRhiCapture::deviceSnapshot().backend;
+    const int previousBackend = snapshotBackend.load();
+    const auto restoreBackend = qScopeGuard([&] { snapshotBackend.store(previousBackend); });
+    snapshotBackend.store(rhiBackend);
+
+    GstVideoInfo info;
+    GstSample* sample = makeMemfdDmaBufSample(static_cast<GstVideoFormat>(format), info);
+    QVERIFY(sample);
+    const GstDmaBufVideoBuffer frame(sample, info, QVideoFrameFormat(QSize(64, 64), QVideoFrameFormat::Format_NV12),
+                                     EGL_NO_DISPLAY);
+    gst_sample_unref(sample);
+
+    QCOMPARE(frame.validatePlaneHandles(), expectAccepted);
 #endif
 }
 

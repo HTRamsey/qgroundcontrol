@@ -11,6 +11,7 @@
 #include "GstHwVideoBuffer.h"
 #include "GstVulkanFrameTextures.h"
 #include "HwBuffers.h"
+#include "QGCRhiCapture.h"
 
 #if defined(QGC_HAS_GST_DMABUF_GPU_PATH)
 
@@ -399,8 +400,8 @@ constexpr int kProducerWaitTimeoutMs = 100;
 
 // CPU-side barrier on the producer's implicit write fences: poll(POLLIN) on a dma-buf fd returns once its write fences
 // signal (the wait linux/dma-buf.h documents). Unlike mmap/DMA_BUF_IOCTL_SYNC it triggers no exporter cache maintenance
-// or buffer migration.
-void waitForProducerWrites(GstBuffer* buffer)
+// or buffer migration. False when a wait timed out or failed.
+bool waitForProducerWrites(GstBuffer* buffer)
 {
     int lastFd = -1;
     for (guint i = 0; i < gst_buffer_n_memory(buffer); ++i) {
@@ -420,12 +421,13 @@ void waitForProducerWrites(GstBuffer* buffer)
             GstHwPathTelemetry::recordFenceTimeout(HwVideoBufferPath::DmaBuf);
             QGC_HW_WARN_ONCE(GstDmaBufLog, s_loggedProducerWaitTimeout,
                              "dma-buf producer fence wait" << (ret == 0 ? "timed out" : "failed") << "errno="
-                                                           << pollError << "— importing without a producer barrier");
-            return;
+                                                           << pollError << "— no producer barrier for this frame");
+            return false;
         }
     }
     GstHwPathTelemetry::recordSyncWait(HwVideoBufferPath::DmaBuf, /*gpuSide=*/false);
     GstHwPathTelemetry::recordMmapBarrierHit(HwVideoBufferPath::DmaBuf);
+    return true;
 }
 
 }  // namespace
@@ -455,7 +457,7 @@ void GstDmaBufVideoBuffer::resetCachedState() noexcept
     s_singleFdBroken.store(false, std::memory_order_release);
     s_loggedSingleFdDisabled.store(false, std::memory_order_release);
 #if defined(QGC_HAS_GST_VULKAN_GPU_PATH)
-    GstDmaBufVulkan::resetLoggedState();
+    GstDmaBufVulkan::resetCachedState();
 #endif
     s_loggedBadBackend.store(false, std::memory_order_release);
     s_loggedProducerWaitTimeout.store(false, std::memory_order_release);
@@ -528,6 +530,12 @@ bool GstDmaBufVideoBuffer::validatePlaneHandles() const
     });
     if (!planesOk)
         return false;
+#if defined(QGC_HAS_GST_VULKAN_GPU_PATH)
+    if (QGCRhiCapture::deviceSnapshot().backend.load(std::memory_order_acquire) == static_cast<int>(QRhi::Vulkan) &&
+        !GstDmaBufVulkan::canImport(_videoInfo)) {
+        return false;
+    }
+#endif
     // Reject tiled (non-LINEAR) DMABuf without EGL_EXT_image_dma_buf_import_modifiers — mapTextures() needs the
     // modifier attribs to import tiled layouts.
 #if GST_CHECK_VERSION(1, 24, 0)
@@ -568,6 +576,12 @@ QVideoFrameTexturesUPtr GstDmaBufVideoBuffer::mapTextures(QRhi& rhi, QVideoFrame
 
 #if defined(QGC_HAS_GST_VULKAN_GPU_PATH)
     if (rhi.backend() == QRhi::Vulkan) {
+        // Vulkan does not wait on implicit fences of imported dma-buf memory, so import only after the producer's
+        // writes are confirmed complete (same policy as GstVulkanVideoBuffer: no import without producer sync).
+        GstBuffer* buffer = gst_sample_get_buffer(_sample);
+        if (!buffer || !waitForProducerWrites(buffer)) {
+            return GstHwPathTelemetry::fail(HwVideoBufferPath::DmaBuf);
+        }
         return importVulkan(rhi);
     }
 #endif

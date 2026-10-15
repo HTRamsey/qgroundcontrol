@@ -12,8 +12,8 @@
 
 #include "GstHwFrameTexturesBase.h"
 
-/// Wraps a single multi-plane VkImage as a QRhiTexture (NV12/P010/RGBA). Owning and borrowing variants share this
-/// wrap; only the image lifetime differs. `_textures[0]` is null when the wrap fails, surfaced via valid().
+/// Wraps a single VkImage as one QRhiTexture. Owning and borrowing variants share this wrap; only the image lifetime
+/// differs. `_textures[0]` is null when the wrap fails, surfaced via valid().
 class GstVulkanFrameTexturesBase : public GstHwFrameTexturesBase
 {
 public:
@@ -42,7 +42,9 @@ class GstVulkanOwnedFrameTextures final : public GstVulkanFrameTexturesBase
 public:
     GstVulkanOwnedFrameTextures(QRhi* rhi, QSize size, QVideoFrameFormat::PixelFormat pixelFormat, VkImage image)
     {
-        wrapImage(rhi, size, pixelFormat, image, VK_IMAGE_LAYOUT_UNDEFINED);
+        // QRhi's first barrier transitions from this layout; UNDEFINED would let the driver discard the imported
+        // contents, GENERAL preserves them.
+        wrapImage(rhi, size, pixelFormat, image, VK_IMAGE_LAYOUT_GENERAL);
     }
 
     ~GstVulkanOwnedFrameTextures() override

@@ -12,7 +12,6 @@
 #include <gst/allocators/gstdmabuf.h>
 #include <gst/video/video.h>
 #include <limits>
-#include <mutex>
 #include <rhi/qrhi.h>
 #include <rhi/qrhi_platform.h>
 #include <unistd.h>
@@ -32,31 +31,28 @@ namespace {
 
 std::atomic<bool> s_loggedVulkanUnimpl{false};
 
-// DRM fourcc -> single-plane VkFormat for formats importable as one VkImage. Returns VK_FORMAT_UNDEFINED for layouts
-// that need a multi-disjoint-plane import (handled by the CPU fallback).
-VkFormat vkFormatForDrmFourcc(int fourcc)
+// VkFormat for single-plane RGB layouts. Multi-planar YUV (NV12/P010/I420) maps to VK_FORMAT_UNDEFINED: QRhi would wrap
+// a multi-planar VkImage as one single-plane texture with a COLOR-aspect view (invalid usage, no chroma), so those
+// layouts take the CPU path until a per-plane import exists.
+VkFormat vkFormatForVideoInfo(const GstVideoInfo& videoInfo)
 {
-    switch (fourcc) {
+    if (GST_VIDEO_INFO_N_PLANES(&videoInfo) != 1) {
+        return VK_FORMAT_UNDEFINED;
+    }
+    switch (GstHw::drmFourccForPlane(videoInfo, 0)) {
         case DRM_FORMAT_ABGR8888:
         case DRM_FORMAT_XBGR8888:
             return VK_FORMAT_R8G8B8A8_UNORM;
         case DRM_FORMAT_ARGB8888:
         case DRM_FORMAT_XRGB8888:
             return VK_FORMAT_B8G8R8A8_UNORM;
-        case DRM_FORMAT_NV12:
-            return VK_FORMAT_G8_B8R8_2PLANE_420_UNORM;
-        case DRM_FORMAT_P010:
-            return VK_FORMAT_G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16;
-        case DRM_FORMAT_YUV420:
-            return VK_FORMAT_G8_B8_R8_3PLANE_420_UNORM;
         default:
             return VK_FORMAT_UNDEFINED;
     }
 }
 
-// Process-cached Vulkan dispatch for the DMABuf import. Device-level entry points are resolved through
-// vkGetDeviceProcAddr (itself obtained from the instance loader); vkGetPhysicalDeviceMemoryProperties stays on the
-// instance loader. The QRhi VkDevice is process-stable, so a single resolve serves every frame.
+// Vulkan dispatch for the DMABuf import. Device-level entry points are resolved through vkGetDeviceProcAddr (itself
+// obtained from the instance loader); vkGetPhysicalDeviceMemoryProperties stays on the instance loader.
 struct VulkanImportFns
 {
     PFN_vkCreateImage createImage = nullptr;
@@ -75,28 +71,44 @@ struct VulkanImportFns
     }
 };
 
+// Bumped by resetCachedState() so every render thread re-resolves after a device reset.
+std::atomic<quint64> s_importFnsGeneration{0};
+
+// Cached per render thread (each window's QRhi owns its VkDevice) and re-resolved when that thread's QRhi device
+// changes (window recreation, device loss) or after a reset.
 const VulkanImportFns& resolveVulkanImportFns(QVulkanInstance& inst, VkDevice dev)
 {
-    static VulkanImportFns fns;
-    static std::once_flag once;
-    std::call_once(once, [&] {
-        const auto getDeviceProcAddr =
-            reinterpret_cast<PFN_vkGetDeviceProcAddr>(inst.getInstanceProcAddr("vkGetDeviceProcAddr"));
-        const auto dev_fn = [&](const char* name) -> PFN_vkVoidFunction {
-            return getDeviceProcAddr ? getDeviceProcAddr(dev, name) : nullptr;
-        };
-        fns.createImage = reinterpret_cast<PFN_vkCreateImage>(dev_fn("vkCreateImage"));
-        fns.destroyImage = reinterpret_cast<PFN_vkDestroyImage>(dev_fn("vkDestroyImage"));
-        fns.allocateMemory = reinterpret_cast<PFN_vkAllocateMemory>(dev_fn("vkAllocateMemory"));
-        fns.freeMemory = reinterpret_cast<PFN_vkFreeMemory>(dev_fn("vkFreeMemory"));
-        fns.bindImageMemory = reinterpret_cast<PFN_vkBindImageMemory>(dev_fn("vkBindImageMemory"));
-        fns.getImageMemoryRequirements =
-            reinterpret_cast<PFN_vkGetImageMemoryRequirements>(dev_fn("vkGetImageMemoryRequirements"));
-        fns.getMemoryFdProperties =
-            reinterpret_cast<PFN_vkGetMemoryFdPropertiesKHR>(dev_fn("vkGetMemoryFdPropertiesKHR"));
-        fns.getPhysicalDeviceMemoryProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceMemoryProperties>(
-            inst.getInstanceProcAddr("vkGetPhysicalDeviceMemoryProperties"));
-    });
+    struct CachedFns
+    {
+        VkDevice dev = VK_NULL_HANDLE;
+        quint64 generation = 0;
+        VulkanImportFns fns;
+    };
+
+    thread_local CachedFns cache;
+
+    const quint64 generation = s_importFnsGeneration.load(std::memory_order_acquire);
+    if (cache.dev == dev && cache.generation == generation) {
+        return cache.fns;
+    }
+    const auto getDeviceProcAddr =
+        reinterpret_cast<PFN_vkGetDeviceProcAddr>(inst.getInstanceProcAddr("vkGetDeviceProcAddr"));
+    const auto dev_fn = [&](const char* name) -> PFN_vkVoidFunction {
+        return getDeviceProcAddr ? getDeviceProcAddr(dev, name) : nullptr;
+    };
+    VulkanImportFns& fns = cache.fns;
+    fns.createImage = reinterpret_cast<PFN_vkCreateImage>(dev_fn("vkCreateImage"));
+    fns.destroyImage = reinterpret_cast<PFN_vkDestroyImage>(dev_fn("vkDestroyImage"));
+    fns.allocateMemory = reinterpret_cast<PFN_vkAllocateMemory>(dev_fn("vkAllocateMemory"));
+    fns.freeMemory = reinterpret_cast<PFN_vkFreeMemory>(dev_fn("vkFreeMemory"));
+    fns.bindImageMemory = reinterpret_cast<PFN_vkBindImageMemory>(dev_fn("vkBindImageMemory"));
+    fns.getImageMemoryRequirements =
+        reinterpret_cast<PFN_vkGetImageMemoryRequirements>(dev_fn("vkGetImageMemoryRequirements"));
+    fns.getMemoryFdProperties = reinterpret_cast<PFN_vkGetMemoryFdPropertiesKHR>(dev_fn("vkGetMemoryFdPropertiesKHR"));
+    fns.getPhysicalDeviceMemoryProperties = reinterpret_cast<PFN_vkGetPhysicalDeviceMemoryProperties>(
+        inst.getInstanceProcAddr("vkGetPhysicalDeviceMemoryProperties"));
+    cache.dev = dev;
+    cache.generation = generation;
     return fns;
 }
 
@@ -183,9 +195,15 @@ bool validateVulkanPlaneLayouts(const GstVideoInfo& videoInfo, GstVideoMeta* vme
 
 namespace GstDmaBufVulkan {
 
-void resetLoggedState() noexcept
+bool canImport(const GstVideoInfo& videoInfo) noexcept
+{
+    return vkFormatForVideoInfo(videoInfo) != VK_FORMAT_UNDEFINED;
+}
+
+void resetCachedState() noexcept
 {
     s_loggedVulkanUnimpl.store(false, std::memory_order_release);
+    s_importFnsGeneration.fetch_add(1, std::memory_order_acq_rel);
 }
 
 }  // namespace GstDmaBufVulkan
@@ -193,16 +211,15 @@ void resetLoggedState() noexcept
 QVideoFrameTexturesUPtr GstDmaBufVideoBuffer::importVulkan(QRhi& rhi)
 {
     // dmabuf-fd -> VkImage via VK_EXT_external_memory_dma_buf + VkImageDrmFormatModifierExplicitCreateInfoEXT, wrapped
-    // with QRhiTexture::createFrom. Every step is capability-gated; any miss returns fail() so the caller does the CPU
-    // upload. Single VkImage per buffer only (multi-plane YUV uses disjoint VkFormat planes); odd layouts fall back.
+    // with QRhiTexture::createFrom. Every step is capability-gated; any miss returns fail(). Single-plane RGB layouts
+    // only (see vkFormatForVideoInfo); validatePlaneHandles() already routed other layouts to the CPU path.
     const auto* nh = static_cast<const QRhiVulkanNativeHandles*>(rhi.nativeHandles());
     if (!nh || nh->dev == VK_NULL_HANDLE || nh->physDev == VK_NULL_HANDLE || !nh->inst) {
         QGC_HW_WARN_ONCE(GstDmaBufVulkanLog, s_loggedVulkanUnimpl, "Vulkan import: native device handles unavailable");
         return GstHwPathTelemetry::fail(HwVideoBufferPath::DmaBuf);
     }
     const VkDevice dev = nh->dev;
-    // Resolved once per process (see VulkanImportFns); an instance-level lookup of device functions may return a
-    // trampoline or null.
+    // Device-level lookup: an instance-level lookup of device functions may return a trampoline or null.
     const VulkanImportFns& fns = resolveVulkanImportFns(*nh->inst, dev);
     if (!fns.ok()) {
         QGC_HW_WARN_ONCE(GstDmaBufVulkanLog, s_loggedVulkanUnimpl,
@@ -225,8 +242,7 @@ QVideoFrameTexturesUPtr GstDmaBufVideoBuffer::importVulkan(QRhi& rhi)
                          "Vulkan import: multi-fd DMABuf not supported — CPU upload");
         return GstHwPathTelemetry::fail(HwVideoBufferPath::DmaBuf);
     }
-    const int fourcc = GstHw::drmFourccForSingleFd(_videoInfo);
-    const VkFormat vkFormat = vkFormatForDrmFourcc(fourcc);
+    const VkFormat vkFormat = vkFormatForVideoInfo(_videoInfo);
     if (vkFormat == VK_FORMAT_UNDEFINED) {
         QGC_HW_WARN_ONCE(GstDmaBufVulkanLog, s_loggedVulkanUnimpl,
                          "Vulkan import: no VkFormat for DMABuf layout — CPU upload");
