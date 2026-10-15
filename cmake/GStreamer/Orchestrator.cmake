@@ -13,7 +13,6 @@
 include("${CMAKE_CURRENT_LIST_DIR}/Helpers.cmake")
 
 qgc_gst_platform(_qgc_gst_platform)
-qgc_gst_platform_descriptor("${_qgc_gst_platform}" _qgc_gst_platform)
 
 # The version asked of the SDK: QGC_GST_VERSION when set, else the platform's gstreamer.version entry in
 # .github/build-config.json (the minimum on Linux; the SDK to download or accept elsewhere).
@@ -81,7 +80,7 @@ _qgc_gst_select_sdk_root(GStreamer_ROOT_DIR GStreamer_AUTO_DOWNLOADED "${_qgc_gs
                          "${QGC_GST_REQUESTED_VERSION}"
 )
 
-# Per-platform discovery functions, named by the platform descriptor; each sets GStreamer_ROOT_DIR, the
+# Per-platform discovery functions, _qgc_gst_discover_<platform>_sdk; each sets GStreamer_ROOT_DIR, the
 # GSTREAMER_*_PATH layout variables and its pkg-config setup in this scope. Shared Mac+iOS helpers live in
 # platform/Apple.cmake.
 include("${CMAKE_CURRENT_LIST_DIR}/platform/Apple.cmake")
@@ -91,7 +90,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/platform/Android.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/platform/MacOS.cmake")
 include("${CMAKE_CURRENT_LIST_DIR}/platform/IOS.cmake")
 
-cmake_language(CALL ${_qgc_gst_platform_DISCOVER})
+cmake_language(CALL _qgc_gst_discover_${_qgc_gst_platform}_sdk)
 
 # Post-dispatch invariant: at most one of the three layout modes may be ON.
 set(_qgc_gst_active_modes)

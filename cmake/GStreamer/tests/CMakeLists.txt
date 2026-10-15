@@ -17,6 +17,7 @@ set(_qgc_findmod_tests
     test_install_libs_guard_windows
     test_android_abi_info
     test_windows_sdk_root
+    test_platform
     test_checksum_authority
     test_ios_bundle_from_root
     test_sdk_acquire
