@@ -176,15 +176,12 @@ template <class HandleT>
 class FrameTextures final : public GstHwFrameTexturesBase
 {
 public:
-    FrameTextures(HwVideoBufferPath path, QRhi* rhi, QSize size, QVideoFrameFormat::PixelFormat pixelFormat,
+    FrameTextures(QRhi* rhi, QSize size, QVideoFrameFormat::PixelFormat pixelFormat,
                   std::array<HandleT*, kMaxPlanes> handles, int count)
-        : _handles(handles), _path(path), _rhi(rhi), _size(size), _pixelFormat(pixelFormat)
+        : _handles(handles)
     {
-        std::array<quint64, kMaxPlanes> native{};
-        std::transform(handles.begin(), handles.end(), native.begin(),
-                       [](HandleT* handle) { return reinterpret_cast<quint64>(handle); });
         wrapPlanes(rhi, size, pixelFormat,
-                   std::span<const quint64>(native.data(), std::size_t(std::clamp(count, 0, kMaxPlanes))));
+                   std::span<HandleT* const>(_handles.data(), std::size_t(std::clamp(count, 0, kMaxPlanes))));
     }
 
     ~FrameTextures() override
@@ -195,34 +192,12 @@ public:
         }
     }
 
-    HwVideoBufferPath sourcePath() const override { return _path; }
-
     /// Keeps backend-owned state (D3D12 staging slot leases) alive for as long as QRhi may sample this bundle.
     void setKeepAlive(std::shared_ptr<void> keepAlive) noexcept { _keepAlive = std::move(keepAlive); }
-
-    /// Reuse-eligible when the pooled staging handles are identical: the pool rotates a stable set of resources, so the
-    /// existing QRhiTexture views transparently sample the newly-copied frame.
-    bool matches(QRhi* rhi, QSize size, QVideoFrameFormat::PixelFormat pixelFormat,
-                 const std::array<HandleT*, kMaxPlanes>& handles, int count) const
-    {
-        if (_rhi != rhi || _size != size || _pixelFormat != pixelFormat || _count != count) {
-            return false;
-        }
-        for (int i = 0; i < _count; ++i) {
-            if (!_handles[i] || _handles[i] != handles[i] || !_textures[i]) {
-                return false;
-            }
-        }
-        return true;
-    }
 
 private:
     std::array<HandleT*, kMaxPlanes> _handles;
     std::shared_ptr<void> _keepAlive;
-    HwVideoBufferPath _path = HwVideoBufferPath::None;
-    QRhi* _rhi = nullptr;
-    QSize _size;
-    QVideoFrameFormat::PixelFormat _pixelFormat = QVideoFrameFormat::Format_Invalid;
 };
 
 /// Shared D3D11/D3D12 render-thread tail run after the streaming-thread resolve: aliases a single NV12/P010 resource
@@ -261,10 +236,13 @@ QVideoFrameTexturesUPtr mapResolvedTextures(GstHwVideoBuffer& self, QRhi& rhi, Q
         }
     }
 
+    // Reuse-eligible when the pooled staging handles are identical: the pool rotates a stable set of resources, so the
+    // existing QRhiTexture views transparently sample the newly-copied frame.
     return GstHwFrameTexturesBase::finishMap<BundleT>(
         self, rhi, old, tail,
         [&](BundleT& prev) {
-            if (!prev.matches(&rhi, tail.frameSize, tail.pixelFormat, handles, textureCount)) {
+            if (!prev.matchesImport(&rhi, tail.frameSize, tail.pixelFormat,
+                                    std::span<HandleT* const>(handles.data(), std::size_t(textureCount)))) {
                 return false;
             }
             prev.setKeepAlive(keepAlive);
@@ -276,8 +254,7 @@ QVideoFrameTexturesUPtr mapResolvedTextures(GstHwVideoBuffer& self, QRhi& rhi, Q
                 if (handles[i])
                     handles[i]->AddRef();
             }
-            auto textures =
-                std::make_unique<BundleT>(tail.path, &rhi, tail.frameSize, tail.pixelFormat, handles, textureCount);
+            auto textures = std::make_unique<BundleT>(&rhi, tail.frameSize, tail.pixelFormat, handles, textureCount);
             textures->setKeepAlive(keepAlive);
             return textures;
         });

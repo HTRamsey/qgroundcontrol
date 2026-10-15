@@ -205,9 +205,8 @@ void testD3DMapTextures(QRhi& rhi, const char* inputCaps, const char* uploadElem
         QVERIFY2(textures->texture(static_cast<uint>(plane)),
                  qPrintable(QStringLiteral("D3D QRhi texture bundle has no plane %1 texture").arg(plane)));
     }
-    auto* base = dynamic_cast<GstHwFrameTexturesBase*>(textures.get());
-    QVERIFY2(base, "D3D texture bundle does not use the HW frame texture base");
-    QCOMPARE(base->sourcePath(), expectedPath);
+    QVERIFY2(dynamic_cast<GstHwFrameTexturesBase*>(textures.get()),
+             "D3D texture bundle does not use the HW frame texture base");
 }
 
 } // namespace

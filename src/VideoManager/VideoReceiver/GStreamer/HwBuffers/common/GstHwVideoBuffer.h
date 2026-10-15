@@ -71,10 +71,6 @@ public:
     /// alongside the bundle anyway (QVideoFrameTextures::setSourceFrame), so no buffer is held longer.
     GstSample* refSample() noexcept { return _sample ? gst_sample_ref(_sample) : nullptr; }
 
-    /// One-shot "first zero-copy success" info line; silent after @p flag first flips.
-    static void logFirstSuccess(std::atomic<bool>& flag, const QLoggingCategory& cat, const char* tag, QSize frameSize,
-                                QVideoFrameFormat::PixelFormat pixelFormat, int planes);
-
 protected:
     /// Validate each plane satisfies @p planePred; predicate runs once per plane on the streaming thread.
     template <class PlanePred>

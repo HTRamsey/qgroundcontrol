@@ -84,12 +84,3 @@ bool GstHwVideoBuffer::checkMapPreconditions(const QRhi& rhi, int expectedBacken
     }
     return true;
 }
-
-void GstHwVideoBuffer::logFirstSuccess(std::atomic<bool>& flag, const QLoggingCategory& cat, const char* tag,
-                                       QSize frameSize, QVideoFrameFormat::PixelFormat pixelFormat, int planes)
-{
-    if (!flag.exchange(true, std::memory_order_relaxed)) {
-        qCInfo(cat) << "First" << tag << "zero-copy mapTextures success: size=" << frameSize
-                    << "format=" << int(pixelFormat) << "planes=" << planes;
-    }
-}

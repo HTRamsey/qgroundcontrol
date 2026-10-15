@@ -31,8 +31,7 @@ public:
     {
         // QRhi's first barrier transitions from this layout; UNDEFINED would let the driver discard the imported
         // contents, GENERAL preserves them.
-        const quint64 handle = reinterpret_cast<quint64>(image);
-        wrapPlanes(rhi, size, pixelFormat, std::span<const quint64>(&handle, 1), VK_IMAGE_LAYOUT_GENERAL);
+        wrapPlanes(rhi, size, pixelFormat, std::span<const VkImage>(&image, 1), VK_IMAGE_LAYOUT_GENERAL);
     }
 
     ~GstVulkanOwnedFrameTextures() override
@@ -43,8 +42,6 @@ public:
             _release();
         }
     }
-
-    HwVideoBufferPath sourcePath() const override { return HwVideoBufferPath::DmaBuf; }
 
     /// Transfers VkImage/VkDeviceMemory ownership into the bundle: @p release runs once, when Qt destroys the bundle.
     void adoptVulkanResources(std::function<void()> release) noexcept { _release = std::move(release); }

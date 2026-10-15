@@ -537,8 +537,6 @@ public:
 
 class TestFrameTextures : public GstHwFrameTexturesBase
 {
-public:
-    HwVideoBufferPath sourcePath() const override { return HwVideoBufferPath::GlMemory; }
 };
 
 class ForeignFrameTextures : public QVideoFrameTextures
@@ -578,11 +576,11 @@ void GStreamerTest::_testHwFrameTexturesRejectsForeignOldTextures()
     QSKIP("GstHwFrameTexturesBase not compiled in this build (no GPU path enabled)");
 #else
     QVideoFrameTexturesUPtr foreign = std::make_unique<ForeignFrameTextures>();
-    QVERIFY(!GstHwFrameTexturesBase::reusableBundle<TestFrameTextures>(foreign, HwVideoBufferPath::GlMemory));
+    QVERIFY(!GstHwFrameTexturesBase::reusableBundle<TestFrameTextures>(foreign));
     QVERIFY(foreign);
 
     QVideoFrameTexturesUPtr own = std::make_unique<TestFrameTextures>();
-    QVERIFY(GstHwFrameTexturesBase::reusableBundle<TestFrameTextures>(own, HwVideoBufferPath::GlMemory));
+    QVERIFY(GstHwFrameTexturesBase::reusableBundle<TestFrameTextures>(own));
     QVERIFY(own);
 #endif
 }
