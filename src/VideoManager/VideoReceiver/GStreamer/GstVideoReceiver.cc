@@ -24,6 +24,7 @@
 #include <QtQuick/QQuickItem>
 
 #include "GStreamerHelpers.h"
+#include "GstScoped.h"
 #include "GstSourceFactory.h"
 #include "HwBuffers/common/HwBuffers.h"
 #include "QGCLoggingCategory.h"
@@ -99,6 +100,15 @@ void selectVideoStreams(GstMessage* message)
         g_list_free_full(selectedIds, g_free);
     }
     gst_object_unref(collection);
+}
+
+using GstElementRef = std::unique_ptr<GstElement, GStreamer::GstObjectDeleter>;
+using GstPadRef = std::unique_ptr<GstPad, GStreamer::GstObjectDeleter>;
+
+// Blocking probe: returning OK keeps the pad blocked until the probe is removed.
+GstPadProbeReturn holdPad(GstPad* /*pad*/, GstPadProbeInfo* /*info*/, gpointer /*userData*/)
+{
+    return GST_PAD_PROBE_OK;
 }
 
 // Refs the element's first src pad into *userData and stops iterating. Resync is handled
@@ -633,7 +643,7 @@ void GstVideoReceiver::_resetPipelineState()
     _lastSourceFrameTime = 0;
     _lastVideoFrameTime = 0;
 
-    if (_streaming.exchange(false)) {
+    if (std::exchange(_streaming, false)) {
         qCDebug(GstVideoReceiverLog) << "Streaming stopped" << _redactedUri();
         emit streamingChanged(false);
     }
@@ -694,7 +704,7 @@ void GstVideoReceiver::_startDecoding(GstElement* videoSink, bool hasWidget)
     _ensureVideoSinkInPipeline();
 
     if (!_addDecoder(_decoderValve)) {
-        qCCritical(GstVideoReceiverLog) << "_addDecoder() failed" << _redactedUri();
+        qCWarning(GstVideoReceiverLog) << "_addDecoder() failed" << _redactedUri();
         _shutdownDecodingBranch();
         emit onStartDecodingComplete(STATUS_FAIL);
         return;
@@ -924,14 +934,10 @@ void GstVideoReceiver::_onWatchdogTick()
         return;
     }
 
+    // _decoding is only set once a frame reached the sink, so the last frame time is valid. The probe alone writes it:
+    // its first write is what reports decoding.
     if (_decoding) {
-        qint64 lastVideoFrameTime = _lastVideoFrameTime.load(std::memory_order_relaxed);
-        if (lastVideoFrameTime == 0) {
-            lastVideoFrameTime = now;
-            _lastVideoFrameTime.store(now, std::memory_order_relaxed);
-        }
-
-        elapsed = now - lastVideoFrameTime;
+        elapsed = now - _lastVideoFrameTime.load(std::memory_order_relaxed);
         if (elapsed > (timeoutMs * 2)) {
             qCDebug(GstVideoReceiverLog) << "Video decoder timeout, no frames for" << elapsed << "ms" << _redactedUri();
             GST_DEBUG_BIN_TO_DOT_FILE(GST_BIN(_pipeline), GST_DEBUG_GRAPH_SHOW_ALL, "pipeline-watchdog-timeout");
@@ -1140,12 +1146,16 @@ GstElement* GstVideoReceiver::_makeFileSink(const QString& videoFile, FILE_FORMA
 void GstVideoReceiver::_onNewSourcePad(GstPad *pad)
 {
     // FIXME: check for caps - if this is not video stream (and preferably - one of these which we have to support) then simply skip it
-    if (!gst_element_link(_source, _tee)) {
-        qCCritical(GstVideoReceiverLog) << "Unable to link source";
+    GstPad* teeSink = gst_element_get_static_pad(_tee, "sink");
+    const GstPadLinkReturn linkResult = teeSink ? gst_pad_link(pad, teeSink) : GST_PAD_LINK_WRONG_HIERARCHY;
+    gst_clear_object(&teeSink);
+    if (linkResult != GST_PAD_LINK_OK) {
+        qCWarning(GstVideoReceiverLog) << "Unable to link source:" << gst_pad_link_get_name(linkResult);
         return;
     }
 
-    if (!_streaming.exchange(true)) {
+    if (!_streaming) {
+        _streaming = true;
         qCDebug(GstVideoReceiverLog) << "Streaming started" << _redactedUri();
         emit streamingChanged(true);
     }
@@ -1166,7 +1176,7 @@ void GstVideoReceiver::_onNewSourcePad(GstPad *pad)
     _ensureVideoSinkInPipeline();
 
     if (!_addDecoder(_decoderValve)) {
-        qCCritical(GstVideoReceiverLog) << "_addDecoder() failed";
+        qCWarning(GstVideoReceiverLog) << "_addDecoder() failed";
         _shutdownDecodingBranch();
         return;
     }
@@ -1407,11 +1417,19 @@ void GstVideoReceiver::_noteTeeFrame()
 
 void GstVideoReceiver::_noteVideoSinkFrame()
 {
-    _lastVideoFrameTime.store(monotonicMs(), std::memory_order_relaxed);
-    if (!_decoding.exchange(true)) {
-        qCDebug(GstVideoReceiverLog) << "Decoding started";
-        emit decodingChanged(true);
+    if (_lastVideoFrameTime.exchange(monotonicMs(), std::memory_order_relaxed) == 0) {
+        _runOnWorkerForPipeline([this]() { _onFirstVideoFrame(); });
     }
+}
+
+void GstVideoReceiver::_onFirstVideoFrame()
+{
+    if (!_videoSink || _decoding) {
+        return;
+    }
+    _decoding = true;
+    qCDebug(GstVideoReceiverLog) << "Decoding started";
+    emit decodingChanged(true);
 }
 
 bool GstVideoReceiver::_unlinkBranch(GstElement *from)
@@ -1797,14 +1815,26 @@ void GstVideoReceiver::_onRecordingStopTimeout()
 
 void GstVideoReceiver::_onNewPad(GstElement *element, GstPad *pad, gpointer data)
 {
-    GstVideoReceiver *self = static_cast<GstVideoReceiver*>(data);
+    auto* self = static_cast<GstVideoReceiver*>(data);
 
-    if (element == self->_source) {
-        self->_onNewSourcePad(pad);
-    } else if (element == self->_decoder) {
-        self->_onNewDecoderPad(pad);
+    // Runs on a streaming thread; the pipeline is only changed on the worker. Data waits at the pad until the
+    // worker has linked it, since an unlinked push would fail the stream.
+    const gulong blockId = gst_pad_add_probe(pad, GST_PAD_PROBE_TYPE_BLOCK_DOWNSTREAM, holdPad, nullptr, nullptr);
+    self->_runOnWorkerForPipeline([self, blockId, padElement = GstElementRef(GST_ELEMENT(gst_object_ref(element))),
+                                   newPad = GstPadRef(GST_PAD(gst_object_ref(pad)))]() {
+        self->_onPadAdded(padElement.get(), newPad.get());
+        gst_pad_remove_probe(newPad.get(), blockId);
+    });
+}
+
+void GstVideoReceiver::_onPadAdded(GstElement* element, GstPad* pad)
+{
+    if (element == _source) {
+        _onNewSourcePad(pad);
+    } else if (element == _decoder) {
+        _onNewDecoderPad(pad);
     } else {
-        qCDebug(GstVideoReceiverLog) << "Unexpected call!";
+        qCDebug(GstVideoReceiverLog) << "Ignoring a pad of a removed element";
     }
 }
 

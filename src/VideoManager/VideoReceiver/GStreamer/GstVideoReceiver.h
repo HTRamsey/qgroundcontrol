@@ -115,8 +115,10 @@ private:
     bool _addDecoder(GstElement *src);
     void _ensureVideoSinkInPipeline();
     bool _addVideoSink(GstPad *pad);
+    void _onPadAdded(GstElement* element, GstPad* pad);
     void _noteTeeFrame();
     void _noteVideoSinkFrame();
+    void _onFirstVideoFrame();
     /// -Unlink the branch from the src pad
     /// -Send an EOS event at the beginning of that branch
     bool _unlinkBranch(GstElement *from);
@@ -196,9 +198,8 @@ private:
     const std::unique_ptr<RecordingFinalizer> _recordingFinalizer;
 
     int _statsTickCounter = 0;
-    // Flipped on streaming threads.
-    std::atomic<bool> _decoding = false;
-    std::atomic<bool> _streaming = false;
+    bool _streaming = false;
+    std::atomic<bool> _decoding = false;  ///< Read by the tee probe's flow log.
     // Monotonic ms. Written on streaming threads (pad probes), read/written by the watchdog on the worker thread.
     std::atomic<qint64> _lastSourceFrameTime = 0;
     std::atomic<qint64> _lastVideoFrameTime = 0;

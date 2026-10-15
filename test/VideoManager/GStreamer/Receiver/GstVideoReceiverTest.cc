@@ -247,18 +247,14 @@ void GstVideoReceiverTest::_testStartDecodeStop()
     QQuickItem widget;
     const auto receiver = makeReceiver(loopbackUri(QLatin1StringView("udp"), port), &widget);
     QSignalSpy startSpy(receiver.get(), &VideoReceiver::onStartComplete);
-    QSignalSpy streamingSpy(receiver.get(), &VideoReceiver::streamingChanged);
     QSignalSpy decodingSpy(receiver.get(), &VideoReceiver::decodingChanged);
     QSignalSpy stopSpy(receiver.get(), &VideoReceiver::onStopComplete);
 
+    // Decoding is requested while the first source pad may be arriving, as VideoManager does.
     receiver->start(kWatchdogTimeoutSec);
+    receiver->startDecoding(videoSink);
     QVERIFY_SIGNAL_COUNT_WAIT(startSpy, 1, TestTimeout::mediumMs());
     QCOMPARE(lastStatus(startSpy), VideoReceiver::STATUS_OK);
-
-    // startDecoding() racing the first source pad is a known, separate receiver issue; let
-    // streaming begin first so this test only exercises the lifecycle.
-    QVERIFY_SIGNAL_COUNT_WAIT(streamingSpy, 1, TestTimeout::mediumMs());
-    receiver->startDecoding(videoSink);
     QVERIFY_SIGNAL_COUNT_WAIT(decodingSpy, 1, TestTimeout::mediumMs());
     QVERIFY(lastBool(decodingSpy));
 
@@ -348,18 +344,14 @@ void GstVideoReceiverTest::_testVideoSinkRefcountStableAcrossRestarts()
     QQuickItem widget;
     const auto receiver = makeReceiver(loopbackUri(QLatin1StringView("udp"), port), &widget);
     QSignalSpy startSpy(receiver.get(), &VideoReceiver::onStartComplete);
-    QSignalSpy streamingSpy(receiver.get(), &VideoReceiver::streamingChanged);
     QSignalSpy decodingSpy(receiver.get(), &VideoReceiver::decodingChanged);
     QSignalSpy stopSpy(receiver.get(), &VideoReceiver::onStopComplete);
 
     for (int cycle = 1; cycle <= kRestartCycles; ++cycle) {
         receiver->start(kWatchdogTimeoutSec);
+        receiver->startDecoding(videoSink);
         QVERIFY_SIGNAL_COUNT_WAIT(startSpy, cycle, TestTimeout::mediumMs());
         QCOMPARE(lastStatus(startSpy), VideoReceiver::STATUS_OK);
-
-        // See _testStartDecodeStop: decode only once streaming has begun.
-        QVERIFY_SIGNAL_COUNT_WAIT(streamingSpy, (2 * cycle) - 1, TestTimeout::mediumMs());
-        receiver->startDecoding(videoSink);
         QVERIFY_SIGNAL_COUNT_WAIT(decodingSpy, (2 * cycle) - 1, TestTimeout::mediumMs());
 
         receiver->stop();
@@ -497,6 +489,35 @@ void GstVideoReceiverTest::_testSecondRecordingIsNotTruncated()
     const int secondFrames = countPlayableFrames(second, failure);
     QVERIFY2(secondFrames >= kMinRecordedFrames,
              qPrintable(QStringLiteral("second: %1 frames %2").arg(secondFrames).arg(failure)));
+}
+
+void GstVideoReceiverTest::_testDecodingRequestedBeforeStreamStarts()
+{
+    const quint16 port = freeLoopbackUdpPort();
+    QVERIFY(port != 0);
+
+    GstElement* videoSink = makeFakeVideoSink();
+    QVERIFY(videoSink);
+    const auto sinkCleanup = qScopeGuard([videoSink] { gst_object_unref(videoSink); });
+
+    QQuickItem widget;
+    const auto receiver = makeReceiver(loopbackUri(QLatin1StringView("udp"), port), &widget);
+    QSignalSpy startSpy(receiver.get(), &VideoReceiver::onStartComplete);
+    QSignalSpy startDecodingSpy(receiver.get(), &VideoReceiver::onStartDecodingComplete);
+    QSignalSpy decodingSpy(receiver.get(), &VideoReceiver::decodingChanged);
+
+    receiver->start(kWatchdogTimeoutSec);
+    receiver->startDecoding(videoSink);
+    QVERIFY_SIGNAL_COUNT_WAIT(startSpy, 1, TestTimeout::mediumMs());
+    QCOMPARE(lastStatus(startSpy), VideoReceiver::STATUS_OK);
+    QVERIFY_SIGNAL_COUNT_WAIT(startDecodingSpy, 1, TestTimeout::mediumMs());
+    QCOMPARE(lastStatus(startDecodingSpy), VideoReceiver::STATUS_OK);
+
+    // Nothing is sent until decoding was requested, so the source pad appears only now.
+    H264RtpSender sender;
+    QVERIFY(sender.start(port));
+    QVERIFY_SIGNAL_COUNT_WAIT(decodingSpy, 1, TestTimeout::mediumMs());
+    QVERIFY(lastBool(decodingSpy));
 }
 
 void GstVideoReceiverTest::_testStopDecodingBeforeFirstFrame()
@@ -688,6 +709,8 @@ void GstVideoReceiverTest::_testRecordingPlayableWhileInProgress() {}
 void GstVideoReceiverTest::_testDestroyWhileRecordingFinalizesFile() {}
 
 void GstVideoReceiverTest::_testSecondRecordingIsNotTruncated() {}
+
+void GstVideoReceiverTest::_testDecodingRequestedBeforeStreamStarts() {}
 
 void GstVideoReceiverTest::_testStopDecodingBeforeFirstFrame() {}
 
