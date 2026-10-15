@@ -153,15 +153,10 @@ else()
     endif()
 endif()
 
-# Always recompute from the current component set — a stale list from a prior
-# configure would miss a newly-requested component.
 gstreamer_build_apis(GSTREAMER_APIS ${QGC_GST_COMPONENTS})
 
-# Plugin list lives in .github/build-config.json. Alternate groups (e.g. the
-# videoconvertscale↔videoconvert+videoscale 1.22 split) are owned by
-# GStreamerPluginPolicy and applied below in the missing-plugin scan.
-# Always recompute (see GSTREAMER_APIS above) — never carry a stale plugin list
-# across reconfigures.
+# The plugin list lives in .github/build-config.json; the alternate groups of PluginPolicy.cmake (e.g. the 1.22
+# videoconvertscale fusion of videoconvert+videoscale) apply to the missing-plugin check below.
 gstreamer_plugins_for(PLATFORM "${_qgc_gst_platform_PLUGIN_KEY}" OUT_VAR GSTREAMER_PLUGINS)
 
 # Mobile builds have no filesystem plugin scan — only statically registered plugins exist at

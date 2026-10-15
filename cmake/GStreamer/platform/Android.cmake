@@ -353,7 +353,6 @@ function(_qgc_gst_create_android_mobile_target)
     # Single-core model: GStreamer::mobile is an INTERFACE target that whole-archives the plugin .a's +
     # helpers + GIO modules into the app, which carries the one static core (GStreamer::GStreamer). A
     # separate .so would carry a duplicate GstElement core and fail g_type_is_a for every plugin.
-    # Do NOT re-link the core here — that produced the duplicate-GstElement-core failure.
     add_library(GStreamerMobile INTERFACE IMPORTED GLOBAL)
     add_library(GStreamer::mobile ALIAS GStreamerMobile)
     target_include_directories(GStreamerMobile

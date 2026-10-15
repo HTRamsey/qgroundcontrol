@@ -76,7 +76,8 @@ Per-platform zero-copy import of decoded GPU frames, all sharing `GstHwFrameText
   - `StaticInit.cmake`: generates `gst_init_static_plugins()` for static layouts from `gst_static_plugins.c.in`.
   - `Install.cmake`: desktop install helpers; each reports the plugin directory it installs to, which the install-time verifier checks.
   - `SdkState.cmake`: the resolved-SDK cache entries and the SDK fingerprint that drops cached probe results when the SDK changes.
-  - `Helpers.cmake`: include aggregator for the modules above; its header indexes their functions.
+  - `Platform.cmake`, `Components.cmake`, `Layout.cmake`, `Link.cmake`, `Json.cmake` and `Probe.cmake`: the target platform, the component registry, the `GStreamer::Layout` target describing the SDK's on-disk layout, library resolution for the targets, the `build-config.json` reader and the header probes.
+  - `Helpers.cmake`: include aggregator for the modules above.
   - `tests/`: script tests and a fake-SDK configure fixture, run with `ctest -L FindModule`.
 
 ## Runtime Environment Setup
