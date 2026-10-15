@@ -127,10 +127,6 @@ set(QGC_GST_DOWNLOAD_TIMEOUT
     ""
     CACHE STRING "GStreamer SDK download wall-clock timeout (seconds, default 1200)"
 )
-set(QGC_GST_DOWNLOAD_INACTIVITY_TIMEOUT
-    ""
-    CACHE STRING "GStreamer SDK download inactivity timeout (seconds, default 60)"
-)
 
 # Coverage thresholds
 set(QGC_COVERAGE_LINE_THRESHOLD

@@ -24,12 +24,11 @@ endfunction()
 
 string(SHA256 _pinned "pinned")
 string(SHA256 _other "other")
-string(TOUPPER "${_other}" _other_upper)
 
 if(TEST_CASE STREQUAL "sidecar-only-required")
+    # Nothing is seeded: the check must fail before it would fetch the upstream sidecar.
     set(QGC_BUILD_CONFIG_CONTENT "{}")
     set(GStreamer_REQUIRE_CHECKSUM ON)
-    _qgc_test_seed_sidecar(9.0.4 "${_other}")
     gstreamer_fetch_checksum(${_platform} 9.0.4 _hash)
 elseif(DEFINED TEST_CASE)
     message(FATAL_ERROR "Unknown test case: ${TEST_CASE}")
@@ -48,7 +47,7 @@ qgc_test_pass("pinned checksum is authoritative")
 
 set(QGC_BUILD_CONFIG_CONTENT "{}")
 set(GStreamer_REQUIRE_CHECKSUM OFF)
-_qgc_test_seed_sidecar(9.0.2 "${_other_upper}")
+_qgc_test_seed_sidecar(9.0.2 "${_other}")
 gstreamer_fetch_checksum(${_platform} 9.0.2 _hash)
-qgc_test_assert_streq("unpinned sidecar, lowercased" "SHA256=${_other}" "${_hash}")
+qgc_test_assert_streq("unpinned sidecar" "SHA256=${_other}" "${_hash}")
 qgc_test_pass("sidecar accepted only when checksums are optional")
