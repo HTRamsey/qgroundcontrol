@@ -1,3 +1,15 @@
+# GStreamer SDK orchestration, included once by src/VideoManager/VideoReceiver/GStreamer/CMakeLists.txt: picks the
+# requested version, discovers or downloads the target platform's SDK (Platform.cmake, platform/*.cmake), creates the
+# GStreamer:: targets, checks the plugin set and records the resolved SDK (SdkState.cmake, GStreamer::Layout).
+#
+# Input: QGC_GST_COMPONENTS (components beyond the mandatory registry rows, Components.cmake) and the cache options
+# GStreamer_ROOT_DIR, QGC_GST_VERSION, GStreamer_USE_{STATIC_LIBS,FRAMEWORK} and PKG_CONFIG_ARGN.
+# Sets, in the including directory: GStreamer_ROOT_DIR (resolved), GStreamer_VERSION, GStreamer_AUTO_DOWNLOADED,
+# GStreamer_USE_{STATIC_LIBS,FRAMEWORK,MERGED_STATIC}, GSTREAMER_{LIB,PLUGIN,INCLUDE}_PATH, GSTREAMER_APIS,
+# GSTREAMER_PLUGINS, GSTREAMER_STATIC_PLUGINS (static layouts), G_IO_MODULES (mobile), GStreamer_<component>_FOUND,
+# GST_PLUGIN_<plugin>_FOUND, QGC_GST_HAS_DMABUF (Linux) and the SDK's pkg-config view (PKG_CONFIG_EXECUTABLE and
+# PKG_CONFIG_ARGN normal variables plus the environment), which qgc_gst_restore_pkgconfig_env undoes.
+
 include("${CMAKE_CURRENT_LIST_DIR}/Helpers.cmake")
 
 qgc_gst_platform(_qgc_gst_platform)
@@ -225,7 +237,7 @@ unset(_qgc_gst_missing_mandatory)
 unset(_qgc_gst_mandatory)
 unset(_qgc_gst_mandatory_apis)
 # User-requested optional components: mark FOUND only if the corresponding
-# api_ target was actually created by find_package(GStreamer).
+# api_ target was actually created (Targets.cmake, or the iOS targets).
 foreach(_comp IN LISTS QGC_GST_COMPONENTS)
     gstreamer_resolve_component("${_comp}" _resolved_name _api _ _)
     # A registry match (non-empty resolved name) includes umbrella entries like

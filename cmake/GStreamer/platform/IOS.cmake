@@ -587,7 +587,7 @@ function(_qgc_gst_create_ios_targets)
         file(
             WRITE "${_xcfw_cache_file}"
             "# Auto-generated cache of plugin descriptors enumerated from the iOS xcframework.\n"
-            "# Regenerated when GStreamer_VERSION or libGStreamer.a (size+mtime) changes.\n"
+            "# Regenerated when GStreamer_VERSION or libGStreamer.a (size, mtime or SHA256) changes.\n"
             "set(_xcfw_cached_key \"${_xcfw_cache_key}\")\n" "set(_xcfw_descs \"${_xcfw_descs}\")\n"
         )
     endif()
