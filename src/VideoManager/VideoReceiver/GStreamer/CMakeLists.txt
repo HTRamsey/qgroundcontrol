@@ -119,6 +119,8 @@ target_sources(${CMAKE_PROJECT_NAME}
         RecordingBranch.h
         RecordingFinalizer.cc
         RecordingFinalizer.h
+        DecodingBranch.cc
+        DecodingBranch.h
 )
 
 # iOS xcframework ships no CA list / no keychain-via-OpenSSL; bundle a Mozilla NSS extract for

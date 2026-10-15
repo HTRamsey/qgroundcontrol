@@ -781,7 +781,7 @@ void GstVideoReceiverTest::_testDecoderQosDisabledAndReported()
     QVERIFY(QMetaObject::invokeMethod(
         gstReceiver->_workerContext,
         [gstReceiver, &decoders, &qosEnabled]() {
-            GstIterator* it = gst_bin_iterate_recurse(GST_BIN(gstReceiver->_decoder));
+            GstIterator* it = gst_bin_iterate_recurse(GST_BIN(gstReceiver->_decodingBranch.decoder()));
             GValue item = G_VALUE_INIT;
             while (gst_iterator_next(it, &item) == GST_ITERATOR_OK) {
                 auto* element = GST_ELEMENT(g_value_get_object(&item));

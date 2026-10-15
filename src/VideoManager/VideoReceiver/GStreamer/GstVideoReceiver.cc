@@ -1,7 +1,7 @@
 //-----------------------------------------------------------------------------
 // Our pipeline look like this:
 //
-//              +-->queue-->_decoderValve[-->_decoder-->_videoSink]
+//              +-->DecodingBranch: queue-->valve[-->decodebin3-->video sink]
 //              |
 // _source-->_tee
 //              |
@@ -15,7 +15,6 @@
 #include <memory>
 
 #include <QtCore/QDeadlineTimer>
-#include <QtCore/QMutexLocker>
 #include <QtCore/QThread>
 #include <QtCore/QTimer>
 #include <QtCore/QUrl>
@@ -116,6 +115,7 @@ GstVideoReceiver::GstVideoReceiver(QObject* parent)
     , _watchdogTimer(new QTimer(_workerContext))
     , _reconnectTimer(new QTimer(_workerContext))
     , _recordingBranch(*this, _workerContext)
+    , _decodingBranch(*this)
 {
     qCDebug(GstVideoReceiverLog) << this;
 
@@ -238,36 +238,7 @@ void GstVideoReceiver::_startPipeline(const StartConfig& config)
             break;
         }
 
-        GstElement* decoderQueue = gst_element_factory_make("queue", nullptr);
-        if (!decoderQueue)  {
-            qCCritical(GstVideoReceiverLog) << "gst_element_factory_make('queue') failed";
-            break;
-        }
-
-        // leaky=downstream (2) + tiny depth: the live-display branch must drop the oldest
-        // buffer on backpressure, not stall the streaming thread. The recording branch
-        // keeps default non-leaky semantics so every frame reaches the muxer.
-        g_object_set(decoderQueue,
-                     "leaky", 2,
-                     "max-size-buffers", 2,
-                     "max-size-bytes", 0,
-                     "max-size-time", G_GUINT64_CONSTANT(0),
-                     nullptr);
-        (void) gst_bin_add(GST_BIN(_pipeline), decoderQueue);
-
-        _decoderValve = gst_element_factory_make("valve", nullptr);
-        if (!_decoderValve)  {
-            qCCritical(GstVideoReceiverLog) << "gst_element_factory_make('valve') failed";
-            break;
-        }
-
-        g_object_set(_decoderValve,
-                     "drop", TRUE,
-                     nullptr);
-        (void) gst_bin_add(GST_BIN(_pipeline), _decoderValve);
-
-        if (!gst_element_link_many(_tee, decoderQueue, _decoderValve, nullptr)) {
-            qCCritical(GstVideoReceiverLog) << "Unable to link decoder queue";
+        if (!_decodingBranch.build(_pipeline, _tee)) {
             break;
         }
 
@@ -409,19 +380,13 @@ void GstVideoReceiver::_resetPipelineState()
     _removeSourceEosProbe();
 
     _recordingBranch.reset();
-
-    // The video sink outlives the pipeline (owned by the caller of startDecoding), so its probe
-    // and pipeline membership must be dropped even when start() failed before decoding began.
-    if (_decoder || _videoSink) {
-        _shutdownDecodingBranch();
-    }
+    _decodingBranch.reset();
 
     _dotDumper.dump(_pipeline, "pipeline-stopped");
 
     gst_clear_object(&_pipeline);
 
     // Owned by the (now released) pipeline.
-    _decoderValve = nullptr;
     _tee = nullptr;
     _source = nullptr;
 
@@ -433,7 +398,7 @@ void GstVideoReceiver::_resetPipelineState()
     }
 }
 
-void GstVideoReceiver::startDecoding(void *sink)
+void GstVideoReceiver::startDecoding(void* sink)
 {
     if (!sink) {
         qCCritical(GstVideoReceiverLog) << "VideoSink is NULL";
@@ -441,66 +406,7 @@ void GstVideoReceiver::startDecoding(void *sink)
     }
 
     const bool hasWidget = (_widget != nullptr);
-    _runOnWorker([this, sink, hasWidget]() { _startDecoding(GST_ELEMENT(sink), hasWidget); });
-}
-
-void GstVideoReceiver::_startDecoding(GstElement* videoSink, bool hasWidget)
-{
-    qCDebug(GstVideoReceiverLog) << "Starting decoding" << _redactedUri();
-
-    if (!hasWidget) {
-        qCDebug(GstVideoReceiverLog) << "Video Widget is NULL" << _redactedUri();
-        emit onStartDecodingComplete(STATUS_FAIL);
-        return;
-    }
-
-    if (!_pipeline && _videoSink) {
-        // Replace a sink stored before start(); also drops its frame probe.
-        _shutdownDecodingBranch();
-    }
-
-    if (_videoSink || _decoding) {
-        qCDebug(GstVideoReceiverLog) << "Already decoding!" << _redactedUri();
-        emit onStartDecodingComplete(STATUS_INVALID_STATE);
-        return;
-    }
-
-    GstPad *pad = gst_element_get_static_pad(videoSink, "sink");
-    if (!pad) {
-        qCCritical(GstVideoReceiverLog) << "Unable to find sink pad of video sink" << _redactedUri();
-        emit onStartDecodingComplete(STATUS_FAIL);
-        return;
-    }
-
-    _watchdog.clearSinkFrames();
-
-    _videoSinkProbeId = gst_pad_add_probe(pad, GST_PAD_PROBE_TYPE_BUFFER, _videoSinkProbe, this, nullptr);
-    gst_clear_object(&pad);
-
-    // The caller keeps its own (non-floating) reference; ours is dropped in _shutdownDecodingBranch().
-    _videoSink = GST_ELEMENT(gst_object_ref(videoSink));
-
-    if (!_streaming) {
-        emit onStartDecodingComplete(STATUS_OK);
-        return;
-    }
-
-    _ensureVideoSinkInPipeline();
-
-    if (!_addDecoder(_decoderValve)) {
-        qCWarning(GstVideoReceiverLog) << "_addDecoder() failed" << _redactedUri();
-        _shutdownDecodingBranch();
-        emit onStartDecodingComplete(STATUS_FAIL);
-        return;
-    }
-
-    g_object_set(_decoderValve,
-                 "drop", FALSE,
-                 nullptr);
-
-    qCDebug(GstVideoReceiverLog) << "Decoding started" << _redactedUri();
-
-    emit onStartDecodingComplete(STATUS_OK);
+    _runOnWorker([this, sink, hasWidget]() { _decodingBranch.start(GST_ELEMENT(sink), hasWidget, _streaming); });
 }
 
 void GstVideoReceiver::stopDecoding()
@@ -510,23 +416,7 @@ void GstVideoReceiver::stopDecoding()
         return;
     }
 
-    qCDebug(GstVideoReceiverLog) << "Stopping decoding" << _redactedUri();
-
-    // Gate on _videoSink (set by startDecoding) instead of _decoding (which only flips on the first frame),
-    // so a stop before the first frame still removes the branch.
-    if (!_videoSink) {
-        qCDebug(GstVideoReceiverLog) << "Not decoding!" << _redactedUri();
-        emit onStopDecodingComplete(STATUS_INVALID_STATE);
-        return;
-    }
-
-    // The display branch has nothing to flush, so it is torn down at once instead of draining an EOS.
-    if (_decoderValve) {
-        g_object_set(_decoderValve, "drop", TRUE, nullptr);
-    }
-    _shutdownDecodingBranch();
-
-    emit onStopDecodingComplete(STATUS_OK);
+    _decodingBranch.stop();
 }
 
 void GstVideoReceiver::startRecording(const QString &videoFile, FILE_FORMAT format)
@@ -575,12 +465,9 @@ void GstVideoReceiver::_onWatchdogTick()
         }
     }
 
-    // Drain QoS updates accumulated since the last tick (see GST_MESSAGE_QOS).
-    if (_qosStatsDirty.exchange(false, std::memory_order_acq_rel)) {
-        _notifyDecoderStatsChanged();
-    }
+    _decodingBranch.publishQosStats();
 
-    const StreamWatchdog::Result result = _watchdog.check(StreamWatchdog::now(), _decoding);
+    const StreamWatchdog::Result result = _watchdog.check(StreamWatchdog::now(), _decodingBranch.isDecoding());
     if (result.stall == StreamWatchdog::Stall::None) {
         return;
     }
@@ -637,15 +524,6 @@ void GstVideoReceiver::dumpPipelineGraph(const QString &tag)
     });
 }
 
-GstElement *GstVideoReceiver::_makeDecoder()
-{
-    GstElement *decoder = gst_element_factory_make("decodebin3", nullptr);
-    if (!decoder) {
-        qCCritical(GstVideoReceiverLog) << "gst_element_factory_make('decodebin3') failed";
-    }
-    return decoder;
-}
-
 void GstVideoReceiver::_onNewSourcePad(GstPad *pad)
 {
     // FIXME: check for caps - if this is not video stream (and preferably - one of these which we have to support) then simply skip it
@@ -670,166 +548,8 @@ void GstVideoReceiver::_onNewSourcePad(GstPad *pad)
     if (_eosProbeId != 0) {
         _eosProbePad = GST_PAD_CAST(gst_object_ref(pad));
     }
-    if (!_videoSink) {
-        return;
-    }
 
-    _dotDumper.dump(_pipeline, "pipeline-with-new-source-pad");
-
-    _ensureVideoSinkInPipeline();
-
-    if (!_addDecoder(_decoderValve)) {
-        qCWarning(GstVideoReceiverLog) << "_addDecoder() failed";
-        _shutdownDecodingBranch();
-        return;
-    }
-
-    g_object_set(_decoderValve,
-                 "drop", FALSE,
-                 nullptr);
-
-    qCDebug(GstVideoReceiverLog) << "Decoding started" << _redactedUri();
-}
-
-void GstVideoReceiver::_onDecoderElementAdded(GstBin* /*decodebin*/, GstBin* /*subBin*/, GstElement* element,
-                                              gpointer data)
-{
-    GstElementFactory* factory = gst_element_get_factory(element);
-    if (!factory || !gst_element_factory_list_is_type(factory, GST_ELEMENT_FACTORY_TYPE_DECODER)) {
-        return;
-    }
-
-    // Live streams: once a frame is late, the videodecoder base class advances earliest_time and drops every frame
-    // after it. Turned off here, before the decoder sees data, for each decoder decodebin3 plugs, later swaps included.
-    if (g_object_class_find_property(G_OBJECT_GET_CLASS(element), "qos")) {
-        g_object_set(element, "qos", FALSE, nullptr);
-    }
-
-    GstPluginFeature* feature = GST_PLUGIN_FEATURE(factory);
-    const QString decoderName = QString::fromUtf8(gst_plugin_feature_get_name(feature));
-    QString pluginName = decoderName;
-    if (GstPlugin* plugin = gst_plugin_feature_get_plugin(feature)) {
-        pluginName = QString::fromUtf8(gst_plugin_get_name(plugin));
-        gst_object_unref(plugin);
-    }
-    qCDebug(GstVideoReceiverLog) << "Decodebin3 selected codec:rank -" << pluginName << "/" << decoderName << "-"
-                                 << gst_element_factory_get_klass(factory)
-                                 << (GStreamer::isHardwareDecoderFactory(factory) ? "(HW)" : "(SW)") << ":"
-                                 << gst_plugin_feature_get_rank(feature) << "- QoS disabled";
-
-    auto* self = static_cast<GstVideoReceiver*>(data);
-    self->_runOnWorkerForPipeline([self, decoderName]() {
-        {
-            QMutexLocker locker(&self->_decoderNameMutex);
-            if (decoderName == self->_decoderName) {
-                return;
-            }
-            self->_decoderName = decoderName;
-        }
-        self->_notifyDecoderStatsChanged();
-    });
-}
-
-void GstVideoReceiver::_notifyDecoderStatsChanged()
-{
-    // Emitted on the receiver's own thread, where its QML consumers live.
-    QMetaObject::invokeMethod(this, [this]() { emit decoderStatsChanged(); }, Qt::QueuedConnection);
-}
-
-void GstVideoReceiver::_onNewDecoderPad(GstPad *pad)
-{
-    qCDebug(GstVideoReceiverLog) << "_onNewDecoderPad" << _redactedUri();
-
-    _dotDumper.dump(_pipeline, "pipeline-with-new-decoder-pad");
-
-    (void) _addVideoSink(pad);
-}
-
-bool GstVideoReceiver::_addDecoder(GstElement *src)
-{
-    _decoder = _makeDecoder();
-    if (!_decoder) {
-        qCCritical(GstVideoReceiverLog) << "_makeDecoder() failed";
-        return false;
-    }
-
-    (void) gst_object_ref(_decoder);
-    (void) g_signal_connect(_decoder, "deep-element-added", G_CALLBACK(_onDecoderElementAdded), this);
-
-    (void) gst_bin_add(GST_BIN(_pipeline), _decoder);
-    (void) gst_element_sync_state_with_parent(_decoder);
-
-    _dotDumper.dump(_pipeline, "pipeline-with-decoder");
-
-    if (!gst_element_link(src, _decoder)) {
-        qCWarning(GstVideoReceiverLog) << "Unable to link decoder";
-        gst_element_set_state(_decoder, GST_STATE_NULL);
-        (void) gst_element_get_state(_decoder, nullptr, nullptr, GST_CLOCK_TIME_NONE);
-        (void) gst_bin_remove(GST_BIN(_pipeline), _decoder);
-        gst_clear_object(&_decoder);
-        return false;
-    }
-
-    GstPad *srcPad = nullptr;
-    (void) gst_element_foreach_src_pad(_decoder, grabFirstSrcPad, &srcPad);
-
-    if (srcPad) {
-        _onNewDecoderPad(srcPad);
-    } else {
-        (void) g_signal_connect(_decoder, "pad-added", G_CALLBACK(_onNewPad), this);
-    }
-
-    gst_clear_object(&srcPad);
-    return true;
-}
-
-void GstVideoReceiver::_ensureVideoSinkInPipeline()
-{
-    if (!_videoSink || !_pipeline) {
-        return;
-    }
-
-    GstObject *parent = gst_element_get_parent(_videoSink);
-    if (parent) {
-        gst_object_unref(parent);
-        return;
-    }
-
-    g_object_set(_videoSink, "sync", !_config.lowLatency, NULL);
-
-    // The sink is never floating here, so the bin takes its own reference; removal drops only that one.
-    (void) gst_bin_add(GST_BIN(_pipeline), _videoSink);
-
-    // PAUSED (not READY) triggers downstream caps negotiation before source data arrives.
-    (void) gst_element_set_state(_videoSink, GST_STATE_PAUSED);
-}
-
-bool GstVideoReceiver::_addVideoSink(GstPad *pad)
-{
-    _ensureVideoSinkInPipeline();
-
-    GstPad *sinkPad = gst_element_get_static_pad(_videoSink, "sink");
-    GstPadLinkReturn linkRet = sinkPad ? gst_pad_link(pad, sinkPad) : GST_PAD_LINK_WRONG_HIERARCHY;
-    gst_clear_object(&sinkPad);
-    if (linkRet != GST_PAD_LINK_OK) {
-        qCWarning(GstVideoReceiverLog) << "Unable to link decoder pad to video sink:" << gst_pad_link_get_name(linkRet);
-
-        // _ensureVideoSinkInPipeline() added it before linking; detach for the next retry.
-        GstObject *parent = gst_element_get_parent(_videoSink);
-        if (parent) {
-            (void) gst_element_set_state(_videoSink, GST_STATE_NULL);
-            (void) gst_element_get_state(_videoSink, nullptr, nullptr, GST_CLOCK_TIME_NONE);
-            (void) gst_bin_remove(GST_BIN(_pipeline), _videoSink);
-            gst_clear_object(&parent);
-        }
-        return false;
-    }
-
-    (void) gst_element_sync_state_with_parent(_videoSink);
-
-    _dotDumper.dump(_pipeline, "pipeline-with-videosink");
-
-    return true;
+    _decodingBranch.onSourceStreaming();
 }
 
 void GstVideoReceiver::_noteTeeFrame()
@@ -838,71 +558,9 @@ void GstVideoReceiver::_noteTeeFrame()
     if (sourceFrames == 1) {
         qCDebug(GstVideoReceiverLog).noquote() << "Source receiving frames (tee):" << _redactedUri();
     } else if ((sourceFrames % 300) == 0) {
-        qCDebug(GstVideoReceiverLog).noquote()
-            << "Source flow: teeFrames=" << sourceFrames << "decoding=" << _decoding << _redactedUri();
+        qCDebug(GstVideoReceiverLog).noquote() << "Source flow: teeFrames=" << sourceFrames
+                                               << "decoding=" << _decodingBranch.isDecoding() << _redactedUri();
     }
-}
-
-void GstVideoReceiver::_noteVideoSinkFrame()
-{
-    if (_watchdog.noteSinkFrame(StreamWatchdog::now())) {
-        _runOnWorkerForPipeline([this]() { _onFirstVideoFrame(); });
-    }
-}
-
-void GstVideoReceiver::_onFirstVideoFrame()
-{
-    if (!_videoSink || _decoding) {
-        return;
-    }
-    _decoding = true;
-    qCDebug(GstVideoReceiverLog) << "Decoding started";
-    emit decodingChanged(true);
-}
-
-void GstVideoReceiver::_shutdownDecodingBranch()
-{
-    if (_decoder) {
-        GstObject *parent = gst_element_get_parent(_decoder);
-        if (parent) {
-            (void) gst_bin_remove(GST_BIN(parent), _decoder);
-            (void) gst_element_set_state(_decoder, GST_STATE_NULL);
-            (void) gst_element_get_state(_decoder, nullptr, nullptr, GST_CLOCK_TIME_NONE);
-            gst_clear_object(&parent);
-        }
-
-        gst_clear_object(&_decoder);
-    }
-
-    if (_videoSinkProbeId != 0 && _videoSink) {
-        GstPad *sinkpad = gst_element_get_static_pad(_videoSink, "sink");
-        if (sinkpad) {
-            gst_pad_remove_probe(sinkpad, _videoSinkProbeId);
-            gst_clear_object(&sinkpad);
-        }
-    }
-    _videoSinkProbeId = 0;
-
-    _watchdog.clearSinkFrames();
-
-    if (_videoSink) {
-        GstObject *parent = gst_element_get_parent(_videoSink);
-        if (parent) {
-            // Drops only the bin's own reference; _videoSink keeps ours until the clear below.
-            (void) gst_bin_remove(GST_BIN(parent), _videoSink);
-            (void) gst_element_set_state(_videoSink, GST_STATE_NULL);
-            (void) gst_element_get_state(_videoSink, nullptr, nullptr, GST_CLOCK_TIME_NONE);
-            gst_clear_object(&parent);
-        }
-        gst_clear_object(&_videoSink);
-    }
-
-    if (_decoding.exchange(false)) {
-        qCDebug(GstVideoReceiverLog) << "Decoding stopped";
-        emit decodingChanged(false);
-    }
-
-    _dotDumper.dump(_pipeline, "pipeline-decoding-stopped");
 }
 
 void GstVideoReceiver::_removeSourceEosProbe()
@@ -939,7 +597,7 @@ GstBusSyncReply GstVideoReceiver::_onBusSyncMessage(GstBus* bus, GstMessage* mes
             selectVideoStreams(message);
             break;
         case GST_MESSAGE_QOS:
-            self->_onBusQos(message);
+            self->_decodingBranch.onBusQos(message);
             break;
         case GST_MESSAGE_STATE_CHANGED:
             self->_onBusStateChanged(message);
@@ -1004,50 +662,11 @@ void GstVideoReceiver::_onBusElement(GstMessage* message)
     }
 
     if (gst_structure_has_name(structure, "qgc-caps-info")) {
-        gint w = 0, h = 0;
-        const gchar* fmt = gst_structure_get_string(structure, "format");
-        gst_structure_get_int(structure, "width", &w);
-        gst_structure_get_int(structure, "height", &h);
-        const QString format = QString::fromUtf8(fmt ? fmt : "");
-        const QSize resolution(w, h);
-        // src compared by address only on the GUI thread; never dereferenced (may be gone by then).
-        void* src = GST_MESSAGE_SRC(message);
-        QMetaObject::invokeMethod(
-            this,
-            [this, format, resolution, src]() {
-                for (auto* c : QGCQVideoSinkController::controllersOf(this)) {
-                    if (static_cast<const void*>(c->element()) == src) {
-                        c->updateNegotiation(format, resolution);
-                    }
-                }
-                // The sink's negotiated raw caps are always fixed, unlike the encoded caps upstream of the decoder.
-                emit videoSizeChanged(resolution);
-            },
-            Qt::QueuedConnection);
+        _decodingBranch.onBusCapsInfo(message);
         return;
     }
 
     _recordingBranch.onBusElement(message);
-}
-
-void GstVideoReceiver::_onBusQos(GstMessage* message)
-{
-    guint64 processed = 0, dropped = 0;
-    gst_message_parse_qos_stats(message, nullptr, &processed, &dropped);
-
-    gint64 jitter = 0;
-    gdouble proportion = 0;
-    gint quality = 0;
-    gst_message_parse_qos_values(message, &jitter, &proportion, &quality);
-
-    _processedFrames.store(processed, std::memory_order_relaxed);
-    _droppedFrames.store(dropped, std::memory_order_relaxed);
-    _currentJitterNs.store(jitter, std::memory_order_relaxed);
-    _qosProportion.store(proportion, std::memory_order_relaxed);
-    _qosQuality.store(quality, std::memory_order_relaxed);
-    // GstBaseSink can post QOS per dropped buffer; defer the emit to the 1 Hz
-    // watchdog tick so QML isn't flooded from the streaming thread.
-    _qosStatsDirty.store(true, std::memory_order_release);
 }
 
 void GstVideoReceiver::_onBusStateChanged(GstMessage* message)
@@ -1086,7 +705,7 @@ void GstVideoReceiver::_onPipelineError()
     _onStreamFailure("pipeline error");
 }
 
-void GstVideoReceiver::_onNewPad(GstElement *element, GstPad *pad, gpointer data)
+void GstVideoReceiver::_onNewPad(GstElement* element, GstPad* pad, gpointer data)
 {
     auto* self = static_cast<GstVideoReceiver*>(data);
 
@@ -1104,8 +723,8 @@ void GstVideoReceiver::_onPadAdded(GstElement* element, GstPad* pad)
 {
     if (element == _source) {
         _onNewSourcePad(pad);
-    } else if (element == _decoder) {
-        _onNewDecoderPad(pad);
+    } else if (element == _decodingBranch.decoder()) {
+        _decodingBranch.onDecoderPad(pad);
     } else {
         qCDebug(GstVideoReceiverLog) << "Ignoring a pad of a removed element";
     }
@@ -1118,17 +737,6 @@ GstPadProbeReturn GstVideoReceiver::_teeProbe(GstPad *pad, GstPadProbeInfo *info
     if (user_data) {
         GstVideoReceiver *pThis = static_cast<GstVideoReceiver*>(user_data);
         pThis->_noteTeeFrame();
-    }
-
-    return GST_PAD_PROBE_OK;
-}
-
-GstPadProbeReturn GstVideoReceiver::_videoSinkProbe(GstPad *pad, GstPadProbeInfo *info, gpointer user_data)
-{
-    Q_UNUSED(pad); Q_UNUSED(info)
-
-    if (user_data) {
-        static_cast<GstVideoReceiver*>(user_data)->_noteVideoSinkFrame();
     }
 
     return GST_PAD_PROBE_OK;
