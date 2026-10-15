@@ -141,7 +141,7 @@ void GstVideoReceiver::_startPipeline(const StartConfig& config)
         _dotDumper.setReceiverName(_config.name);
         _pipeline = GStreamer::adoptElement(gst_pipeline_new(_dotDumper.pipelineName().constData()));
         if (!_pipeline) {
-            qCCritical(GstVideoReceiverLog) << "gst_pipeline_new() failed";
+            qCWarning(GstVideoReceiverLog) << "gst_pipeline_new() failed";
             break;
         }
         // Nothing else ever takes a ref on the pipeline, so ours is a plain one.
@@ -152,7 +152,7 @@ void GstVideoReceiver::_startPipeline(const StartConfig& config)
 
         _tee = gst_element_factory_make("tee", nullptr);
         if (!_tee) {
-            qCCritical(GstVideoReceiverLog) << "gst_element_factory_make('tee') failed";
+            qCWarning(GstVideoReceiverLog) << "gst_element_factory_make('tee') failed";
             break;
         }
         (void) gst_bin_add(GST_BIN(_pipeline.get()), _tee);
@@ -167,7 +167,7 @@ void GstVideoReceiver::_startPipeline(const StartConfig& config)
         if (_teeProbeId == 0) {
             // _teeProbe feeds the watchdog; without it the watchdog fires spuriously instead of reporting a real
             // failure.
-            qCCritical(GstVideoReceiverLog) << "gst_pad_add_probe(_teeProbe) failed";
+            qCCritical(GstVideoReceiverLog) << "Failed to add the tee frame probe";
             break;
         }
 
@@ -189,7 +189,7 @@ void GstVideoReceiver::_startPipeline(const StartConfig& config)
                                         (sourceConfig.jitterBuffer != GStreamer::SourceFactory::JitterBuffer::None);
         _source = GStreamer::SourceFactory::create(_config.uri, sourceConfig);
         if (!_source) {
-            qCCritical(GstVideoReceiverLog) << "SourceFactory::create() failed";
+            qCWarning(GstVideoReceiverLog) << "Failed to create the source for" << _redactedUri();
             break;
         }
         (void) gst_bin_add(GST_BIN(_pipeline.get()), _source);
@@ -247,7 +247,7 @@ bool GstVideoReceiver::_stopPipeline()
     qCDebug(GstVideoReceiverLog) << "Stopped" << _redactedUri();
 
     if (const HwBuffers::PathStats hwStats = HwBuffers::formatPathStats(true); hwStats.totalDelivered > 0) {
-        qCInfo(GstVideoReceiverLog).noquote()
+        qCDebug(GstVideoReceiverLog).noquote()
             << "HW path stats" << _redactedUri() << hwStats.line + HwBuffers::takeExtraPathStats();
     }
 
@@ -413,7 +413,7 @@ void GstVideoReceiver::dumpPipelineGraph(const QString& tag)
 {
     _runOnWorker([this, tag]() {
         if (!_pipeline) {
-            qCDebug(GstVideoReceiverLog) << "dumpPipelineGraph: pipeline not running";
+            qCDebug(GstVideoReceiverLog) << "No running pipeline to dump";
             return;
         }
         _dotDumper.snapshot(_pipeline.get(), tag);

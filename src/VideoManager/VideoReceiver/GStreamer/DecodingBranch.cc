@@ -19,7 +19,7 @@ bool DecodingBranch::build(GstElement* pipeline, GstElement* tee)
 
     GstElement* queue = gst_element_factory_make("queue", nullptr);
     if (!queue) {
-        qCCritical(GstVideoReceiverLog) << "gst_element_factory_make('queue') failed";
+        qCWarning(GstVideoReceiverLog) << "gst_element_factory_make('queue') failed";
         return false;
     }
 
@@ -32,7 +32,7 @@ bool DecodingBranch::build(GstElement* pipeline, GstElement* tee)
 
     _valve = gst_element_factory_make("valve", nullptr);
     if (!_valve) {
-        qCCritical(GstVideoReceiverLog) << "gst_element_factory_make('valve') failed";
+        qCWarning(GstVideoReceiverLog) << "gst_element_factory_make('valve') failed";
         return false;
     }
 
@@ -40,7 +40,7 @@ bool DecodingBranch::build(GstElement* pipeline, GstElement* tee)
     (void) gst_bin_add(GST_BIN(_pipeline), _valve);
 
     if (!gst_element_link_many(tee, queue, _valve, nullptr)) {
-        qCCritical(GstVideoReceiverLog) << "Unable to link decoder queue";
+        qCWarning(GstVideoReceiverLog) << "Unable to link decoder queue";
         return false;
     }
     return true;
@@ -179,7 +179,7 @@ bool DecodingBranch::_insertDecoder()
     _ensureVideoSinkInPipeline();
 
     if (!_addDecoder()) {
-        qCWarning(GstVideoReceiverLog) << "_addDecoder() failed" << _receiver._redactedUri();
+        qCWarning(GstVideoReceiverLog) << "Failed to add the decoder" << _receiver._redactedUri();
         _shutdown();
         return false;
     }
@@ -194,7 +194,7 @@ bool DecodingBranch::_addDecoder()
 {
     _decoder = GStreamer::adoptElement(gst_element_factory_make("decodebin3", nullptr));
     if (!_decoder) {
-        qCCritical(GstVideoReceiverLog) << "gst_element_factory_make('decodebin3') failed";
+        qCWarning(GstVideoReceiverLog) << "gst_element_factory_make('decodebin3') failed";
         return false;
     }
     // Ours alongside the pipeline's, so decoder() stays valid until _shutdown().

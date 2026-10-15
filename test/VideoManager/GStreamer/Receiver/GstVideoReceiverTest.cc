@@ -787,8 +787,8 @@ void GstVideoReceiverTest::_testFailedRecordingStartLeavesBranchUsable()
         Qt::BlockingQueuedConnection));
     QVERIFY(nameTaken);
 
-    expectLogMessage("Video.GStreamer.GstVideoReceiver", QtCriticalMsg,
-                     QRegularExpression(QStringLiteral("^gst_bin_add\\(file sink\\) failed")));
+    expectLogMessage("Video.GStreamer.GstVideoReceiver", QtWarningMsg,
+                     QRegularExpression(QStringLiteral("^Failed to add the recording sink")));
     receiver->startRecording(tempDir.filePath(QStringLiteral("refused.mp4")), VideoReceiver::FILE_FORMAT_MP4);
     QVERIFY_SIGNAL_COUNT_WAIT(startRecordingSpy, 1, TestTimeout::mediumMs());
     QCOMPARE(lastStatus(startRecordingSpy), VideoReceiver::STATUS_FAIL);

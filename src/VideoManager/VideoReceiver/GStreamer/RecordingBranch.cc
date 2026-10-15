@@ -66,7 +66,7 @@ GStreamer::GstElementPtr RecordingBranch::makeFileSink(const QString& videoFile,
     // gst_element_add_pad consume a floating ref even when they fail, so each owner is released into the call.
     GStreamer::GstElementPtr bin = GStreamer::adoptElement(gst_bin_new("sinkbin"));
     if (!bin) {
-        qCCritical(GstVideoReceiverLog) << "gst_bin_new('sinkbin') failed";
+        qCWarning(GstVideoReceiverLog) << "gst_bin_new('sinkbin') failed";
         return nullptr;
     }
     (void) gst_object_ref_sink(bin.get());
@@ -80,13 +80,13 @@ GStreamer::GstElementPtr RecordingBranch::makeFileSink(const QString& videoFile,
         GStreamer::GstElementPtr parserOwner =
             GStreamer::adoptElement(gst_element_factory_make(parserFactory, nullptr));
         if (!parserOwner) {
-            qCCritical(GstVideoReceiverLog) << "gst_element_factory_make() failed for" << parserFactory;
+            qCWarning(GstVideoReceiverLog) << "gst_element_factory_make() failed for" << parserFactory;
             return nullptr;
         }
         g_object_set(parserOwner.get(), "config-interval", -1, nullptr);
         parser = parserOwner.release();
         if (!gst_bin_add(GST_BIN(bin.get()), parser)) {
-            qCCritical(GstVideoReceiverLog) << "gst_bin_add(parser) failed";
+            qCWarning(GstVideoReceiverLog) << "gst_bin_add(parser) failed";
             return nullptr;
         }
     }
@@ -97,7 +97,7 @@ GStreamer::GstElementPtr RecordingBranch::makeFileSink(const QString& videoFile,
     // bounded-wait in stop()). max-size-time=0 keeps single-file behaviour.
     GStreamer::GstElementPtr splitmuxOwner = GStreamer::adoptElement(gst_element_factory_make("splitmuxsink", nullptr));
     if (!splitmuxOwner) {
-        qCCritical(GstVideoReceiverLog) << "gst_element_factory_make('splitmuxsink') failed";
+        qCWarning(GstVideoReceiverLog) << "gst_element_factory_make('splitmuxsink') failed";
         return nullptr;
     }
     GstElement* const splitmux = splitmuxOwner.get();
@@ -121,7 +121,7 @@ GStreamer::GstElementPtr RecordingBranch::makeFileSink(const QString& videoFile,
     }
 
     if (!gst_bin_add(GST_BIN(bin.get()), splitmuxOwner.release())) {
-        qCCritical(GstVideoReceiverLog) << "gst_bin_add(splitmuxsink) failed";
+        qCWarning(GstVideoReceiverLog) << "gst_bin_add(splitmuxsink) failed";
         return nullptr;
     }
 
@@ -131,7 +131,7 @@ GStreamer::GstElementPtr RecordingBranch::makeFileSink(const QString& videoFile,
     // finalizing splitmuxsink with the bin reclaims it.
     const GStreamer::GstPadPtr videopad = GStreamer::adoptPad(gst_element_request_pad_simple(splitmux, "video"));
     if (!videopad) {
-        qCCritical(GstVideoReceiverLog) << "gst_element_request_pad_simple(splitmuxsink, video) failed";
+        qCWarning(GstVideoReceiverLog) << "gst_element_request_pad_simple(splitmuxsink, video) failed";
         return nullptr;
     }
 
@@ -146,7 +146,7 @@ GStreamer::GstElementPtr RecordingBranch::makeFileSink(const QString& videoFile,
 
         const GstPadLinkReturn linkResult = gst_pad_link(parserSrcPad.get(), videopad.get());
         if (linkResult != GST_PAD_LINK_OK) {
-            qCCritical(GstVideoReceiverLog)
+            qCWarning(GstVideoReceiverLog)
                 << "Failed to link parser and splitmuxsink:" << gst_pad_link_get_name(linkResult);
             return nullptr;
         }
@@ -154,11 +154,11 @@ GStreamer::GstElementPtr RecordingBranch::makeFileSink(const QString& videoFile,
 
     GstPad* const ghostpad = gst_ghost_pad_new("sink", parserSinkPad ? parserSinkPad.get() : videopad.get());
     if (!ghostpad) {
-        qCCritical(GstVideoReceiverLog) << "gst_ghost_pad_new() failed";
+        qCWarning(GstVideoReceiverLog) << "gst_ghost_pad_new() failed";
         return nullptr;
     }
     if (!gst_element_add_pad(bin.get(), ghostpad)) {
-        qCCritical(GstVideoReceiverLog) << "gst_element_add_pad(ghost) failed";
+        qCWarning(GstVideoReceiverLog) << "gst_element_add_pad(ghost) failed";
         return nullptr;
     }
 
@@ -229,14 +229,14 @@ bool RecordingBranch::build(GstElement* pipeline, GstElement* tee)
 
     GstElement* queue = gst_element_factory_make("queue", nullptr);
     if (!queue) {
-        qCCritical(GstVideoReceiverLog) << "gst_element_factory_make('queue') failed";
+        qCWarning(GstVideoReceiverLog) << "gst_element_factory_make('queue') failed";
         return false;
     }
     (void) gst_bin_add(GST_BIN(_pipeline), queue);
 
     _valve = gst_element_factory_make("valve", nullptr);
     if (!_valve) {
-        qCCritical(GstVideoReceiverLog) << "gst_element_factory_make('valve') failed";
+        qCWarning(GstVideoReceiverLog) << "gst_element_factory_make('valve') failed";
         return false;
     }
     g_object_set(_valve, "drop", TRUE, nullptr);
@@ -246,7 +246,7 @@ bool RecordingBranch::build(GstElement* pipeline, GstElement* tee)
     (void) gst_bin_add(GST_BIN(_pipeline), _valve);
 
     if (!gst_element_link_many(_tee, queue, _valve, nullptr)) {
-        qCCritical(GstVideoReceiverLog) << "Unable to link recorder queue";
+        qCWarning(GstVideoReceiverLog) << "Unable to link recorder queue";
         return false;
     }
     return true;
@@ -307,7 +307,7 @@ void RecordingBranch::start(const QString& videoFile, VideoReceiver::FILE_FORMAT
     }
     _fileSink = makeFileSink(videoFile, format, inputCaps.get());
     if (!_fileSink) {
-        qCCritical(GstVideoReceiverLog) << "makeFileSink() failed" << _receiver._redactedUri();
+        qCWarning(GstVideoReceiverLog) << "Failed to create the recording sink" << _receiver._redactedUri();
         failRecordingStart();
         return;
     }
@@ -318,7 +318,7 @@ void RecordingBranch::start(const QString& videoFile, VideoReceiver::FILE_FORMAT
 
     // The bin takes its own ref; ours survives a failed add.
     if (!gst_bin_add(GST_BIN(_pipeline), _fileSink.get())) {
-        qCCritical(GstVideoReceiverLog) << "gst_bin_add(file sink) failed" << _receiver._redactedUri();
+        qCWarning(GstVideoReceiverLog) << "Failed to add the recording sink" << _receiver._redactedUri();
         failRecordingStart();
         return;
     }
@@ -345,7 +345,7 @@ void RecordingBranch::start(const QString& videoFile, VideoReceiver::FILE_FORMAT
                                          new KeyframeWatch{&_receiver, &_keyframeWatchId, videoFile},
                                          [](gpointer watch) { delete static_cast<KeyframeWatch*>(watch); });
     if (_keyframeWatchId == 0) {
-        qCCritical(GstVideoReceiverLog) << "gst_pad_add_probe(keyframeWatch) failed" << _receiver._redactedUri();
+        qCCritical(GstVideoReceiverLog) << "Failed to add the keyframe probe" << _receiver._redactedUri();
         failRecordingStart();
         return;
     }
