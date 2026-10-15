@@ -12,6 +12,7 @@
 
 #include "GStreamerFrameMap.h"
 #include "GstQgcAllocation.h"
+#include "HwBuffers/common/HwBuffers.h"
 #include "HwBuffers/dmabuf/GstDmaDrmCaps.h"
 #include "QGCLoggingCategory.h"
 #include "gstqgcelements.h"
@@ -60,6 +61,8 @@ struct PrivState
     // Per-element render counter (read via `frames-delivered`) so multi-receiver setups
     // don't see a shared process-global total.
     std::atomic<quint64> delivered_frames{0};
+    // Live zero-copy CPU frames pinning this sink's decoder buffers; shared because Qt may hold frames past finalize.
+    CpuVideoFramePool::PinnedFrameCounter pinned_cpu_frames = std::make_shared<std::atomic<int>>(0);
     // Replaced (under GST_OBJECT_LOCK) whenever `qvideosink` changes: an invoke queued to a destroyed QVideoSink is
     // purged without running, which would otherwise leave `posted` latched and starve the next sink.
     std::shared_ptr<PendingFrameSlot> pending = std::make_shared<PendingFrameSlot>();
@@ -398,12 +401,12 @@ static GstFlowReturn gst_qgc_q_video_sink_show_frame(GstVideoSink* vsink, GstBuf
     if (hasCrop) {
         croppedFmt = applyCropMeta(p->format, buf);
     }
-    MappedFrame mapped =
-        mapSampleToFrame(buf, p->cached_caps, self->video_info, hasCrop ? croppedFmt : p->format, hwCtx,
+    MappedFrame mapped = mapSampleToFrame(buf, p->cached_caps, self->video_info, hasCrop ? croppedFmt : p->format,
+                                          hwCtx, p->pinned_cpu_frames,
 #if defined(QGC_HAS_ANY_GPU_PATH)
-                         &p->resolved_path_cache);
+                                          &p->resolved_path_cache);
 #else
-                         nullptr);
+                                          nullptr);
 #endif
     if (!mapped.frame.isValid()) {
         p->dropped_frames.fetch_add(1, std::memory_order_relaxed);
@@ -510,7 +513,7 @@ static gboolean gst_qgc_q_video_sink_stop(GstBaseSink* bsink)
 }
 
 // Add qgcqvideosink's consumed metas + min-buffer pool hint, then chain so GstBaseSink's default
-// allocation bookkeeping still runs. Replaces the former QUERY_DOWNSTREAM pad probe for ALLOCATION.
+// allocation bookkeeping still runs.
 static gboolean gst_qgc_q_video_sink_propose_allocation(GstBaseSink* bsink, GstQuery* query)
 {
     GstQgc::populateAllocationQuery(query);
@@ -521,6 +524,16 @@ static gboolean gst_qgc_q_video_sink_propose_allocation(GstBaseSink* bsink, GstQ
         return parentClass->propose_allocation(bsink, query);
     }
     return TRUE;
+}
+
+// Answer CONTEXT (gst.gl.GLDisplay/app_context, Vulkan, D3D devices) synchronously so upstream GPU elements share Qt's
+// RHI device; the bus NEED_CONTEXT fallback races state changes. ALLOCATION reaches propose_allocation via the parent.
+static gboolean gst_qgc_q_video_sink_query(GstBaseSink* bsink, GstQuery* query)
+{
+    if ((GST_QUERY_TYPE(query) == GST_QUERY_CONTEXT) && HwBuffers::answerSinkBinContextQuery(query)) {
+        return TRUE;
+    }
+    return GST_BASE_SINK_CLASS(gst_qgc_q_video_sink_parent_class)->query(bsink, query);
 }
 
 static void gst_qgc_q_video_sink_class_init(GstQgcQVideoSinkClass* klass)
@@ -582,5 +595,6 @@ static void gst_qgc_q_video_sink_class_init(GstQgcQVideoSinkClass* klass)
     basesink_class->event = gst_qgc_q_video_sink_event;
     basesink_class->stop = gst_qgc_q_video_sink_stop;
     basesink_class->propose_allocation = gst_qgc_q_video_sink_propose_allocation;
+    basesink_class->query = gst_qgc_q_video_sink_query;
     videosink_class->show_frame = gst_qgc_q_video_sink_show_frame;
 }

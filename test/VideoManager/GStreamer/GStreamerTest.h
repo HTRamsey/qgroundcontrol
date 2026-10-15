@@ -95,12 +95,14 @@ private slots:
     void _testDmaBufVulkanImportRejectsMultiPlanar_data();
     void _testDmaBufVulkanImportRejectsMultiPlanar();
     void _testCpuZeroCopyFrameRejectsWritableMap();
+    void _testCpuZeroCopyPinnedFramesCappedPerSink();
     void _testCpuMemcpyActiveRowStrideHandling();
     void _testQGCRhiCaptureCacheLifecycle();
     void _testColorimetryPixelFormatMapping();
     void _testCpuCapsFormatsRoundTripToQt();
     void _testAllocationQueryHwMemoryPoolHint();
     void _testQgcVideoSinkBinAllocationQueryAdvertisesVideoMeta();
+    void _testQgcQVideoSinkProposesVideoMetaPool();
     void _testAllocationQuerySystemMemoryNoPoolStillAdvertisesMetas();
     void _testColorimetryColorSpaceMapping();
     void _testColorimetryResolutionHeuristicMatchesQt();

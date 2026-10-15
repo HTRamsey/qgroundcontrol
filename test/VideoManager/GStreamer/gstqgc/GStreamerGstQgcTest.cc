@@ -1274,7 +1274,7 @@ void GStreamerTest::_testCpuZeroCopyFrameRejectsWritableMap()
     gst_buffer_unmap(buffer, &mapInfo);
 
     QVideoFrameFormat format(QSize(4, 4), QVideoFrameFormat::Format_BGRA8888);
-    auto wrapped = CpuVideoFramePool::wrapZeroCopy(buffer, info, format);
+    auto wrapped = CpuVideoFramePool::wrapZeroCopy(buffer, info, format, std::make_shared<std::atomic<int>>(0));
     QVERIFY(wrapped);
 
     QVideoFrame frame(std::move(wrapped));
@@ -1285,6 +1285,33 @@ void GStreamerTest::_testCpuZeroCopyFrameRejectsWritableMap()
 
     QVERIFY(!frame.map(QVideoFrame::WriteOnly));
     QVERIFY(!frame.map(QVideoFrame::ReadWrite));
+}
+
+void GStreamerTest::_testCpuZeroCopyPinnedFramesCappedPerSink()
+{
+    GstVideoInfo info;
+    gst_video_info_init(&info);
+    gst_video_info_set_format(&info, GST_VIDEO_FORMAT_BGRA, 4, 4);
+    GstBuffer* buffer = gst_buffer_new_allocate(nullptr, GST_VIDEO_INFO_SIZE(&info), nullptr);
+    QVERIFY(buffer);
+    auto bufferGuard = qScopeGuard([&] { gst_buffer_unref(buffer); });
+    const QVideoFrameFormat format(QSize(4, 4), QVideoFrameFormat::Format_BGRA8888);
+
+    const auto sinkA = std::make_shared<std::atomic<int>>(0);
+    const auto sinkB = std::make_shared<std::atomic<int>>(0);
+    std::vector<std::unique_ptr<QAbstractVideoBuffer>> pinned;
+    for (int i = 0; i < CpuVideoFramePool::kMaxPinnedFrames; ++i) {
+        pinned.push_back(CpuVideoFramePool::wrapZeroCopy(buffer, info, format, sinkA));
+        QVERIFY(pinned.back());
+    }
+
+    // At the cap the caller must copy instead; another sink's budget is independent.
+    QVERIFY(!CpuVideoFramePool::wrapZeroCopy(buffer, info, format, sinkA));
+    QVERIFY(CpuVideoFramePool::wrapZeroCopy(buffer, info, format, sinkB));
+
+    // Releasing a frame (Qt dropping it) frees its slot.
+    pinned.pop_back();
+    QVERIFY(CpuVideoFramePool::wrapZeroCopy(buffer, info, format, sinkA));
 }
 
 void GStreamerTest::_testCpuMemcpyActiveRowStrideHandling()
@@ -1380,7 +1407,8 @@ void GStreamerTest::_testAllocationQueryHwMemoryPoolHint()
     guint size = 0, minBuffers = 0, maxBuffers = 0;
     gst_query_parse_nth_allocation_pool(query, 0, &pool, &size, &minBuffers, &maxBuffers);
     QVERIFY2(pool == nullptr, "HW path must not propose a generic pool for native memory");
-    QVERIFY2(minBuffers > 0, "min-buffer hint must be non-zero");
+    QVERIFY2(minBuffers > guint(CpuVideoFramePool::kMaxPinnedFrames),
+             "min-buffer hint must leave the decoder a buffer beyond those the sink and Qt hold");
     QVERIFY2(gst_query_find_allocation_meta(query, GST_VIDEO_META_API_TYPE, nullptr),
              "VideoMeta not advertised on HW path");
 
@@ -1423,6 +1451,35 @@ void GStreamerTest::_testQgcVideoSinkBinAllocationQueryAdvertisesVideoMeta()
     gst_query_parse_nth_allocation_pool(query, 0, &pool, &size, &minBuffers, &maxBuffers);
     QVERIFY2(pool == nullptr, "qgcvideosinkbin must not propose a generic pool for native memory");
     QVERIFY2(minBuffers > 0, "qgcvideosinkbin min-buffer hint must be non-zero");
+}
+
+void GStreamerTest::_testQgcQVideoSinkProposesVideoMetaPool()
+{
+    QVERIFY2(GStreamer::completeInit(), "completeInit failed");
+
+    GstElement* sink = gst_element_factory_make("qgcqvideosink", nullptr);
+    QVERIFY2(sink, "qgcqvideosink factory not found");
+    gst_object_ref_sink(sink);
+    auto sinkGuard = qScopeGuard([&] { gst_object_unref(sink); });
+    GstPad* sinkPad = gst_element_get_static_pad(sink, "sink");
+    QVERIFY(sinkPad);
+    auto sinkPadGuard = qScopeGuard([&] { gst_object_unref(sinkPad); });
+
+    GstCaps* caps = gst_caps_from_string(
+        "video/x-raw, format=(string)BGRA, width=(int)64, height=(int)64, framerate=(fraction)30/1");
+    QVERIFY2(caps, "System-memory caps did not parse");
+    auto capsGuard = qScopeGuard([&] { gst_caps_unref(caps); });
+    GstQuery* query = gst_query_new_allocation(caps, /*need_pool=*/TRUE);
+    auto queryGuard = qScopeGuard([&] { gst_query_unref(query); });
+
+    QVERIFY2(gst_pad_query(sinkPad, query), "qgcqvideosink did not answer ALLOCATION");
+    QCOMPARE(gst_query_get_n_allocation_pools(query), 1U);
+    GstBufferPool* pool = nullptr;
+    gst_query_parse_nth_allocation_pool(query, 0, &pool, nullptr, nullptr, nullptr);
+    QVERIFY2(pool, "need_pool=TRUE must get a pool proposal");
+    const bool hasVideoMeta = gst_buffer_pool_has_option(pool, GST_BUFFER_POOL_OPTION_VIDEO_META);
+    gst_object_unref(pool);
+    QVERIFY2(hasVideoMeta, "proposed pool must support VIDEO_META so decoders can write into it directly");
 }
 
 void GStreamerTest::_testAllocationQuerySystemMemoryNoPoolStillAdvertisesMetas()
