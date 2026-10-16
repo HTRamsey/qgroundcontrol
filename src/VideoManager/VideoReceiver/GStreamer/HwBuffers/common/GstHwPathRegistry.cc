@@ -63,8 +63,7 @@ bool has(HwVideoBufferPath path) noexcept
 ScopedPathsForTest::ScopedPathsForTest(std::initializer_list<const HwPathDescriptor*> paths)
     : _paths(paths)
     , _previous(s_testPaths.exchange(&_paths, std::memory_order_acq_rel))
-{
-}
+{}
 
 ScopedPathsForTest::~ScopedPathsForTest()
 {
