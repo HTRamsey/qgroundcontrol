@@ -9,7 +9,8 @@
 #include <atomic>
 #include <cstddef>
 #include <gst/gst.h>
-#include <gst/video/gstvideopool.h>
+// Not <gst/video/gstvideopool.h>: on GStreamer 1.28 it must not be the first video header (include cycle).
+#include <gst/video/video.h>
 #include <memory>
 #include <private/qhwvideobuffer_p.h>
 #include <private/qvideotexturehelper_p.h>
