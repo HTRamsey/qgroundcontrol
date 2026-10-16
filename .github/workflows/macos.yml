@@ -128,7 +128,7 @@ jobs:
         working-directory: ${{ runner.temp }}/build
         run: |
           for i in 1 2; do
-            QT_QPA_PLATFORM=offscreen timeout 600 ./Debug/QGroundControl.app/Contents/MacOS/QGroundControl \
+            QT_QPA_PLATFORM=offscreen ./Debug/QGroundControl.app/Contents/MacOS/QGroundControl \
               --unittest:GstVideoReceiverTest --allow-multiple > "gvr-$i.log" 2>&1 || true
             echo "run $i: $(grep -c 'No caps set' "gvr-$i.log") no-caps, $(grep -c '^FAIL!' "gvr-$i.log") failures"
           done
