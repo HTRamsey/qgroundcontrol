@@ -44,25 +44,65 @@ void configureH26xParser(GstElement* element)
     }
 }
 
-// Joining a stream mid-GOP, the units before the first SPS/PPS/IDR (VPS/SPS/PPS/IRAP for H.265) can't be decoded.
-// GStreamer 1.28's h264parse warns for each one and, when converting byte-stream to avc for the decoder, fails the
-// pipeline with "No caps set". The depayloaders flag them DELTA_UNIT; drop them until the first key unit.
-GstPadProbeReturn dropUntilKeyUnit([[maybe_unused]] GstPad* pad, GstPadProbeInfo* info, [[maybe_unused]] gpointer data)
+// Joining a stream mid-GOP, nothing before the next parameter sets can be decoded. GStreamer 1.28's h264parse warns
+// for every such slice and, when converting byte-stream to avc for the decoder, can fail the pipeline with "No caps
+// set". The depayloader's DELTA_UNIT flag isn't enough: with sliced encoders, a late join can start inside an IDR
+// access unit, after its SPS/PPS. So drop byte-stream output until the first SPS (VPS for H.265).
+bool containsLeadingParameterSet(const guint8* data, gsize size, bool h265)
 {
-    const GstBuffer* buffer = GST_PAD_PROBE_INFO_BUFFER(info);
-    if (buffer && GST_BUFFER_FLAG_IS_SET(buffer, GST_BUFFER_FLAG_DELTA_UNIT)) {
+    const guint wantedType = h265 ? 32U : 7U;
+    for (gsize i = 0; (i + 3) < size; ++i) {
+        if ((data[i] != 0) || (data[i + 1] != 0) || (data[i + 2] != 1)) {
+            continue;
+        }
+        const guint8 header = data[i + 3];
+        const guint nalType = h265 ? ((header >> 1) & 0x3FU) : (header & 0x1FU);
+        if (nalType == wantedType) {
+            return true;
+        }
+        i += 2;
+    }
+    return false;
+}
+
+bool outputsByteStream(GstPad* pad)
+{
+    const GstCapsPtr caps = adoptCaps(gst_pad_get_current_caps(pad));
+    const GstStructure* structure =
+        (caps && !gst_caps_is_empty(caps.get())) ? gst_caps_get_structure(caps.get(), 0) : nullptr;
+    return structure && (g_strcmp0(gst_structure_get_string(structure, "stream-format"), "byte-stream") == 0);
+}
+
+GstPadProbeReturn dropUntilParameterSets(GstPad* pad, GstPadProbeInfo* info, gpointer data)
+{
+    GstBuffer* buffer = GST_PAD_PROBE_INFO_BUFFER(info);
+    if (!buffer) {
+        return GST_PAD_PROBE_OK;
+    }
+    // Length-prefixed avc/hvc1 output carries its parameter sets in the caps' codec_data.
+    if (!outputsByteStream(pad)) {
+        return GST_PAD_PROBE_REMOVE;
+    }
+
+    GstMapInfo map;
+    if (!gst_buffer_map(buffer, &map, GST_MAP_READ)) {
         return GST_PAD_PROBE_DROP;
     }
-    return GST_PAD_PROBE_REMOVE;
+    const bool found = containsLeadingParameterSet(map.data, map.size, GPOINTER_TO_INT(data) != 0);
+    gst_buffer_unmap(buffer, &map);
+    return found ? GST_PAD_PROBE_REMOVE : GST_PAD_PROBE_DROP;
 }
 
 void configureH26xRtpDepayloader(GstElement* element)
 {
-    if (!isH26xRtpDepayloader(elementFactoryName(element))) {
+    const char* factoryName = elementFactoryName(element);
+    if (!isH26xRtpDepayloader(factoryName)) {
         return;
     }
+    const bool h265 = g_strcmp0(factoryName, "rtph265depay") == 0;
     if (const GstPadPtr srcPad = adoptPad(gst_element_get_static_pad(element, "src"))) {
-        (void) gst_pad_add_probe(srcPad.get(), GST_PAD_PROBE_TYPE_BUFFER, dropUntilKeyUnit, nullptr, nullptr);
+        (void) gst_pad_add_probe(srcPad.get(), GST_PAD_PROBE_TYPE_BUFFER, dropUntilParameterSets,
+                                 GINT_TO_POINTER(h265 ? 1 : 0), nullptr);
     }
 }
 
