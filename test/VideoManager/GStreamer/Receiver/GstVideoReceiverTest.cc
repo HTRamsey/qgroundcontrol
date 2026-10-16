@@ -253,15 +253,11 @@ void GstVideoReceiverTest::init()
         QSKIP(qPrintable(QStringLiteral("Required GStreamer factory is unavailable: %1").arg(missing)));
     }
 
-    static bool s_gstStderr = false;
-    if (!s_gstStderr) {
-        s_gstStderr = true;
-        gst_debug_set_colored(FALSE);
-        gst_debug_set_active(TRUE);
-        gst_debug_add_log_function(gst_debug_log_default, nullptr, nullptr);
-        gst_debug_set_threshold_from_string(
-            "h264parse:5,parsebin:5,rtph264depay:5,baseparse:4,decodebin3:4,vtdec:4,GST_PADS:3,GST_CAPS:3", FALSE);
-    }
+    gst_debug_set_colored(FALSE);
+    gst_debug_set_active(TRUE);
+    gst_debug_remove_log_function(gst_debug_log_default);
+    gst_debug_add_log_function(gst_debug_log_default, nullptr, nullptr);
+    gst_debug_set_threshold_from_string("h264parse:4,rtpjitterbuffer:4,rtph264depay:4,parsebin:3", TRUE);
     fprintf(stderr, "=== QGCDBG test start: %s\n", QTest::currentTestFunction());
 
     UnitTest::init();

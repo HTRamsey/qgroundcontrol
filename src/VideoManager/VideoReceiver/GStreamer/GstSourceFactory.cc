@@ -3,6 +3,7 @@
 #include <gst/gst.h>
 #include <gst/rtsp/gstrtsptransport.h>
 #include <utility>
+#include <cstdio>
 
 #include <QtCore/QFile>
 #include <QtCore/QUrl>
@@ -44,25 +45,51 @@ void configureH26xParser(GstElement* element)
     }
 }
 
-// Joining a stream mid-GOP, nothing before the next parameter sets can be decoded. GStreamer 1.28's h264parse warns
+// Joining a stream mid-GOP, slices before the next parameter sets can't be decoded. GStreamer 1.28's h264parse warns
 // for every such slice and, when converting byte-stream to avc for the decoder, can fail the pipeline with "No caps
-// set". The depayloader's DELTA_UNIT flag isn't enough: with sliced encoders, a late join can start inside an IDR
-// access unit, after its SPS/PPS. So drop byte-stream output until the first SPS (VPS for H.265).
-bool containsLeadingParameterSet(const guint8* data, gsize size, bool h265)
+// set". The depayloader's DELTA_UNIT flag isn't enough: a sliced encoder's IDR can be joined after its SPS/PPS, and
+// a jitter buffer dropping a late PPS leaves the SPS alone. So, on byte-stream output, parameter sets always pass and
+// slices are dropped until a full set (SPS and PPS, plus VPS for H.265) has passed. No IDR is required, so
+// intra-refresh streams still start.
+struct ParameterSetGate
 {
-    const guint wantedType = h265 ? 32U : 7U;
+    bool h265 = false;
+    bool sawVps = false;
+    bool sawSps = false;
+    bool sawPps = false;
+};
+
+struct NalSummary
+{
+    bool vps = false;
+    bool sps = false;
+    bool pps = false;
+    bool slice = false;
+};
+
+NalSummary summarizeNals(const guint8* data, gsize size, bool h265)
+{
+    NalSummary summary;
     for (gsize i = 0; (i + 3) < size; ++i) {
         if ((data[i] != 0) || (data[i + 1] != 0) || (data[i + 2] != 1)) {
             continue;
         }
         const guint8 header = data[i + 3];
-        const guint nalType = h265 ? ((header >> 1) & 0x3FU) : (header & 0x1FU);
-        if (nalType == wantedType) {
-            return true;
+        if (h265) {
+            const guint nalType = (header >> 1) & 0x3FU;
+            summary.vps |= (nalType == 32U);
+            summary.sps |= (nalType == 33U);
+            summary.pps |= (nalType == 34U);
+            summary.slice |= (nalType <= 31U);
+        } else {
+            const guint nalType = header & 0x1FU;
+            summary.sps |= (nalType == 7U);
+            summary.pps |= (nalType == 8U);
+            summary.slice |= ((nalType >= 1U) && (nalType <= 5U));
         }
         i += 2;
     }
-    return false;
+    return summary;
 }
 
 bool outputsByteStream(GstPad* pad)
@@ -73,7 +100,7 @@ bool outputsByteStream(GstPad* pad)
     return structure && (g_strcmp0(gst_structure_get_string(structure, "stream-format"), "byte-stream") == 0);
 }
 
-GstPadProbeReturn dropUntilParameterSets(GstPad* pad, GstPadProbeInfo* info, gpointer data)
+GstPadProbeReturn gateOnParameterSets(GstPad* pad, GstPadProbeInfo* info, gpointer data)
 {
     GstBuffer* buffer = GST_PAD_PROBE_INFO_BUFFER(info);
     if (!buffer) {
@@ -84,13 +111,29 @@ GstPadProbeReturn dropUntilParameterSets(GstPad* pad, GstPadProbeInfo* info, gpo
         return GST_PAD_PROBE_REMOVE;
     }
 
+    auto* gate = static_cast<ParameterSetGate*>(data);
     GstMapInfo map;
     if (!gst_buffer_map(buffer, &map, GST_MAP_READ)) {
         return GST_PAD_PROBE_DROP;
     }
-    const bool found = containsLeadingParameterSet(map.data, map.size, GPOINTER_TO_INT(data) != 0);
+    const NalSummary nals = summarizeNals(map.data, map.size, gate->h265);
     gst_buffer_unmap(buffer, &map);
-    return found ? GST_PAD_PROBE_REMOVE : GST_PAD_PROBE_DROP;
+
+    const bool complete =
+        (gate->sawSps || nals.sps) && (gate->sawPps || nals.pps) && (!gate->h265 || gate->sawVps || nals.vps);
+    fprintf(stderr, "QGCDBG gate %p: size=%zu vps=%d sps=%d pps=%d slice=%d saw(%d,%d,%d) complete=%d\n", (void*)gate,
+            (size_t)gst_buffer_get_size(buffer), nals.vps, nals.sps, nals.pps, nals.slice, gate->sawVps, gate->sawSps,
+            gate->sawPps, complete);
+    if (nals.slice) {
+        return complete ? GST_PAD_PROBE_REMOVE : GST_PAD_PROBE_DROP;
+    }
+    if (nals.vps || nals.sps || nals.pps) {
+        gate->sawVps |= nals.vps;
+        gate->sawSps |= nals.sps;
+        gate->sawPps |= nals.pps;
+        return GST_PAD_PROBE_OK;
+    }
+    return complete ? GST_PAD_PROBE_OK : GST_PAD_PROBE_DROP;
 }
 
 void configureH26xRtpDepayloader(GstElement* element)
@@ -99,11 +142,14 @@ void configureH26xRtpDepayloader(GstElement* element)
     if (!isH26xRtpDepayloader(factoryName)) {
         return;
     }
-    const bool h265 = g_strcmp0(factoryName, "rtph265depay") == 0;
-    if (const GstPadPtr srcPad = adoptPad(gst_element_get_static_pad(element, "src"))) {
-        (void) gst_pad_add_probe(srcPad.get(), GST_PAD_PROBE_TYPE_BUFFER, dropUntilParameterSets,
-                                 GINT_TO_POINTER(h265 ? 1 : 0), nullptr);
+    const GstPadPtr srcPad = adoptPad(gst_element_get_static_pad(element, "src"));
+    if (!srcPad) {
+        return;
     }
+    auto* gate = new ParameterSetGate{};
+    gate->h265 = g_strcmp0(factoryName, "rtph265depay") == 0;
+    (void) gst_pad_add_probe(srcPad.get(), GST_PAD_PROBE_TYPE_BUFFER, gateOnParameterSets, gate,
+                             [](gpointer gateData) { delete static_cast<ParameterSetGate*>(gateData); });
 }
 
 void configureAutopluggedElement([[maybe_unused]] GstBin* bin, [[maybe_unused]] GstBin* subBin, GstElement* element,
