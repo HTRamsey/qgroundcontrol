@@ -257,7 +257,7 @@ void GstVideoReceiverTest::init()
     gst_debug_set_active(TRUE);
     gst_debug_remove_log_function(gst_debug_log_default);
     gst_debug_add_log_function(gst_debug_log_default, nullptr, nullptr);
-    gst_debug_set_threshold_from_string("h264parse:4,rtpjitterbuffer:4,rtph264depay:4,parsebin:3", TRUE);
+    gst_debug_set_threshold_from_string("h264parse:6,baseparse:6,GST_EVENT:5,rtpjitterbuffer:4,rtph264depay:4,parsebin:4", TRUE);
     fprintf(stderr, "=== QGCDBG test start: %s\n", QTest::currentTestFunction());
 
     UnitTest::init();

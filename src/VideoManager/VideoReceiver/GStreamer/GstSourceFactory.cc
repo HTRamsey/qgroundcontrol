@@ -152,11 +152,77 @@ void configureH26xRtpDepayloader(GstElement* element)
                              [](gpointer gateData) { delete static_cast<ParameterSetGate*>(gateData); });
 }
 
+GstPadProbeReturn qgcdbgTraceParserSrc(GstPad* pad, GstPadProbeInfo* info, gpointer)
+{
+    const GstClockTime now = gst_util_get_timestamp();
+    GstObject* parent = gst_pad_get_parent(pad);
+    const char* name = parent ? GST_OBJECT_NAME(parent) : "?";
+    if (GST_PAD_PROBE_INFO_TYPE(info) & GST_PAD_PROBE_TYPE_BUFFER) {
+        static thread_local int count = 0;
+        if (count++ < 4) {
+            fprintf(stderr, "QGCDBG %" GST_TIME_FORMAT " %s src BUFFER size=%zu has_caps=%d flushing=%d\n",
+                    GST_TIME_ARGS(now), name, (size_t)gst_buffer_get_size(GST_PAD_PROBE_INFO_BUFFER(info)),
+                    gst_pad_has_current_caps(pad), GST_PAD_IS_FLUSHING(pad));
+        }
+    } else if (GstEvent* event = GST_PAD_PROBE_INFO_EVENT(info)) {
+        gchar* detail = nullptr;
+        if (GST_EVENT_TYPE(event) == GST_EVENT_CAPS) {
+            GstCaps* caps = nullptr;
+            gst_event_parse_caps(event, &caps);
+            detail = caps ? gst_caps_to_string(caps) : nullptr;
+        }
+        fprintf(stderr, "QGCDBG %" GST_TIME_FORMAT " %s src EVENT %s %s has_caps=%d flushing=%d\n", GST_TIME_ARGS(now),
+                name, GST_EVENT_TYPE_NAME(event), detail ? detail : "", gst_pad_has_current_caps(pad),
+                GST_PAD_IS_FLUSHING(pad));
+        g_free(detail);
+    }
+    if (parent) {
+        gst_object_unref(parent);
+    }
+    return GST_PAD_PROBE_OK;
+}
+
+void qgcdbgNotifyCaps(GObject* object, GParamSpec*, gpointer)
+{
+    GstPad* pad = GST_PAD(object);
+    GstCaps* caps = gst_pad_get_current_caps(pad);
+    GstObject* parent = gst_pad_get_parent(pad);
+    fprintf(stderr, "QGCDBG %" GST_TIME_FORMAT " %s:%s notify::caps -> %s flushing=%d active=%d\n",
+            GST_TIME_ARGS(gst_util_get_timestamp()), parent ? GST_OBJECT_NAME(parent) : "?", GST_OBJECT_NAME(pad),
+            caps ? "SET" : "NULL", GST_PAD_IS_FLUSHING(pad), gst_pad_is_active(pad));
+    if (caps) {
+        gst_caps_unref(caps);
+    }
+    if (parent) {
+        gst_object_unref(parent);
+    }
+}
+
+void qgcdbgTraceParser(GstElement* element)
+{
+    if (g_strcmp0(elementFactoryName(element), "h264parse") != 0) {
+        return;
+    }
+    GstPad* src = gst_element_get_static_pad(element, "src");
+    if (!src) {
+        return;
+    }
+    (void) gst_pad_add_probe(src,
+                             static_cast<GstPadProbeType>(GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM |
+                                                          GST_PAD_PROBE_TYPE_EVENT_FLUSH | GST_PAD_PROBE_TYPE_BUFFER),
+                             qgcdbgTraceParserSrc, nullptr, nullptr);
+    (void) g_signal_connect(src, "notify::caps", G_CALLBACK(qgcdbgNotifyCaps), nullptr);
+    fprintf(stderr, "QGCDBG %" GST_TIME_FORMAT " traced %s\n", GST_TIME_ARGS(gst_util_get_timestamp()),
+            GST_OBJECT_NAME(element));
+    gst_object_unref(src);
+}
+
 void configureAutopluggedElement([[maybe_unused]] GstBin* bin, [[maybe_unused]] GstBin* subBin, GstElement* element,
                                  [[maybe_unused]] gpointer data)
 {
     configureH26xParser(element);
     configureH26xRtpDepayloader(element);
+    qgcdbgTraceParser(element);
 }
 
 // Older Linux/system GStreamer needs an autoplug-query caps filter to keep parsebin on byte-stream output.
