@@ -1,8 +1,6 @@
 #include "GstQgcAllocation.h"
 
-#include <gst/video/gstvideometa.h>
-#include <gst/video/gstvideopool.h>
-#include <gst/video/video-info.h>
+#include <gst/video/video.h>
 #include <memory>
 
 #include "GstScoped.h"
