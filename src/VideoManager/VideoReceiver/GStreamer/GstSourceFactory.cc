@@ -22,14 +22,20 @@ constexpr guint64 kRtspTcpTimeoutUs = G_GUINT64_CONSTANT(5000000);
 constexpr int kRtspRetry = 3;
 constexpr int kUdpBufferSizeBytes = 8 * 1024 * 1024;
 
-void configureH26xParser(GstElement* element)
+const char* elementFactoryName(GstElement* element)
 {
     GstElementFactory* factory = gst_element_get_factory(element);
-    if (!factory) {
-        return;
-    }
+    return factory ? gst_plugin_feature_get_name(GST_PLUGIN_FEATURE(factory)) : nullptr;
+}
 
-    const char* factoryName = gst_plugin_feature_get_name(GST_PLUGIN_FEATURE(factory));
+bool isH26xRtpDepayloader(const char* factoryName)
+{
+    return (g_strcmp0(factoryName, "rtph264depay") == 0) || (g_strcmp0(factoryName, "rtph265depay") == 0);
+}
+
+void configureH26xParser(GstElement* element)
+{
+    const char* factoryName = elementFactoryName(element);
     if ((g_strcmp0(factoryName, "h264parse") == 0) || (g_strcmp0(factoryName, "h265parse") == 0)) {
         // Recording can begin long after RTSP setup. Repeat codec parameter sets at every IDR so
         // the late-opened recording branch can construct MP4/MOV codec_data without relying on
@@ -38,10 +44,33 @@ void configureH26xParser(GstElement* element)
     }
 }
 
-void configureAutopluggedParser([[maybe_unused]] GstBin* bin, [[maybe_unused]] GstBin* subBin, GstElement* element,
-                                [[maybe_unused]] gpointer data)
+// Joining a stream mid-GOP, the units before the first SPS/PPS/IDR (VPS/SPS/PPS/IRAP for H.265) can't be decoded.
+// GStreamer 1.28's h264parse warns for each one and, when converting byte-stream to avc for the decoder, fails the
+// pipeline with "No caps set". The depayloaders flag them DELTA_UNIT; drop them until the first key unit.
+GstPadProbeReturn dropUntilKeyUnit([[maybe_unused]] GstPad* pad, GstPadProbeInfo* info, [[maybe_unused]] gpointer data)
+{
+    const GstBuffer* buffer = GST_PAD_PROBE_INFO_BUFFER(info);
+    if (buffer && GST_BUFFER_FLAG_IS_SET(buffer, GST_BUFFER_FLAG_DELTA_UNIT)) {
+        return GST_PAD_PROBE_DROP;
+    }
+    return GST_PAD_PROBE_REMOVE;
+}
+
+void configureH26xRtpDepayloader(GstElement* element)
+{
+    if (!isH26xRtpDepayloader(elementFactoryName(element))) {
+        return;
+    }
+    if (const GstPadPtr srcPad = adoptPad(gst_element_get_static_pad(element, "src"))) {
+        (void) gst_pad_add_probe(srcPad.get(), GST_PAD_PROBE_TYPE_BUFFER, dropUntilKeyUnit, nullptr, nullptr);
+    }
+}
+
+void configureAutopluggedElement([[maybe_unused]] GstBin* bin, [[maybe_unused]] GstBin* subBin, GstElement* element,
+                                 [[maybe_unused]] gpointer data)
 {
     configureH26xParser(element);
+    configureH26xRtpDepayloader(element);
 }
 
 // Older Linux/system GStreamer needs an autoplug-query caps filter to keep parsebin on byte-stream output.
@@ -560,10 +589,11 @@ GstElement* create(const QString& uri, const Config& config)
             return nullptr;
         }
         configureH26xParser(parser.get());
+        configureH26xRtpDepayloader(rtpDepay.get());
     } else {
-        // parsebin creates the codec parser only after it sees the stream caps. Configure that
-        // parser as soon as it is autoplugged, before the pipeline reaches PLAYING.
-        (void) g_signal_connect(parser.get(), "deep-element-added", G_CALLBACK(configureAutopluggedParser), nullptr);
+        // parsebin creates the depayloader and codec parser only after it sees the stream caps. Configure them
+        // as soon as they are autoplugged, before data flows.
+        (void) g_signal_connect(parser.get(), "deep-element-added", G_CALLBACK(configureAutopluggedElement), nullptr);
     }
 
     // Older Linux/system GStreamer misnegotiates parser->decoder caps; force avc/hvc1 there only.
