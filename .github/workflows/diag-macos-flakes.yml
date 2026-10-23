@@ -1,0 +1,97 @@
+name: Diag macOS flakes
+
+on:
+  push:
+    branches:
+      - diag/macos-flakes
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  diag:
+    runs-on: macos-15
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Build Setup
+        uses: ./.github/actions/build-setup
+        with:
+          qt-host: mac
+          qt-arch: clang_64
+          build-type: Debug
+
+      - name: Install Dependencies
+        uses: ./.github/actions/install-dependencies
+
+      - name: CMake configure
+        uses: ./.github/actions/cmake-configure
+        with:
+          preset: macOS-debug
+          extra-args: >-
+            -DQGC_BUILD_PORTABLE_TESTS=OFF
+            -DQGC_MACOS_SIGN_WITH_IDENTITY=OFF
+            -DQGC_MACOS_UNIVERSAL_BUILD=OFF
+            -DQGC_UNITY_BUILD=ON
+
+      - name: Build
+        uses: ./.github/actions/cmake-build
+
+      - name: Loop flaky tests
+        env:
+          BIN: ${{ runner.temp }}/build/Debug/QGroundControl.app/Contents/MacOS/QGroundControl
+          LOGS: ${{ runner.temp }}/diag-logs
+        run: |
+          set -u
+          mkdir -p "$LOGS"
+          run_one() {
+            local label=$1 test=$2 idx=$3 gst=$4 dir="$LOGS/$1/$3"
+            mkdir -p "$dir/home" "$dir/tmp"
+            env HOME="$dir/home" TMPDIR="$dir/tmp" QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software \
+              'QT_LOGGING_RULES=*.debug=false' GST_DEBUG="$gst" \
+              "$BIN" "--unittest:$test" --allow-multiple > "$dir/out.log" 2>&1
+            echo $? > "$dir/rc"
+          }
+          export -f run_one
+          export LOGS BIN
+          loop() {
+            local label=$1 test=$2 runs=$3 par=$4 gst=$5
+            local start=$SECONDS
+            seq 1 "$runs" | xargs -P "$par" -I{} bash -c "run_one $label $test {} '$gst'"
+            local failed
+            failed=$(grep -L '^0$' "$LOGS/$label"/*/rc | wc -l | tr -d ' ')
+            echo "### $label: $failed/$runs exited non-zero ($((SECONDS - start))s, P=$par)" | tee -a "$GITHUB_STEP_SUMMARY"
+            grep -h "FAIL!" "$LOGS/$label"/*/out.log | sed -E 's/ +[0-9]+\.[0-9]+ / /' | sort | uniq -c | sort -rn | head -15 || true
+          }
+          GST_VERBOSE='2,h265parse:4,rtph265depay:4,rtph264depay:4,qtmux:4,mp4mux:4,splitmuxsink:4,udpsrc:4,rtpjitterbuffer:4'
+          # CPU hogs stand in for the other tests CTest runs alongside
+          hogs_start() { for _ in 1 2 3; do (while :; do :; done) & done; }
+          hogs_stop() { kill $(jobs -p) 2>/dev/null || true; wait 2>/dev/null || true; }
+          hogs_start
+          loop gst-p1-load GstVideoReceiverTest 20 1 "$GST_VERBOSE"
+          loop onboardlog-load OnboardLogFtpDownloadTest 25 1 ''
+          loop udpgps-load UDPGPSTransportTest 25 1 ''
+          loop gpsreceiver-load GPSReceiverTest 25 1 ''
+          loop apmsensors-load APMSensorsCalibrationUITest 6 1 ''
+          hogs_stop
+          loop gst-p3 GstVideoReceiverTest 30 3 "$GST_VERBOSE"
+          echo "--- signatures ---"
+          grep -rlE "Could not multiplex|Error parsing H.265|decodingSpy|frames recorded" "$LOGS"/gst-* | head -20 || true
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: diag-logs
+          path: ${{ runner.temp }}/diag-logs
+          retention-days: 3
