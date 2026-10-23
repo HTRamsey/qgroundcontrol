@@ -69,24 +69,23 @@ jobs:
             local start=$SECONDS
             seq 1 "$runs" | xargs -P "$par" -I{} bash -c "run_one $label $test {} '$gst'"
             local failed
-            failed=$(grep -L '^0$' "$LOGS/$label"/*/rc | wc -l | tr -d ' ')
+            failed=$({ grep -L '^0$' "$LOGS/$label"/*/rc || true; } | wc -l | tr -d ' ')
             echo "### $label: $failed/$runs exited non-zero ($((SECONDS - start))s, P=$par)" | tee -a "$GITHUB_STEP_SUMMARY"
-            grep -h "FAIL!" "$LOGS/$label"/*/out.log | sed -E 's/ +[0-9]+\.[0-9]+ / /' | sort | uniq -c | sort -rn | head -15 || true
+            grep -ah -A3 "FAIL!" "$LOGS/$label"/*/out.log | grep -av "^\s*Loc:" | sed -E 's/ +[0-9]+\.[0-9]+ / /' | sort | uniq -c | sort -rn | head -15 || true
           }
-          GST_VERBOSE='2,h265parse:4,rtph265depay:4,rtph264depay:4,qtmux:4,mp4mux:4,splitmuxsink:4,udpsrc:4,rtpjitterbuffer:4'
           # CPU hogs stand in for the other tests CTest runs alongside
           hogs_start() { for _ in 1 2 3; do (while :; do :; done) & done; }
           hogs_stop() { kill $(jobs -p) 2>/dev/null || true; wait 2>/dev/null || true; }
+          loop gst-p3 GstVideoReceiverTest 60 3 ''
           hogs_start
-          loop gst-p1-load GstVideoReceiverTest 20 1 "$GST_VERBOSE"
-          loop onboardlog-load OnboardLogFtpDownloadTest 25 1 ''
-          loop udpgps-load UDPGPSTransportTest 25 1 ''
-          loop gpsreceiver-load GPSReceiverTest 25 1 ''
+          loop gst-p1-load GstVideoReceiverTest 15 1 ''
           loop apmsensors-load APMSensorsCalibrationUITest 6 1 ''
+          loop onboardlog-load OnboardLogFtpDownloadTest 20 1 ''
+          loop udpgps-load UDPGPSTransportTest 20 1 ''
+          loop gpsreceiver-load GPSReceiverTest 20 1 ''
           hogs_stop
-          loop gst-p3 GstVideoReceiverTest 30 3 "$GST_VERBOSE"
           echo "--- signatures ---"
-          grep -rlE "Could not multiplex|Error parsing H.265|decodingSpy|frames recorded" "$LOGS"/gst-* | head -20 || true
+          grep -raE "Recording error|Error parsing H.265|decodingSpy|frames recorded" "$LOGS"/gst-* | cut -c1-400 | head -40 || true
 
       - name: Upload logs
         if: always()
