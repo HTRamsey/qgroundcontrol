@@ -25,11 +25,13 @@ struct NTRIPSourceTableController::FetchAttempt
     QByteArray body;
 };
 
-NTRIPSourceTableController::NTRIPSourceTableController(QObject* parent, RuntimeScheduler* scheduler)
+NTRIPSourceTableController::NTRIPSourceTableController(QObject* parent, RuntimeScheduler* scheduler,
+                                                       std::shared_ptr<NTRIPCasterVersions> casterVersions)
     : QObject(parent)
     , _model(new NTRIPSourceTableModel(this))
     , _sortedModel(new NTRIPSourceTableSortModel(_model, this))
     , _scheduler(RuntimeScheduler::orDefault(scheduler, this))
+    , _casterVersions(std::move(casterVersions))
 {}
 
 NTRIPSourceTableController::~NTRIPSourceTableController()
@@ -45,10 +47,11 @@ QAbstractItemModel* NTRIPSourceTableController::mountpointModel() const
 
 void NTRIPSourceTableController::fetch(const NTRIPConnectionConfig& config, const QGeoCoordinate& sortCoord)
 {
+    // The request does not name the mountpoint, so the one being replaced need not be valid.
     auto casterConfig = config;
     casterConfig.mountpoint.clear();
     const bool sameCaster = casterConfig == _lastFetchConfig;
-    const QString error = config.validationError();
+    const QString error = casterConfig.validationError();
 
     if (error.isEmpty() && _attempt && sameCaster) {
         _sortCoord = sortCoord;
@@ -106,7 +109,7 @@ void NTRIPSourceTableController::_startFetch()
     connect(session, &NTRIPHttpSession::finished, this,
             [this]() { _finishFetch(tr("Response does not contain a valid source table")); });
     _armFetchTimeout();
-    if (const QString openError = session->open(_lastFetchConfig); !openError.isEmpty()) {
+    if (const QString openError = session->open(_lastFetchConfig, _casterVersions); !openError.isEmpty()) {
         _finishFetch(openError);
     }
 }
@@ -154,6 +157,11 @@ void NTRIPSourceTableController::_finishFetch(const QString& error)
 void NTRIPSourceTableController::_onSourceTableReceived(const QString& table)
 {
     _model->parseSourceTable(table, _sortCoord);
+    if (_model->count() == 0) {
+        // An empty list alone would look as if nothing had been fetched.
+        _onFetchError(tr("The caster's source table lists no mountpoints"));
+        return;
+    }
     _cacheStoredAtUs = _scheduler->nowUs();
     _setFetchState(FetchStatus::Success, QString());
 }

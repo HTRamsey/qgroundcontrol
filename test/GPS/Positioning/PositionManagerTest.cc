@@ -10,6 +10,7 @@
 
 #include "ManualScheduler.h"
 #include "PositionManager.h"
+#include "QGCGeoid.h"
 #include "Support/GPSQmlTestHelpers.h"
 #include "Support/GPSTestHelpers.h"
 
@@ -213,11 +214,38 @@ void PositionManagerTest::_deviceAltitudeDatum_data()
 {
     QTest::addColumn<GPSAltitudeDatum>("declared");
     QTest::addColumn<bool>("verticalAccuracy");
+    // What Remote ID is given for the altitude of 500 m at 47N 8E, where the geoid is about 48 m above the ellipsoid.
     QTest::addColumn<GPSAltitudeDatum>("expected");
-    QTest::newRow("ellipsoid") << GPSAltitudeDatum::Ellipsoid << true << GPSAltitudeDatum::Ellipsoid;
-    QTest::newRow("mean-sea-level") << GPSAltitudeDatum::MeanSeaLevel << true << GPSAltitudeDatum::MeanSeaLevel;
-    QTest::newRow("unverified-altitude") << GPSAltitudeDatum::MeanSeaLevel << false << GPSAltitudeDatum::Unknown;
-    QTest::newRow("undeclared") << GPSAltitudeDatum::Unknown << true << GPSAltitudeDatum::Unknown;
+    QTest::addColumn<double>("expectedAltitude");
+    QTest::newRow("ellipsoid") << GPSAltitudeDatum::Ellipsoid << true << GPSAltitudeDatum::Ellipsoid << 500.0;
+    QTest::newRow("mean-sea-level") << GPSAltitudeDatum::MeanSeaLevel << true << GPSAltitudeDatum::Ellipsoid
+                                    << 500.0 + QGCGeo::geoidSeparation(47, 8);
+    QTest::newRow("unverified-altitude") << GPSAltitudeDatum::MeanSeaLevel << false << GPSAltitudeDatum::Unknown
+                                         << 500.0;
+    QTest::newRow("undeclared") << GPSAltitudeDatum::Unknown << true << GPSAltitudeDatum::Unknown << 500.0;
+}
+
+void PositionManagerTest::_backendAltitudeDatum_data()
+{
+    // What each Qt position backend reports as altitude, by the name of the backend in use.
+    QTest::addColumn<QString>("backend");
+    QTest::addColumn<GPSAltitudeDatum>("datum");
+    QTest::newRow("android") << QStringLiteral("android") << GPSAltitudeDatum::Ellipsoid;
+    QTest::newRow("corelocation") << QStringLiteral("corelocation") << GPSAltitudeDatum::MeanSeaLevel;
+    QTest::newRow("winrt") << QStringLiteral("winrt") << GPSAltitudeDatum::MeanSeaLevel;
+    QTest::newRow("nmea") << QStringLiteral("nmea") << GPSAltitudeDatum::MeanSeaLevel;
+    // Backends whose sources do not say which height they pass on.
+    QTest::newRow("geoclue2") << QStringLiteral("geoclue2") << GPSAltitudeDatum::Unknown;
+    QTest::newRow("wasm") << QStringLiteral("wasm") << GPSAltitudeDatum::Unknown;
+    QTest::newRow("ohos") << QStringLiteral("ohos") << GPSAltitudeDatum::Unknown;
+    QTest::newRow("unnamed") << QString() << GPSAltitudeDatum::Unknown;
+}
+
+void PositionManagerTest::_backendAltitudeDatum()
+{
+    QFETCH(QString, backend);
+    QFETCH(GPSAltitudeDatum, datum);
+    QCOMPARE(PositionManager::_backendAltitudeDatum(backend), datum);
 }
 
 void PositionManagerTest::_deviceAltitudeDatum()
@@ -225,6 +253,7 @@ void PositionManagerTest::_deviceAltitudeDatum()
     QFETCH(GPSAltitudeDatum, declared);
     QFETCH(bool, verticalAccuracy);
     QFETCH(GPSAltitudeDatum, expected);
+    QFETCH(double, expectedAltitude);
     ManualScheduler scheduler;
     PositionSource source;
     PositionManager service(nullptr, &scheduler);
@@ -238,6 +267,7 @@ void PositionManagerTest::_deviceAltitudeDatum()
     const auto remoteId = service.acceptedObservation(GPSObservation::PositionUse::RemoteID);
     QVERIFY(remoteId);
     QCOMPARE(remoteId->altitudeDatum, expected);
+    QCOMPARE(remoteId->position.coordinate().altitude(), expectedAltitude);
 }
 
 void PositionManagerTest::_registrationReplacementAndSessions()

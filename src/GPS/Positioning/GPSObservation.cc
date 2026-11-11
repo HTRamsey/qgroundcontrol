@@ -9,6 +9,35 @@
 
 #include "GPSReceiverConfig.h"
 #include "GPSReceiverReports.h"
+#include "QGCGeoid.h"
+
+namespace {
+
+/// The user-equivalent range error assumed for a receiver that reports only DOP.
+constexpr double DOP_RANGE_ERROR_METERS = 5.1;
+
+/// The height of mean sea level above the ellipsoid at @a coordinate; empty for an invalid coordinate.
+std::optional<double> egm96Separation(const QGeoCoordinate& coordinate)
+{
+    const double separation = QGCGeo::geoidSeparation(coordinate.latitude(), coordinate.longitude());
+    return qIsFinite(separation) ? std::optional<double>(separation) : std::nullopt;
+}
+
+/// The altitude of @a observation when its datum is @a datum.
+std::optional<double> altitudeIn(const GPSObservation& observation, GPSAltitudeDatum datum)
+{
+    const double altitude = observation.position.coordinate().altitude();
+    return observation.altitudeDatum == datum && qIsFinite(altitude) ? std::optional<double>(altitude) : std::nullopt;
+}
+
+/// The height above the ellipsoid that @a observation has without a conversion.
+std::optional<double> reportedEllipsoidHeight(const GPSObservation& observation)
+{
+    const std::optional<double> height = observation.altitudeEllipsoidMeters;
+    return height && qIsFinite(*height) ? height : altitudeIn(observation, GPSAltitudeDatum::Ellipsoid);
+}
+
+}  // namespace
 
 GPSObservation GPSObservation::fromNavigation(const GPSNavigationValues& navigation, quint64 receivedAtUs)
 {
@@ -21,6 +50,9 @@ GPSObservation GPSObservation::fromNavigation(const GPSNavigationValues& navigat
         if (qIsFinite(navigation.altitudeMslMeters)) {
             coordinate.setAltitude(navigation.altitudeMslMeters);
             observation.altitudeDatum = GPSAltitudeDatum::MeanSeaLevel;
+        } else if (qIsFinite(navigation.altitudeEllipsoidMeters)) {
+            coordinate.setAltitude(navigation.altitudeEllipsoidMeters);
+            observation.altitudeDatum = GPSAltitudeDatum::Ellipsoid;
         }
         const QDateTime timestamp =
             navigation.utcTimeUs
@@ -34,13 +66,14 @@ GPSObservation GPSObservation::fromNavigation(const GPSNavigationValues& navigat
         }
     };
     // Receivers without a metric estimate, such as NMEA without GST, fall back to DOP.
-    const auto accuracy = [](float meters, float dop) {
-        return qIsFinite(meters) && meters > 0 ? meters : (qIsFinite(dop) && dop > 0 ? accuracyFromDop(dop) : qQNaN());
+    const auto accuracy = [](float meters, float dop, double (*fromDop)(double)) {
+        return qIsFinite(meters) && meters > 0 ? meters : (qIsFinite(dop) && dop > 0 ? fromDop(dop) : qQNaN());
     };
     setAttribute(QGeoPositionInfo::HorizontalAccuracy,
-                 accuracy(navigation.horizontalAccuracyMeters, navigation.horizontalDop), false);
+                 accuracy(navigation.horizontalAccuracyMeters, navigation.horizontalDop, horizontalAccuracyFromDop),
+                 false);
     setAttribute(QGeoPositionInfo::VerticalAccuracy,
-                 accuracy(navigation.verticalAccuracyMeters, navigation.verticalDop), false);
+                 accuracy(navigation.verticalAccuracyMeters, navigation.verticalDop, verticalAccuracyFromDop), false);
     setAttribute(QGeoPositionInfo::GroundSpeed, navigation.speedMetersPerSecond, true);
     if (qIsFinite(navigation.courseRadians)) {
         const double degrees = std::fmod(qRadiansToDegrees(static_cast<double>(navigation.courseRadians)), 360.0);
@@ -68,11 +101,19 @@ GPSObservation GPSObservation::fromSurveyedPosition(const GPSEllipsoidPosition& 
     observation.fixQuality = FixQuality::Fix3D;
     observation.receiverFixValid = true;
     if (qIsFinite(position.latitudeDegrees) && qIsFinite(position.longitudeDegrees) && qIsFinite(accuracyMeters)) {
-        // Only ellipsoid height is known, so the ground-station coordinate stays two-dimensional.
-        observation.position = QGeoPositionInfo(QGeoCoordinate(position.latitudeDegrees, position.longitudeDegrees),
-                                                QDateTime::currentDateTimeUtc());
-        observation.position.setAttribute(QGeoPositionInfo::HorizontalAccuracy,
-                                          (std::max) (accuracyMeters, MINIMUM_ACCURACY_METERS));
+        const double accuracy = (std::max) (accuracyMeters, MINIMUM_ACCURACY_METERS);
+        const bool hasHeight = qIsFinite(position.altitudeMeters);
+        QGeoCoordinate coordinate(position.latitudeDegrees, position.longitudeDegrees);
+        if (hasHeight) {
+            // A base is positioned by its height above the ellipsoid, as accurately as horizontally.
+            coordinate.setAltitude(position.altitudeMeters);
+            observation.altitudeDatum = GPSAltitudeDatum::Ellipsoid;
+        }
+        observation.position = QGeoPositionInfo(coordinate, QDateTime::currentDateTimeUtc());
+        observation.position.setAttribute(QGeoPositionInfo::HorizontalAccuracy, accuracy);
+        if (hasHeight) {
+            observation.position.setAttribute(QGeoPositionInfo::VerticalAccuracy, accuracy);
+        }
     }
     if (qIsFinite(position.altitudeMeters)) {
         observation.altitudeEllipsoidMeters = position.altitudeMeters;
@@ -80,11 +121,15 @@ GPSObservation GPSObservation::fromSurveyedPosition(const GPSEllipsoidPosition& 
     return observation;
 }
 
-double GPSObservation::accuracyFromDop(double dop)
+double GPSObservation::horizontalAccuracyFromDop(double dop)
 {
-    constexpr double USER_EQUIVALENT_RANGE_ERROR_METERS = 5.1;
     constexpr double CONFIDENCE_SCALE = 2.0;
-    return dop * USER_EQUIVALENT_RANGE_ERROR_METERS * CONFIDENCE_SCALE;
+    return dop * DOP_RANGE_ERROR_METERS * CONFIDENCE_SCALE;
+}
+
+double GPSObservation::verticalAccuracyFromDop(double dop)
+{
+    return dop * DOP_RANGE_ERROR_METERS;
 }
 
 std::optional<GPSObservation> GPSObservation::projected(PositionUse use) const
@@ -97,16 +142,23 @@ std::optional<GPSObservation> GPSObservation::projected(PositionUse use) const
         case PositionUse::Gga:
         case PositionUse::Motion:
             break;
-        case PositionUse::GroundStation:
-            accepted.position.setCoordinate(coordinate());
-            if (accepted.position.coordinate().type() != QGeoCoordinate::Coordinate3D) {
+        case PositionUse::GroundStation: {
+            QGeoCoordinate groundStation = coordinate();
+            if (groundStation.type() != QGeoCoordinate::Coordinate3D) {
+                // An altitude that is not accurate enough is withheld in either datum.
                 accepted.position.removeAttribute(QGeoPositionInfo::VerticalAccuracy);
+                accepted.altitudeEllipsoidMeters.reset();
+            } else if (const auto altitudeMsl = altitudeMslMeters()) {
+                groundStation.setAltitude(*altitudeMsl);
+                accepted.altitudeDatum = GPSAltitudeDatum::MeanSeaLevel;
             }
+            accepted.position.setCoordinate(groundStation);
             break;
+        }
         case PositionUse::RemoteID:
-            if (altitudeEllipsoidMeters && qIsFinite(*altitudeEllipsoidMeters)) {
+            if (const auto ellipsoidHeight = ellipsoidHeightMeters()) {
                 auto ellipsoidCoordinate = accepted.position.coordinate();
-                ellipsoidCoordinate.setAltitude(*altitudeEllipsoidMeters);
+                ellipsoidCoordinate.setAltitude(*ellipsoidHeight);
                 accepted.position.setCoordinate(ellipsoidCoordinate);
                 accepted.altitudeDatum = GPSAltitudeDatum::Ellipsoid;
             } else if (!qIsFinite(accepted.position.coordinate().altitude())) {
@@ -116,7 +168,7 @@ std::optional<GPSObservation> GPSObservation::projected(PositionUse use) const
                 accepted.position.removeAttribute(QGeoPositionInfo::VerticalAccuracy);
                 accepted.altitudeDatum = GPSAltitudeDatum::Unknown;
             }
-            // Otherwise the altitude keeps its datum, which the consumer checks before calling it geodetic.
+            // Otherwise the altitude is of unknown datum, which the consumer checks before calling it geodetic.
             break;
     }
     if (use == PositionUse::Motion) {
@@ -161,11 +213,32 @@ QGeoCoordinate GPSObservation::coordinate() const
 
 std::optional<double> GPSObservation::altitudeMslMeters() const
 {
-    const double altitude = position.coordinate().altitude();
-    if (altitudeDatum != GPSAltitudeDatum::MeanSeaLevel || !qIsFinite(altitude)) {
-        return std::nullopt;
+    if (const auto altitude = altitudeIn(*this, GPSAltitudeDatum::MeanSeaLevel)) {
+        return altitude;
     }
-    return altitude;
+    const std::optional<double> ellipsoidHeight = reportedEllipsoidHeight(*this);
+    const std::optional<double> separation = egm96Separation(position.coordinate());
+    return ellipsoidHeight && separation ? std::optional<double>(*ellipsoidHeight - *separation) : std::nullopt;
+}
+
+std::optional<double> GPSObservation::ellipsoidHeightMeters() const
+{
+    if (const auto ellipsoidHeight = reportedEllipsoidHeight(*this)) {
+        return ellipsoidHeight;
+    }
+    const std::optional<double> altitude = altitudeIn(*this, GPSAltitudeDatum::MeanSeaLevel);
+    const std::optional<double> separation = egm96Separation(position.coordinate());
+    return altitude && separation ? std::optional<double>(*altitude + *separation) : std::nullopt;
+}
+
+std::optional<double> GPSObservation::geoidSeparationMeters() const
+{
+    const std::optional<double> altitude = altitudeIn(*this, GPSAltitudeDatum::MeanSeaLevel);
+    const std::optional<double> ellipsoidHeight = reportedEllipsoidHeight(*this);
+    if (altitude && ellipsoidHeight) {
+        return *ellipsoidHeight - *altitude;
+    }
+    return egm96Separation(position.coordinate());
 }
 
 double GPSObservation::heading() const

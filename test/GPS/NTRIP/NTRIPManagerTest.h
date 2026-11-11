@@ -21,6 +21,7 @@ class NTRIPManagerTest : public UnitTest
 private slots:
     void _stopFromIdleIsNoop();
     void _statusMessageNamesStateWithoutDetail();
+    void _canConnectNeedsCasterHost();
     void _transportFactory();
     void _stopCancelsDeferredSettings_data();
     void _stopCancelsDeferredSettings();
@@ -51,6 +52,7 @@ private slots:
     void _httpRetryAfterReachesManager();
     void _unrepeatableAnswerWaitsForUser_data();
     void _unrepeatableAnswerWaitsForUser();
+    void _version1CasterIsRemembered();
     void _retryPublicationSuperseded();
     void _missingMountpointDoesNotStartTransport();
     void _correctionIngressKeepsSessionAndIdentity();

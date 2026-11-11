@@ -113,10 +113,14 @@ void NTRIPSourceTableControllerTest::_fetchErrorInvalidatesCache()
                               TestTimeout::mediumMs());
     QCOMPARE(ctrl.mountpointModel()->rowCount(), 1);
 
-    // A failed refresh discards the cached table, so the next fetch asks the caster again.
+    // A failed refresh discards the cached table, so the next fetch asks the caster again. The caster answers
+    // neither the request nor its repeat in NTRIP version 1 form.
     QVERIFY(scheduler.advanceBy(NTRIPSourceTableController::CACHE_TTL + std::chrono::milliseconds(1)));
+    expectLogMessage("GPS.NTRIP.NTRIPHttpSession", QtWarningMsg, repeatedInVersion1());
     ctrl.fetch(config);
     QVERIFY(caster.dropNextRequest());
+    QVERIFY(caster.dropNextRequest());
+    verifyExpectedLogMessage();
     QTRY_COMPARE_WITH_TIMEOUT(ctrl.fetchStatus(), NTRIPSourceTableController::FetchStatus::Error,
                               TestTimeout::mediumMs());
     QCOMPARE(ctrl.mountpointModel()->rowCount(), 0);
@@ -269,10 +273,51 @@ void NTRIPSourceTableControllerTest::_sourceTableSuccessAndCache()
     QCOMPARE(distanceAt(1), -1.0);
 
     auto invalid = configuration;
-    invalid.mountpoint = QStringLiteral("invalid\r\nmount");
+    invalid.username = QStringLiteral("invalid:user");
     controller.fetch(invalid);
     QCOMPARE(controller.fetchStatus(), NTRIPSourceTableController::FetchStatus::Error);
     QVERIFY(!controller._cacheStoredAtUs.has_value());
+    QCOMPARE(controller.mountpointModel()->rowCount(), 0);
+}
+
+void NTRIPSourceTableControllerTest::_mountpointSettingDoesNotBlockFetch()
+{
+    ScriptedNTRIPCaster caster;
+    QVERIFY(caster.isListening());
+    NTRIPSourceTableController controller;
+    // The request does not name the mountpoint, and a mistyped one is a reason to browse.
+    controller.fetch(caster.connectionConfig(QStringLiteral("MIS TYPED")));
+    QCOMPARE(controller.fetchStatus(), NTRIPSourceTableController::FetchStatus::InProgress);
+    QVERIFY(controller.fetchError().isEmpty());
+    QVERIFY(caster.serveSourceTable(kValidTable));
+    QTRY_COMPARE_WITH_TIMEOUT(controller.fetchStatus(), NTRIPSourceTableController::FetchStatus::Success,
+                              TestTimeout::mediumMs());
+    QCOMPARE(caster.requestLines(), QList<QByteArray>{"GET / HTTP/1.1"});
+    QCOMPARE(controller.mountpointModel()->rowCount(), 1);
+}
+
+void NTRIPSourceTableControllerTest::_tableWithoutMountpoints_data()
+{
+    QTest::addColumn<QString>("table");
+    QTest::newRow("empty") << QStringLiteral("ENDSOURCETABLE\r\n");
+    QTest::newRow("no-stream-records") << QStringLiteral(
+        "CAS;caster.example.com;2101;desc;op;0;USA;0;0;0;0;0;0;misc\r\nENDSOURCETABLE\r\n");
+    QTest::newRow("unnamed-stream") << QStringLiteral("STR;;Rooftop antenna;RTCM 3.2\r\nENDSOURCETABLE\r\n");
+}
+
+void NTRIPSourceTableControllerTest::_tableWithoutMountpoints()
+{
+    QFETCH(QString, table);
+    ScriptedNTRIPCaster caster;
+    QVERIFY(caster.isListening());
+    NTRIPSourceTableController controller;
+    controller.fetch(caster.connectionConfig(QString()));
+    QVERIFY(caster.serveSourceTable(table));
+    QTRY_VERIFY_WITH_TIMEOUT(controller.fetchStatus() != NTRIPSourceTableController::FetchStatus::InProgress,
+                             TestTimeout::mediumMs());
+    // An empty list alone would look like a fetch that never happened.
+    QCOMPARE(controller.fetchStatus(), NTRIPSourceTableController::FetchStatus::Error);
+    QCOMPARE(controller.fetchError(), NTRIPSourceTableController::tr("The caster's source table lists no mountpoints"));
     QCOMPARE(controller.mountpointModel()->rowCount(), 0);
 }
 
@@ -376,6 +421,30 @@ void NTRIPSourceTableControllerTest::_v1SourceTable()
         QCOMPARE(requests, 1);
         QVERIFY(!activeSession(controller));
     }
+}
+
+void NTRIPSourceTableControllerTest::_version1OnlyCaster()
+{
+    ScriptedNTRIPCaster caster;
+    QVERIFY(caster.isListening());
+    NTRIPSourceTableController controller;
+    expectLogMessage("GPS.NTRIP.NTRIPHttpSession", QtWarningMsg, repeatedInVersion1());
+    controller.fetch(caster.connectionConfig(QString()));
+    auto* connection = caster.waitForVersion1Request();
+    QVERIFY(connection && connection->peer);
+    verifyExpectedLogMessage();
+    QCOMPARE(caster.requestLines(), (QList<QByteArray>{"GET / HTTP/1.1", "GET / HTTP/1.0"}));
+    // The answer of RTKLIB's caster.
+    const QByteArray table = "STR;MP;Id;RTCM 3.2;;2;GPS;NET;USA;40;-74;0;1;gen;none;B;N;4800\r\nENDSOURCETABLE\r\n";
+    const QByteArray response =
+        "SOURCETABLE 200 OK\r\nServer: RTKLIB 2.4.3 b33\r\nDate: 2026/11/11 21:00:00 UTC\r\n"
+        "Connection: close\r\nContent-Type: text/plain\r\nContent-Length: " +
+        QByteArray::number(table.size()) + "\r\n\r\n" + table;
+    QCOMPARE(connection->write(response), response.size());
+    connection->disconnectFromHost();
+    QTRY_COMPARE_WITH_TIMEOUT(controller.fetchStatus(), NTRIPSourceTableController::FetchStatus::Success,
+                              TestTimeout::mediumMs());
+    QCOMPARE(controller.mountpointModel()->rowCount(), 1);
 }
 
 void NTRIPSourceTableControllerTest::_sourceTableIdentity_data()

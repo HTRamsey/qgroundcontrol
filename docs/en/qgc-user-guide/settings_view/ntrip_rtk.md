@@ -25,10 +25,12 @@ The counters count everything the caster sends, including messages the [RTCM mes
 - **Use TLS encryption** — connect with TLS 1.2 or later
 - **Accept self-signed TLS certificates** — accept a caster whose certificate is self-signed. The first successful connection records that certificate; a later connection that presents a different one fails, reporting that the caster's certificate changed. Turning the option off forgets the recorded certificate. Certificates signed by a trusted authority are never recorded.
 
+QGroundControl asks a caster in the form NTRIP version 2 defines. A caster that speaks only version 1, such as RTKLIB's `str2str` up to 2.4.3 b33, closes such a request without answering it. QGroundControl then repeats the request once in the version 1 form, for the corrections and for the mountpoint list, with or without TLS. Once the caster has accepted that form, QGroundControl uses it first for that caster until it is restarted, or until the caster leaves such a request unanswered.
+
 ## NTRIP Mountpoint
 
 - **Mount Point** — the NTRIP mountpoint to connect to. It is required: without one, NTRIP reports an error instead of connecting
-- **Browse** — fetch available mountpoints from the server and display them in a list with format, navigation system, country, bitrate, and distance information
+- **Browse** — fetch available mountpoints from the server and display them in a list with the caster's description, format, navigation system, country, bitrate, and distance, as far as the caster gives them. A mountpoint is listed when the caster names it, even without any of these. **Browse** does not use the **Mount Point** field, so it also works while that field holds a name the caster does not have. When the caster's list names no mountpoint, QGroundControl says so.
 
 QGroundControl receives RTCM 3 corrections only. A mountpoint that sends another format, such as SPARTN, is disconnected after 30 seconds of data without a valid RTCM message. Before any corrections have arrived, QGroundControl reports that and does not retry. Once the mountpoint has delivered corrections, it keeps reconnecting.
 
@@ -42,7 +44,9 @@ Network RTK (VRS) casters need the rover position. Select the position QGC repor
 
 A network RTK mountpoint sends nothing until it has received a position. While none is available, for example before the vehicle has a GPS fix, QGroundControl stays connected and the connection status reads **Connected, waiting for a position to report**. The 30-second limit on a silent stream starts with the first position reported or the first data received.
 
-The report carries the height of the selected position. When that height is not above mean sea level, as for the position of an Android, Linux or Windows device or of a base station, it is reported as it is, and a position without a height is reported with height 0. A caster places the rover by its latitude and longitude.
+The report carries the selected position's height above mean sea level and the geoid separation that goes with it.
+A height above the WGS84 ellipsoid, as the position of an Android device or of a base station has, is converted with the EGM96 geoid model built into QGroundControl.
+A height of unknown reference, as the position of a Linux device has, is reported as it is, and a position without a height is reported with height 0, both without a geoid separation. A caster places the rover by its latitude and longitude.
 
 ## UDP RTCM Input
 
