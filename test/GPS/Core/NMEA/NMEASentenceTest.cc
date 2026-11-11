@@ -51,18 +51,20 @@ void NMEASentenceTest::_fixQuality_data()
     QTest::addColumn<unsigned>("quality");
     QTest::addColumn<GPSFixQuality>("autonomous");
     QTest::addColumn<GPSFixQuality>("expected");
+    // Indexed by quality: 3 is the Precise Positioning Service, 8 simulation and 9 NovAtel's SBAS solution.
     const std::array qualities{
-        GPSFixQuality::NoFix,        GPSFixQuality::Unknown,  GPSFixQuality::Differential,
-        GPSFixQuality::Unknown,      GPSFixQuality::RTKFixed, GPSFixQuality::RTKFloat,
-        GPSFixQuality::Extrapolated, GPSFixQuality::Fix3D,    GPSFixQuality::Unknown,
+        GPSFixQuality::NoFix,    GPSFixQuality::Fix3D,        GPSFixQuality::Differential, GPSFixQuality::Fix3D,
+        GPSFixQuality::RTKFixed, GPSFixQuality::RTKFloat,     GPSFixQuality::Extrapolated, GPSFixQuality::Fix3D,
+        GPSFixQuality::Unknown,  GPSFixQuality::Differential,
     };
     for (unsigned quality = 0; quality < qualities.size(); ++quality) {
-        QTest::addRow("%u", quality) << quality << GPSFixQuality::Fix3D
-                                     << (quality == NMEA::GgaQuality::GPS ? GPSFixQuality::Fix3D : qualities[quality]);
+        QTest::addRow("%u", quality) << quality << GPSFixQuality::Fix3D << qualities[quality];
     }
     // Only an autonomous fix takes the dimension the receiver reports elsewhere.
     QTest::newRow("gps-2d") << unsigned(NMEA::GgaQuality::GPS) << GPSFixQuality::Fix2D << GPSFixQuality::Fix2D;
     QTest::newRow("gps-unknown") << unsigned(NMEA::GgaQuality::GPS) << GPSFixQuality::Unknown << GPSFixQuality::Unknown;
+    QTest::newRow("pps-2d") << 3u << GPSFixQuality::Fix2D << GPSFixQuality::Fix2D;
+    QTest::newRow("sbas-2d") << 9u << GPSFixQuality::Fix2D << GPSFixQuality::Differential;
     QTest::newRow("unsupported") << 255u << GPSFixQuality::Fix3D << GPSFixQuality::Unknown;
 }
 
@@ -189,22 +191,23 @@ void NMEASentenceTest::_navigationFreshnessBoundaries()
     QVERIFY(rmc && gga && gsa && gst);
 
     constexpr quint64 maxAgeUs = NMEA::NavigationEpochAssembler::METADATA_MAX_AGE.count();
+    // Neither sentence publishes the epoch the RMC began; the GGA does, with what joined it in time.
     const auto gsaFresh = [&](quint64 ageUs) {
         NMEA::NavigationEpochAssembler assembler;
-        if (!assembler.ingest(rmc->sentence(), 1000000) || !assembler.ingest(gga->sentence(), 1000000)) {
-            return std::optional<NMEA::NavigationUpdate>();
+        if (assembler.ingest(rmc->sentence(), 1000000) || assembler.ingest(gsa->sentence(), 1000000 + ageUs)) {
+            return false;
         }
-        return assembler.ingest(gsa->sentence(), 1000000 + ageUs);
+        const auto update = assembler.ingest(gga->sentence(), 1000000 + ageUs);
+        return update && update->epoch.verticalDop.has_value();
     };
-    QVERIFY(gsaFresh(maxAgeUs).has_value());
-    QVERIFY(!gsaFresh(maxAgeUs + 1).has_value());
+    QVERIFY(gsaFresh(maxAgeUs));
+    QVERIFY(!gsaFresh(maxAgeUs + 1));
 
     const auto gstFresh = [&](quint64 ageUs) {
         NMEA::NavigationEpochAssembler assembler;
-        if (!assembler.ingest(rmc->sentence(), 1000000)) {
+        if (assembler.ingest(rmc->sentence(), 1000000) || assembler.ingest(gst->sentence(), 1000000)) {
             return false;
         }
-        assembler.ingest(gst->sentence(), 1000000);
         const auto update = assembler.ingest(gga->sentence(), 1000000 + ageUs);
         return update && update->epoch.horizontalAccuracyMeters.has_value();
     };
@@ -236,43 +239,6 @@ void NMEASentenceTest::_navigationFixLoss()
     QCOMPARE(update->epoch.fixQuality, GPSFixQuality::NoFix);
     QCOMPARE(update->epoch.receivedAtUs, quint64(42));
     QCOMPARE(update->epoch.satellitesUsed, satellitesUsed < 0 ? std::nullopt : std::optional<unsigned>(satellitesUsed));
-}
-
-void NMEASentenceTest::_expiredMetadataEpoch_data()
-{
-    QTest::addColumn<bool>("fixLost");
-    QTest::newRow("fix") << false;
-    QTest::newRow("fix-lost") << true;
-}
-
-void NMEASentenceTest::_expiredMetadataEpoch()
-{
-    QFETCH(bool, fixLost);
-    const auto gga =
-        ownedSentence(GPSTest::repairChecksum("$GPGGA,092750.000,5321.6802,N,00630.3372,W,1,8,1.03,61.7,M,55.2,M,,"));
-    const auto gsa = ownedSentence(GPSTest::repairChecksum("$GPGSA,A,3,02,,,,,,,,,,,,1.0,1.03,0.6"));
-    const auto loss = ownedSentence(GPSTest::repairChecksum("$GPGGA,092751.000,,,,,0,0,,,,,,,"));
-    QVERIFY(gga && gsa && loss);
-    constexpr quint64 receivedAtUs = 1'000'000;
-    constexpr quint64 maxAgeUs = NMEA::NavigationEpochAssembler::METADATA_MAX_AGE.count();
-    NMEA::NavigationEpochAssembler assembler;
-    QVERIFY(assembler.ingest(gga->sentence(), receivedAtUs));
-    const auto metadata = assembler.ingest(gsa->sentence(), receivedAtUs);
-    QVERIFY(metadata && metadata->epoch.verticalDop);
-    if (fixLost) {
-        const auto update = assembler.ingest(loss->sentence(), receivedAtUs + 1);
-        QVERIFY(update && update->type == NMEA::NavigationUpdate::Type::FixLoss);
-    }
-    QVERIFY(!assembler.expireUntimedMetadata(receivedAtUs + maxAgeUs));
-
-    // The epoch returns without its expired VDOP, unless a fix loss hides it as it does later metadata.
-    const auto expired = assembler.expireUntimedMetadata(receivedAtUs + maxAgeUs + 1);
-    QCOMPARE(expired.has_value(), !fixLost);
-    if (expired) {
-        QVERIFY(!expired->verticalDop);
-        QCOMPARE(expired->latitude, metadata->epoch.latitude);
-    }
-    QVERIFY(!assembler.expireUntimedMetadata(receivedAtUs + 2 * maxAgeUs));
 }
 
 void NMEASentenceTest::_utcMilliseconds_data()
@@ -399,8 +365,9 @@ void NMEASentenceTest::_makeGga_data()
     invalidField("infinite-geoid", &NMEA::GGA::geoidSeparation, -qInf());
     invalidField("infinite-hdop", &NMEA::GGA::hdop, qInf());
     invalidField("negative-hdop", &NMEA::GGA::hdop, -0.1);
+    // The writer keeps to the values NMEA 0183 defines, although the reader accepts NovAtel's SBAS value.
     auto invalidQuality = explicitFix;
-    invalidQuality.quality = NMEA::GgaQuality::MAX_VALUE + 1;
+    invalidQuality.quality = NMEA::GgaQuality::SBAS;
     QTest::newRow("invalid-quality") << invalidQuality << QTime(12, 0) << QByteArray();
 }
 
@@ -758,7 +725,8 @@ void NMEASentenceTest::_navigationStatus_data()
     QTest::addColumn<int>("epoch");
     QTest::newRow("gga-no-fix") << QByteArray("GPGGA,120001,,,,,0,0,,,,,,,") << 0 << 43201000;
     QTest::newRow("gga-declared-fix") << QByteArray("GPGGA,120001,,,,,1,0,,,,,,,") << 1 << 43201000;
-    QTest::newRow("gga-unknown-quality") << QByteArray("GPGGA,120001,,,,,9,0,,,,,,,") << -1 << -1;
+    QTest::newRow("gga-sbas-quality") << QByteArray("GPGGA,120001,,,,,9,0,,,,,,,") << 1 << 43201000;
+    QTest::newRow("gga-unknown-quality") << QByteArray("GPGGA,120001,,,,,10,0,,,,,,,") << -1 << -1;
     QTest::newRow("rmc-valid") << QByteArray("GPRMC,120001,A") << 1 << 43201000;
     QTest::newRow("rmc-invalid") << QByteArray("GPRMC,120001,V") << 0 << 43201000;
     QTest::newRow("rmc-invalid-time") << QByteArray("GPRMC,,V") << 0 << -1;

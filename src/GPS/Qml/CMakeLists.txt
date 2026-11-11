@@ -1,6 +1,6 @@
 # ============================================================================
 # GPS QML Module
-# Shared GPS components, and the QML types of QGCGPSCore's value types and models, which build without QML. The GPS
+# Shared GPS components, and the QML registration of QGCGPSCore's fix types: the library builds without QML. The GPS
 # services register their own types in the application module.
 # ============================================================================
 
@@ -24,7 +24,6 @@ qt_add_qml_module(
         GPSFactSwitchField.qml
         GPSFactTextField.qml
         GPSField.qml
-        GPSNoteLabel.qml
         GPSReceiverBaseSites.qml
         GPSReceiverBaseStation.qml
         GPSReceiverConnectControls.qml

@@ -36,15 +36,6 @@ QString mismatchHint(const GPSReceiverSignatures& signatures, GPSType configured
         .arg(evidence, gpsReceiverName(match->family->type));
 }
 
-/// Whether @a family's RTCM3 is forwarded whatever base status it publishes. Passive input comes from a receiver that
-/// was not configured here, so it reports no base. A Septentrio receiver starts its corrections with its configuration
-/// and reports its base in PVTGeodetic blocks half a second apart, and no recording of a base confirms how those read,
-/// so its corrections do not wait for them.
-bool forwardsCorrectionsWithoutBase(GPSType family)
-{
-    return family == GPSType::Passive || family == GPSType::Septentrio;
-}
-
 }  // namespace
 
 struct GPSDriver::State
@@ -73,12 +64,13 @@ struct GPSDriver::State
 };
 
 GPSDriver::GPSDriver(GPSType type, GPSTransport& transport, const GPSReceiverConfig& config, GPSDriverSinks sinks,
-                     GPSClock clock)
+                     GPSClock clock, GPSDriverObserver observer)
     : _type(type)
     , _transport(transport)
     , _config(config)
     , _sinks(std::move(sinks))
     , _clock(std::move(clock))
+    , _observer(std::move(observer))
     , _state(std::make_unique<State>())
 {}
 
@@ -161,8 +153,16 @@ bool GPSDriver::configure()
         if (_state->configuring) {
             _state->evidence.push_back(result);
         }
+        if (_observer.commandFinished) {
+            _observer.commandFinished(result);
+        }
     };
-    observer.decoded = [this](const GPSEventBatch& batch) { _publish(batch); };
+    observer.decoded = [this](const GPSEventBatch& batch) {
+        if (_observer.decoded) {
+            _observer.decoded(batch);
+        }
+        _publish(batch);
+    };
 
     unsigned baudRate = _config.baudRate ? _config.baudRate : _transport.fixedBaudRate();
     if (_config.baudRate && _transport.fixedBaudRate() && _config.baudRate != _transport.fixedBaudRate()) {
@@ -199,6 +199,9 @@ bool GPSDriver::_configureDetected(GPSRuntimeIO io, GPSRuntimeObserver observer,
     const GPSReceiverDetection detection =
         GPSReceiverDetector(gpsReceiverFamilies(), io, observer.commandFinished).detect(baudRate);
     _state->configuring = false;
+    if (_observer.detected) {
+        _observer.detected(detection, baudRate);
+    }
     if (!detection.found()) {
         _state->configurationError = !detection.errorDetail.isEmpty() ? detection.errorDetail
                                      : detection.error == GPSProtocolError::Cancelled
@@ -237,8 +240,12 @@ bool GPSDriver::_configureFamily(const GPSReceiverFamily& family, GPSRuntimeIO i
 {
     _state->runtime = std::make_unique<GPSProtocolRuntime>(family, std::move(io), std::move(observer));
     _state->configuring = true;
+    const unsigned requestedBaud = baudRate;
     const bool configured = _state->runtime->configure(config, baudRate);
     _state->configuring = false;
+    if (_observer.configured) {
+        _observer.configured(*_state->runtime, requestedBaud, baudRate);
+    }
     const auto signatures = std::exchange(_state->signatures, nullptr);
     if (!configured) {
         QString error = _state->runtime->errorDetail();

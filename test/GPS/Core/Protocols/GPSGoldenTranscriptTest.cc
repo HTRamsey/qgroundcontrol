@@ -6,6 +6,7 @@
 
 #include <QtCore/QDir>
 #include <QtCore/QFileInfo>
+#include <QtCore/QRegularExpression>
 #include <QtCore/QSet>
 #include <QtCore/QStringList>
 
@@ -184,6 +185,13 @@ GPSTest::Golden::Decode navigationEvents(GPSTest::Golden::Decode decode)
 
 }  // namespace
 
+void GPSGoldenTranscriptTest::init()
+{
+    GPSProtocolTestBase::init();
+    // GPSDriver warns with the error each transcript records.
+    ignoreLogMessage("GPS.GPSDriver", QtWarningMsg, QRegularExpression());
+}
+
 void GPSGoldenTranscriptTest::_scenario_data()
 {
     QTest::addColumn<int>("index");
@@ -334,6 +342,12 @@ void GPSGoldenTranscriptTest::_decodeOnlyArming()
         GPSTest::Golden::Decode actual = armed;
         std::erase_if(expected.expired, revocation);
         std::erase_if(actual.expired, revocation);
+        // Only the configured decoder runs in a GPSDriver, which forwards or withholds its RTCM frames.
+        for (auto& event : expected.events) {
+            if (auto* rtcm = std::get_if<GPSTest::Golden::RTCM>(&event)) {
+                rtcm->forwarded.reset();
+            }
+        }
         const QString title =
             QStringLiteral("decode/%1 %2/%3 (armed)").arg(QString::fromLatin1(decoder.name), file.directory, file.name);
         QVERIFY2(formatDecode(actual) == formatDecode(expected),

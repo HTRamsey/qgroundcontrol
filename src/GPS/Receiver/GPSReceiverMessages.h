@@ -46,7 +46,10 @@ struct ReceiverStatus
     bool forwardingCorrections = false;
     /// Base mode of a configured base; empty for a passive receiver or without one.
     std::optional<BaseModeDefinition::Mode> baseMode;
-    bool surveyActive = false;
+    /// What a configured base reports of its base position.
+    GPSBaseState baseState = GPSBaseState::Inactive;
+    /// The base's corrections wait for a valid base position, so none are forwarded.
+    bool correctionsWithheld = false;
 };
 
 /// The receiver status sentence; empty when no receiver is connected or being connected.

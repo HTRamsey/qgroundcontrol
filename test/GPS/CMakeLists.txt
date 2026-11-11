@@ -45,6 +45,7 @@ set(_qgc_gps_suites
     Corrections/GPSCorrectionSelectorTest
     Corrections/RTCMMAVLinkPacketTest
     Corrections/RTCMMAVLinkTest
+    Corrections/RTCMMessageCountModelTest
     Corrections/RTCMUdpInputTest
     NTRIP/HTTP/NTRIPConfigurationTest
     NTRIP/HTTP/NTRIPHttpCodecTest
@@ -64,6 +65,7 @@ set(_qgc_gps_suites
     Receiver/GPSBaseStationSettingsTest
     Receiver/GPSReceiverConnectionPolicyTest
     Receiver/GPSReceiverFactGroupTest
+    Receiver/GPSReceiverPresentationTest
     Receiver/GPSReceiverTest
 )
 qgc_add_gps_suites(Unit ${_qgc_gps_suites})

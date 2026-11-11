@@ -60,7 +60,7 @@ Packages = files that `publish.yml` publishes.
 | Workflow | Triggers | Purpose | Publishes |
 | --- | --- | --- | --- |
 | `linux.yml` | all | AppImages, coverage and sanitizer test legs, custom plugin, translation extraction check | Packages; coverage to Codecov |
-| `windows.yml` | all | Installers, portable and GStreamer tests | Packages |
+| `windows.yml` | all | Installers, portable, GStreamer and GPS tests | Packages |
 | `macos.yml` | all | Universal DMG (signed and notarized outside PRs), Debug test leg | Packages |
 | `android.yml` | all | APKs, emulator boot test, Android Lint | Packages; Play Store: beta on `master`, 20% production rollout on tags |
 | `ios.yml` | all | Device IPA, simulator boot test | TestFlight on tags |

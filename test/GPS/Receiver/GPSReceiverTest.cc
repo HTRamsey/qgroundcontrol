@@ -329,6 +329,90 @@ void GPSReceiverTest::_statusTextFollowsState()
     QVERIFY(receiver.statusText().isEmpty());
 }
 
+void GPSReceiverTest::_statusTextSaysWhenNoCorrectionsAreSent_data()
+{
+    using Mode = BaseModeDefinition::Mode;
+    using States = QList<GPSBaseState>;
+    QTest::addColumn<GPSType>("family");
+    // An Automatic connection detects the family instead of being told it.
+    QTest::addColumn<bool>("automatic");
+    QTest::addColumn<BaseModeDefinition::Mode>("mode");
+    // What the receiver reports of its base position once it is ready, in order.
+    QTest::addColumn<QList<GPSBaseState>>("states");
+    QTest::addColumn<QString>("text");
+    const QString waiting =
+        GPSReceiver::tr("Waiting for a valid base position; the base sends no corrections until then");
+    const QString surveying = GPSReceiver::tr("Survey-In active; the base sends no corrections until it completes");
+    const QString connected = GPSReceiver::tr("Receiver connected");
+    // A base's corrections are forwarded only while it reports its position valid.
+    QTest::newRow("survey-not-started") << GPSType::UBlox << false << Mode::BaseSurveyIn << States{} << waiting;
+    QTest::newRow("survey-running") << GPSType::UBlox << false << Mode::BaseSurveyIn << States{GPSBaseState::Active}
+                                    << surveying;
+    QTest::newRow("survey-complete") << GPSType::UBlox << false << Mode::BaseSurveyIn
+                                     << States{GPSBaseState::Active, GPSBaseState::Valid} << connected;
+    QTest::newRow("survey-lost") << GPSType::UBlox << false << Mode::BaseSurveyIn
+                                 << States{GPSBaseState::Valid, GPSBaseState::Inactive} << waiting;
+    QTest::newRow("fixed-unconfirmed") << GPSType::UBlox << false << Mode::BaseFixed << States{} << waiting;
+    QTest::newRow("fixed") << GPSType::UBlox << false << Mode::BaseFixed << States{GPSBaseState::Valid}
+                           << GPSReceiver::tr("Fixed position");
+    QTest::newRow("averaging-running")
+        << GPSType::Unicore << false << Mode::BaseReceiverAveraging << States{GPSBaseState::Active}
+        << GPSReceiver::tr("Receiver-managed averaging active; the base sends no corrections until it completes");
+    QTest::newRow("averaging-complete") << GPSType::Unicore << false << Mode::BaseReceiverAveraging
+                                        << States{GPSBaseState::Active, GPSBaseState::Valid}
+                                        << GPSReceiver::tr("Receiver-managed averaging — no accuracy guarantee");
+    QTest::newRow("detected-family") << GPSType::UBlox << true << Mode::BaseSurveyIn << States{GPSBaseState::Active}
+                                     << surveying;
+    // A Septentrio base's corrections do not wait for its base position, so its status claims nothing about them.
+    QTest::newRow("septentrio-survey-running") << GPSType::Septentrio << false << Mode::BaseSurveyIn
+                                               << States{GPSBaseState::Active} << GPSReceiver::tr("Survey-In active");
+    QTest::newRow("septentrio-survey-lost") << GPSType::Septentrio << false << Mode::BaseSurveyIn
+                                            << States{GPSBaseState::Valid, GPSBaseState::Inactive} << connected;
+    QTest::newRow("septentrio-fixed-unconfirmed")
+        << GPSType::Septentrio << false << Mode::BaseFixed << States{} << GPSReceiver::tr("Fixed position");
+    QTest::newRow("septentrio-detected") << GPSType::Septentrio << true << Mode::BaseSurveyIn
+                                         << States{GPSBaseState::Active} << GPSReceiver::tr("Survey-In active");
+    // A passive receiver is no base of this session: what it forwards is not held back.
+    QTest::newRow("passive") << GPSType::Passive << false << Mode::BaseSurveyIn << States{GPSBaseState::Inactive}
+                             << GPSReceiver::tr("Passive receiver connected; forwarding its RTCM");
+}
+
+void GPSReceiverTest::_statusTextSaysWhenNoCorrectionsAreSent()
+{
+    using Mode = BaseModeDefinition::Mode;
+    QFETCH(GPSType, family);
+    QFETCH(bool, automatic);
+    QFETCH(BaseModeDefinition::Mode, mode);
+    QFETCH(QList<GPSBaseState>, states);
+    QFETCH(QString, text);
+    ScriptedGPSReceiver harness;
+    GPSReceiver& receiver = harness.receiver;
+    auto configuration =
+        receiverConfiguration(automatic ? GPS_AUTOMATIC_MANUFACTURER : gpsReceiverManufacturerForType(family));
+    configuration.forwardReceiverRtcm = true;
+    if (mode == Mode::BaseFixed) {
+        configuration.base.mode = GPSBaseStationConfig::Fixed{
+            .position = {.latitudeDegrees = 47.5, .longitudeDegrees = 8.25, .altitudeMeters = 480.0}};
+    } else if (mode == Mode::BaseReceiverAveraging) {
+        configuration.base.mode = GPSBaseStationConfig::ReceiverAveraging{};
+    }
+    QVERIFY(connectOverTcp(receiver, configuration));
+    ScriptedReceiverWorker* const worker = harness.workers.current();
+    if (automatic) {
+        worker->detected(family);
+    }
+    // The status panel shows the sentence it was last notified of.
+    QString notified;
+    QObject observer;
+    connect(&receiver, &GPSReceiver::statusTextChanged, &observer, [&] { notified = receiver.statusText(); });
+    worker->ready();
+    for (const GPSBaseState state : states) {
+        worker->baseStatus({.state = state});
+    }
+    QCOMPARE(receiver.statusText(), text);
+    QCOMPARE(notified, text);
+}
+
 void GPSReceiverTest::_notificationsFollowCompletedConnection()
 {
     BlockedTransportGate gate;
@@ -500,14 +584,14 @@ void GPSReceiverTest::_retiredWorkerCannotUpdateReplacement()
     survey.position = {.latitudeDegrees = 47, .longitudeDegrees = 8, .altitudeMeters = 500};
     survey.duration = std::chrono::seconds(4294967295LL);
     survey.meanAccuracyMeters = 1.5;
-    emit first->surveyInStatusUpdated(survey);
+    emit first->baseStatusUpdated(survey);
     GPSSatelliteReport satellites;
     satellites.timestampUs = 1;
     satellites.inView = 2;
     satellites.used = 7;
     emit first->satelliteInfoUpdated(satellites);
     QTRY_VERIFY_WITH_TIMEOUT(receiver.facts()->telemetryAvailable(), TestTimeout::shortMs());
-    QVERIFY(facts.valid()->rawValue().toBool());
+    QCOMPARE(baseState(facts), GPSBaseState::Valid);
     QCOMPARE(facts.currentBasePosition(),
              std::optional(GPSBaseStationConfig::Fixed{.position = survey.position, .accuracyMeters = 1.5f}));
     QCOMPARE(facts.currentAccuracy()->rawValue().toDouble(), 1.5);
@@ -522,7 +606,7 @@ void GPSReceiverTest::_retiredWorkerCannotUpdateReplacement()
     // Retirement must reject callbacks already in the GUI queue.
     satellites.used = 12;
     emit first->rtcmDataReceived(frame, GPSTest::nowMs());
-    emit first->surveyInStatusUpdated(survey);
+    emit first->baseStatusUpdated(survey);
     emit first->satelliteInfoUpdated(satellites);
     emit first->positionUpdated(fixReport(GPSFixQuality::Unknown));
     emit first->receiverReady();
@@ -533,8 +617,7 @@ void GPSReceiverTest::_retiredWorkerCannotUpdateReplacement()
     receiver.disconnectReceiver();
     QVERIFY(connectOverTcp(receiver));
     QVERIFY(!receiver.facts()->telemetryAvailable());
-    QVERIFY(!facts.valid()->rawValue().toBool());
-    QVERIFY(!facts.active()->rawValue().toBool());
+    QCOMPARE(baseState(facts), GPSBaseState::Inactive);
     QVERIFY(!facts.currentBasePosition());
     QVERIFY(qIsNaN(facts.currentAccuracy()->rawValue().toDouble()));
     QCOMPARE(facts.currentDuration()->rawValue().toLongLong(), 0);
@@ -566,7 +649,7 @@ void GPSReceiverTest::_retiredWorkerCannotUpdateReplacement()
     emit second->connectionError(GPSConnectionError::DeviceError);
     emit second->rtcmDataReceived(frame, GPSTest::nowMs());
     emit second->receiverReady();
-    emit second->surveyInStatusUpdated(survey);
+    emit second->baseStatusUpdated(survey);
     emit second->satelliteInfoUpdated(satellites);
     deliverQueuedCalls();
     verifyExpectedLogMessage();
@@ -1130,8 +1213,7 @@ void GPSReceiverTest::_manualPassiveBaudPreserved()
     QCOMPARE(state->baud.load(), baud);
     QCOMPARE(state->baudChanges.load(), 1U);
     QCOMPARE(state->writes.load(), 0U);
-    QVERIFY(!receiver.facts()->active()->rawValue().toBool());
-    QVERIFY(!receiver.facts()->valid()->rawValue().toBool());
+    QCOMPARE(baseState(*receiver.facts()), GPSBaseState::Inactive);
     QVERIFY(serial.manager.isPortReserved(QStringLiteral("/test/passive")));
     state->releaseRead.release();
     receiver.disconnectReceiver();

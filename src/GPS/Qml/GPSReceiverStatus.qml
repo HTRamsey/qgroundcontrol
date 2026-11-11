@@ -23,7 +23,8 @@ QGCGroupBox {
     readonly property gpsReceiverPresentation _presentation: root.receiver.activePresentation
     readonly property bool _surveyConnected: root.receiver.activeBaseMode === BaseModeDefinition.BaseSurveyIn
     // A finished survey is the moment to keep its position, so the next connection can start as a fixed base.
-    readonly property bool _surveyComplete: root._connected && root._surveyConnected && !root.facts.active.value
+    readonly property bool _surveyComplete: root._connected && root._surveyConnected
+                                            && root.facts.baseState.value !== GPSReceiverFactGroup.BaseState.Active
                                             && root.facts.canSaveCurrentBasePosition
     readonly property bool _surveySaved: root.facts.currentBasePositionSaved
     readonly property list<gpsConstellationSatellites> _constellations: root.receiver.constellations
@@ -65,14 +66,14 @@ QGCGroupBox {
             id: rowLabel
             textFormat: Text.PlainText
         }
-        GPSNoteLabel {
+        QGCNoteLabel {
             id: rowValue
             horizontalAlignment: Text.AlignRight
             wrapMode: Text.WrapAnywhere
         }
     }
 
-    GPSNoteLabel {
+    QGCNoteLabel {
         objectName: "rtkReceiverStatus"
         text: root.receiver.statusText || root.disconnectedText
     }
@@ -154,12 +155,13 @@ QGCGroupBox {
 
     LabelledFactLabel {
         objectName: "rtkSurveyAccuracy"
-        label: root.facts.valid.value ? qsTr("Accuracy") : qsTr("Current Accuracy")
+        label: root.facts.baseState.value === GPSReceiverFactGroup.BaseState.Valid ? qsTr("Accuracy")
+                                                                                   : qsTr("Current Accuracy")
         fact: root.facts.currentAccuracy
         visible: root._connected && root._surveyConnected && root.facts.currentAccuracy.value > 0
     }
 
-    GPSNoteLabel {
+    QGCNoteLabel {
         objectName: "rtkSurveyCompletePrompt"
         visible: surveySave.offered
         text: root._surveySaved
@@ -198,7 +200,7 @@ QGCGroupBox {
             onClicked: surveySave.failed = !QGroundControl.gpsManager.saveCurrentBasePosition(surveySiteName.text)
         }
 
-        GPSNoteLabel {
+        QGCNoteLabel {
             objectName: "rtkSurveySaveFailed"
             visible: surveySave.failed
             warning: true
