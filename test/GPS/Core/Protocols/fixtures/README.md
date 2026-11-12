@@ -33,8 +33,8 @@ Each record starts with the microseconds from the start of the recording, when t
 opened, to the return of its call, on the clock the session runs on. So a recording holds both
 directions and the baud rate changes with their times, not only what the receiver sent. An `RX`
 record is one read, not one message: frames are split and joined as the session read them. One
-recording holds one session: QGroundControl and the runner on a physical transport start a file
-for each.
+recording holds one session: QGroundControl starts a file for each connection, and the runner
+for each stage, so a `suite` leaves two.
 
 A session goes on after the two refusals, so its recording holds them: detection tries the next
 rate when a serial adapter cannot run at one, and a link that carries no writes, as UDP, refuses
@@ -84,8 +84,9 @@ only with the sender's agreement, and name the sender, the receiver and its firm
 `SOURCES.md`.
 
 1. **Decode it** as QGroundControl does, without the receiver. `--family` is the receiver type in
-   the file name, or the family that an `automatic` session detected, and the role and base
-   options are those of the session's `SETTINGS` record:
+   the file name, and the role and base options are those of the session's `SETTINGS` record. An
+   `automatic` session names no decoder: give the family it detected, which its
+   [dialogue replay](#replaying-the-dialogue) reports as `detected_family`:
 
    ```sh
    $R --replay 20260102T030405.006Z-ublox.log --action configure --family ublox
@@ -106,8 +107,9 @@ only with the sender's agreement, and name the sender, the receiver and its firm
    claims: name the file as the rule of its family expects, or add a rule.
    As a `.cap` capture, `GPSCaptureDecodeTest` compares what QGroundControl decodes with what the
    pinned tools decode (`capture_expectations.py`), which suits values QGroundControl may get
-   wrong. That script's `--upstream` check takes every capture for a slice of a public log, which
-   a user's capture is not, and has to skip it. Both kinds seed the protocol fuzzers.
+   wrong. List the capture in that script's `CAPTURES` with its directory alone, and in the list
+   of its protocol: a capture without an upstream file is no slice of a public log, and the
+   script's `--upstream` check leaves it as it is. Both kinds seed the protocol fuzzers.
 4. **Pin the behaviour.** Fix the code, write the golden with
    `QGC_GPS_GOLDEN_UPDATE=1 ctest --test-dir build -R GPSGoldenTranscriptTest`, and review its new
    lines: they are the regression test.
@@ -145,9 +147,10 @@ command the driver has not sent 30 seconds after the recording has it, and a ses
 ends while records remain. The report's `divergence` names the line of the record, what the
 recording has there and what the driver did, each with its time; its `outcome` is `reproduced`,
 `diverged`, or `failed` for a file that is damaged, has no settings or is not a session
-recording. The replay ends with the recording, since a recording does not say what its session
-did after its last record: one that was cut between two lines replays as far as it goes. Nothing
-is decoded for the report, and the session's own duration takes no time to replay.
+recording. For an `automatic` session, `detected_family` is the family the driver found, which
+decided its commands. The replay ends with the recording, since a recording does not say what its
+session did after its last record: one that was cut between two lines replays as far as it goes.
+Nothing is decoded for the report, and the session's own duration takes no time to replay.
 
 `--replay` decodes unless `--dialogue` is given. Decoding is the first step above: it works for
 raw receiver output, for a recording without settings and whatever the driver sends today. The
@@ -243,3 +246,11 @@ evidence file, the outcome from `outcome` and the failed checks, and says where 
 and the recordings are kept. The runner reports `inconclusive` rather than `passed` for what it
 cannot prove, such as a fresh survey; copy that. A run against a receiver model, the simulator or
 a replay is not a row.
+
+`--family automatic` runs the session QGroundControl runs with **Detect automatically**: the
+driver finds the receiver family and then configures it. Each stage reports what it found as
+`detected_family`, whose row the run belongs to, and the recordings are named `automatic`, as
+QGroundControl's are. Detection can take 45 seconds on a serial port, so a stage's deadline
+defaults to 105 seconds. Two things a detected session does not have: a passive role, since
+passive input is decoded as it arrives without detecting a receiver, and a decoder for `--replay`,
+which takes the detected family instead.

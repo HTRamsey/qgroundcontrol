@@ -37,6 +37,7 @@
 #include "GPSReceiverSimulator.h"
 #include "GPSRecordingTransport.h"
 #include "MonotonicClock.h"
+#include "Protocols/Support/DetectionReceiver.h"
 #include "Protocols/Support/GoldenFormat.h"
 #include "Protocols/Support/ProtocolTestPackets.h"
 #include "Protocols/Support/ScriptedReceiver.h"
@@ -204,7 +205,8 @@ QString parseOptions(QCommandLineParser& parser, Options& options)
     const QString role = parser.value("role");
     if (!QStringList{"plan", "configure", "suite", "cancel"}.contains(options.action) ||
         !QStringList{"scripted", "serial", "tcp"}.contains(options.transport) ||
-        !QStringList{"ublox", "trimble", "septentrio", "femto", "unicore", "quectel", "passive"}.contains(family) ||
+        !QStringList{"ublox", "trimble", "septentrio", "femto", "unicore", "quectel", "passive", "automatic"}.contains(
+            family) ||
         !QStringList{"base", "passive"}.contains(role) || !QStringList{"f9p", "m8p"}.contains(options.model) ||
         !QStringList{"fresh", "retained", "none"}.contains(options.surveyState) ||
         !QStringList{"none", "nak", "wrong-readback", "cancel", "rtcm-nak", "rtcm-nak-cancel"}.contains(
@@ -250,9 +252,19 @@ QString parseOptions(QCommandLineParser& parser, Options& options)
         options.family = GPSType::Quectel;
     } else if (family == "passive") {
         options.family = GPSType::Passive;
+    } else if (family == "automatic") {
+        options.family = GPSType::Automatic;
     }
     options.passive = role == "passive";
-    if (options.transport == "scripted" && options.family != GPSType::UBlox) {
+    const bool detecting = options.family == GPSType::Automatic;
+    if (detecting && options.passive) {
+        return "Passive input is decoded as it arrives, without a receiver to detect: use --family passive";
+    }
+    if (detecting && options.transport == "replay" && !options.dialogue) {
+        return "--replay decodes with the decoder of one family, which --family automatic does not name: give the "
+               "family the session detected, which its --dialogue replay reports, or passive with --role passive";
+    }
+    if (options.transport == "scripted" && options.family != GPSType::UBlox && !detecting) {
         return "The scripted peer supports UBX only";
     }
     if (options.fault.startsWith("rtcm-nak") && role != "base") {
@@ -261,9 +273,19 @@ QString parseOptions(QCommandLineParser& parser, Options& options)
     if (options.fault == "rtcm-nak-cancel" && options.action != "cancel") {
         return "rtcm-nak-cancel requires --action cancel";
     }
-    if (options.transport != "scripted" &&
-        (parser.isSet("fault") || parser.isSet("survey-state") || parser.isSet("model"))) {
-        return "Scripted receiver options cannot be applied to a physical transport";
+    if (options.transport != "scripted") {
+        for (const char* name : {"model", "fault", "survey-state"}) {
+            if (!parser.isSet(name)) {
+                continue;
+            }
+            return options.transport == "replay"
+                       ? QString(
+                             "--%1 describes the scripted receiver, and --replay puts the recording in its place: "
+                             "leave --%1 out to use the recording, or --replay to use the scripted receiver")
+                             .arg(name)
+                       : QString("--%1 describes the scripted receiver and cannot be applied to a physical transport")
+                             .arg(name);
+        }
     }
     bool valid = true;
     auto integer = [&](const QString& name, int minimum, int maximum) {
@@ -296,6 +318,9 @@ QString parseOptions(QCommandLineParser& parser, Options& options)
     if (options.family == GPSType::Quectel && !parser.isSet("timeout-ms")) {
         // Role and base changes can require multiple receiver restarts within the driver's 45-second budget.
         options.timeoutMs = 60000;
+    } else if (detecting && !parser.isSet("timeout-ms")) {
+        // Detection takes up to 45 s on a serial port, before the configuration of a family that may be Quectel.
+        options.timeoutMs = 105000;
     }
     options.config.baudRate = static_cast<uint32_t>(integer("baud", 0, 4000000));
     options.config.allowPersistentChanges = parser.isSet("allow-save");
@@ -665,6 +690,9 @@ int checkDialogue(const Options& options, QJsonObject report)
         report.insert("requested", session);
         report.insert("configured", result.configured);
         report.insert("receiver_identity", result.receiverIdentity);
+        if (result.detected) {
+            report.insert("detected_family", Golden::typeName(*result.detected));
+        }
         if (!result.configured) {
             report.insert("configuration_error", result.configurationError);
         }
@@ -732,6 +760,7 @@ int run(const Options& options)
 {
     const bool scripted = options.transport == "scripted";
     const bool replaying = options.transport == "replay";
+    const bool detecting = options.family == GPSType::Automatic;
     QJsonObject report{{"action", options.action},
                        {"transport", options.transport},
                        {"evidence_origin", scripted    ? "scripted"
@@ -802,13 +831,14 @@ int run(const Options& options)
         watchdog.join();
     });
     QJsonArray recordings;
-    // Each physical session gets its own file; the scripted peer keeps one session across stages.
+    GPSFileStartTimes recordingStartTimes;
+    // A recording holds one session of the driver, so the link of each stage gets a file of its own.
     const auto recorded = [&](std::unique_ptr<GPSTransport> transport) -> std::unique_ptr<GPSTransport> {
         if (options.recordDirectory.isEmpty() || !transport) {
             return transport;
         }
-        const QString file = GPSRecordingTransport::sessionFile(options.recordDirectory, options.family,
-                                                                QDateTime::currentDateTimeUtc());
+        const QString file = GPSRecordingTransport::sessionFile(
+            options.recordDirectory, options.family, recordingStartTimes.next(QDateTime::currentDateTimeUtc()));
         recordings.append(file);
         report.insert("recordings", recordings);
         return std::make_unique<GPSRecordingTransport>(std::move(transport), file,
@@ -817,12 +847,10 @@ int run(const Options& options)
     };
     GPSTestClock scriptedClock;
     std::unique_ptr<UBXReceiverModel> receiver;
-    std::unique_ptr<GPSTransport> link;
     if (scripted) {
         receiver = std::make_unique<UBXReceiverModel>(
             options.model == "f9p" ? UBXReceiverModel::Receiver::F9P : UBXReceiverModel::Receiver::M8PBase,
             scriptedClock);
-        link = recorded(std::make_unique<ScriptedReceiver>(stop, receiver.get()));
         if (options.fault == "nak") {
             receiver->disableReply = UBXReceiverModel::DisableReply::Nak;
         } else if (options.fault == "wrong-readback") {
@@ -830,9 +858,26 @@ int run(const Options& options)
         } else if (options.fault == "cancel") {
             receiver->disableReply = UBXReceiverModel::DisableReply::Cancelled;
         }
-    } else {
-        link = recorded(physicalTransport(options, stop.token()));
     }
+    // A new link to the receiver. The scripted receiver is its model, which keeps its state from one link to the next.
+    const auto connect = [&]() -> std::unique_ptr<GPSTransport> {
+        if (!scripted) {
+            return recorded(physicalTransport(options, stop.token()));
+        }
+        auto peer = std::make_unique<ScriptedReceiver>(stop, receiver.get());
+        // Detection asks every family for its identity. A u-blox receiver ignores the text commands of the others,
+        // which the model would take for the start of a frame.
+        peer->setWriteHandler(
+            [](const QByteArray& bytes, const ScriptedReceiver::WriteContext&) -> std::optional<GPSWriteResult> {
+                if (!textCommand(bytes)) {
+                    return std::nullopt;
+                }
+                const int length = static_cast<int>(bytes.size());
+                return GPSWriteResult{GPSWriteStatus::Completed, length, length};
+            });
+        return recorded(std::move(peer));
+    };
+    std::unique_ptr<GPSTransport> link = connect();
 
     QStringList stages{"configured"};
     if (options.action == "suite") {
@@ -847,9 +892,9 @@ int run(const Options& options)
             return evidenceError(report, error);
         }
         operationDeadline.store(now() + options.timeoutMs);
-        if (name == "reconnected_base" && !scripted) {
+        if (name == "reconnected_base") {
             link.reset();
-            link = recorded(physicalTransport(options, stop.token()));
+            link = connect();
         }
         GPSTransport& transport = *link;
         GPSEvidenceTransport evidence(transport, stop.token());
@@ -866,7 +911,7 @@ int run(const Options& options)
             }
             if (name == "reconnected_base") {
                 checks.append(check("reconnect", "passed",
-                                    scripted ? "Scripted peer reopened; state retained, no "
+                                    scripted ? "Scripted peer reopened on a new link; state retained, no "
                                                "physical reconnect exercised"
                                              : "Transport destroyed and reopened; not a power "
                                                "cycle or physical unplug"));
@@ -883,7 +928,12 @@ int run(const Options& options)
         QMap<int, qint64> correctionBytes;
         QElapsedTimer elapsed;
         elapsed.start();
+        // The family --family automatic finds, which decides the commands the stage sends.
+        std::optional<GPSType> detected;
         GPSDriverSinks sinks;
+        if (detecting) {
+            sinks.onReceiverDetected = [&detected](GPSType family) { detected = family; };
+        }
         sinks.onPosition = [&](const GPSPositionReport& position) {
             ++positions;
             const auto& navigation = position.navigation;
@@ -931,6 +981,9 @@ int run(const Options& options)
         stage.insert("configuration_evidence", configurationEvidence(driver));
         // The model and firmware the receiver reported, which a qualification row names; empty when it reported none.
         stage.insert("receiver_identity", driver.receiverIdentity());
+        if (detected) {
+            stage.insert("detected_family", Golden::typeName(*detected));
+        }
         auto snapshot = [&] {
             stage.insert("position_messages", positions);
             stage.insert("last_position", lastPosition);
@@ -944,7 +997,7 @@ int run(const Options& options)
             stage.insert("correction_messages", messages);
             stage.insert("survey_observations", surveys);
             stage.insert("wire_evidence", evidence.evidence());
-            if (options.family == GPSType::UBlox) {
+            if (detected.value_or(options.family) == GPSType::UBlox) {
                 stage.insert("requested_setting_observations", evidence.requestedSettings(config, options.passive));
             }
             stage.insert("checks", checks);
@@ -1107,13 +1160,18 @@ int main(int argc, char* argv[])
     parser.addOptions({
         {{"a", "action"}, "plan|configure|suite|cancel", "action", "plan"},
         {"transport", "scripted|serial|tcp", "transport", "scripted"},
-        {"family", "ublox|trimble|septentrio|femto|unicore|quectel|passive", "family", "ublox"},
+        {"family",
+         "ublox|trimble|septentrio|femto|unicore|quectel|passive, or automatic, which detects the receiver family as "
+         "the application does and configures what it finds",
+         "family", "ublox"},
         {"role", "base|passive", "role", "base"},
         {"allow-reconfigure", "Authorize physical receiver writes and role changes"},
         {"allow-save", "Explicitly permit LG290P settings to be saved to flash and the receiver restarted"},
         {"compact-rtcm", "Request compact MSM4 instead of MSM7 RTCM observations from a supporting base"},
         {"output", "New JSON evidence path (atomic progress snapshots; never overwrites a previous run)", "path"},
-        {"record", "Record each receiver session's received and sent bytes and baud changes into this directory",
+        {"record",
+         "Record each session of the driver into a file of its own in this directory, two for a suite: the received "
+         "and sent bytes, the baud changes and what the link refused",
          "directory"},
         {"replay",
          "Decode a session recording, or a file of raw receiver output, with --family, as configured for --role and "
