@@ -203,6 +203,8 @@ struct PassiveSatellites
         result.onSatelliteInfo = [this](const GPSSatelliteReport& report) {
             if (report.inView) {
                 views.push_back(report);
+            } else if (!views.empty()) {
+                ++withdrawals;
             }
         };
         return result;
@@ -223,6 +225,8 @@ struct PassiveSatellites
     GPSTestClock clock{GPSTestClock::START_US};
     ModelReceiver<ScriptedReceiver::Model> link{clock};
     std::vector<GPSSatelliteReport> views;
+    /// The reports without a view that followed one with a view.
+    int withdrawals = 0;
     GPSDriver driver;
 };
 
@@ -389,6 +393,48 @@ void GPSSatelliteReportTest::_ubxLegacyNumbering()
                                            {GPSConstellation::SBAS, 2, 1}}));
 }
 
+void GPSSatelliteReportTest::_eventSharesItsSatellites()
+{
+    GPSTestClock clock(GPSTestClock::START_US);
+    GPSProtocolRuntime runtime(UBX::FAMILY, makeDecoderOnlyIO(clock));
+    runtime.armNavigationDecode({.corrections = true});
+    const auto rover = fixtureBytes(ROVER);
+    const auto session = fixtureBytes(SESSION);
+    QVERIFY(rover && session);
+    const auto satelliteEvent = [](const GPSEventBatch& batch) -> const GPSDecodedSatellites* {
+        for (const auto& event : batch.events) {
+            if (const auto* satellites = std::get_if<GPSDecodedSatellites>(&event)) {
+                return satellites;
+            }
+        }
+        return nullptr;
+    };
+    const auto listed = [&clock](const GPSDecodedSatellites& event) {
+        return satellitesOf(GPSDecodedData::SatelliteCounts().update(event, clock.nowUs()));
+    };
+
+    // An event does not hold its satellites: it shares the list of the report the decoder fills for each message.
+    // One that is kept still lists its own after the decoder went on to the next message.
+    const GPSEventBatch kept = runtime.decode(*rover);
+    const GPSEventBatch next = runtime.decode(*session);
+    QVERIFY(satelliteEvent(kept) && satelliteEvent(next));
+    QCOMPARE(listed(*satelliteEvent(kept)), capturedIn(ROVER));
+    QCOMPARE(listed(*satelliteEvent(next)), capturedIn(SESSION));
+
+    // Once a batch is delivered and gone, as every batch of a session is, the next report fills the same storage:
+    // decoding the satellites allocates nothing.
+    const GPSSatellite* storage = nullptr;
+    for (int message = 0; message < 3; ++message) {
+        const GPSEventBatch batch = runtime.decode(*rover);
+        const auto* satellites = satelliteEvent(batch);
+        QVERIFY(satellites);
+        if (storage) {
+            QCOMPARE(satellites->satellitesInView().data(), storage);
+        }
+        storage = satellites->satellitesInView().data();
+    }
+}
+
 void GPSSatelliteReportTest::_nmeaCaptureSatellites()
 {
     // An Ashtech AC12: GSA names three satellites in use of the ten its GSV pages describe, two of them SBAS.
@@ -475,6 +521,37 @@ void GPSSatelliteReportTest::_reportKeepsEachConstellation()
     report = counts.update(none, START_US + lifetimeUs + SECOND_US);
     QVERIFY(report.satellitesInView().empty());
     QCOMPARE(report.inView, std::optional<int>(0));
+}
+
+void GPSSatelliteReportTest::_reportOutlastsSlowSatelliteOutput_data()
+{
+    QTest::addColumn<int>("periodSeconds");
+    // SiRF and MediaTek receivers send their GSV every fifth second unless told otherwise, and some send it every
+    // sixth.
+    QTest::newRow("every-5-s") << 5;
+    QTest::newRow("every-6-s") << 6;
+}
+
+void GPSSatelliteReportTest::_reportOutlastsSlowSatelliteOutput()
+{
+    QFETCH(int, periodSeconds);
+    PassiveSatellites receiver;
+    QVERIFY(receiver.driver.configure());
+    for (int second = 0; second <= 4 * periodSeconds; ++second) {
+        QByteArray output = nmeaBytes("GPGGA," + QByteArray::number(123500 + second) +
+                                      ",4807.038,N,01131.000,E,1,03,0.9,545.4,M,46.9,M,,");
+        output += nmeaBytes("GPGSA,A,3,01,02,12,,,,,,,,,,1.0,0.8,0.6");
+        if (second % periodSeconds == 0) {
+            output += nmeaBytes("GPGSV,1,1,03,01,40,083,46,02,17,308,41,12,07,344,39");
+        }
+        QCOMPARE(receiver.receive(output).error, GPSProtocolError::None);
+        receiver.clock.advanceBy(1'000'000);
+    }
+    // Each view lasts until the next one arrives: the satellites never leave the report in between.
+    QCOMPARE(receiver.views.empty(), false);
+    QCOMPARE(receiver.withdrawals, 0);
+    QCOMPARE(constellationsOf(receiver.views.back()), (QList<ReportedConstellation>{{GPSConstellation::GPS, 3, 3}}));
+    QCOMPARE(receiver.views.back().satellitesInView().size(), size_t(3));
 }
 
 void GPSSatelliteReportTest::_reportIsBounded()

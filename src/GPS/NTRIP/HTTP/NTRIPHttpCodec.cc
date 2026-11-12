@@ -64,6 +64,17 @@ std::chrono::milliseconds retryAfter(const QHttpHeaders& headers, const QDateTim
     return std::chrono::milliseconds{std::clamp(utcNow.msecsTo(*deadline), qint64(0), maxMs)};
 }
 
+/// The Host field of a request to @a url. The zone of a link-local IPv6 address names an interface of this computer
+/// and means nothing to the caster, so it is left out (RFC 6874, section 4).
+QByteArray hostField(QUrl url)
+{
+    const QString host = url.host();
+    if (const qsizetype zone = host.indexOf(QLatin1Char('%')); zone >= 0) {
+        url.setHost(host.first(zone));
+    }
+    return url.authority(QUrl::FullyEncoded).toLatin1();
+}
+
 /// Caster-supplied text for an error detail: without markup or control characters, on one line, and capped.
 QString errorPreview(QString text)
 {
@@ -97,8 +108,7 @@ NTRIPHttpRequest NTRIPHttpRequest::build(const NTRIPConnectionConfig& config, NT
         // The request of RTKLIB's client (reqntrip_c): its caster up to 2.4.3 b33 takes no other request line.
         result.bytes += " HTTP/1.0\r\n";
     } else {
-        result.bytes +=
-            " HTTP/1.1\r\nHost: " + url.authority(QUrl::FullyEncoded).toLatin1() + "\r\nNtrip-Version: Ntrip/2.0\r\n";
+        result.bytes += " HTTP/1.1\r\nHost: " + hostField(url) + "\r\nNtrip-Version: Ntrip/2.0\r\n";
     }
     result.bytes += "User-Agent: NTRIP " + QGCNetworkHelper::defaultUserAgent().toLatin1() + "\r\n";
     if (!config.username.isEmpty() || !config.password.isEmpty()) {
@@ -133,6 +143,11 @@ void NTRIPHttpDecoder::_fail(Result& result, const QString& detail, NTRIPError c
     _line.clear();
     result.complete = false;
     result.failure = NTRIPFailure{code, detail};
+}
+
+void NTRIPHttpDecoder::_failAsSourceTable(Result& result)
+{
+    _fail(result, tr("Caster returned a source table; select a valid mountpoint"), NTRIPError::InvalidMountpoint);
 }
 
 void NTRIPHttpDecoder::_finishError(Result& result)
@@ -278,8 +293,7 @@ void NTRIPHttpDecoder::_statusLineReceived(Result& result)
             _state = State::IcyHeaders;
             result.connected = true;
         } else {
-            _fail(result, tr("Caster returned a source table; select a valid mountpoint"),
-                  NTRIPError::InvalidMountpoint);
+            _failAsSourceTable(result);
         }
     } else if (_line.first(3).compare("ICY", Qt::CaseInsensitive) == 0 && _status.code == 200) {
         _state = State::IcyHeaders;
@@ -409,8 +423,7 @@ bool NTRIPHttpDecoder::_acceptContent(Result& result)
     for (const auto& value : _headers.values(QHttpHeaders::WellKnownHeader::ContentType)) {
         if (_purpose == NTRIPHttpPurpose::Corrections &&
             value.split(';').first().trimmed().compare("gnss/sourcetable", Qt::CaseInsensitive) == 0) {
-            _fail(result, tr("Caster returned a source table; select a valid mountpoint"),
-                  NTRIPError::InvalidMountpoint);
+            _failAsSourceTable(result);
             return false;
         }
     }

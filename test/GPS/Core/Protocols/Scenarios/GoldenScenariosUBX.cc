@@ -1,5 +1,6 @@
 #include "Protocols/Scenarios/GoldenScenarios.h"
 #include "Protocols/Support/UBXReceiverModel.h"
+#include "UBX/UBXFrame.h"
 
 namespace GPSTest::GoldenScenario {
 
@@ -98,6 +99,19 @@ void addUblox(Table& table)
               ubxProfile(Receiver::F9P, finds({47, -8, 500})), fixed);
     table.add(type, "profile-m8p-base-fixed-checked", "M8P finds itself 20 m from the fixed position",
               ubxProfile(Receiver::M8PBase, finds({47, 8, 520})), fixed);
+    // A position report between the time mode that a poll reads back and the poll's ACK. The readback ends with that
+    // ACK, so the report does not end the wait for the receiver's position, and the NAK is the fixed position's.
+    table.add(type, "profile-m8p-base-fixed-rejected",
+              "M8P rejects the fixed position, after a position report ahead of the ACK of the time mode poll",
+              ubxProfile(Receiver::M8PBase,
+                         [](UBXBench& b) {
+                             b.model.readbackAckDelay = 100ms;
+                             b.model.rejectFixedPosition = true;
+                             b.faults.rules.push_back(
+                                 afterCommand(ubx(UBX::Msg::CFG_TMODE3.value(), {}),
+                                              [](ScriptedReceiver& receiver) { receiver.queueReply(navPvt(1000)); }));
+                         }),
+              fixed);
 
     // The gate on a base's corrections: GPSDriver forwards none while it configures the receiver, and none of a
     // survey before the base position is valid.
@@ -129,7 +143,7 @@ void addUblox(Table& table)
         };
     };
     table.add(type, "wire-f9p-l1l5-survey", "ZED-F9P L1/L5 firmware (FWVER=HPGL1L5), survey-in",
-              ubxWire(module("ZED-F9P FWVER=HPGL1L5")), wireSurvey);
+              ubxWire([](UBXBench& b) { b.model.firmware = "HPGL1L5 1.40"; }), wireSurvey);
     table.add(type, "wire-x20-fixed-compact", "ZED-X20P, fixed base with MSM4", ubxWire(module("ZED-X20P")),
               compact(wireFixed));
     table.add(type, "wire-f9p-legacy-protocol", "ZED-F9P hardware reporting PROTVER 20.30", ubxWire([](UBXBench& b) {

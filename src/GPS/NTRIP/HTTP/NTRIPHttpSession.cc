@@ -87,7 +87,7 @@ QString NTRIPHttpSession::open(const NTRIPConnectionConfig& config, std::shared_
 void NTRIPHttpSession::_connect()
 {
     const auto port = static_cast<quint16>(_config.port);
-    qCDebug(NTRIPHttpSessionLog) << "connectToHost" << _config.host << ":" << _config.port << "TLS" << _config.useTls;
+    qCDebug(NTRIPHttpSessionLog) << "connectToHost" << _endpoint << "TLS" << _config.useTls;
     if (!_config.useTls) {
         auto* socket = new QTcpSocket(this);
         _attach(socket);
@@ -196,7 +196,7 @@ void NTRIPHttpSession::_establish()
         }
     }
     if (_socket->write(_request) != _request.size()) {
-        _fail(NTRIPError::SocketError, tr("Socket did not accept the complete NTRIP write"));
+        _fail(NTRIPError::SocketError, incompleteWriteDetail());
         return;
     }
     _requestSent = true;
@@ -206,6 +206,11 @@ void NTRIPHttpSession::_establish()
 bool NTRIPHttpSession::write(const QByteArray& bytes)
 {
     return isConnected() && _socket->write(bytes) == bytes.size();
+}
+
+QString NTRIPHttpSession::incompleteWriteDetail()
+{
+    return tr("Socket did not accept the complete NTRIP write");
 }
 
 bool NTRIPHttpSession::isConnected() const

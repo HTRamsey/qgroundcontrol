@@ -15,9 +15,11 @@
 #include "NTRIP/Support/NTRIPTestHelpers.h"
 #include "NTRIP/Support/ScriptedNTRIPCaster.h"
 #include "NTRIPManager.h"
+#include "NTRIPSourceTableController.h"
 #include "NTRIPVehiclePresence.h"
 #include "Protocols/Support/ProtocolTestPackets.h"
 #include "QGCNetworkAvailabilityMonitor.h"
+#include "RTCM/Support/RTCMTestFrames.h"
 #include "RTCMFramer.h"
 #include "Support/GPSTestHelpers.h"
 
@@ -202,24 +204,29 @@ void NTRIPManagerTest::_canConnectNeedsCasterHost()
     QCOMPARE(changes.size(), 2);
 }
 
-void NTRIPManagerTest::_statusKeepsPlaceMarkers_data()
+void NTRIPManagerTest::_statusNamesTheCaster_data()
 {
     QTest::addColumn<QString>("host");
-    // A link-local IPv6 address with a numeric zone, as Windows writes it.
-    QTest::newRow("zone-index") << QStringLiteral("fe80::1%2");
-    QTest::newRow("first-marker") << QStringLiteral("a%1b");
+    QTest::addColumn<QString>("endpoint");
+    QTest::newRow("name") << QStringLiteral("caster.example.com") << QStringLiteral("caster.example.com:2101");
+    // In brackets, as in a URL: "fe80::1:2101" reads as another address.
+    QTest::newRow("ipv6") << QStringLiteral("fe80::1") << QStringLiteral("[fe80::1]:2101");
+    // A link-local IPv6 address with a numeric zone, as Windows writes it: the zone is no place marker.
+    QTest::newRow("zone-index") << QStringLiteral("fe80::1%2") << QStringLiteral("[fe80::1%2]:2101");
+    QTest::newRow("first-marker") << QStringLiteral("a%1b") << QStringLiteral("a%1b:2101");
 }
 
-void NTRIPManagerTest::_statusKeepsPlaceMarkers()
+void NTRIPManagerTest::_statusNamesTheCaster()
 {
     QFETCH(QString, host);
+    QFETCH(QString, endpoint);
     ManualScheduler scheduler;
     NTRIPManager manager(nullptr, &scheduler);
     auto configuration = mockCasterConfiguration();
     configuration.connection.host = host;
     auto* transport = injectMockTransport(manager);
     initialize(manager, configuration);
-    QCOMPARE(manager.statusMessage(), QStringLiteral("Connecting to %1:2101...").arg(host));
+    QCOMPARE(manager.statusMessage(), QStringLiteral("Connecting to ") + endpoint + QStringLiteral("..."));
     // What a caster answers is text of its own as well.
     const QString detail = QStringLiteral("HTTP 503: %1 busy %2");
     _fail(transport, detail);
@@ -1202,7 +1209,7 @@ void NTRIPManagerTest::_mountpointChangeReconnects()
     QCOMPARE(second->startCount, 1);
     QCOMPARE(stops, 1);
     QCOMPARE(second->stopCount, 0);
-    const auto frame = GPSTest::rtcmMessage(1077);
+    const auto frame = GPSTest::rtcmMsmFrame(1077, 8);
     second->simulateRtcmData(frame, 1077, scheduler.nowMs() - 10);
     deliverQueuedCalls();
     QCOMPARE(routed.size(), 2);
@@ -1236,7 +1243,7 @@ void NTRIPManagerTest::_transportDiagnosticsReachManager()
     QVERIFY(connection && connection->peer);
     QVERIFY(connection->waitForRequest(TestTimeout::shortMs()).startsWith("GET /TEST HTTP/1.1"));
     const auto accepted = GPSTest::rtcmMessage(1005);
-    const auto filtered = GPSTest::rtcmMessage(1077);
+    const auto filtered = GPSTest::rtcmMsmFrame(1077, 8);
     auto rejected = GPSTest::rtcmMessage(1087);
     rejected.back() ^= 1;
     expectLogMessage("GPS.NTRIPHttpTransport", QtWarningMsg, QRegularExpression(QStringLiteral("Invalid RTCM frame")));
@@ -1490,6 +1497,38 @@ void NTRIPManagerTest::_failoverStartsAgainFromTheEnteredCaster()
     QCOMPARE(attempts.hosts.last(), entered);
     QCOMPARE(manager.connectionStatus(), Status::Connected);
     QVERIFY(!manager.statusMessage().contains(QStringLiteral("saved caster")));
+    manager.shutdown();
+}
+
+void NTRIPManagerTest::_failoverGivesUpAfterTheAttemptCeiling()
+{
+    using Status = NTRIPManager::ConnectionStatus;
+    const QString entered = mockCasterConfiguration().connection.host;
+    ManualScheduler scheduler;
+    NTRIPManager manager(nullptr, &scheduler);
+    Attempts attempts(manager);
+    initialize(manager, failoverConfiguration({savedCaster(QStringLiteral("Backup"))}));
+
+    // The attempts are counted across the casters, three to each in turn: going on to the next caster does not
+    // begin a new count.
+    constexpr int ATTEMPTS = 100;
+    QVERIFY(_failAttempts(manager, scheduler, attempts.latest, ATTEMPTS));
+    QCOMPARE(attempts.hosts.size(), ATTEMPTS + 1);
+    QCOMPARE(attempts.hosts.count(entered), 51);
+    QCOMPARE(attempts.hosts.count(kBackupHost), 50);
+    QCOMPARE(attempts.hosts.last(), kBackupHost);
+    _fail(attempts.latest, QStringLiteral("last refusal"));
+    QCOMPARE(manager.connectionStatus(), Status::Error);
+    // The connection has ended, so the message names no caster in use.
+    QCOMPARE(manager.statusMessage(),
+             QStringLiteral("Gave up after %1 reconnect attempts: last refusal").arg(ATTEMPTS));
+    QVERIFY(scheduler.advanceBy(NTRIPFailure::MAX_RETRY_AFTER));
+    QCOMPARE(attempts.hosts.size(), ATTEMPTS + 1);
+
+    // Retry starts again, with the entered caster.
+    manager.connectCaster();
+    QCOMPARE(attempts.hosts.size(), ATTEMPTS + 2);
+    QCOMPARE(attempts.hosts.last(), entered);
     manager.shutdown();
 }
 
@@ -1773,6 +1812,47 @@ void NTRIPManagerTest::_dataCapLoweredBelowTheCount()
     expectLogMessage("GPS.NTRIPManager", QtWarningMsg, QRegularExpression(QStringLiteral("stopped at the data limit")));
     QVERIFY(scheduler.advanceBy(SettingsDebounce));
     verifyExpectedLogMessage();
+    QCOMPARE(manager.connectionStatus(), Status::Error);
+    QCOMPARE(manager.statusMessage(), kStoppedAtOneMB);
+    QCOMPARE(attempts.hosts.size(), 1);
+}
+
+void NTRIPManagerTest::_dataCapLeavesBrowsingAlone()
+{
+    using Status = NTRIPManager::ConnectionStatus;
+    using Fetch = NTRIPSourceTableController::FetchStatus;
+    ScriptedNTRIPCaster caster;
+    QVERIFY(caster.isListening());
+    ManualScheduler scheduler;
+    NTRIPManager manager(nullptr, &scheduler);
+    Attempts attempts(manager, true);
+    auto configuration = dataCapConfiguration(1);
+    configuration.connection = caster.connectionConfig();
+    initialize(manager, configuration);
+    NTRIPSourceTableController* const browser = manager.sourceTableController();
+    const QString row = QStringLiteral("STR;%1;Town;RTCM 3.2;;2;GPS;NET;USA;40;-74\r\n");
+    const QString end = QStringLiteral("ENDSOURCETABLE\r\n");
+
+    // One more byte would reach the limit, and the table is longer: it is not what the limit counts.
+    receive(attempts.latest, MB - 1);
+    manager.fetchMountpoints();
+    QVERIFY(caster.serveSourceTable(row.arg(QStringLiteral("MP1")) + row.arg(QStringLiteral("MP2")) + end));
+    QTRY_COMPARE_WITH_TIMEOUT(browser->fetchStatus(), Fetch::Success, TestTimeout::mediumMs());
+    QCOMPARE(browser->mountpointCount(), 2);
+    deliverQueuedCalls();
+    QCOMPARE(manager.connectionStatus(), Status::Connected);
+
+    _receiveToTheLimit(attempts.latest, 1);
+    QCOMPARE(manager.connectionStatus(), Status::Error);
+
+    // Stopped at the limit, the connection leaves the caster's mountpoints to be fetched, and stays stopped. The
+    // table fetched before is asked for again once it is no longer fresh.
+    QVERIFY(scheduler.advanceBy(NTRIPSourceTableController::CACHE_TTL + std::chrono::milliseconds(1)));
+    manager.fetchMountpoints();
+    QVERIFY(caster.serveSourceTable(row.arg(QStringLiteral("MP3")) + end));
+    QTRY_COMPARE_WITH_TIMEOUT(browser->mountpointCount(), 1, TestTimeout::mediumMs());
+    QCOMPARE(browser->fetchStatus(), Fetch::Success);
+    deliverQueuedCalls();
     QCOMPARE(manager.connectionStatus(), Status::Error);
     QCOMPARE(manager.statusMessage(), kStoppedAtOneMB);
     QCOMPARE(attempts.hosts.size(), 1);

@@ -13,7 +13,10 @@ private slots:
     void _ubxCaptureSatellites_data();
     void _ubxCaptureSatellites();
     void _ubxLegacyNumbering();
+    void _eventSharesItsSatellites();
     void _nmeaCaptureSatellites();
     void _reportKeepsEachConstellation();
+    void _reportOutlastsSlowSatelliteOutput_data();
+    void _reportOutlastsSlowSatelliteOutput();
     void _reportIsBounded();
 };
