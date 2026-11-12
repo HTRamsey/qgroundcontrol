@@ -21,6 +21,7 @@ set(_qgc_gps_core_suites
     GPSReceiverWorkerTest
     Common/GPSProtocolMathTest
     Common/GPSReceiverConfigTest
+    NMEA/NMEASatellitesTest
     NMEA/NMEASentenceTest
     RTCM/RTCMConformanceTest
     Transport/GPSCancellationTest
@@ -39,6 +40,7 @@ set(_qgc_gps_core_suites
     Protocols/GPSProtocolFamilyContractTest
     Protocols/GPSProtocolRuntimeTest
     Protocols/GPSReceiverDetectorTest
+    Protocols/GPSSatelliteReportTest
     Protocols/GPSStreamDemuxTest
     Protocols/Ashtech/AshtechProtocolTest
     Protocols/Femto/FemtoProtocolTest

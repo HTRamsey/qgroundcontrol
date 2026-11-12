@@ -32,13 +32,12 @@ void applyNavigationEpoch(GPSDecodedPosition& report, const NMEA::NavigationEpoc
     report.velocityValid = epoch.speedMetersPerSecond || epoch.courseDegrees;
 }
 
-GPSDecodedSatellites satelliteReport(const NMEA::SatelliteSystem& system)
+/// Adds what an epoch reports of one system to @a report: its counts and the satellites of its view.
+void addSystem(GPSDecodedSatellites& report, const NMEA::SatelliteSystem& system)
 {
-    GPSDecodedSatellites report;
-    report.fullSnapshot = false;
     auto* constellation = report.ensureConstellation(system.constellation);
     if (!constellation) {
-        return report;
+        return;
     }
     constellation->inViewTimestampUs = system.inViewTimestampUs;
     constellation->inView = system.inView;
@@ -46,7 +45,9 @@ GPSDecodedSatellites satelliteReport(const NMEA::SatelliteSystem& system)
         constellation->inUseTimestampUs = system.inUseTimestampUs;
         constellation->inUse = *system.inUse;
     }
-    return report;
+    for (const GPSSatellite& satellite : system.satellites) {
+        report.listSatellite(satellite);
+    }
 }
 
 }  // namespace
@@ -145,8 +146,15 @@ void GPSNMEAStream::_queueSatellites(const NMEA::SatelliteEpoch& epoch)
 
 void GPSNMEAStream::_publishSatellites(GPSDecodeContext& context)
 {
-    for (const auto& system : _pendingSatellites) {
-        context.publishSatellites(satelliteReport(system));
+    if (_pendingSatellites.empty()) {
+        return;
     }
+    // One report for the epoch: it names each of its systems once, and a consumer gets them together.
+    GPSDecodedSatellites report;
+    report.fullSnapshot = false;
+    for (const auto& system : _pendingSatellites) {
+        addSystem(report, system);
+    }
+    context.publishSatellites(report);
     _pendingSatellites.clear();
 }
