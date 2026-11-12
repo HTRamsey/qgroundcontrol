@@ -13,6 +13,7 @@
 #include <QtCore/QByteArray>
 #include <QtCore/QDir>
 #include <QtCore/QStringList>
+#include <QtCore/QtMath>
 
 #include "GPSNMEAStream.h"
 #include "GPSObservation.h"
@@ -248,6 +249,7 @@ void GPSNMEAStreamTest::_ggaQuality_data()
     QTest::addColumn<bool>("published");
     QTest::addColumn<GPSFixQuality>("fixType");
     QTest::newRow("precise-positioning-service") << QByteArray("3") << true << GPSFixQuality::Fix3D;
+    QTest::newRow("simulation") << QByteArray("8") << true << GPSFixQuality::Fix3D;
     QTest::newRow("novatel-sbas") << QByteArray("9") << true << GPSFixQuality::Differential;
     QTest::newRow("undefined") << QByteArray("10") << false << GPSFixQuality::Unknown;
 }
@@ -422,6 +424,35 @@ void GPSNMEAStreamTest::_untimedSentenceBeforeItsPosition()
     }
 }
 
+void GPSNMEAStreamTest::_emptyFieldKeepsEpochValue_data()
+{
+    QTest::addColumn<QByteArrayList>("sentences");
+    const QByteArray utc("123519");
+    // The epoch has its speed, course and VDOP; the last sentence before the GGA leaves those fields empty.
+    QTest::newRow("vtg-after-rmc") << QByteArrayList{rmc(utc), GSA, "GPVTG,,T,,M,,N,,K"};
+    QTest::newRow("rmc-after-vtg") << QByteArrayList{sentenceOf("GLL", utc), VTG, GSA,
+                                                     "GPRMC," + utc + ",A,4807.038,N,01131.000,E,,,230394,,,A"};
+    QTest::newRow("gsa-after-gsa") << QByteArrayList{rmc(utc), GSA, QByteArray("GPGSA,A,3,02") + QByteArray(14, ',')};
+}
+
+void GPSNMEAStreamTest::_emptyFieldKeepsEpochValue()
+{
+    QFETCH(QByteArrayList, sentences);
+    NMEAReceiver receiver;
+    for (const auto& sentence : sentences) {
+        receiver.feed(sentence);
+    }
+    QVERIFY(!receiver.published);
+    receiver.feed(gga("123519"));
+    QVERIFY(receiver.published);
+    const auto& navigation = receiver.published->navigation;
+    QVERIFY(receiver.published->velocityValid);
+    // Two knots in the RMC, 3.7 km/h in the VTG.
+    QVERIFY(qAbs(navigation.speedMetersPerSecond - 1.03f) < 0.01f);
+    QCOMPARE(navigation.courseRadians, qDegreesToRadians(90.0f));
+    QCOMPARE(navigation.verticalDop, 0.6f);
+}
+
 void GPSNMEAStreamTest::_lateSentenceCompletesWaitingEpoch()
 {
     NMEAReceiver receiver;
@@ -440,6 +471,43 @@ void GPSNMEAStreamTest::_lateSentenceCompletesWaitingEpoch()
     QCOMPARE(receiver.positions, 3);
     QCOMPARE(receiver.published->navigation.timestampUs, positionReceipt);
     QVERIFY(receiver.published->velocityValid);
+}
+
+void GPSNMEAStreamTest::_awaitedSentenceLaterThanMetadataAge_data()
+{
+    QTest::addColumn<QByteArray>("type");
+    QTest::newRow("rmc") << QByteArray("RMC");
+    QTest::newRow("gst") << QByteArray("GST");
+}
+
+void GPSNMEAStreamTest::_awaitedSentenceLaterThanMetadataAge()
+{
+    QFETCH(QByteArray, type);
+    // A receiver that reports every five seconds at 4800 baud and sends the GSV sentences of four constellations
+    // between its GGA and the sentence that follows: twelve of them put that sentence 1.92 s after the GGA, thirteen
+    // put it 2.07 s after.
+    constexpr uint64_t INTERVAL_US = 5000000;
+    constexpr uint64_t MAX_AGE_US = NMEA::NavigationEpochAssembler::METADATA_MAX_AGE.count();
+    NMEAReceiver receiver;
+    const uint64_t start = receiver.now;
+    int epoch = 0;
+    for (const uint64_t delayUs : {1920000, 1920000, 2070000, 1920000, 1920000, 2070000}) {
+        const QByteArray utc = QByteArray::number(123500 + 5 * epoch);
+        receiver.now = start + epoch * INTERVAL_US;
+        const uint64_t positionReceipt = receiver.now;
+        receiver.feed(gga(utc));
+        receiver.now += delayUs;
+        receiver.feed(sentenceOf(type, utc));
+        ++epoch;
+        QCOMPARE(receiver.positions, epoch);
+        const auto& navigation = receiver.published->navigation;
+        QCOMPARE(navigation.timestampUs, positionReceipt);
+        if (delayUs > MAX_AGE_US) {
+            // Two epochs have shown the sentence, so this one waited for it and is published with it.
+            QVERIFY(type == "RMC" ? receiver.published->velocityValid
+                                  : std::isfinite(navigation.horizontalAccuracyMeters));
+        }
+    }
 }
 
 void GPSNMEAStreamTest::_fixLossWhileWaiting()

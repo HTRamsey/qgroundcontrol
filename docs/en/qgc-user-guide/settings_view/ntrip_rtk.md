@@ -14,7 +14,10 @@ The toolbar GNSS indicator also offers **Connect** once an NTRIP server is confi
 ## NTRIP Connection
 
 Shows the NTRIP connection state with message and byte counters, the age of the last correction, and a Connect/Disconnect button.
+While a connection is being opened or retried, the button stops it. After an error it reads **Retry**, beside a **Disconnect** button that turns the connection off; **Connect** and **Retry** need a host address.
 The counters count everything the caster sends, including messages the [RTCM message filter](#correction-routing) keeps from vehicles.
+
+QGroundControl reconnects when a stream that has delivered data sends nothing for 30 seconds. A stream that has not delivered anything yet has longer: it waits without a limit while there is no position to report to the caster, and 2 minutes once one has been reported ([GGA Position Reporting](#gga-position-reporting)).
 
 ## NTRIP Server
 
@@ -30,7 +33,7 @@ QGroundControl asks a caster in the form NTRIP version 2 defines. A caster that 
 ## NTRIP Mountpoint
 
 - **Mount Point** — the NTRIP mountpoint to connect to. It is required: without one, NTRIP reports an error instead of connecting
-- **Browse** — fetch available mountpoints from the server and display them in a list with the caster's description, format, navigation system, country, bitrate, and distance, as far as the caster gives them. A mountpoint is listed when the caster names it, even without any of these. **Browse** does not use the **Mount Point** field, so it also works while that field holds a name the caster does not have. When the caster's list names no mountpoint, QGroundControl says so.
+- **Browse** — fetch available mountpoints from the server and display them in a list with the caster's description, format, navigation system, country, bitrate, and distance, as far as the caster gives them. A mountpoint is listed when the caster names it, even without any of these. **Browse** does not use the **Mount Point** field, so it also works while that field holds a name the caster does not have. When the caster's list names no mountpoint, QGroundControl says so. A list without its closing `ENDSOURCETABLE` line, as RTKLIB's `str2str` sends when its table file has none, is shown once the caster's answer is complete; one that is cut off before that is reported as an error.
 
 QGroundControl receives RTCM 3 corrections only. A mountpoint that sends another format, such as SPARTN, is disconnected after 30 seconds of data without a valid RTCM message. Before any corrections have arrived, QGroundControl reports that and does not retry. Once the mountpoint has delivered corrections, it keeps reconnecting.
 
@@ -42,10 +45,14 @@ A caster that answers with an HTTP redirect is not followed. QGroundControl repo
 
 Network RTK (VRS) casters need the rover position. Select the position QGC reports and how often.
 
-A network RTK mountpoint sends nothing until it has received a position. While none is available, for example before the vehicle has a GPS fix, QGroundControl stays connected and the connection status reads **Connected, waiting for a position to report**. The 30-second limit on a silent stream starts with the first position reported or the first data received.
+A network RTK mountpoint sends nothing until it has received a position. While none is available, for example before the vehicle has a GPS fix, QGroundControl stays connected and the connection status reads **Connected, waiting for a position to report**.
+
+Once it has a position, the caster works out corrections for it before it sends any, which can take a minute or more. Until the first corrections arrive the connection status reads **Connected, waiting for corrections**, and QGroundControl gives the caster 2 minutes from the first position reported to send its first data before it reconnects. From the first data on, the [30-second limit](#ntrip-connection) on a silent stream applies.
 
 The report carries the selected position's height above mean sea level and the geoid separation that goes with it.
-A height above the WGS84 ellipsoid, as the position of an Android device or of a base station has, is converted with the EGM96 geoid model built into QGroundControl.
+When the position comes with its height above the WGS84 ellipsoid as well, the separation is the receiver's own, the difference between the two heights. A local receiver's position usually has both, and so has the vehicle GPS position when the vehicle reports the ellipsoid height (`alt_ellipsoid` in `GPS_RAW_INT`), as PX4 and ArduPilot do for most receivers.
+Otherwise the separation comes from the EGM96 geoid model built into QGroundControl.
+A height above the WGS84 ellipsoid alone, as the position of an Android device or of a base station has, is converted with that model.
 A height of unknown reference, as the position of a Linux device has, is reported as it is, and a position without a height is reported with height 0, both without a geoid separation. A caster places the rover by its latitude and longitude.
 
 ## UDP RTCM Input
@@ -80,4 +87,4 @@ It is off each time QGroundControl starts. Each time it is turned on it starts a
 The file's path is shown below the switch while the log is written.
 The file holds the RTCM 3 messages exactly as vehicles and UDP forwarding receive them, one after the other, which is the raw RTCM 3 format other tools read: only the stream selected for vehicles, without the messages the RTCM message filter leaves out.
 It therefore includes the base station location, so share it only where that is acceptable.
-A log stops when its file reaches 256 MB or cannot be written: the switch turns off, the application log reports it and the path is no longer shown. The corrections continue either way.
+A log stops when its file reaches 256 MB or cannot be written: the switch turns off, the path is no longer shown, and a message below the switch says why until the log is turned on again. A log that cannot start says why in the same place. The corrections continue either way.

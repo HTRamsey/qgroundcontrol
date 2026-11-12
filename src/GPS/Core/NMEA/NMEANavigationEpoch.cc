@@ -17,6 +17,14 @@ std::optional<double> nonnegativeNumber(std::string_view field)
     return value && *value >= 0.0 ? value : std::nullopt;
 }
 
+/// A sentence adds the fields it reports: an empty one leaves what an earlier sentence of the epoch supplied.
+void addReported(std::optional<double>& value, std::optional<double> reported)
+{
+    if (reported) {
+        value = reported;
+    }
+}
+
 void markReceipt(NMEA::NavigationEpoch& epoch, uint64_t receivedAtUs)
 {
     epoch.receivedAtUs = epoch.receivedAtUs == 0 ? receivedAtUs : (std::min) (epoch.receivedAtUs, receivedAtUs);
@@ -131,6 +139,11 @@ void NavigationEpochAssembler::_resetEpoch(StoredEpoch& stored, std::optional<in
 
 void NavigationEpochAssembler::_resetExpiredEpoch(StoredEpoch& stored, uint64_t receivedAtUs)
 {
+    // A GGA that waits for the rest of its epoch is not retained metadata: a sentence of its time completes it however
+    // late, and only another GGA replaces it.
+    if (stored.epoch.ggaQuality && !stored.published) {
+        return;
+    }
     if (stored.epoch.receivedAtUs && receivedAtUs > stored.epoch.receivedAtUs &&
         !MonotonicClock::withinAge(stored.epoch.receivedAtUs, receivedAtUs, METADATA_MAX_AGE)) {
         _resetEpoch(stored, stored.epoch.timeMs);
@@ -241,8 +254,8 @@ NavigationEpochAssembler::StoredEpoch* NavigationEpochAssembler::_joinPosition(c
     }
     markReceipt(epoch, receivedAtUs);
     if (rmcFix) {
-        epoch.speedMetersPerSecond = finiteValue(rmcFix->speedMetersPerSecond);
-        epoch.courseDegrees = finiteValue(rmcFix->courseDegrees);
+        addReported(epoch.speedMetersPerSecond, finiteValue(rmcFix->speedMetersPerSecond));
+        addReported(epoch.courseDegrees, finiteValue(rmcFix->courseDegrees));
         _add(stored, Addition::RMC, receivedAtUs);
     }
     return &stored;
@@ -287,11 +300,11 @@ NavigationEpochAssembler::StoredEpoch* NavigationEpochAssembler::_joinUntimed(co
         if (!epoch.horizontalDop) {
             epoch.horizontalDop = nonnegativeNumber(sentence.fields[Field::GSA_HDOP]);
         }
-        epoch.verticalDop = nonnegativeNumber(sentence.fields[Field::GSA_VDOP]);
+        addReported(epoch.verticalDop, nonnegativeNumber(sentence.fields[Field::GSA_VDOP]));
         _add(*stored, Addition::GSA, receivedAtUs);
     } else if (const auto velocity = vtg(sentence)) {
-        epoch.speedMetersPerSecond = finiteValue(velocity->speedMetersPerSecond);
-        epoch.courseDegrees = finiteValue(velocity->courseDegrees);
+        addReported(epoch.speedMetersPerSecond, finiteValue(velocity->speedMetersPerSecond));
+        addReported(epoch.courseDegrees, finiteValue(velocity->courseDegrees));
         _add(*stored, Addition::VTG, receivedAtUs);
     } else {
         return nullptr;

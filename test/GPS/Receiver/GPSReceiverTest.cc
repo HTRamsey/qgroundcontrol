@@ -1065,7 +1065,7 @@ void GPSReceiverTest::_withoutSerialLinksSerialSelectionUsesTcp()
 {
     // The serial side of a build without serial links, on any build.
     ManualScheduler scheduler;
-    ScriptedGPSReceiver harness(&scheduler, {.serialLinks = false});
+    ScriptedGPSReceiver harness(&scheduler, {.serial = withoutSerialLinks});
     GPSReceiver& receiver = harness.receiver;
     QVERIFY(!receiver.serialSupported());
     QVERIFY(receiver.serialBaudRates().isEmpty());
@@ -1338,7 +1338,8 @@ void GPSReceiverTest::_effectiveConnection()
     QFETCH(int, saved);
     QFETCH(int, effective);
     QFETCH(bool, supported);
-    ScriptedGPSReceiver harness(nullptr, {.serialLinks = serialLinks});
+    ScriptedGPSReceiver harness(
+        nullptr, serialLinks ? GPSReceiver::Dependencies{} : GPSReceiver::Dependencies{.serial = withoutSerialLinks});
     GPSReceiver& receiver = harness.receiver;
     QSignalSpy changed(&receiver, &GPSReceiver::configurationChanged);
     auto configuration = receiverConfiguration();
@@ -1384,7 +1385,7 @@ void GPSReceiverTest::_serialPortEntries()
          .boardName = QStringLiteral("SiK Radio")},
         serialPort(QStringLiteral("/dev/ttyS0")),
     });
-    ScriptedGPSReceiver harness(nullptr, {.serialPorts = &serial.manager});
+    ScriptedGPSReceiver harness(nullptr, {.serial = serial.side()});
     GPSReceiver& receiver = harness.receiver;
     auto configuration = serialConfiguration(kPassiveManufacturer, QStringLiteral("/dev/ttyACM0"), 115200);
     configuration.autoConnect = false;
@@ -1413,16 +1414,31 @@ void GPSReceiverTest::_serialPortEntries()
                                                   }));
     QCOMPARE(entries(&GPSSerialPortEntry::value).first(), QStringLiteral("/dev/ttyACM0"));
 
-    // The mark follows the vehicle link at the next scan; the receiver's own claim never marks its port, even while
-    // a disconnected session's worker still holds it.
+    // A link releases its port without a scan, so the mark follows it when the receiver is next polled. The
+    // receiver's own claim never marks its port, even while a disconnected session's worker still holds it.
     vehicleLink.reset();
     receiver.disconnectReceiver();
-    serial.manager.rescan();
+    receiver.tick();
     QCOMPARE(entries(&GPSSerialPortEntry::label).at(1), QStringLiteral("CubeOrange+ – /dev/ttyACM1"));
     QVERIFY(serial.manager.isPortReserved(QStringLiteral("/dev/ttyACM0")));
     QCOMPARE(entries(&GPSSerialPortEntry::label).first(), QStringLiteral("u-blox GNSS receiver – /dev/ttyACM0"));
     harness.workers.finishRetired();
     QVERIFY(!serial.manager.isPortReserved(QStringLiteral("/dev/ttyACM0")));
+
+    // Where only one port can be open at a time, nothing is scanned while a link holds its port, and the port is
+    // marked all the same.
+    serial.manager.setSinglePortOnly(true);
+    QSignalSpy scans(&serial.manager, &SerialPortManager::portsEnumerated);
+    vehicleLink = serial.manager.reservePort(QStringLiteral("/dev/ttyACM1"));
+    QVERIFY(vehicleLink);
+    changes.clear();
+    receiver.tick();
+    QCOMPARE(entries(&GPSSerialPortEntry::label).at(1), QStringLiteral("CubeOrange+ – /dev/ttyACM1 (in use)"));
+    QCOMPARE(changes.size(), 1);
+    QVERIFY(scans.isEmpty());
+    // Polled again, the entries are as they were, so their views are left alone.
+    receiver.tick();
+    QCOMPARE(changes.size(), 1);
 }
 
 void GPSReceiverTest::_serialReservationSurvivesDelayedStop()
@@ -1500,7 +1516,7 @@ void GPSReceiverTest::_manualPassiveBaudPreserved()
     QFETCH(uint, baud);
     TestSerialPorts serial({serialPort(QStringLiteral("/test/passive"))});
     auto state = std::make_shared<PassiveTransportState>();
-    GPSReceiver receiver(nullptr, nullptr, {.serialPorts = &serial.manager});
+    GPSReceiver receiver(nullptr, nullptr, {.serial = serial.side()});
     auto configuration = serialConfiguration(kPassiveManufacturer, QStringLiteral("/test/passive"), baud);
     configuration.autoConnect = false;
     receiver.setConfiguration(configuration);

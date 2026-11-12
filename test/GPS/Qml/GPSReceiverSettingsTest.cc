@@ -45,11 +45,13 @@ struct SettingsReceiver
     // Scripted workers open no link, so a recorded session names a file here and never creates it.
     static QString recordingDirectory() { return QStringLiteral("/test/recordings"); }
 
-    GPSReceiver::Dependencies dependencies(bool serialLinks)
+    GPSReceiver::Dependencies dependencies([[maybe_unused]] bool serialLinks)
     {
-        GPSReceiver::Dependencies dependencies{.serialLinks = serialLinks, .recordingDirectory = recordingDirectory};
+        GPSReceiver::Dependencies dependencies{.serial = withoutSerialLinks, .recordingDirectory = recordingDirectory};
 #ifndef QGC_NO_SERIAL_LINK
-        dependencies.serialPorts = &serial.manager;
+        if (serialLinks) {
+            dependencies.serial = serial.side();
+        }
 #endif
         return dependencies;
     }
@@ -1027,7 +1029,7 @@ void GPSReceiverSettingsTest::_settingsPageListsGroups()
     if (baseSites) {
         sections.append(QStringLiteral("Saved Base Sites"));
     }
-    sections.append({QStringLiteral("Connect"), QStringLiteral("GCS Position")});
+    sections.append({QStringLiteral("Connection Options"), QStringLiteral("GCS Position")});
     QCOMPARE(listed.value<QJSValue>().toVariant().toStringList(), sections);
 
     // The page's group of a control: the child of the page layout that holds it.
@@ -1042,11 +1044,16 @@ void GPSReceiverSettingsTest::_settingsPageListsGroups()
     auto* connection = group("rtkReceiverRole");
     auto* baseStationGroup = group("rtkFixedMode");
     auto* baseSitesGroup = group("rtkBaseSiteName");
-    auto* connect = group("rtkAutoConnect");
-    QVERIFY(status && connection && baseStationGroup && baseSitesGroup && connect);
+    auto* options = group("rtkAutoConnect");
+    QVERIFY(status && connection && baseStationGroup && baseSitesGroup && options);
     // Connect is in the status group, which the page always shows.
     QCOMPARE(status, group("rtkReceiverStatus"));
-    QVERIFY(status->isVisible() && connection->isVisible() && connect->isVisible());
+    QVERIFY(status->isVisible() && connection->isVisible() && options->isVisible());
+    // The group of the remaining options is headed as the sidebar lists it, not after the button that left it.
+    const auto headed = TestFixtures::findItems(
+        options, [](QQuickItem* item) { return !item->property("heading").toString().isEmpty(); });
+    QCOMPARE(headed.size(), 1);
+    QCOMPARE(headed.first()->property("heading").toString(), QStringLiteral("Connection Options"));
     QCOMPARE(baseStationGroup->isVisible(), baseStation);
     QCOMPARE(baseSitesGroup->isVisible(), baseSites);
     for (const auto& [file, shown] :

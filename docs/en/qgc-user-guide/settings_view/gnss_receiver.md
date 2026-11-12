@@ -11,6 +11,7 @@ The dot is grey without a receiver, orange while a connection is opened or await
 The button reads **Connect**, then **Disconnect** from the moment a connection is being opened, and **Cancel reconnect** while QGroundControl waits to reconnect automatically.
 **Connect** uses the [settings](#receiver) as they are, and is unavailable while they select no receiver type, a base mode the receiver does not support, or UDP for a configured base.
 A message below that line explains a failed or lost connection.
+When **Connect** cannot start, as without a TCP host or with a serial device that is not plugged in, the message says why, and it goes away once the settings no longer have that problem.
 Below the connection, the status shows the receiver's fix and satellites, and any jamming or spoofing it reports.
 The status of a configured base says when the base sends no corrections.
 While a survey or the receiver's own averaging runs, it sends none until that completes.
@@ -31,7 +32,7 @@ Each is a section of **GNSS Receiver** in the settings sidebar, and the settings
 - **GNSS Receiver:** The receiver role, manufacturer and connection.
 - **RTK Base Station** (_Configured base_ only): The base mode and its settings.
 - **Saved Base Sites** (_Fixed position_ only): The [saved base sites](#base_sites).
-- **Connect:** How and when the receiver connects: the remaining settings.
+- **Connection Options:** The remaining settings: the corrections format, the permission to save to the receiver's flash, automatic connection and recording.
 
 The **Connect** button is not among them: it is in the [receiver status](#status), the first group of the page.
 The GNSS indicator's drop-down shows the same settings as one form when expanded, and the receiver status with **Connect** once a receiver is set up, so a saved receiver connects without opening the settings. Beside a vehicle's GPS status, a receiver that is not set up is shown only while the settings are open.
@@ -78,6 +79,7 @@ The settings are:
   A recording stops when its file reaches 256 MB or cannot be written: the application log reports it and the path is no longer shown. The connection continues either way.
 
 The message below the connection line of the [receiver status](#status) explains a failed or lost connection.
+When a receiver identified itself before its configuration failed, the message names its model and firmware.
 When a u-blox receiver reports that it produces more output than its connection carries, the message warns until 30 seconds after the last report: use a higher baud rate or turn on **Compact RTCM corrections (MSM4)**.
 
 ### RTK Base Station {#base_station}
@@ -159,3 +161,6 @@ A connected GNSS receiver can provide the ground station position instead; use t
 The settings are:
 
 - **Source**: _Best available_ uses the GNSS receiver while it has a fix and falls back to this device; select _GNSS receiver_ or _This device_ to use only one.
+
+A position is used while it is accurate to 100 m horizontally; a less accurate one is shown as _Position fix does not meet accuracy requirements_.
+A receiver that states no horizontal accuracy, as an NMEA receiver without GST sentences, counts as accurate to 5.1 m times its HDOP, which is one standard deviation as a stated accuracy is, so its position is used while its HDOP is below 19.6.

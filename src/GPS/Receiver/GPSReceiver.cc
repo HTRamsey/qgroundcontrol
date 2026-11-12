@@ -46,12 +46,17 @@ void logConnectionError(GPSConnectionError error, const QString& detail)
     }
 }
 
+GPSReceiverSerialPorts* createSerialSide(const GPSReceiver::Dependencies& dependencies, QObject* parent)
+{
+    GPSReceiverSerialPorts* const serial = dependencies.serial ? dependencies.serial(parent) : nullptr;
+    return serial ? serial : GPSReceiverSerialPorts::create(nullptr, parent);
+}
+
 }  // namespace
 
 GPSReceiver::GPSReceiver(QObject* parent, RuntimeScheduler* scheduler, const Dependencies& dependencies)
     : QObject(parent)
-    , _serial(dependencies.serialLinks ? GPSReceiverSerialPorts::create(dependencies.serialPorts, this)
-                                       : new GPSReceiverSerialPorts(this))
+    , _serial(createSerialSide(dependencies, this))
     , _connectability(GPSReceiverConnectionPolicy::connectability(_configuration, _serial->supported()))
     , _correctionManager(dependencies.corrections)
     , _positionManager(dependencies.positions)
@@ -457,6 +462,9 @@ void GPSReceiver::tick()
         return;
     }
     _scanSerialPorts();
+    // Other connections claim and release their ports without a scan. Their marks are renewed before the policy
+    // decides, as the scan is: observers of the entries may act too.
+    _serial->refreshEntries();
     _connection->update();
     _emitChanges();
 }

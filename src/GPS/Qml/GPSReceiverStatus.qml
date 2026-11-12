@@ -56,25 +56,6 @@ QGCGroupBox {
         labelTextFormat: Text.PlainText
     }
 
-    /// A label and a value reported from outside, such as a long endpoint, which wraps instead of widening the panel.
-    component WrappingRow: RowLayout {
-        property alias label: rowLabel.text
-        property alias labelText: rowValue.text
-        property alias labelWrapMode: rowValue.wrapMode
-
-        spacing: ScreenTools.defaultFontPixelWidth * 2
-
-        QGCLabel {
-            id: rowLabel
-            textFormat: Text.PlainText
-        }
-        QGCNoteLabel {
-            id: rowValue
-            horizontalAlignment: Text.AlignRight
-            wrapMode: Text.WrapAnywhere
-        }
-    }
-
     GPSReceiverConnectionRow {
         id: connection
         receiver: root.receiver
@@ -88,14 +69,14 @@ QGCGroupBox {
         labelTextFormat: Text.PlainText
     }
 
-    WrappingRow {
+    GPSWrappingRow {
         objectName: "rtkReceiverIdentity"
         visible: root._connected && root.receiver.receiverIdentity.length > 0
         label: qsTr("Receiver")
         labelText: root.receiver.receiverIdentity
     }
 
-    WrappingRow {
+    GPSWrappingRow {
         objectName: "rtkReceiverEndpoint"
         visible: root.receiver.activeEndpoint.length > 0
         label: qsTr("Connection")
@@ -121,7 +102,7 @@ QGCGroupBox {
         visible: root._connected && root.facts.numSatellitesUsed.value >= 0
     }
 
-    WrappingRow {
+    GPSWrappingRow {
         objectName: "rtkConstellations"
         visible: root._connected && root._constellations.length > 0
         //: Label of the satellites used and in view of each satellite constellation, such as GPS and Galileo
@@ -152,6 +133,7 @@ QGCGroupBox {
         objectName: "rtkSurveyDuration"
         label: root._presentation.acceptedObservationTime ? qsTr("Accepted observation time") : qsTr("Duration")
         fact: root.facts.currentDuration
+        factLabel.textFormat: Text.PlainText
         visible: root._connected && root._presentation.reportsSurveyDuration && root._surveyConnected
     }
 
@@ -160,6 +142,7 @@ QGCGroupBox {
         label: root.facts.baseState.value === GPSReceiverFactGroup.BaseState.Valid ? qsTr("Accuracy")
                                                                                    : qsTr("Current Accuracy")
         fact: root.facts.currentAccuracy
+        factLabel.textFormat: Text.PlainText
         visible: root._connected && root._surveyConnected && root.facts.currentAccuracy.value > 0
     }
 

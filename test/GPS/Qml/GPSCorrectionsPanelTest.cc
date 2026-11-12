@@ -3,6 +3,7 @@
 #include <chrono>
 #include <memory>
 
+#include <QtCore/QDir>
 #include <QtCore/QPointer>
 #include <QtCore/QRegularExpression>
 #include <QtPositioning/QGeoCoordinate>
@@ -318,9 +319,11 @@ void GPSCorrectionsPanelTest::_correctionsLogSwitch()
     QVERIFY2(log, qPrintable(engine.lastError()));
     auto* toggle = log->findChild<QObject*>(QStringLiteral("correctionsLogSwitch"));
     auto* file = log->findChild<QObject*>(QStringLiteral("correctionsLogFile"));
-    QVERIFY(toggle && file);
+    auto* error = log->findChild<QObject*>(QStringLiteral("correctionsLogError"));
+    QVERIFY(toggle && file && error);
     QVERIFY(!toggle->property("checked").toBool());
     QVERIFY(!file->property("visible").toBool());
+    QVERIFY(!error->property("visible").toBool());
 
     QVERIFY(QMetaObject::invokeMethod(toggle, "click"));
     QVERIFY(corrections.logToFile());
@@ -334,7 +337,8 @@ void GPSCorrectionsPanelTest::_correctionsLogSwitch()
     QVERIFY(!toggle->property("checked").toBool());
     QVERIFY(!file->property("visible").toBool());
 
-    // A log that cannot start, here for a regular file where its folder should be, leaves the switch off.
+    // A log that cannot start, here for a regular file where its folder should be, leaves the switch off and says
+    // why.
     folder = directory.createFile(QStringLiteral("GPSCorrections"), "not a folder");
     expectLogMessage("GPS.Corrections.RTCMLogFile", QtWarningMsg, QRegularExpression(QStringLiteral("file error")));
     QVERIFY(QMetaObject::invokeMethod(toggle, "click"));
@@ -342,6 +346,16 @@ void GPSCorrectionsPanelTest::_correctionsLogSwitch()
     QVERIFY(!corrections.logToFile());
     QVERIFY(!toggle->property("checked").toBool());
     QVERIFY(!file->property("visible").toBool());
+    QVERIFY(error->property("visible").toBool());
+    QVERIFY(!corrections.logError().isEmpty());
+    QCOMPARE(error->property("text").toString(), corrections.logError());
+
+    // The reason goes once a log starts. A log started within the same millisecond would be named as the first one,
+    // so this one goes to a folder of its own.
+    folder = QDir(directory.path()).filePath(QStringLiteral("next"));
+    QVERIFY(QMetaObject::invokeMethod(toggle, "click"));
+    QVERIFY(toggle->property("checked").toBool());
+    QVERIFY(!error->property("visible").toBool());
 }
 
 void GPSCorrectionsPanelTest::_ntripErrorActionRetries()
@@ -382,7 +396,9 @@ void GPSCorrectionsPanelTest::_ntripErrorActionRetries()
     QCOMPARE(ntrip.manager.connectionStatus(), NTRIPManager::ConnectionStatus::Connecting);
     QCOMPARE(requests.size(), 1);
     QVERIFY(requests.constLast().constFirst().toBool());
-    QVERIFY(!button->property("enabled").toBool());
+    // The attempt can be stopped by the row's own action, so the second one goes.
+    QCOMPARE(button->property("text").toString(), QStringLiteral("Disconnect"));
+    QVERIFY(button->property("enabled").toBool());
     QTRY_VERIFY_WITH_TIMEOUT(!disconnect->property("visible").toBool(), TestTimeout::shortMs());
     fail(retry);
     QCOMPARE(ntrip.manager.connectionStatus(), NTRIPManager::ConnectionStatus::Error);
@@ -393,12 +409,40 @@ void GPSCorrectionsPanelTest::_ntripErrorActionRetries()
     QCOMPARE(retry->startCount, 1);
 }
 
+void GPSCorrectionsPanelTest::_ntripRetryNeedsCaster()
+{
+    ScriptedNTRIP ntrip;
+    // A connection that is on without a caster host fails as it starts, and stays on.
+    NTRIPManager::Configuration configuration = ntrip.manager.configuration();
+    configuration.connection.host.clear();
+    ntrip.manager.setConfiguration(configuration);
+    expectLogMessage("GPS.NTRIPManager", QtWarningMsg, QRegularExpression(QStringLiteral("NTRIP config invalid")));
+    ntrip.manager.init();
+    verifyExpectedLogMessage();
+    QCOMPARE(ntrip.manager.connectionStatus(), NTRIPManager::ConnectionStatus::Error);
+
+    TestFixtures::QmlWindowFixture window(640, 400);
+    TestFixtures::QmlEngine engine;
+    std::unique_ptr<QObject> panel = createConnectionPanel(engine, window, ntrip.manager);
+    QVERIFY2(panel, qPrintable(engine.lastError()));
+    auto* button = panel->findChild<QObject*>(QStringLiteral("ntripConnectButton"));
+    auto* disconnect = panel->findChild<QObject*>(QStringLiteral("ntripDisconnectButton"));
+    QVERIFY(button && disconnect);
+    // Retrying would fail the same way; turning the connection off unlocks the settings that name a caster.
+    QCOMPARE(button->property("text").toString(), QStringLiteral("Retry"));
+    QVERIFY(!button->property("enabled").toBool());
+    QVERIFY(disconnect->property("enabled").toBool());
+    ntrip.manager.setConfiguration(mockCasterConfiguration());
+    QVERIFY(button->property("enabled").toBool());
+}
+
 void GPSCorrectionsPanelTest::_ntripConnectionActionIsIdempotent_data()
 {
     QTest::addColumn<int>("status");
     // What the action asks the connection setting to be.
     QTest::addColumn<bool>("requested");
     QTest::newRow("disconnect") << static_cast<int>(NTRIPManager::ConnectionStatus::Connected) << false;
+    QTest::newRow("stop-connecting") << static_cast<int>(NTRIPManager::ConnectionStatus::Connecting) << false;
     QTest::newRow("cancel-reconnect") << static_cast<int>(NTRIPManager::ConnectionStatus::Reconnecting) << false;
     QTest::newRow("connect") << static_cast<int>(NTRIPManager::ConnectionStatus::Disconnected) << true;
 }
@@ -409,7 +453,9 @@ void GPSCorrectionsPanelTest::_ntripConnectionActionIsIdempotent()
     QFETCH(bool, requested);
     ScriptedNTRIP ntrip;
     if (status != static_cast<int>(NTRIPManager::ConnectionStatus::Disconnected)) {
-        MockNTRIPTransport* transport = ntrip.nextTransport(true);
+        // A caster that does not answer leaves the attempt connecting.
+        MockNTRIPTransport* transport =
+            ntrip.nextTransport(status != static_cast<int>(NTRIPManager::ConnectionStatus::Connecting));
         ntrip.manager.init();
         if (status == static_cast<int>(NTRIPManager::ConnectionStatus::Reconnecting)) {
             expectLogMessage("GPS.NTRIPManager", QtWarningMsg,
@@ -514,14 +560,16 @@ void GPSCorrectionsPanelTest::_ntripLongStatusWrapsWithinPanel()
     QVERIFY2(buttonRight.x() <= panelItem->width(), qPrintable(QString::number(buttonRight.x())));
 }
 
-void GPSCorrectionsPanelTest::_ntripMountpointButtonsAligned()
+void GPSCorrectionsPanelTest::_ntripMountpointRowLayout()
 {
     NTRIPSourceTableModel model;
+    // The last row only names its mountpoint, as a short source-table record does.
     model.parseSourceTable(QStringLiteral(
         "STR;LONG;Long;RTCM 3.3;1005(1),1077(1);2;GPS+GLO+GAL+BDS+SBAS+QZSS;NET;FRA;0;0;0;0;gen;none;B;N;15200;\r\n"
         "STR;S;Short;RTCM 3.3;1005(1);2;GPS;NET;FRA;0;0;0;0;gen;none;N;N;0;\r\n"
+        "STR;BARE\r\n"
         "ENDSOURCETABLE\r\n"));
-    QCOMPARE(model.rowCount(), 2);
+    QCOMPARE(model.rowCount(), 3);
     TestFixtures::QmlWindowFixture window(640, 400);
     TestFixtures::QmlEngine engine;
     std::unique_ptr<QObject> list =
@@ -539,11 +587,22 @@ void GPSCorrectionsPanelTest::_ntripMountpointButtonsAligned()
             return item->inherits("QQuickAbstractButton") && item->isVisible() && item->width() > 0;
         });
     };
-    QTRY_COMPARE_WITH_TIMEOUT(buttons().size(), 2, TestTimeout::mediumMs());
+    QTRY_COMPARE_WITH_TIMEOUT(buttons().size(), 3, TestTimeout::mediumMs());
     const auto right = [listItem](QQuickItem* button) {
         return button->mapToItem(listItem, QPointF(button->width(), 0)).x();
     };
     QTRY_COMPARE_WITH_TIMEOUT(right(buttons().at(0)), right(buttons().at(1)), TestTimeout::mediumMs());
+    QTRY_COMPARE_WITH_TIMEOUT(right(buttons().at(0)), right(buttons().at(2)), TestTimeout::mediumMs());
+
+    // A row without details has no line for them.
+    const auto rows =
+        TestFixtures::findItems(listItem, [](QQuickItem* item) { return item->property("mountpoint").isValid(); });
+    QCOMPARE(rows.size(), 3);
+    QCOMPARE(rows.at(2)->property("mountpoint").toString(), QStringLiteral("BARE"));
+    QVERIFY(rows.at(2)->property("details").toString().isEmpty());
+    QCOMPARE(rows.at(0)->height(), rows.at(1)->height());
+    QVERIFY2(rows.at(2)->height() < rows.at(1)->height(),
+             qPrintable(QStringLiteral("%1 and %2").arg(rows.at(2)->height()).arg(rows.at(1)->height())));
 }
 
 UT_REGISTER_TEST(GPSCorrectionsPanelTest, TestLabel::Unit)

@@ -29,7 +29,6 @@ enum class GPSReceiverSessionEnd;
 class GPSSourceHealth;
 class PositionManager;
 class RuntimeScheduler;
-class SerialPortManager;
 
 /// Services a GPSReceiver uses, which must outlive it.
 struct GPSReceiverDependencies
@@ -38,13 +37,11 @@ struct GPSReceiverDependencies
     GPSCorrectionManager* corrections = nullptr;
     /// Ready receivers publish their solution here as the GCS "RTK receiver" position source.
     PositionManager* positions = nullptr;
-    /// The serial devices a receiver may connect or discover, and their claims; without it none is available. A
-    /// session holds its claim until its worker has stopped, and ends unplugged when a scan no longer lists its device.
-    /// Builds without serial links have no such devices and leave it empty.
-    SerialPortManager* serialPorts = nullptr;
-    /// Off gives the receiver the serial side of a build without serial links, GPSReceiverSerialPorts itself, whatever
-    /// the build: tests run that build's behaviour with it.
-    bool serialLinks = true;
+    /// Creates the receiver's serial side as its child: the serial devices it may connect or discover, and their
+    /// claims. A session holds its claim until its worker has stopped, and ends unplugged when a scan no longer lists
+    /// its device. Without it the receiver has the serial side of its build, GPSReceiverSerialPorts::create(), with
+    /// no device available.
+    std::function<GPSReceiverSerialPorts*(QObject* parent)> serial = nullptr;
     /// The folder a recorded session's file goes to, asked as each session starts. Without it, or while it returns
     /// an empty path, sessions are not recorded.
     std::function<QString()> recordingDirectory = nullptr;
@@ -143,7 +140,8 @@ public:
 
     const Configuration& configuration() const { return _configuration; }
 
-    /// GPSReceiverSerialPorts::entries(): the serial device picker's entries from the last scan.
+    /// GPSReceiverSerialPorts::entries(): the serial device picker's entries, of the devices the last scan listed and
+    /// marked as other connections hold them when the receiver was last polled.
     QList<GPSSerialPortEntry> serialPortEntries() const { return _serial->entries(); }
 
     /// The application's serial rates that a receiver accepts as an explicit rate; empty without serial links.
@@ -158,7 +156,8 @@ public:
     Q_INVOKABLE void disconnectReceiver();
     /// Runs tick() every POLL_INTERVAL until shutdown(), skipping ticks while @a suspended returns true.
     void startConnectionPolling(std::function<bool()> suspended = {});
-    /// One step of automatic connection: connections due, reconnections, and USB discovery.
+    /// One step of automatic connection: connections due, reconnections, and USB discovery. It also brings the serial
+    /// port entries up to date with the ports other connections hold.
     void tick();
     /// Stops polling and disconnects, then waits up to SHUTDOWN_TIMEOUT for the workers of retired sessions, which
     /// otherwise finish on their own once the event loop delivers their exit. An observer's connectReceiver() from a
