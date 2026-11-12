@@ -54,9 +54,9 @@ public:
     virtual QList<int> baudRates() const { return {}; }
 
     /// The serial device picker's entries, of the devices the last scan listed: "value" is the system location,
-    /// "label" the device's description and path, marked when another QGroundControl connection, such as a vehicle
-    /// link, holds the port. Where only one serial device can be open at a time, the other ports are marked too
-    /// while such a connection holds one, since none of them can be opened until then.
+    /// "label" the device's description and path, marked in front when another QGroundControl connection, such as a
+    /// vehicle link, holds the port. Where only one serial device can be open at a time, the other ports are marked
+    /// too while such a connection holds one, since none of them can be opened until then.
     QList<GPSSerialPortEntry> entries() const { return _entries; }
 
     /// Scans the devices when a scan is due. A scan notifies, as scanned() describes.
@@ -73,6 +73,10 @@ public:
     /// the first free device whose USB identity is a known RTK receiver adapter and which has been listed for as long
     /// as a newly plugged device needs before it is opened. Empty while there is none.
     virtual QString settledRtkReceiver([[maybe_unused]] quint64 nowUs) { return {}; }
+
+    /// An RTK receiver that discovery would connect is listed and stays closed: only one serial device can be open at
+    /// a time, and another QGroundControl connection, such as a vehicle link, has one open.
+    virtual bool rtkReceiverKeptClosed() const { return false; }
 
     /// Forgets since when the RTK receivers have been listed, so each waits again from its next listing.
     virtual void forgetRtkReceivers() {}

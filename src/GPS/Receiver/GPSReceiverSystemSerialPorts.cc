@@ -55,7 +55,7 @@ bool GPSReceiverSystemSerialPorts::available(const QString& device) const
                        [&device](const auto& port) { return port.systemLocation == device && !port.bootloader; });
 }
 
-QStringList GPSReceiverSystemSerialPorts::_freeRtkReceivers() const
+QStringList GPSReceiverSystemSerialPorts::_listedRtkReceivers() const
 {
     QStringList receivers;
     if (!_manager) {
@@ -68,8 +68,7 @@ QStringList GPSReceiverSystemSerialPorts::_freeRtkReceivers() const
         }
         // A labelled NMEA interface remains a receiver candidate on composite GPS devices.
         const bool primary = SerialPortManager::isPrimaryInterface(port, seenDevices);
-        if ((primary || port.description.contains(QStringLiteral("NMEA"))) &&
-            _manager->canReservePort(port.systemLocation)) {
+        if (primary || port.description.contains(QStringLiteral("NMEA"))) {
             receivers.append(port.systemLocation);
         }
     }
@@ -78,14 +77,32 @@ QStringList GPSReceiverSystemSerialPorts::_freeRtkReceivers() const
 
 QString GPSReceiverSystemSerialPorts::settledRtkReceiver(quint64 nowUs)
 {
-    const QStringList receivers = _freeRtkReceivers();
+    QStringList receivers = _listedRtkReceivers();
+    receivers.removeIf([this](const QString& device) { return !_manager->canReservePort(device); });
     _rtkReceivers.removeIf([&receivers](const QString& device) { return !receivers.contains(device); });
-    for (const QString& device : receivers) {
+    for (const QString& device : std::as_const(receivers)) {
         if (_rtkReceivers.settled(device, nowUs)) {
             return device;
         }
     }
     return {};
+}
+
+bool GPSReceiverSystemSerialPorts::rtkReceiverKeptClosed() const
+{
+    // A session of this receiver keeps the other devices closed too, and is not another connection.
+    if (_heldHere()) {
+        return false;
+    }
+    const QStringList receivers = _listedRtkReceivers();
+    return std::any_of(receivers.cbegin(), receivers.cend(), [this](const QString& device) {
+        return !_manager->isPortReserved(device) && !_manager->canReservePort(device);
+    });
+}
+
+bool GPSReceiverSystemSerialPorts::_heldHere() const
+{
+    return std::any_of(_claims.cbegin(), _claims.cend(), [](const auto& claim) { return !claim.expired(); });
 }
 
 GPSSerialClaim GPSReceiverSystemSerialPorts::claim(const QString& device)
@@ -118,8 +135,7 @@ void GPSReceiverSystemSerialPorts::refreshEntries()
     }
     // The marks tell what other connections hold. A session of this receiver keeps the other devices closed too
     // where only one can be open at a time, and marks them no more than its own.
-    const bool heldHere =
-        std::any_of(_claims.cbegin(), _claims.cend(), [](const auto& claim) { return !claim.expired(); });
+    const bool heldHere = _heldHere();
     QList<GPSSerialPortEntry> entries;
     entries.reserve(_scannedPorts.size());
     for (const auto& port : std::as_const(_scannedPorts)) {
@@ -128,15 +144,16 @@ void GPSReceiverSystemSerialPorts::refreshEntries()
         //: %1 is a serial device's name, such as u-blox GNSS receiver; %2 its path, such as /dev/ttyACM0 or COM3
         QString label =
             name.isEmpty() ? port.systemLocation : GPSReceiver::tr("%1 – %2").arg(name, port.systemLocation);
+        // A mark comes first: the picker cuts a label that is wider than it is at the end.
         if (_manager->isPortReserved(port.systemLocation)) {
             if (_claims.value(port.systemLocation).expired()) {
                 //: %1 is a serial device that another QGroundControl connection, such as a vehicle link, uses
-                label = GPSReceiver::tr("%1 (in use)").arg(label);
+                label = GPSReceiver::tr("(in use) %1").arg(label);
             }
         } else if (!heldHere && !_manager->canReservePort(port.systemLocation)) {
             //: %1 is a serial device that cannot be opened while another QGroundControl connection uses another
             //: serial device, where only one can be open at a time, as with Android's USB serial driver
-            label = GPSReceiver::tr("%1 (another is in use)").arg(label);
+            label = GPSReceiver::tr("(another is in use) %1").arg(label);
         }
         entries.append({.value = port.systemLocation, .label = label});
     }
