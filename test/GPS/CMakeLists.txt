@@ -33,6 +33,7 @@ target_sources(
         NTRIP/Support/ScriptedNTRIPCaster.h
         Qml/Support/GPSPanelFixtures.h
         Receiver/Support/GPSReceiverTestSupport.h
+        Receiver/Support/ScriptedBluetooth.h
         Receiver/Support/ScriptedReceiverWorker.h
         Support/GPSTestHelpers.h
 )
@@ -69,7 +70,9 @@ set(_qgc_gps_suites
     Qml/GPSSatelliteViewTest
     Qml/NTRIPMountpointBrowserTest
     Qml/NTRIPSavedCastersTest
+    Receiver/GPSBluetoothLinkTest
     Receiver/GPSFixedBaseEcefTest
+    Receiver/GPSReceiverBluetoothTest
     Receiver/GPSReceiverConnectionPolicyTest
     Receiver/GPSReceiverFactGroupTest
     Receiver/GPSReceiverPresentationTest
@@ -84,6 +87,9 @@ qgc_add_gps_suites(Integration Qml/GPSSettingsPagesTest)
 
 add_subdirectory(Core)
 add_subdirectory(NTRIP/HTTP/Fuzz)
+
+# The receiver's Bluetooth suite configures the simulated receiver (Core/Protocols/Hardware) where the build has it.
+target_compile_definitions(QGCUnitTests PRIVATE $<$<TARGET_EXISTS:QGCGPSReceiverSimulator>:QGC_GPS_RECEIVER_SIMULATOR>)
 
 # `ctest -L GPS` must select every test registered under this directory.
 function(qgc_check_gps_labels dir)
