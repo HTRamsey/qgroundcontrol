@@ -34,13 +34,12 @@ target_sources(
         Qml/Support/GPSPanelFixtures.h
         Receiver/Support/GPSReceiverTestSupport.h
         Receiver/Support/ScriptedReceiverWorker.h
-        Support/GPSQmlTestHelpers.h
         Support/GPSTestHelpers.h
 )
 
 set(_qgc_gps_suites
     GPSManagerTest
-    GPSReceiverSettingsBindingTest
+    GPSSettingsBindingsTest
     Corrections/GPSCorrectionManagerTest
     Corrections/GPSCorrectionSelectorTest
     Corrections/RTCMMAVLinkPacketTest
