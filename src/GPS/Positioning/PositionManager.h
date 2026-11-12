@@ -149,8 +149,6 @@ public:
         std::optional<std::chrono::milliseconds> maximumAge = std::nullopt,
         const std::optional<GPSGeoidSeparation>& nearby = std::nullopt) const;
 
-    QGeoPositionInfoSource::Error gcsPositioningError() const { return _gcsPositioningError; }
-
 signals:
     void selectionChanged();
     void gcsPositionChanged(QGeoCoordinate gcsPosition);

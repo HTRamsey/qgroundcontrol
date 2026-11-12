@@ -23,7 +23,8 @@ application    Vehicle, FollowMe, RemoteIDManager; QML through QGroundControl.gp
                ----------------------------------------------------------------------------------------------
 src/GPS        GPSManager, GPSSettingsBindings                creates the services, hands them the settings
                Receiver                 NTRIP                 the two services that hold a connection
-               Corrections  Positioning         NTRIP/HTTP *  what they feed; one HTTP exchange with a caster
+               Corrections  Positioning  Connection  NTRIP/HTTP *  what they feed; when a connection is retried;
+                                                              one HTTP exchange with a caster
 src/GPS/Core * GPSReceiverWorker                              one receiver session, on a thread of its own
                Protocols                                      GPSDriver, its framework, the receiver families
                NMEA    RTCM    Transport                      wire formats and byte links
@@ -34,14 +35,15 @@ src/GPS/Core * GPSReceiverWorker                              one receiver sessi
 
 | Directory | Owns | Includes, within `src/GPS` |
 | --- | --- | --- |
-| `Core/Common` | `GPSType`, the request (`GPSReceiverConfig`), the reports (`GPSReceiverReports.h`), the family descriptors, the detection hint, clock and math | Nothing |
+| `Core/Common` | `GPSType`, the request (`GPSReceiverConfig`), the reports (`GPSReceiverReports.h`), the event a session reports (`GPSReceiverEvent`), the family descriptors, the detection hint, clock and math | Nothing |
 | `Core/NMEA`, `Core/RTCM`, `Core/Transport` | NMEA sentences and epochs; RTCM framing, station position and stream content; `GPSTransport` with the serial, TCP, UDP, pipe and recording transports | `Core/Common` |
 | `Core/Protocols` | `GPSDriver`, `GPSProtocolRuntime`, `GPSCommandChannel`, `GPSStreamDemux`, `GPSReceiverDetector` and a folder for each family | The three above, `Core/Common` |
 | `Core` | `GPSReceiverWorker` | `Core/Protocols`, `Core/Transport`, `Core/Common` |
 | `NTRIP/HTTP` | `NTRIPHttpSession`, the request and response codec, `NTRIPConnectionConfig` | Nothing |
+| `Connection` | `GPSConnectionSupervisor` | Nothing |
 | `Positioning` | `GPSObservation`, `GPSSourceHealth`, `PositionManager` | `Core/Common` |
 | `Corrections` | `GPSCorrectionManager`, `GPSCorrectionSelector`, `RTCMMAVLink`, UDP input, the log, the loss alert | `Core/Common`, `Core/RTCM` |
-| `NTRIP` | `NTRIPManager`, its transport, `NTRIPGgaReporter`, the source table | `NTRIP/HTTP`, `Corrections`, `Positioning`, `Core/Common`, `Core/NMEA`, `Core/RTCM` |
+| `NTRIP` | `NTRIPManager`, its transport, `NTRIPGgaReporter`, the source table | `NTRIP/HTTP`, `Connection`, `Corrections`, `Positioning`, `Core/Common`, `Core/NMEA`, `Core/RTCM` |
 | `Receiver` | `GPSReceiver`, its session and connection policy, its serial and Bluetooth sides, status Facts, wording | `Corrections`, `Positioning`, `Core`, `Core/Transport`, `Core/Common` |
 | `src/GPS` itself | `GPSManager`, `GPSSettingsBindings` | `Receiver`, `NTRIP`, `Corrections`, `Positioning` |
 | `Qml` | The QML module `QGroundControl.GPS` | `Core/Common`, in `GPSQmlTypes.h` |
@@ -76,6 +78,9 @@ Quoted names are what the settings show today; the user guide is the reference f
   commands of its plan through a `GPSCommandChannel`.
 - **Session**: one connection's lifetime: a `GPSReceiverSession` with its `GPSReceiverWorker` thread for a
   receiver, an `NTRIPHttpSession` for one exchange with a caster. The rest of `src/GPS` runs on the main thread.
+- **Connection supervisor**: a `GPSConnectionSupervisor`, the value that says for a connection that is kept up
+  when its next attempt opens, how long a retry waits, what it does behind a gate such as a missing network, and
+  when it gives up. Its owner opens the attempts and times the delays: `NTRIPManager`, for the caster connection.
 - **Base state**: `GPSBaseState`: `Inactive`, `Active` while a survey or averaging runs, `Valid` once the base
   position holds. Base modes are "Survey-In", "Fixed position" and "Receiver-managed averaging".
 - **Correction source**: where RTCM comes from, a `GPSCorrectionSettings::CorrectionSource`: `LocalReceiver`
@@ -125,10 +130,11 @@ A position, from a receiver's bytes to the ground station position:
    `GPSCommandChannel::receiveCycle()` reads the `GPSTransport`.
 2. `GPSStreamDemux` frames the bytes. The family's protocol decodes a frame in `onFrame()` and publishes a
    `GPSDecodedPosition` through its `GPSDecodeContext`.
-3. `GPSDriver` adapts it to a `GPSPositionReport` for `GPSDriverSinks::onPosition`, and the worker emits
-   `positionUpdated()`, queued to the main thread.
-4. `GPSReceiverSession` relays it to `GPSReceiver`, which writes the status Facts (`GPSReceiverFactGroup`) and
-   gives its `GPSSourceHealth` a `GPSObservation`. A base that knows its antenna position reports that one.
+3. `GPSDriver` adapts it to a `GPSPositionReport` for `GPSDriverSinks::onPosition`, and the worker reports it as a
+   `GPSReceiverEvent` with its one signal, `reported()`, queued to the main thread.
+4. `GPSReceiverSession` takes what it keeps of an event and passes it on to `GPSReceiver`, which visits it: for a
+   position it writes the status Facts (`GPSReceiverFactGroup`) and gives its `GPSSourceHealth` a `GPSObservation`.
+   A base that knows its antenna position reports that one.
 5. `PositionManager` chooses between the receiver source and this device's source and publishes `gcsPosition`.
 6. Readers bind to it or ask `PositionManager::acceptedObservation()` for the use they have.
 
@@ -138,7 +144,8 @@ An RTCM frame, from its source to a vehicle link:
    `NTRIPHttpTransport` cuts frames with an `RTCMFrameDecoder` and emits `correctionFrameReceived()`, queued to
    `NTRIPManager`.
 2. From the local base: steps 1 and 2 above, where the family calls `publishRTCM()`. `GPSDriver` drops the frame unless
-   the base state allows it, the worker emits `rtcmDataReceived()` and `GPSReceiverSession` forwards it.
+   the base state allows it, the worker reports it as a `GPSReceiverRTCM` event with the time it was read, and
+   `GPSReceiverSession` forwards it.
 3. Either source calls `GPSCorrectionSourceHandle::submit()`. `GPSCorrectionManager` applies the message filter,
    and `GPSCorrectionSelector` passes frames of the selected stream while they are fresh.
 4. `RTCMMAVLink` packs the frame into `GPS_RTCM_DATA` fragments of 180 bytes (`RTCMMAVLinkPacket`) and sends them

@@ -14,6 +14,7 @@
 #include <QtQmlIntegration/QtQmlIntegration>
 
 #include "ExponentialBackoff.h"
+#include "GPSConnectionSupervisor.h"
 #include "NTRIPConfiguration.h"
 #include "NTRIPConnectionStats.h"
 #include "NTRIPGgaReporter.h"
@@ -39,14 +40,12 @@ struct NTRIPManagerDependencies
     NTRIPVehiclePresence* vehicles = nullptr;
 };
 
-/// Manages the NTRIP caster connection lifecycle as an explicit event-driven
-/// state machine. All connection state changes flow through `_dispatch()` and
-/// the transition table in NTRIPManager.cc — there is no second, internal
-/// state enum. Entry actions own per-state side effects: each Connecting entry
-/// registers the stream as the NTRIP correction source, in place of the previous
-/// registration, and opens a new transport; Reconnecting, Error and Disconnected
-/// retire the transport; only Disconnected releases the registration; and the
-/// manager schedules reconnects.
+/// Manages the NTRIP caster connection. A GPSConnectionSupervisor says when an attempt opens, how long a retry waits
+/// and when the connection gives up, and its phase is the connection status: there is no second state. The manager
+/// tells it what happened and does what follows. Each attempt registers the stream as the NTRIP correction source, in
+/// place of the previous registration, and opens a new transport; Reconnecting, Error and Disconnected retire the
+/// transport; only Disconnected releases the registration. What the supervisor is not told stays here: which caster
+/// is next, which failures are not retried, and what the network and a vehicle mean for an attempt.
 ///
 /// Failover (Configuration::failover) goes on to the saved casters when the caster in use cannot be reached:
 /// - Order: the caster that is entered, then the saved casters in their order, then the entered one again. A saved
@@ -109,24 +108,6 @@ public:
     };
     Q_ENUM(ConnectionStatus)
 
-    /// Internal state-machine events, public only so the log names them. Each represents an external stimulus; the
-    /// transition table in _dispatch() maps (state, event) to the next state.
-    enum class Event
-    {
-        StartRequested,       ///< Settings enable went true, or the user retried an error.
-        StopRequested,        ///< Settings enable went false, or the manager shut down.
-        ConfigInvalid,        ///< The connection configuration failed validation.
-        TransportConnected,   ///< NTRIPTransport emitted connected().
-        TransportError,       ///< NTRIPTransport emitted a retryable error.
-        TransportFatalError,  ///< NTRIPTransport emitted a non-retryable error.
-        ReconnectDue,         ///< The reconnect delay elapsed or the network returned.
-        ReconnectGaveUp,      ///< The reconnect attempt ceiling was reached.
-        HotReconfigure,       ///< Transport-affecting setting changed while connected; reconnect in place.
-        NoVehicle,            ///< The connection may run only with a vehicle, and none is connected.
-        DataCapReached,       ///< As much data arrived from the caster as the connection may use.
-    };
-    Q_ENUM(Event)
-
     /// A caster kept under a name beside the one that is entered.
     struct SavedCaster
     {
@@ -170,7 +151,7 @@ public:
 
     const Configuration& configuration() const { return _configuration; }
 
-    ConnectionStatus connectionStatus() const { return _connectionStatus; }
+    ConnectionStatus connectionStatus() const;
 
     QString statusMessage() const;
 
@@ -234,42 +215,50 @@ private:
         QString streamMountpoint;
     };
 
+    /// What a connection in the Reconnecting state waits for.
+    enum class Wait
+    {
+        Delay,  ///< The delay before its next attempt.
+        Network,
+        Vehicle,
+    };
+
+    /// Why a connection is in the Error state.
+    enum class StopReason
+    {
+        Failure,    ///< A failure that is not retried, or a configuration that is not valid: _lastFailureDetail.
+        GaveUp,     ///< The last of MAX_RECONNECT_ATTEMPTS failed.
+        DataLimit,  ///< _stoppedAtCapMB megabytes arrived.
+    };
+
     /// Emits one change signal for each property that differs from what the signals last announced. Public operations
-    /// and event handlers call it once the state machine has settled, so observers never see a half-entered state.
+    /// and event handlers call it once the connection has settled, so observers never see a half-entered state.
     void _publish();
     /// Starts with a fresh retry budget, unless already connecting or connected, and publishes the result.
     void _start();
     /// Stops, cancelling deferred settings work and reconnects, and publishes the result.
     void _stop();
+    /// Ends the connection with an error that says @a reason, until it is started again.
+    void _halt(StopReason reason);
+    /// What the Error and the Disconnected state share: nothing is pending, no transport is open, and the next start
+    /// begins with the entered caster.
+    void _end();
 
-    /// Dispatch an event. Returns true if a transition was found and taken.
-    /// Events with no matching row for the current state are ignored (debug log).
-    bool _dispatch(Event ev, const QString& detail = {}, std::chrono::milliseconds retryAfter = {});
-
-    /// Commit a state change before invoking entry actions, so recursive dispatches from entry
-    /// actions observe the new state.
-    void _enterState(ConnectionStatus to, const QString& detail, std::chrono::milliseconds retryAfter = {});
-
-    /// Per-state side effects (open or retire the transport, schedule reconnect, etc.).
-    void _onEnterState(ConnectionStatus to, std::chrono::milliseconds retryAfter);
-
-    /// Default user-visible message for a state. Callers may override via detail.
-    static QString _defaultMessageFor(ConnectionStatus state);
-    /// The message of the Connected state. A network RTK (VRS) mountpoint sends nothing until it is told a position,
-    /// and may then take a minute or more over its first corrections, so until corrections arrive the message says
-    /// which of the two the stream waits for.
-    QString _connectedMessage() const;
-    /// Publishes _connectedMessage() while connected; the other states publish their own message.
+    /// The one place that words what the connection is doing or why it stopped, from the state and the values kept
+    /// for it. statusMessage() adds the saved caster in use.
+    QString _stateMessage() const;
+    /// Publishes the message of the Connected state, which says what the stream waits for, once that has changed;
+    /// the other states publish their own message.
     void _refreshConnectedMessage();
 
-    /// Stops the previous stream, registers the new one as the NTRIP correction source in place of the previous
-    /// registration, then validates the configuration and opens a new transport.
+    /// One attempt: stops the previous stream, registers the new one as the NTRIP correction source in place of the
+    /// previous registration, then validates the configuration and opens a new transport.
     void _openSession();
     /// Retires the transport and stops GGA and statistics. The correction source stays registered; it is selected
     /// only while its corrections are fresh.
     void _stopStreaming();
 
-    // The single-shot reconnect timer fires ReconnectDue; a failure after the attempt ceiling fires ReconnectGaveUp.
+    /// The reconnect attempts without corrections after which the next failure ends the connection.
     static constexpr int MAX_RECONNECT_ATTEMPTS = 100;
     /// Failed attempts in a row, without corrections, after which failover leaves a caster.
     static constexpr int FAILOVER_ATTEMPTS = 3;
@@ -283,27 +272,38 @@ private:
     /// Makes the entered caster the one in use, as at every start.
     void _useEnteredCaster();
 
-    void _scheduleReconnect(std::chrono::milliseconds retryAfter = {});
-
-    void _cancelReconnect();
+    /// The one place that decides what follows a failure that is retried: the wait for a vehicle or the network, the
+    /// delay the supervisor answers, which the reconnect task times, or the end after the last attempt. @a retryAfter
+    /// is what the caster of the next attempt asked for.
+    void _retry(std::chrono::milliseconds retryAfter);
+    /// The delay before the next attempt ended.
+    void _onRetryDue();
 
     bool _shouldWaitForNetwork() const;
     bool _casterIsLoopback() const;
-    void _waitForNetwork();
+
+    /// The connection is in the Reconnecting state, waiting for @a what.
+    bool _waitsFor(Wait what) const
+    {
+        return connectionStatus() == ConnectionStatus::Reconnecting && _waitingFor == what;
+    }
+
+    /// The network returned or a vehicle connected: a connection that waited for it opens an attempt at once.
+    void _gateOpened(Wait gate);
 
     /// How long the stream outlasts the last vehicle.
     static constexpr std::chrono::milliseconds VEHICLE_HOLD{10000};
 
     bool _shouldWaitForVehicle() const;
+    /// Waits for a vehicle, which then starts the connection anew: from the entered caster, with a fresh retry budget.
     void _waitForVehicle();
     void _onVehiclePresenceChanged(bool present);
 
     /// As much has arrived in this run of the connection as it may use.
     bool _dataCapReached() const;
-    QString _dataCapMessage() const;
+    /// Ends the connection with the error that it reached its data limit.
+    void _stopAtDataCap();
     void _onDataReceived(qint64 bytes);
-
-    bool _reconnectExhausted() const { return _reconnectBackoff.attempts() >= MAX_RECONNECT_ATTEMPTS; }
 
     void _onGgaSourceChanged();
     void _onTransportConnected();
@@ -324,8 +324,9 @@ private:
     NTRIPGgaReporter _ggaReporter;
     NTRIPConnectionStats _stats;
 
-    ConnectionStatus _connectionStatus = ConnectionStatus::Disconnected;
-    QString _statusMessage;
+    GPSConnectionSupervisor _supervisor{
+        ExponentialBackoff{std::chrono::seconds(1), 2, std::chrono::seconds(30), NTRIPFailure::MAX_RETRY_AFTER},
+        MAX_RECONNECT_ATTEMPTS};
     Notified _notified;
 
     TransportFactory _transportFactory;
@@ -348,9 +349,12 @@ private:
     NTRIPSourceTableController _sourceTableController;
 
     static constexpr std::chrono::milliseconds SETTINGS_DEBOUNCE{250};
-    ExponentialBackoff _reconnectBackoff{std::chrono::seconds(1), 2, std::chrono::seconds(30),
-                                         NTRIPFailure::MAX_RETRY_AFTER};
-    QString _lastFailureDetail;  ///< The latest transport failure, for the give-up message.
+    /// What the latest failure said: the transport's own text, or why the configuration is not valid.
+    QString _lastFailureDetail;
+    Wait _waitingFor = Wait::Delay;
+    StopReason _stopReason = StopReason::Failure;
+    /// The data limit the connection ended at, which the setting may no longer be.
+    quint32 _stoppedAtCapMB = 0;
     /// Corrections have arrived over the current connection settings since they were last started, so a source
     /// table in place of the stream means the mountpoint went offline, not that it is wrong.
     bool _streamServed = false;
@@ -362,8 +366,9 @@ private:
     int _casterFailures = 0;
     /// What arrived from the caster in this run of the connection.
     quint64 _linkBytes = 0;
-    bool _waitingForNetwork = false;
-    bool _waitingForVehicle = false;
     bool _initialized = false;
+    /// _start() has run. A connection that is then stopped before its first message was announced still announces
+    /// one, as it did when the message was kept as text that was empty until then.
+    bool _everStarted = false;
     bool _shutdown = false;
 };
