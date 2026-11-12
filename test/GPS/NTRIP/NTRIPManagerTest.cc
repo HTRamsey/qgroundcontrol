@@ -15,6 +15,7 @@
 #include "NTRIP/Support/NTRIPTestHelpers.h"
 #include "NTRIP/Support/ScriptedNTRIPCaster.h"
 #include "NTRIPManager.h"
+#include "NTRIPVehiclePresence.h"
 #include "Protocols/Support/ProtocolTestPackets.h"
 #include "QGCNetworkAvailabilityMonitor.h"
 #include "RTCMFramer.h"
@@ -71,6 +72,43 @@ NTRIPManager::Configuration failoverConfiguration(const QList<NTRIPManager::Save
     return configuration;
 }
 
+class FakeVehicles : public NTRIPVehiclePresence
+{
+public:
+    explicit FakeVehicles(bool connected) { _setPresent(connected); }
+
+    void setConnected(bool connected) { _setPresent(connected); }
+};
+
+const QString kWaitingForVehicle = QStringLiteral("Waiting for a vehicle");
+constexpr std::chrono::seconds VehicleHold{10};
+
+/// mockCasterConfiguration() for a connection that runs only while a vehicle is connected.
+NTRIPManager::Configuration vehicleGateConfiguration()
+{
+    NTRIPManager::Configuration configuration = mockCasterConfiguration();
+    configuration.requireVehicle = true;
+    return configuration;
+}
+
+constexpr qint64 MB = 1024 * 1024;
+const QString kStoppedAtOneMB = QStringLiteral("Stopped at the data limit of 1 MB");
+
+/// mockCasterConfiguration() for a connection that may use @a megabytes.
+NTRIPManager::Configuration dataCapConfiguration(quint32 megabytes)
+{
+    NTRIPManager::Configuration configuration = mockCasterConfiguration();
+    configuration.dataCapMB = megabytes;
+    return configuration;
+}
+
+/// @a bytes arrive over @a transport and reach its manager.
+void receive(MockNTRIPTransport* transport, qint64 bytes)
+{
+    transport->simulateData(bytes);
+    deliverQueuedCalls();
+}
+
 class FakeNetworkMonitor : public QGCNetworkAvailabilityMonitor
 {
 public:
@@ -89,6 +127,13 @@ void NTRIPManagerTest::_fail(MockNTRIPTransport* transport, const QString& detai
                      QRegularExpression(QStringLiteral("NTRIP error:.*") + QRegularExpression::escape(detail)));
     transport->simulateError(code, detail, retryAfter);
     deliverQueuedCalls();
+    verifyExpectedLogMessage();
+}
+
+void NTRIPManagerTest::_receiveToTheLimit(MockNTRIPTransport* transport, qint64 bytes)
+{
+    expectLogMessage("GPS.NTRIPManager", QtWarningMsg, QRegularExpression(QStringLiteral("stopped at the data limit")));
+    receive(transport, bytes);
     verifyExpectedLogMessage();
 }
 
@@ -1446,6 +1491,291 @@ void NTRIPManagerTest::_failoverStartsAgainFromTheEnteredCaster()
     QCOMPARE(manager.connectionStatus(), Status::Connected);
     QVERIFY(!manager.statusMessage().contains(QStringLiteral("saved caster")));
     manager.shutdown();
+}
+
+void NTRIPManagerTest::_vehicleGateWaitsForAVehicle()
+{
+    using Status = NTRIPManager::ConnectionStatus;
+    ManualScheduler scheduler;
+    FakeVehicles vehicles(false);
+    NTRIPManager manager(nullptr, &scheduler, {.vehicles = &vehicles});
+    Attempts attempts(manager, true);
+    initialize(manager, vehicleGateConfiguration());
+
+    // The connection is on and says what it waits for; it can be stopped like a reconnect that is due.
+    QCOMPARE(manager.connectionStatus(), Status::Reconnecting);
+    QCOMPARE(manager.statusMessage(), kWaitingForVehicle);
+    QVERIFY(scheduler.advanceBy(std::chrono::minutes(10)));
+    QVERIFY(attempts.hosts.isEmpty());
+
+    vehicles.setConnected(true);
+    QCOMPARE(attempts.hosts.size(), 1);
+    QCOMPARE(manager.connectionStatus(), Status::Connected);
+    manager.shutdown();
+}
+
+void NTRIPManagerTest::_vehicleGateHoldsThroughAShortLoss()
+{
+    using Status = NTRIPManager::ConnectionStatus;
+    ManualScheduler scheduler;
+    FakeVehicles vehicles(true);
+    NTRIPManager manager(nullptr, &scheduler, {.vehicles = &vehicles});
+    Attempts attempts(manager, true);
+    initialize(manager, vehicleGateConfiguration());
+    QCOMPARE(manager.connectionStatus(), Status::Connected);
+    const QPointer<MockNTRIPTransport> stream = attempts.latest;
+
+    // A link that drops and comes back does not restart the stream.
+    vehicles.setConnected(false);
+    QVERIFY(scheduler.advanceBy(VehicleHold - std::chrono::milliseconds(1)));
+    QCOMPARE(manager.connectionStatus(), Status::Connected);
+    vehicles.setConnected(true);
+    QVERIFY(scheduler.advanceBy(std::chrono::minutes(1)));
+    QCOMPARE(manager.connectionStatus(), Status::Connected);
+    QCOMPARE(stream->stopCount, 0);
+    QCOMPARE(attempts.hosts.size(), 1);
+
+    // Without a vehicle for the whole hold, counted from when the last one left, the stream ends.
+    vehicles.setConnected(false);
+    QVERIFY(scheduler.advanceBy(VehicleHold - std::chrono::milliseconds(1)));
+    QCOMPARE(manager.connectionStatus(), Status::Connected);
+    QVERIFY(scheduler.advanceBy(std::chrono::milliseconds(1)));
+    QCOMPARE(manager.connectionStatus(), Status::Reconnecting);
+    QCOMPARE(manager.statusMessage(), kWaitingForVehicle);
+    QVERIFY(!stream || stream->stopCount == 1);
+    QVERIFY(scheduler.advanceBy(std::chrono::minutes(10)));
+    QCOMPARE(attempts.hosts.size(), 1);
+
+    vehicles.setConnected(true);
+    QCOMPARE(attempts.hosts.size(), 2);
+    QCOMPARE(manager.connectionStatus(), Status::Connected);
+    manager.shutdown();
+}
+
+void NTRIPManagerTest::_vehicleGateNeedsTheOptionAndTheVehicles_data()
+{
+    QTest::addColumn<bool>("option");
+    QTest::addColumn<bool>("vehiclesKnown");
+    QTest::newRow("option-off") << false << true;
+    // An application that does not say whether a vehicle is connected cannot be waited on.
+    QTest::newRow("vehicles-unknown") << true << false;
+}
+
+void NTRIPManagerTest::_vehicleGateNeedsTheOptionAndTheVehicles()
+{
+    QFETCH(bool, option);
+    QFETCH(bool, vehiclesKnown);
+    ManualScheduler scheduler;
+    FakeVehicles vehicles(false);
+    NTRIPManager manager(nullptr, &scheduler, {.vehicles = vehiclesKnown ? &vehicles : nullptr});
+    Attempts attempts(manager, true);
+    auto configuration = vehicleGateConfiguration();
+    configuration.requireVehicle = option;
+    initialize(manager, configuration);
+    QCOMPARE(manager.connectionStatus(), NTRIPManager::ConnectionStatus::Connected);
+    QCOMPARE(attempts.hosts.size(), 1);
+    manager.shutdown();
+}
+
+void NTRIPManagerTest::_vehicleGateFollowsTheOption()
+{
+    using Status = NTRIPManager::ConnectionStatus;
+    ManualScheduler scheduler;
+    FakeVehicles vehicles(false);
+    NTRIPManager manager(nullptr, &scheduler, {.vehicles = &vehicles});
+    Attempts attempts(manager, true);
+    auto configuration = mockCasterConfiguration();
+    initialize(manager, configuration);
+    QCOMPARE(manager.connectionStatus(), Status::Connected);
+
+    // Turned on without a vehicle, it ends the stream as any settings change does: the hold is for a lost link.
+    configuration.requireVehicle = true;
+    manager.setConfiguration(configuration);
+    QVERIFY(scheduler.advanceBy(SettingsDebounce));
+    QCOMPARE(manager.connectionStatus(), Status::Reconnecting);
+    QCOMPARE(manager.statusMessage(), kWaitingForVehicle);
+    QCOMPARE(attempts.hosts.size(), 1);
+
+    configuration.requireVehicle = false;
+    manager.setConfiguration(configuration);
+    QVERIFY(scheduler.advanceBy(SettingsDebounce));
+    QCOMPARE(manager.connectionStatus(), Status::Connected);
+    QCOMPARE(attempts.hosts.size(), 2);
+    manager.shutdown();
+}
+
+void NTRIPManagerTest::_vehicleGateWaitsInsteadOfRetrying()
+{
+    using Status = NTRIPManager::ConnectionStatus;
+    ManualScheduler scheduler;
+    FakeVehicles vehicles(true);
+    NTRIPManager manager(nullptr, &scheduler, {.vehicles = &vehicles});
+    Attempts attempts(manager);
+    initialize(manager, vehicleGateConfiguration());
+    _fail(attempts.latest, QStringLiteral("unreachable"));
+    QVERIFY(scheduler.advanceBy(std::chrono::seconds(1)));
+    QCOMPARE(attempts.hosts.size(), 2);
+
+    // A connection that fails while no vehicle is connected is not opened again for none.
+    vehicles.setConnected(false);
+    _fail(attempts.latest, QStringLiteral("unreachable"));
+    QCOMPARE(manager.connectionStatus(), Status::Reconnecting);
+    QCOMPARE(manager.statusMessage(), kWaitingForVehicle);
+    QVERIFY(scheduler.advanceBy(std::chrono::minutes(10)));
+    QCOMPARE(attempts.hosts.size(), 2);
+
+    // The next vehicle starts the connection anew, with the first delay after a failure.
+    vehicles.setConnected(true);
+    QCOMPARE(attempts.hosts.size(), 3);
+    _fail(attempts.latest, QStringLiteral("unreachable"));
+    QVERIFY(manager.statusMessage().contains(QStringLiteral("in 1s: unreachable")));
+    manager.shutdown();
+}
+
+void NTRIPManagerTest::_dataCapEndsTheConnection()
+{
+    using Status = NTRIPManager::ConnectionStatus;
+    ManualScheduler scheduler;
+    NTRIPManager manager(nullptr, &scheduler);
+    Attempts attempts(manager, true);
+    initialize(manager, dataCapConfiguration(1));
+    const QPointer<MockNTRIPTransport> stream = attempts.latest;
+
+    // What arrives counts whether or not it holds a correction: the limit is on what the link carries.
+    receive(stream, MB - 1);
+    QCOMPARE(manager.connectionStatus(), Status::Connected);
+    QCOMPARE(manager.connectionStats()->bytesReceived(), quint64(0));
+    _receiveToTheLimit(stream, 1);
+    QCOMPARE(manager.connectionStatus(), Status::Error);
+    QCOMPARE(manager.statusMessage(), kStoppedAtOneMB);
+    QVERIFY(!stream || stream->stopCount == 1);
+
+    // It stays ended: nothing reconnects.
+    QVERIFY(scheduler.advanceBy(std::chrono::hours(1)));
+    QCOMPARE(attempts.hosts.size(), 1);
+    QCOMPARE(manager.connectionStatus(), Status::Error);
+}
+
+void NTRIPManagerTest::_dataCapCountsOneRunOfTheConnection()
+{
+    using Status = NTRIPManager::ConnectionStatus;
+    ManualScheduler scheduler;
+    FakeVehicles vehicles(true);
+    NTRIPManager manager(nullptr, &scheduler, {.vehicles = &vehicles});
+    Attempts attempts(manager, true);
+    auto configuration = dataCapConfiguration(1);
+    configuration.requireVehicle = true;
+    initialize(manager, configuration);
+
+    // A reconnect is the same run of the connection, and so is the wait for the next vehicle.
+    receive(attempts.latest, 400 * 1024);
+    _fail(attempts.latest, QStringLiteral("dropped"), NTRIPError::ServerDisconnected);
+    QVERIFY(scheduler.advanceBy(std::chrono::seconds(1)));
+    QCOMPARE(attempts.hosts.size(), 2);
+    receive(attempts.latest, 400 * 1024);
+    vehicles.setConnected(false);
+    QVERIFY(scheduler.advanceBy(std::chrono::seconds(10)));
+    QCOMPARE(manager.statusMessage(), kWaitingForVehicle);
+    vehicles.setConnected(true);
+    QCOMPARE(attempts.hosts.size(), 3);
+    QCOMPARE(manager.connectionStatus(), Status::Connected);
+    receive(attempts.latest, 224 * 1024 - 1);
+    QCOMPARE(manager.connectionStatus(), Status::Connected);
+    _receiveToTheLimit(attempts.latest, 1);
+    QCOMPARE(manager.connectionStatus(), Status::Error);
+    QCOMPARE(manager.statusMessage(), kStoppedAtOneMB);
+}
+
+void NTRIPManagerTest::_dataCapEndsWithConnectOrAHigherCap_data()
+{
+    // What is done once the connection has ended at 1 MB, and how much more may then arrive: -1 when it stays ended
+    // and 0 without a limit.
+    QTest::addColumn<int>("action");
+    QTest::addColumn<qint64>("allowance");
+    QTest::newRow("retry") << 0 << MB;
+    QTest::newRow("off-and-on") << 1 << MB;
+    // What has arrived stays counted: a limit of 3 MB leaves two more.
+    QTest::newRow("limit-raised") << 2 << 2 * MB;
+    QTest::newRow("limit-removed") << 3 << qint64(0);
+    QTest::newRow("another-setting") << 4 << qint64(-1);
+}
+
+void NTRIPManagerTest::_dataCapEndsWithConnectOrAHigherCap()
+{
+    using Status = NTRIPManager::ConnectionStatus;
+    QFETCH(int, action);
+    QFETCH(qint64, allowance);
+    ManualScheduler scheduler;
+    NTRIPManager manager(nullptr, &scheduler);
+    Attempts attempts(manager, true);
+    auto configuration = dataCapConfiguration(1);
+    initialize(manager, configuration);
+    _receiveToTheLimit(attempts.latest, MB);
+    QCOMPARE(manager.connectionStatus(), Status::Error);
+
+    switch (action) {
+        case 0:
+            manager.connectCaster();
+            break;
+        case 1:
+            configuration.enabled = false;
+            manager.setConfiguration(configuration);
+            QVERIFY(scheduler.advanceBy(SettingsDebounce));
+            QCOMPARE(manager.connectionStatus(), Status::Disconnected);
+            configuration.enabled = true;
+            break;
+        case 2:
+            configuration.dataCapMB = 3;
+            break;
+        case 3:
+            configuration.dataCapMB = 0;
+            break;
+        default:
+            configuration.connection.mountpoint = QStringLiteral("OTHER");
+            break;
+    }
+    manager.setConfiguration(configuration);
+    QVERIFY(scheduler.advanceBy(SettingsDebounce));
+    if (allowance < 0) {
+        QCOMPARE(manager.connectionStatus(), Status::Error);
+        QCOMPARE(manager.statusMessage(), kStoppedAtOneMB);
+        QCOMPARE(attempts.hosts.size(), 1);
+        return;
+    }
+    QCOMPARE(manager.connectionStatus(), Status::Connected);
+    QCOMPARE(attempts.hosts.size(), 2);
+    if (allowance == 0) {
+        receive(attempts.latest, 100 * MB);
+        QCOMPARE(manager.connectionStatus(), Status::Connected);
+    } else {
+        receive(attempts.latest, allowance - 1);
+        QCOMPARE(manager.connectionStatus(), Status::Connected);
+        _receiveToTheLimit(attempts.latest, 1);
+        QCOMPARE(manager.connectionStatus(), Status::Error);
+    }
+    manager.shutdown();
+}
+
+void NTRIPManagerTest::_dataCapLoweredBelowTheCount()
+{
+    using Status = NTRIPManager::ConnectionStatus;
+    ManualScheduler scheduler;
+    NTRIPManager manager(nullptr, &scheduler);
+    Attempts attempts(manager, true);
+    auto configuration = dataCapConfiguration(0);
+    initialize(manager, configuration);
+    receive(attempts.latest, 2 * MB);
+    QCOMPARE(manager.connectionStatus(), Status::Connected);
+
+    // A limit set below what has arrived ends the connection as it would have.
+    configuration.dataCapMB = 1;
+    manager.setConfiguration(configuration);
+    expectLogMessage("GPS.NTRIPManager", QtWarningMsg, QRegularExpression(QStringLiteral("stopped at the data limit")));
+    QVERIFY(scheduler.advanceBy(SettingsDebounce));
+    verifyExpectedLogMessage();
+    QCOMPARE(manager.connectionStatus(), Status::Error);
+    QCOMPARE(manager.statusMessage(), kStoppedAtOneMB);
+    QCOMPARE(attempts.hosts.size(), 1);
 }
 
 UT_REGISTER_TEST_LIGHTWEIGHT(NTRIPManagerTest, TestLabel::Unit)

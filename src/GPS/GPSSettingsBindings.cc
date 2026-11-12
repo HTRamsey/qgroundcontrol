@@ -98,6 +98,8 @@ NTRIPConfig ntripFromSettings(NTRIPSettings* settings, FactReader& read)
         caster.pinnedCertificate = saved.pinnedCertificate;
         configuration.savedCasters.append({saved.name, caster});
     }
+    configuration.requireVehicle = read(settings->ntripRequireVehicle()).toBool();
+    configuration.dataCapMB = read(settings->ntripDataCapMB()).toUInt();
     return configuration;
 }
 

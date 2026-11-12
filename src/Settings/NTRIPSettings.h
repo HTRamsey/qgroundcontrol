@@ -99,6 +99,8 @@ public:
     /// Not shown in the UI: the saved casters as JSON, each with its password.
     DEFINE_SETTINGFACT(ntripSavedCasters)
     DEFINE_SETTINGFACT(ntripFailoverEnabled)
+    DEFINE_SETTINGFACT(ntripRequireVehicle)
+    DEFINE_SETTINGFACT(ntripDataCapMB)
 
 signals:
     void savedCastersChanged();
