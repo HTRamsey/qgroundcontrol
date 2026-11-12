@@ -1428,13 +1428,20 @@ class TestRealPageDefinitions:
         settings_dir = repo_root / "src" / "Settings"
         page = load_page_def(pages_dir / "RTKCorrections.SettingsUI.json")
         qml = generate_page_qml(page, settings_dir)
-        components = {group.component for group in page.groups if group.component}
-        assert components == {
+        # Status first, then NTRIP as it is filled in, the caster, the mountpoint and Connect, then what is set
+        # less often.
+        assert [group.component or group.heading for group in page.groups] == [
             "CorrectionsStatus",
-            "NTRIPConnectionStatus",
+            "NTRIP Caster",
             "NTRIPMountpointBrowser",
+            "NTRIPConnectionStatus",
             "NTRIPSavedCasters",
-        }
+            "NTRIP Connection Options",
+            "GGA Position Reporting",
+            "UDP RTCM Input",
+            "UDP Forwarding",
+            "Correction Routing",
+        ]
         for name in (
             "correctionSource",
             "ntripWhitelist",
@@ -1450,7 +1457,7 @@ class TestRealPageDefinitions:
         assert 'heading: qsTr("UDP Forwarding")' in qml
         assert "gpsCorrectionSettings.userVisible" in qml
         # The generated NTRIP groups hide with the NTRIP settings group, as its hand-written panels do.
-        assert qml.count("(QGroundControl.settingsManager.ntripSettings.userVisible)") == 2
+        assert qml.count("(QGroundControl.settingsManager.ntripSettings.userVisible)") == 3
         assert "NTRIPPasswordField" in qml
         # The log switch is a setting of the routing, not part of the status the toolbar drop-down shows.
         assert "CorrectionsLogSwitch" in qml
@@ -1460,18 +1467,20 @@ class TestRealPageDefinitions:
     def test_gnss_receiver_page(self, repo_root: Path):
         pages_dir = repo_root / "src" / "AppSettings" / "pages"
         receiver = load_page_def(pages_dir / "GNSSReceiver.SettingsUI.json")
-        # The receiver form is listed group by group, so the sidebar and the search reach each of them.
+        # The receiver's settings are listed group by group, so the sidebar and the search reach each of them, in
+        # the order of the task: what to connect, with Connect, what a base station does, what the receiver reports.
         assert [group.component for group in receiver.groups] == [
-            "GPSReceiverStatus",
             "GPSReceiverConnection",
             "GPSReceiverBaseStation",
             "GPSReceiverBaseSites",
-            "GPSReceiverConnectControls",
+            "GPSReceiverStatus",
             "GPSPositionReceiver",
             "GcsPositionStatus",
         ]
-        # The status section says so when no receiver is connected instead of showing an empty page.
-        assert receiver.groups[0].properties == {"showWhenDisconnected": "true"}
+        # Connect is in the first group, so the status is listed only while it has a receiver to report.
+        status = receiver.groups[3]
+        assert status.properties == {"showConnection": "false"}
+        assert status.showWhen == "receiverReports" and "receiverReports" in receiver.bindings
         # Only the receiver page edits the GCS position source.
         comm_links = load_page_def(pages_dir / "CommLinks.SettingsUI.json")
         assert "GcsPositionStatus" not in {group.component for group in comm_links.groups}
