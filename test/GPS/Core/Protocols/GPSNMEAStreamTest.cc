@@ -664,12 +664,131 @@ void GPSNMEAStreamTest::_fixLossWhileWaiting()
     QCOMPARE(receiver.positions, 3);
     QCOMPARE(receiver.published->navigation.fixType, GPSFixQuality::NoFix);
 
-    // The epoch that was waiting is not published after the loss.
+    // The epoch that was waiting is not published after the loss: the next position is the next epoch's.
     receiver.now += EPOCH_INTERVAL_US;
+    const uint64_t positionReceipt = receiver.now;
     receiver.feed(gga("123522"));
+    receiver.feed(rmc("123522"));
     QCOMPARE(receiver.positions, 4);
-    QCOMPARE(receiver.published->navigation.timestampUs, receiver.now);
+    QCOMPARE(receiver.published->navigation.timestampUs, positionReceipt);
     QCOMPARE(receiver.published->navigation.fixType, GPSFixQuality::Fix3D);
+}
+
+void GPSNMEAStreamTest::_fixLossKeepsSentenceOrder_data()
+{
+    QTest::addColumn<QByteArrayList>("loss");
+    const QByteArray noFixGga("GPGGA,123522,,,,,0,00,,,M,,M,,");
+    const QByteArray noFixGsa("GPGSA,A,1,,,,,,,,,,,,,,,");
+    const QByteArray voidRmc("GPRMC,123522,V,,,,,,,230394,,,N");
+    // The receiver still sends the epoch's GGA as a fix, and the sentences after it declare the loss.
+    QTest::newRow("after-the-gga") << QByteArrayList{gga("123522"), noFixGsa, voidRmc};
+    // The fix returns after the epoch's GGA, so its RMC begins an epoch that has no GGA.
+    QTest::newRow("fix-returns-after-the-gga") << QByteArrayList{noFixGga, GSA, rmc("123522")};
+    // The RMC stays void for an epoch longer than the GGA.
+    QTest::newRow("rmc-void-longer") << QByteArrayList{noFixGga,      noFixGsa, voidRmc,
+                                                       gga("123523"), GSA,      "GPRMC,123523,V,,,,,,,230394,,,N"};
+}
+
+void GPSNMEAStreamTest::_fixLossKeepsSentenceOrder()
+{
+    QFETCH(QByteArrayList, loss);
+    NMEAReceiver receiver;
+    // Three epochs show that the receiver sends GSA and RMC after its GGA.
+    for (const QByteArray& utc : {QByteArray("123519"), QByteArray("123520"), QByteArray("123521")}) {
+        receiver.now += EPOCH_INTERVAL_US;
+        for (const auto& sentence : {gga(utc), QByteArray(GSA), rmc(utc)}) {
+            receiver.feed(sentence);
+        }
+    }
+    QVERIFY(receiver.published->velocityValid);
+    receiver.now += EPOCH_INTERVAL_US;
+    for (const auto& sentence : loss) {
+        receiver.feed(sentence);
+    }
+    QCOMPARE(receiver.published->navigation.fixType, GPSFixQuality::NoFix);
+
+    // The first epoch after the loss waits for them as the last one before it did.
+    receiver.now += 10 * EPOCH_INTERVAL_US;
+    const uint64_t positionReceipt = receiver.now;
+    const int published = receiver.positions;
+    receiver.feed(gga("123530"));
+    receiver.feed(GSA);
+    QCOMPARE(receiver.positions, published);
+    receiver.feed(rmc("123530"));
+    QCOMPARE(receiver.positions, published + 1);
+    QCOMPARE(receiver.published->navigation.fixType, GPSFixQuality::Fix3D);
+    QCOMPARE(receiver.published->navigation.timestampUs, positionReceipt);
+    QVERIFY(receiver.published->velocityValid);
+}
+
+void GPSNMEAStreamTest::_epochWithoutGga()
+{
+    // A receiver that sends its RMC every second and its GGA every other second.
+    NMEAReceiver receiver;
+    int withGga = 0;
+    for (int epoch = 0; epoch < 8; ++epoch) {
+        const QByteArray utc = QByteArray::number(123519 + epoch);
+        receiver.now += EPOCH_INTERVAL_US;
+        if (epoch % 2 == 0) {
+            receiver.feed(gga(utc));
+            ++withGga;
+        }
+        receiver.feed(rmc(utc));
+        // Only a GGA's position is published.
+        QCOMPARE(receiver.positions, withGga);
+        // An epoch without a GGA does not show what follows one, so two epochs with a GGA show that its RMC does, and
+        // the third waits for it.
+        if (withGga > 2) {
+            QVERIFY(receiver.published->velocityValid);
+        }
+    }
+}
+
+void GPSNMEAStreamTest::_positionNotFromSatellites_data()
+{
+    QTest::addColumn<QByteArrayList>("order");
+    QTest::addColumn<QByteArray>("quality");
+    QTest::addColumn<QByteArray>("mode");
+    QTest::addColumn<GPSFixQuality>("fixType");
+    // A Garmin 10x that loses its satellites reports a dead-reckoned position.
+    QTest::newRow("dead-reckoning") << QByteArrayList{"GGA", "GSA", "RMC"} << QByteArray("6") << QByteArray("E")
+                                    << GPSFixQuality::Extrapolated;
+    // A Garmin handheld receiver in its simulator mode.
+    QTest::newRow("simulator") << QByteArrayList{"RMC", "GGA", "GSA", "GLL"} << QByteArray("8") << QByteArray("S")
+                               << GPSFixQuality::Fix3D;
+    QTest::newRow("manual-input") << QByteArrayList{"GGA", "RMC"} << QByteArray("7") << QByteArray("M")
+                                  << GPSFixQuality::Fix3D;
+}
+
+void GPSNMEAStreamTest::_positionNotFromSatellites()
+{
+    QFETCH(QByteArrayList, order);
+    QFETCH(QByteArray, quality);
+    QFETCH(QByteArray, mode);
+    QFETCH(GPSFixQuality, fixType);
+    NMEAReceiver receiver;
+    for (int epoch = 0; epoch < 4; ++epoch) {
+        const QByteArray utc = QByteArray::number(123519 + epoch);
+        receiver.now += EPOCH_INTERVAL_US;
+        for (const auto& type : order) {
+            if (type == "GGA") {
+                receiver.feed("GPGGA," + utc + ",4807.038,N,01131.000,E," + quality + ",00,0.9,100.0,M,10.0,M,,");
+            } else if (type == "RMC") {
+                receiver.feed("GPRMC," + utc + ",V,4807.038,N,01131.000,E,2.0,90.0,230394,,," + mode);
+            } else if (type == "GLL") {
+                receiver.feed("GPGLL,4807.038,N,01131.000,E," + utc + ",V," + mode);
+            } else {
+                receiver.feed(sentenceOf(type, utc));
+            }
+        }
+        // The status of the RMC and the GLL is void for every position that is not a satellite fix. Their mode says
+        // what the GGA's quality says, so they declare no fix loss and the RMC is the epoch's.
+        QCOMPARE(receiver.positions, epoch + 1);
+        QCOMPARE(receiver.published->navigation.fixType, fixType);
+        if (epoch >= 2) {
+            QVERIFY(receiver.published->velocityValid);
+        }
+    }
 }
 
 void GPSNMEAStreamTest::_timeDoesNotAdvance_data()
@@ -742,6 +861,81 @@ void GPSNMEAStreamTest::_timeStepsBack()
     QVERIFY(!receiver.published->velocityValid);
     QVERIFY(std::isnan(navigation.verticalDop));
     QVERIFY(std::isnan(navigation.horizontalAccuracyMeters));
+}
+
+void GPSNMEAStreamTest::_sentenceOfAnotherTalker_data()
+{
+    QTest::addColumn<QByteArrayList>("order");
+    QTest::addColumn<int>("reportsPerTime");
+    // A SiRFstar V reports the satellites of each constellation in a GGA of its own.
+    QTest::newRow("gga-per-constellation") << QByteArrayList{"GPGGA", "GLGGA", "GPGSA", "GNRMC"} << 1;
+    // A Telit PLS83 repeats the RMC as well.
+    QTest::newRow("gga-and-rmc-per-constellation") << QByteArrayList{"GPGGA", "GAGGA", "GPRMC", "GARMC"} << 1;
+    QTest::newRow("gga-last") << QByteArrayList{"GPRMC", "GARMC", "GPGLL", "GAGLL", "GPGGA", "GAGGA"} << 1;
+    // The first talker's sentence again is the next report, also of a receiver whose time stands still.
+    QTest::newRow("time-stands-still") << QByteArrayList{"GPGGA", "GLGGA", "GPGSA", "GNRMC"} << 1000;
+}
+
+void GPSNMEAStreamTest::_sentenceOfAnotherTalker()
+{
+    QFETCH(QByteArrayList, order);
+    QFETCH(int, reportsPerTime);
+    NMEAReceiver receiver;
+    for (int report = 1; report <= 6; ++report) {
+        const QByteArray utc = QByteArray::number(123519 + report / reportsPerTime);
+        receiver.now += EPOCH_INTERVAL_US;
+        uint64_t positionReceipt = 0;
+        QByteArrayList sent;
+        for (const auto& name : order) {
+            const QByteArray type = name.mid(NMEA::Sentence::TALKER_LENGTH);
+            // The epoch's sentence is the first of its type. The one another talker repeats differs in its satellite
+            // count or its course.
+            const bool first = !sent.contains(type);
+            sent.append(type);
+            receiver.now += SENTENCE_INTERVAL_US;
+            if (type == "GGA" && first) {
+                positionReceipt = receiver.now;
+            }
+            const QByteArray body = type == "GGA" ? "GPGGA," + utc + ",4807.038,N,01131.000,E,1," +
+                                                        (first ? "08" : "02") + ",0.9,100.0,M,10.0,M,,"
+                                                  : sentenceOfReport(type, utc, first ? 90 : 180);
+            receiver.feed(name.first(NMEA::Sentence::TALKER_LENGTH) + body.mid(NMEA::Sentence::TALKER_LENGTH));
+        }
+        // One position for each report, however many talkers repeat its sentences.
+        QCOMPARE(receiver.positions, report);
+        const auto& navigation = receiver.published->navigation;
+        QCOMPARE(navigation.timestampUs, positionReceipt);
+        QCOMPARE(navigation.satellitesUsed, std::optional<uint8_t>(8));
+        // Two reports show what the receiver sends after its GGA.
+        if (report > 2) {
+            QVERIFY(receiver.published->velocityValid);
+            QCOMPARE(qRound(qRadiansToDegrees(navigation.courseRadians)), 90);
+        }
+    }
+}
+
+void GPSNMEAStreamTest::_receiverWithoutGga_data()
+{
+    QTest::addColumn<QByteArrayList>("epoch");
+    // What receivers without a GGA were seen to send: a time reference its RMC with ZDA, a depth sounder its GLL.
+    QTest::newRow("rmc-and-zda") << QByteArrayList{rmc("123519"), "GPZDA,123519,23,03,1994,00,00"};
+    QTest::newRow("gll") << QByteArrayList{sentenceOf("GLL", "123519")};
+}
+
+void GPSNMEAStreamTest::_receiverWithoutGga()
+{
+    QFETCH(QByteArrayList, epoch);
+    NMEAReceiver receiver;
+    for (int report = 0; report < 4; ++report) {
+        receiver.now += EPOCH_INTERVAL_US;
+        for (QByteArray sentence : epoch) {
+            receiver.feed(sentence.replace("123519", QByteArray::number(123519 + report)));
+        }
+    }
+    // An RMC or a GLL has the position, but neither its accuracy nor the HDOP that one is estimated from, and a
+    // position of unknown accuracy is not used as the ground station's. None is published, so that the receiver is
+    // reported as sending no position, which asks for its GGA.
+    QVERIFY(!receiver.published);
 }
 
 void GPSNMEAStreamTest::_vdopEpoch_data()

@@ -1,9 +1,11 @@
 #pragma once
 
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <optional>
+#include <string_view>
 
 #include <QtCore/QFlags>
 
@@ -58,9 +60,16 @@ struct NavigationUpdate
 /// sentences reports them: an empty field leaves the value an earlier one supplied. An epoch is published when its
 /// GGA arrives, unless the receiver sends more of it after the GGA: the sentences that followed the GGA in both
 /// previous epochs are waited for, so that a receiver that sends GGA first is published with its speed, course, DOP
-/// and accuracy, at the last of those sentences. What arrives after an epoch was published is not published: not
-/// with that epoch, because every published position is a new observation, and not with the next, whose solution it
-/// does not describe.
+/// and accuracy, at the last of those sentences. Those epochs are the last two whose GGA stood: an epoch without a
+/// GGA shows nothing of what follows one, and an epoch that a fix loss hid not all of it, so neither changes what the
+/// next one waits for, and the first position after a fix loss has what the last one before it had. What arrives
+/// after an epoch was published is not published: not with that epoch, because every published position is a new
+/// observation, and not with the next, whose solution it does not describe.
+///
+/// An epoch without a GGA publishes no position. Its RMC or GLL has one, but without altitude and satellite count, and
+/// without the accuracy, or the HDOP to estimate one from, that the consumers of a ground station position require.
+/// Published, it would serve the GGA sent to an NTRIP caster alone, and the receiver would no longer be reported as
+/// sending no position, which is what asks for its GGA.
 ///
 /// An RMC or GST names its epoch, so it follows its GGA whenever it arrives, and the position waits for it as long as
 /// the receiver takes to send it. At 4800 baud that is 0.6 to 0.8 s when the GSV sentences come between them, which
@@ -71,9 +80,12 @@ struct NavigationUpdate
 /// come. An epoch that still waits when the next one begins is published then as it stands, unless the same sentence
 /// publishes the next one.
 ///
-/// An epoch has one GGA, one RMC, one GLL and one GST. A GGA, RMC or GLL that comes again with the same time begins
-/// another epoch, which takes nothing from the one before it: the next report of a receiver that prints whole seconds
-/// at a faster rate, or whose time stands still. A GST that comes again is kept for that epoch.
+/// An epoch has one GGA, one RMC, one GLL and one GST. A GGA, RMC or GLL that comes again with the same time from the
+/// same talker begins another epoch, which takes nothing from the one before it: the next report of a receiver that
+/// prints whole seconds at a faster rate, or whose time stands still. From another talker it repeats the epoch's
+/// sentence for another constellation, as the GLGGA that a SiRFstar V sends after its GPGGA does with the GLONASS
+/// satellite count: the first one is the epoch's, and the others add nothing. A GST that comes again is kept for that
+/// epoch.
 ///
 /// Two epochs are kept, the only ones a sentence can join: the current one, which the last GGA, RMC or GLL belongs
 /// to, and one that a GST began ahead of the GGA, RMC or GLL of its time. An epoch that ended is forgotten, so a time
@@ -99,11 +111,14 @@ private:
     /// The sentences that place an epoch in time and make it the current one.
     enum class Position : uint8_t
     {
-        GGA = 0x1,
-        RMC = 0x2,
-        GLL = 0x4,
+        GGA,
+        RMC,
+        GLL,
     };
-    Q_DECLARE_FLAGS(Positions, Position)
+    static constexpr size_t POSITION_COUNT = 3;
+
+    /// The two letters that name a sentence's sender, such as GP or GN.
+    using Talker = std::array<char, Sentence::TALKER_LENGTH>;
 
     struct StoredEpoch
     {
@@ -112,7 +127,8 @@ private:
         NavigationEpoch epoch;
         /// The place of the GGA among the sentences, which tells whether a fix loss came after it.
         uint64_t sequence = 0;
-        Positions positions;
+        /// The talker of each position sentence the epoch has, by Position.
+        std::array<std::optional<Talker>, POSITION_COUNT> positions;
         /// The additions received, before or after the GGA.
         Additions additions;
         /// The additions received after the GGA that the epochs to come wait for.
@@ -124,9 +140,11 @@ private:
 
     static bool _holds(const StoredEpoch& stored, std::optional<int> timeMs);
     void _resetEpoch(StoredEpoch& stored, std::optional<int> timeMs);
-    /// The epoch of @a timeMs as the current one. Ends the current epoch when it is of another time or already has
-    /// @a position; @a overdue is that epoch when it was still waiting.
-    StoredEpoch& _positionEpoch(std::optional<int> timeMs, Position position, std::optional<NavigationEpoch>& overdue);
+    /// The epoch of @a timeMs as the current one, for its @a position sentence from @a talker. Ends the current epoch
+    /// when it is of another time or has @a position from that talker; @a overdue is that epoch when it was still
+    /// waiting. @return null when the current epoch has @a position from another talker, which the sentence repeats.
+    StoredEpoch* _positionEpoch(std::optional<int> timeMs, Position position, std::string_view talker,
+                                std::optional<NavigationEpoch>& overdue);
     std::optional<NavigationEpoch> _end(StoredEpoch& stored);
     bool _hiddenByFixLoss(const StoredEpoch& stored) const;
     void _add(StoredEpoch& stored, Addition addition, uint64_t receivedAtUs) const;
@@ -142,7 +160,7 @@ private:
     uint64_t _sequence = 0;
     uint64_t _invalidThroughSequence = 0;
     bool _navigationValid = true;
-    /// The followers of the previous epoch and of the one before it.
+    /// The followers of the last epoch whose GGA stood when it ended, and of the one before it.
     Additions _previousFollowers;
     Additions _earlierFollowers;
     uint64_t _ggaReceivedAtUs = 0;
