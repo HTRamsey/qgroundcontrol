@@ -14,6 +14,7 @@ ColumnLayout {
     required property Fact nameFact
     /// The device discovery of the application's Bluetooth links, a BluetoothConfiguration: the picker lists its
     /// devicesModel and scans with its startScan() and stopScan(). Null where receivers do not connect over Bluetooth.
+    /// The pickers of both receivers scan with the same one, so each shows the scan the other started.
     property var discovery: null
     property bool editable: true
     /// QGroundControl configures the receiver, at a rate the link cannot be set to: a Bluetooth serial adapter in
@@ -40,6 +41,8 @@ ColumnLayout {
     readonly property var _devices: [{ address: root._address, name: root._name }, ...root._found]
     /// Why the last scan failed; empty once another one starts.
     property string _scanError
+    /// This picker started the scan that runs, or asked for one that has not started yet.
+    property bool _ownsScan: false
 
     spacing: ScreenTools.defaultFontPixelHeight / 4
 
@@ -50,9 +53,16 @@ ColumnLayout {
         return device.name !== "" ? qsTr("%1 – %2").arg(device.name).arg(device.address) : device.address
     }
 
+    /// Ends the scan at the user's word, whichever picker started it.
     function _stopScan() {
         if (root._scanning)
             root.discovery.stopScan()
+    }
+
+    /// Ends the scan this picker started. Another picker's is not this one's to end when it goes or is locked.
+    function _stopOwnScan() {
+        if (root._ownsScan)
+            root._stopScan()
     }
 
     GPSField {
@@ -62,6 +72,9 @@ ColumnLayout {
             objectName: "rtkBluetoothDevice"
             Layout.fillWidth: true
             Layout.minimumWidth: 0
+            // A label that is wider than the picker keeps the start of the name and the end of the address.
+            labelElide: Text.ElideMiddle
+            popupElide: Text.ElideMiddle
             enabled: root.editable && root._found.length > 0
             model: root._devices.map(device => root._label(device))
             currentIndex: 0
@@ -85,6 +98,7 @@ ColumnLayout {
                     root.discovery.stopScan()
                 } else {
                     root._scanError = ""
+                    root._ownsScan = true
                     root.discovery.startScan()
                 }
             }
@@ -111,17 +125,27 @@ ColumnLayout {
 
     Connections {
         target: root.discovery
-        function onErrorOccurred(error) { root._scanError = error }
+        function onErrorOccurred(error) {
+            root._scanError = error
+            root._ownsScan = false
+        }
+        function onScanningChanged() {
+            // Asked of the discovery: the binding that follows it may not have run yet.
+            if (root.discovery.scanning)
+                root._scanError = ""
+            else
+                root._ownsScan = false
+        }
     }
 
     // A scan is for choosing a device: it ends when there is nothing to choose, and with the picker.
     onEditableChanged: {
         if (!editable)
-            _stopScan()
+            _stopOwnScan()
     }
     onVisibleChanged: {
         if (!visible)
-            _stopScan()
+            _stopOwnScan()
     }
-    Component.onDestruction: _stopScan()
+    Component.onDestruction: _stopOwnScan()
 }

@@ -25,6 +25,7 @@
 #include "GPSReceiverConnectionPolicy.h"
 #include "GPSReceiverFactGroup.h"
 #include "GPSSettingsBindings.h"
+#include "PositionReceiverSettings.h"
 #include "QGCPalette.h"
 #include "Qml/Support/GPSPanelFixtures.h"
 #include "QmlTesting/QmlFixtures.h"
@@ -176,20 +177,25 @@ struct Panel
     std::unique_ptr<QObject> status;
 };
 
-/// Whether @a label, a text item, shows @a mark whole. A text wider than its item is cut on the right: the device
-/// picker elides its button's there, and its popup clips an entry's.
-bool showsWhole(const QQuickItem* label, const QString& mark)
+/// What @a label, a text item, shows of its text: all of it, what its elide mode leaves of a text that is wider than
+/// the item, or without one what fits before the item's edge cuts it.
+QString shownText(const QQuickItem* label)
 {
     const QString text = label->property("text").toString();
-    const qsizetype at = text.indexOf(mark);
-    if (at < 0) {
-        return false;
-    }
     if (label->implicitWidth() <= label->width()) {
-        return true;
+        return text;
     }
     const QFontMetricsF metrics(label->property("font").value<QFont>());
-    return metrics.horizontalAdvance(text.left(at + mark.size()) + QChar(0x2026)) <= label->width();
+    // Text's elide modes are Qt's.
+    const auto elide = static_cast<Qt::TextElideMode>(label->property("elide").toInt());
+    if (elide != Qt::ElideNone) {
+        return metrics.elidedText(text, elide, label->width());
+    }
+    qsizetype fitting = text.size();
+    while (fitting > 0 && metrics.horizontalAdvance(text.left(fitting)) > label->width()) {
+        --fitting;
+    }
+    return text.left(fitting);
 }
 
 /// The receiver status over a scripted base of @a family, connected and ready, whose status Facts publish at once.
@@ -1108,6 +1114,86 @@ void GPSReceiverSettingsTest::_bluetoothPickerListsLinkConfigurationDevices()
     QCOMPARE(device->property("currentText").toString(), QStringLiteral("Rover – 00:11:22:33:44:02"));
 }
 
+void GPSReceiverSettingsTest::_bluetoothPickersShareScan()
+{
+    // The pickers of the GNSS receiver and of the position receiver, which scan with one discovery.
+    RTKSettingsFixture settings(kPassiveManufacturer);
+    PositionReceiverSettings* const position = SettingsManager::instance()->positionReceiverSettings();
+    settings.saved.setFactValue(position->bluetoothDeviceAddress(), QString());
+    settings.saved.setFactValue(position->bluetoothDeviceName(), QString());
+    ScriptedBluetoothDiscovery discovery;
+    TestFixtures::QmlEngine engine;
+    const auto create = [&](Fact* address, Fact* name) {
+        return engine.create(TestFixtures::sourceQmlUrl(QStringLiteral("GPS/Qml/GPSReceiverBluetoothDevice.qml")),
+                             {{QStringLiteral("addressFact"), QVariant::fromValue(address)},
+                              {QStringLiteral("nameFact"), QVariant::fromValue(name)},
+                              {QStringLiteral("discovery"), QVariant::fromValue(&discovery)}});
+    };
+    const std::unique_ptr<QObject> receiverOwner =
+        create(settings.settings->bluetoothDeviceAddress(), settings.settings->bluetoothDeviceName());
+    QVERIFY2(receiverOwner, qPrintable(engine.lastError()));
+    std::unique_ptr<QObject> positionOwner =
+        create(position->bluetoothDeviceAddress(), position->bluetoothDeviceName());
+    QVERIFY2(positionOwner, qPrintable(engine.lastError()));
+    QObject* const receiverPicker = receiverOwner.get();
+    QObject* const positionPicker = positionOwner.get();
+    const auto part = [](const QObject* picker, const char* name) {
+        return picker->findChild<QObject*>(QString::fromLatin1(name));
+    };
+    const auto text = [&part](const QObject* picker, const char* name) {
+        return part(picker, name)->property("text").toString();
+    };
+    const auto entries = [&part](const QObject* picker) {
+        return part(picker, "rtkBluetoothDevice")->property("model").toStringList().mid(1);
+    };
+    const auto scan = [&part](const QObject* picker) {
+        return QMetaObject::invokeMethod(part(picker, "rtkBluetoothScan"), "clicked");
+    };
+    const QString stop = QCoreApplication::translate("GPSReceiverBluetoothDevice", "Stop Scan");
+    const QString handheld = QStringLiteral("Handheld – 00:11:22:33:44:05");
+
+    // A scan one picker starts is the radio's: both show it and list what it finds.
+    QVERIFY(scan(receiverPicker));
+    QCOMPARE(discovery.scans, 1);
+    discovery.find(QStringLiteral("Handheld"), QStringLiteral("00:11:22:33:44:05"));
+    for (const QObject* const picker : {receiverPicker, positionPicker}) {
+        QCOMPARE(text(picker, "rtkBluetoothScan"), stop);
+        QCOMPARE(entries(picker), QStringList{handheld});
+    }
+
+    // It is not the other picker's to end when that one is locked, as by its receiver connecting, or hidden.
+    QVERIFY(positionPicker->setProperty("editable", false));
+    QVERIFY(positionPicker->setProperty("visible", false));
+    QVERIFY(discovery.scanning());
+    QVERIFY(positionPicker->setProperty("visible", true));
+    QVERIFY(positionPicker->setProperty("editable", true));
+    // Stop is the user's, in either picker, and so is choosing a device.
+    QVERIFY(scan(positionPicker));
+    QVERIFY(!discovery.scanning());
+    QCOMPARE(discovery.scans, 1);
+    QVERIFY(scan(receiverPicker));
+    discovery.find(QStringLiteral("Handheld"), QStringLiteral("00:11:22:33:44:05"));
+    QVERIFY(QMetaObject::invokeMethod(part(positionPicker, "rtkBluetoothDevice"), "activated", Q_ARG(int, 1)));
+    QCOMPARE(position->bluetoothDeviceAddress()->rawValue().toString(), QStringLiteral("00:11:22:33:44:05"));
+    QVERIFY(!discovery.scanning());
+
+    // A scan that fails says why in both, until the next one, whichever picker starts it.
+    QVERIFY(scan(positionPicker));
+    discovery.fail(QStringLiteral("Device is powered off"));
+    for (const QObject* const picker : {receiverPicker, positionPicker}) {
+        QCOMPARE(text(picker, "rtkBluetoothScanError"), QStringLiteral("Device is powered off"));
+    }
+    QVERIFY(scan(positionPicker));
+    for (const QObject* const picker : {receiverPicker, positionPicker}) {
+        QVERIFY(text(picker, "rtkBluetoothScanError").isEmpty());
+    }
+
+    // The picker that started a scan ends it when it goes, as when its page is left.
+    QVERIFY(discovery.scanning());
+    positionOwner.reset();
+    QVERIFY(!discovery.scanning());
+}
+
 void GPSReceiverSettingsTest::_useSelectsRoleAndFields()
 {
     Panel panel(gpsReceiverManufacturerForType(GPSType::UBlox));
@@ -1683,12 +1769,15 @@ void GPSReceiverSettingsTest::_serialDeviceMarkOnNarrowPanel()
     QVERIFY2(picker->property("currentText").toString().contains(mark),
              qPrintable(picker->property("currentText").toString()));
 
-    // The picker's button shows the selected device, and its popup lists the devices as wide as the button.
+    // The picker's button shows the selected device, and its popup lists the devices as wide as the button. A label
+    // that is wider is shortened in the middle: it keeps the mark in front and the end of the path, which tells
+    // the devices of one make apart.
+    const QString pathEnd = device.right(8);
     auto* button = picker->property("contentItem").value<QQuickItem*>();
     QVERIFY(button);
     QTRY_VERIFY_WITH_TIMEOUT(button->width() > 0 && picker->width() <= width, TestTimeout::mediumMs());
     QVERIFY(button->implicitWidth() > button->width());
-    QVERIFY2(showsWhole(button, mark), qPrintable(button->property("text").toString()));
+    QVERIFY2(shownText(button).startsWith(mark) && shownText(button).endsWith(pathEnd), qPrintable(shownText(button)));
     auto* popup = picker->property("popup").value<QObject*>();
     QVERIFY(popup);
     QVERIFY(QMetaObject::invokeMethod(popup, "open"));
@@ -1699,7 +1788,8 @@ void GPSReceiverSettingsTest::_serialDeviceMarkOnNarrowPanel()
         });
     QCOMPARE(entries.size(), 1);
     QVERIFY(entries.first()->implicitWidth() > entries.first()->width());
-    QVERIFY2(showsWhole(entries.first(), mark), qPrintable(entries.first()->property("text").toString()));
+    const QString entry = shownText(entries.first());
+    QVERIFY2(entry.startsWith(mark) && entry.endsWith(pathEnd), qPrintable(entry));
 #endif
 }
 
