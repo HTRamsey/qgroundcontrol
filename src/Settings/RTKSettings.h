@@ -37,6 +37,7 @@ struct RTKBaseSite
     Q_PROPERTY(double longitude MEMBER longitude FINAL)
     Q_PROPERTY(double altitude MEMBER altitude FINAL)
     Q_PROPERTY(double accuracy MEMBER accuracy FINAL)
+    Q_PROPERTY(double antennaHeight MEMBER antennaHeight FINAL)
 
 public:
     QString name;
@@ -47,6 +48,9 @@ public:
     double altitude = 0.;
     /// Meters.
     double accuracy = 0.;
+    /// Meters the antenna's reference point is above the position, as fixedBaseAntennaHeight; zero for a position that
+    /// is the antenna's own, such as a surveyed one, and for a site saved before sites had it.
+    double antennaHeight = 0.;
 
     bool operator==(const RTKBaseSite&) const = default;
 };
@@ -95,6 +99,14 @@ public:
     };
     Q_ENUM(ConnectionType)
 
+    /// Persisted values of fixedBasePositionFormat: how the form shows the one saved fixed base position.
+    enum BasePositionFormat : quint8
+    {
+        Geodetic = 0,
+        Ecef = 1,
+    };
+    Q_ENUM(BasePositionFormat)
+
     /// Limits of the saved base sites, as an enum so that QML reads them from the type.
     enum BaseSiteLimit : int
     {
@@ -115,11 +127,13 @@ public:
 
     /// Saves @a site under its name without surrounding spaces, replacing the site of that name. Returns false,
     /// saving nothing, for a name that is empty or longer than MaxBaseSiteNameLength, a position off the globe or not
-    /// finite, or a new name when MaxBaseSites sites are saved.
+    /// finite, an antenna height outside the limits of fixedBaseAntennaHeight, or a new name when MaxBaseSites sites
+    /// are saved.
     bool saveBaseSite(const RTKBaseSite& site);
-    /// Saves the fixed base position under @a siteName, as saveBaseSite() does.
+    /// Saves the fixed base position and its antenna height under @a siteName, as saveBaseSite() does.
     Q_INVOKABLE bool saveFixedBasePositionAsSite(const QString& siteName);
-    /// Makes the site saved under @a siteName the fixed base position. Returns false when no site has that name.
+    /// Makes the site saved under @a siteName the fixed base position, with its antenna height. Returns false when no
+    /// site has that name.
     Q_INVOKABLE bool useBaseSite(const QString& siteName);
     /// Returns false when no site has that name.
     Q_INVOKABLE bool removeBaseSite(const QString& siteName);
@@ -154,6 +168,8 @@ public:
     DEFINE_SETTINGFACT(compactRtcmCorrections)
     DEFINE_SETTINGFACT(savedBaseSites)
     DEFINE_SETTINGFACT(detectedReceivers)
+    DEFINE_SETTINGFACT(fixedBasePositionFormat)
+    DEFINE_SETTINGFACT(fixedBaseAntennaHeight)
 
 signals:
     void baseSitesChanged();

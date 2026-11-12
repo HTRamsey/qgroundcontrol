@@ -57,6 +57,7 @@ void GPSSettingsBindingsTest::_receiverSettingsMapping()
     saved.setFactValue(settings.fixedBasePositionLongitude(), 8.25);
     saved.setFactValue(settings.fixedBasePositionAltitude(), 512.0);
     saved.setFactValue(settings.fixedBasePositionAccuracy(), 1.5);
+    saved.setFactValue(settings.fixedBaseAntennaHeight(), 1.75);
     saved.setFactValue(settings.surveyInAccuracyLimit(), 1.75);
     saved.setFactValue(settings.surveyInMinObservationDuration(), 195);
     saved.setFactValue(settings.receiverAveragingDuration(), 321);
@@ -77,9 +78,10 @@ void GPSSettingsBindingsTest::_receiverSettingsMapping()
     const auto& config = harness.workers.current()->capturedConfig();
     QCOMPARE(config.baudRate, uint32_t(GPSTransport::BRIDGE_BAUD_RATE));
     QVERIFY(!config.allowPersistentChanges);
+    // A fixed base is given where its antenna is: the antenna height above the saved position.
     const GPSBaseStationConfig::Mode expected =
         baseMode == 1 ? GPSBaseStationConfig::Mode{GPSBaseStationConfig::Fixed{
-                            .position = {.latitudeDegrees = 47.5, .longitudeDegrees = 8.25, .altitudeMeters = 512.0f},
+                            .position = {.latitudeDegrees = 47.5, .longitudeDegrees = 8.25, .altitudeMeters = 513.75},
                             .accuracyMeters = 1.5f}}
         : baseMode == 2
             ? GPSBaseStationConfig::Mode{GPSBaseStationConfig::ReceiverAveraging{.maximumDuration = 321s}}
@@ -388,12 +390,13 @@ void GPSSettingsBindingsTest::_settingsBindingsCoverEveryFact_data()
     QTest::addColumn<QList<Fact*>>("unbound");
 
     // A new setting must be bound, unless no service reads it: RTKSettings itself keeps the saved base sites and the
-    // receivers detected on each link.
+    // receivers detected on each link, and only the form reads how it shows the fixed base position.
     SettingsManager* const settings = SettingsManager::instance();
     QTest::newRow("RTK") << static_cast<SettingsGroup*>(settings->rtkSettings())
                          << GPSSettingsBindings::_boundFacts(settings->rtkSettings())
                          << QList<Fact*>{settings->rtkSettings()->savedBaseSites(),
-                                         settings->rtkSettings()->detectedReceivers()};
+                                         settings->rtkSettings()->detectedReceivers(),
+                                         settings->rtkSettings()->fixedBasePositionFormat()};
     QTest::newRow("NTRIP") << static_cast<SettingsGroup*>(settings->ntripSettings())
                            << GPSSettingsBindings::_boundFacts(settings->ntripSettings()) << QList<Fact*>{};
     QTest::newRow("GPSCorrection") << static_cast<SettingsGroup*>(settings->gpsCorrectionSettings())

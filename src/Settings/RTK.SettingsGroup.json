@@ -181,7 +181,7 @@
             "name": "fixedBasePositionAltitude",
             "shortDesc": "Base Position Alt (WGS84)",
             "longDesc": "Defines the altitude of the fixed RTK base position.",
-            "type": "float",
+            "type": "double",
             "default": 0,
             "units": "vertical m",
             "decimalPlaces": 2,
@@ -207,7 +207,7 @@
         {
             "name": "savedBaseSites",
             "shortDesc": "Base positions saved under a name",
-            "longDesc": "JSON array of the saved base sites. Each entry holds name, latitude and longitude in degrees, altitude in meters above the WGS84 ellipsoid, and accuracy in meters.",
+            "longDesc": "JSON array of the saved base sites. Each entry holds name, latitude and longitude in degrees, altitude in meters above the WGS84 ellipsoid, accuracy in meters, and the antenna height in meters above that position, which is zero when it is left out.",
             "type": "string",
             "default": "",
             "label": "Saved base sites"
@@ -219,6 +219,27 @@
             "type": "string",
             "default": "",
             "label": "Detected receivers"
+        },
+        {
+            "name": "fixedBasePositionFormat",
+            "shortDesc": "Base position format",
+            "longDesc": "How the fixed RTK base position is entered and shown: as latitude, longitude and height above the WGS84 ellipsoid, or as ECEF X, Y and Z in meters. Both show the one saved position.",
+            "type": "uint8",
+            "enumStrings": "Latitude/longitude/height,ECEF X/Y/Z",
+            "enumValues": "0,1",
+            "default": 0,
+            "label": "Base position format"
+        },
+        {
+            "name": "fixedBaseAntennaHeight",
+            "shortDesc": "Height of the antenna's reference point above the base position, measured vertically. The receiver is given the antenna's position: the base position's height plus this. Leave it at zero when the base position is the antenna's own.",
+            "type": "double",
+            "default": 0,
+            "min": 0,
+            "max": 100,
+            "units": "vertical m",
+            "decimalPlaces": 3,
+            "label": "Antenna height"
         }
     ]
 }
