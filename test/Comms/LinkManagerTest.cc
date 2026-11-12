@@ -2,12 +2,16 @@
 
 #include <algorithm>
 
+#include <QtCore/QDir>
 #include <QtCore/QScopeGuard>
 #include <QtNetwork/QUdpSocket>
+#include <QtTest/QSignalSpy>
 #include <QtTest/QTest>
 
 #include "AutoConnectSettings.h"
 #include "LinkManager.h"
+#include "LogReplayLink.h"
+#include "LogReplayLinkController.h"
 #include "MavlinkSettings.h"
 #include "MockLink.h"
 #include "SettingsManager.h"
@@ -197,6 +201,52 @@ void LinkManagerTest::_testManualConnectRefusedWhileSuspended()
     QVERIFY(!linkManager()->connectionsSuspended());
     linkManager()->createConnectedLink(config.get());
     QVERIFY(config->link());
+}
+
+void LinkManagerTest::_testLogReplayRefusedWithActiveVehicle()
+{
+    QVERIFY(createMockLinkAndWaitForVehicle(QStringLiteral("ReplayRefusedMock")));
+    const qsizetype cLinks = linkManager()->links().count();
+
+    const char* const logName = "LogReplayRefused.tlog";
+
+    // Refused where the replay is started, which leaves neither a link that never connects nor its configuration
+    expectLogMessage("Comms.LogReplayLink", QtWarningMsg,
+                     QRegularExpression(QStringLiteral("You must close all connections")));
+    expectAppMessage(QRegularExpression(QStringLiteral("You must close all connections prior to replaying a log")));
+    QVERIFY(!linkManager()->startLogReplay(QLatin1String(logName)));
+    verifyExpectedLogMessage();
+    verifyExpectedLogMessage();
+    QCOMPARE(linkManager()->links().count(), cLinks);
+    QVERIFY(_configsNamed(logName).isEmpty());
+}
+
+void LinkManagerTest::_testLogReplayUnreadableLogEndsLink()
+{
+    const char* const logName = "LogReplayMissing.tlog";
+    // The link was created, so its configuration stays listed as it does after a replay that ran
+    const auto cleanup = qScopeGuard([this, logName] {
+        for (const SharedLinkConfigurationPtr& config : _configsNamed(logName)) {
+            linkManager()->removeConfiguration(config.get());
+        }
+    });
+
+    // The log is opened on the link's thread, after the link was created
+    expectLogMessage("Comms.LogReplayLink", QtWarningMsg,
+                     QRegularExpression(QStringLiteral("Unable to open log file")));
+    expectAppMessage(QRegularExpression(QStringLiteral("Unable to open log file")));
+    LogReplayLink* const link = linkManager()->startLogReplay(QDir::temp().filePath(QLatin1String(logName)));
+    QVERIFY(link);
+    LogReplayLinkController controller;
+    controller.setLink(link);
+    QSignalSpy linkChangedSpy(&controller, &LogReplayLinkController::linkChanged);
+
+    QTRY_COMPARE_WITH_TIMEOUT(linkManager()->links().count(), 0, TestTimeout::mediumMs());
+    verifyExpectedLogMessage();
+    verifyExpectedLogMessage();
+    // The replay's controls learn that there is no replay to control
+    QCOMPARE(linkChangedSpy.count(), 1);
+    QVERIFY(!controller.link());
 }
 
 void LinkManagerTest::_testUdpUnresolvedHostFailsConnect()

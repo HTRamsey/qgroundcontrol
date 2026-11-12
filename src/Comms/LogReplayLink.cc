@@ -108,13 +108,9 @@ void LogReplayWorker::connectToLog()
         return;
     }
 
-    if (MultiVehicleManager::instance()->activeVehicle()) {
-        emit errorOccurred(tr("You must close all connections prior to replaying a log."));
-        return;
-    }
-
     if (!_loadLogFile()) {
-        disconnectFromLog();
+        // Reported, or the link would stay listed without ever having connected
+        emit disconnected();
         return;
     }
 
@@ -180,6 +176,12 @@ void LogReplayWorker::pause()
 void LogReplayWorker::setPlaybackSpeed(qreal playbackSpeed)
 {
     _playbackSpeed = playbackSpeed;
+
+    // A paused replay stays paused: play() suspends connections and logging, and resumes at this speed
+    if (!isPlaying()) {
+        return;
+    }
+
     _playbackStartTimeMSecs = static_cast<quint64>(QDateTime::currentMSecsSinceEpoch());
     _playbackStartLogTimeUSecs = _logCurrentTimeUSecs;
     _readTickTimer->start(1);
@@ -475,6 +477,12 @@ bool LogReplayLink::isConnected() const
 
 bool LogReplayLink::_connect()
 {
+    // Checked here and not by the worker: the active vehicle belongs to this thread
+    if (MultiVehicleManager::instance()->activeVehicle()) {
+        _onErrorOccurred(tr("You must close all connections prior to replaying a log."));
+        return false;
+    }
+
     return QMetaObject::invokeMethod(_worker, "connectToLog", Qt::QueuedConnection);
 }
 
