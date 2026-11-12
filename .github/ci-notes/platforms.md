@@ -253,8 +253,9 @@ How CI runs, retries, and reports the application tests is described in
   uploaded fuzzer builds, so there is no continuous build. The base image's own Python serves
   OSS-Fuzz's tooling; QGC's two scripts run on the pinned Python, which uv installs in the image.
 - **GPS standalone** (`gps-standalone.yml`): `test/GPS/Standalone` builds `QGCGPSCore` and
-  `QGCNTRIPHttp` without the application, with the receiver qualification runner, the NTRIP decoder
-  smoke test and the libFuzzer harnesses. It is its own path-filtered workflow, not a Linux leg or
+  `QGCNTRIPHttp` without the application, with the golden transcripts of the receiver protocols
+  (`GPSGoldenTranscripts`), the receiver qualification runner, the fuzzers'
+  smoke tests and the libFuzzer harnesses. It is its own path-filtered workflow, not a Linux leg or
   a required check: pull requests and `master`/`Stable*` pushes run it when `src/GPS`, the utility
   libraries and CMake modules the project adds, `test/GPS`, `build-config.json` or the workflow
   change (`test_gps_standalone_workflow.py` keeps the source directories in step with the project),
@@ -262,10 +263,12 @@ How CI runs, retries, and reports the application tests is described in
   Clang, `-DQGC_GPS_LIBFUZZER=ON` (ASan and UBSan) and `RelWithDebInfo`: unoptimized,
   `GPSProtocolFuzzSmoke` takes about six times as long. It skips `build-setup`, whose caches and
   full Qt serve the application build: `setup-python` syncs the `build` group for CMake and Ninja,
-  `qt-install` installs only `qtbase`, `icu` and `qtserialport`, CPM clones GeographicLib, and the
-  build's three CPU-minutes need no compiler cache. `cmake-build` and `run-unit-tests` (label
-  `GPS`) report as in the platform jobs. Each harness (`QGCGPSProtocolFuzz`,
-  `ntrip_http_decoder_fuzzer`) then fuzzes its seeds for 60 s with a new random seed.
+  `qt-install` installs only `qtbase`, `icu`, `qtserialport` and, for the source table fuzzer,
+  `qtpositioning`, CPM clones GeographicLib, and the build's three CPU-minutes need no compiler
+  cache. `cmake-build` and `run-unit-tests` (label `GPS`) report as in the platform jobs. Each
+  harness (`QGCGPSProtocolFuzz`, `QGCGPSReplyFuzz`, `ntrip_http_decoder_fuzzer`,
+  `QGCRTCMStationPositionFuzz`, `QGCNTRIPSourceTableFuzz`) then fuzzes its seeds for 60 s with a
+  new random seed.
   `UBSAN_OPTIONS=halt_on_error=1` makes a UBSan report fail the tests and the fuzzers, which
   otherwise print it and continue, and `-timeout=25` reports a hang. A crash, leak, hang or
   sanitizer report fails the job, and the input libFuzzer saved is uploaded as
@@ -273,6 +276,23 @@ How CI runs, retries, and reports the application tests is described in
   ClusterFuzzLite targets: they link Qt (`qt.minimum_version`), which its base image lacks, and its
   toolchain compiles against libc++, which cannot link Qt's prebuilt libstdc++ binaries, so every
   run would have to build Qt from source.
+- **GPS nightly fuzzing**: `gps-standalone.yml` also runs every night on the default branch
+  (`schedule`), and a manual run with the `nightly` input does the same on its branch. Each harness
+  then fuzzes for 15 minutes and the run keeps the corpus. A harness writes the inputs that reach
+  new code into its own directory, which it reads before its seeds;
+  `fuzz_corpus_artifact.py` first fills those directories from the `gps-fuzz-corpus-v1` artifact
+  of the newest scheduled or manual run of the workflow on the default branch (other runs are not
+  trusted, and the job needs `actions: read`), and the run uploads them again for 30 days, also
+  when a fuzzer failed, so that the next night starts close to the failure. It is an artifact, not
+  a cache, because GitHub evicts caches from the repository's full pool within hours. Without an
+  artifact the fuzzers start from their seeds, and a new version in the artifact's name, in the
+  workflow and the script, starts over. Runs for a change neither restore nor save. The nightly
+  run has its own concurrency group, so that `master` pushes neither wait for it nor cancel it.
+  Its failure keeps the input for 30 days but appears on no pull request or commit, only in the
+  Actions tab: GitHub notifies the user who last changed the workflow's `cron` line or re-enabled
+  the workflow, as that user's notification settings have it. Forks start with scheduled
+  workflows disabled, and GitHub disables them in a public repository without activity for 60
+  days.
 
 ## Docker
 

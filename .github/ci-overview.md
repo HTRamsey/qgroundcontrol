@@ -76,7 +76,7 @@ Packages = files that `publish.yml` publishes.
 | `analysis.yml` | PR and `master` push (paths), manual | clang-tidy and Clazy; manual IWYU, qmllint, ThreadSanitizer | — |
 | `codeql.yml` | PR, MG, push, manual | CodeQL for Actions, Java/Kotlin, Python | Code scanning |
 | `clusterfuzzlite.yml` | PR (paths) | MAVLink parser fuzzing | — |
-| `gps-standalone.yml` | PR and push (paths), manual | `QGCGPSCore` and `QGCNTRIPHttp` built without the application (`test/GPS/Standalone`), their tests, and libFuzzer runs of the GPS harnesses | — |
+| `gps-standalone.yml` | PR and push (paths), nightly, manual | `QGCGPSCore` and `QGCNTRIPHttp` built without the application (`test/GPS/Standalone`), their tests, and libFuzzer runs of the GPS harnesses | — |
 | `dependency-review.yml` | PR | Fail on new dependencies with high or critical advisories | — |
 | `pr-checks.yml` | `pull_request_target` | PR title check; size and path labels | Labels |
 | `check-links.yml` | PR and `master` push (paths), manual | Markdown link check (lychee) | — |

@@ -57,6 +57,7 @@ Compiler, moc, CPM, and GitHub Actions cache planning and maintenance.
 | `cache/cache_plan.py` | Plan the cache action: save policy, cache scope, keys, and job environment. | `actions/cache` |
 | `cache/ccache_helper.py` | Ccache helper for CI: install compiler tools and plan build cache saves. | `actions/cache`, `actions/save-build-cache` |
 | `cache/cpm_helper.py` | CPM helper for CI: dependency fingerprints, cache paths, and runner image seeds. | `actions/cache`, `cache/cache_plan.py` |
+| `cache/fuzz_corpus_artifact.py` | Restore the GPS fuzzers' corpus from the newest nightly GPS Standalone artifact. | `gps-standalone.yml` |
 | `cache/gh_cache_cleanup.py` | List and optionally delete GitHub Actions caches and superseded compiler-cache snapshots. | `cache-cleanup.yml` |
 
 ### `compile/`
