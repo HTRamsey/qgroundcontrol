@@ -1,14 +1,16 @@
 #include "BluetoothWorkerTest.h"
 
-#include "BluetoothBleWorker.h"
-#include "BluetoothClassicWorker.h"
-#include "BluetoothConfiguration.h"
-#include "BluetoothWorker.h"
-
 #include <QtBluetooth/QBluetoothServiceDiscoveryAgent>
 #include <QtCore/QRegularExpression>
 #include <QtCore/QTimer>
 #include <QtTest/QSignalSpy>
+
+#include "BluetoothBleWorker.h"
+#include "BluetoothClassicWorker.h"
+#include "BluetoothConfiguration.h"
+#include "BluetoothLink.h"
+#include "BluetoothWorker.h"
+#include "UDPLink.h"
 
 static QTimer *_findServiceDiscoveryTimer(const BluetoothWorker *worker)
 {
@@ -131,6 +133,9 @@ void BluetoothWorkerTest::_testDisconnectResetsReconnectState()
 {
     BluetoothConfiguration config("TestBT_disconnectReset");
 
+    // Use BLE worker — a Classic worker's failed connect falls back to a service discovery, which
+    // without a device address searches for devices with the host's adapter
+    config.setMode(BluetoothConfiguration::BluetoothMode::ModeLowEnergy);
     std::unique_ptr<BluetoothWorker> worker(BluetoothWorker::create(&config));
 
     // Call connectLink to set intentionalDisconnect = false internally
@@ -229,6 +234,21 @@ void BluetoothWorkerTest::_testDestroyBleWorker()
         // destroyed here — must not crash
     }
     QVERIFY2(true, "BLE worker destruction must not crash");
+}
+
+void BluetoothWorkerTest::_testLinkWithoutBluetoothConfiguration()
+{
+    // LinkManager gives a BluetoothLink a BluetoothConfiguration. Any other is reported, and the link is
+    // left without a worker, which it has to survive
+    SharedLinkConfigurationPtr config = std::make_shared<UDPConfiguration>(QStringLiteral("TestBT_notBluetooth"));
+
+    expectLogMessage("Comms.Bluetooth.BluetoothLink", QtCriticalMsg,
+                     QRegularExpression(QStringLiteral("Invalid BluetoothConfiguration")));
+    BluetoothLink link(config);
+    verifyExpectedLogMessage();
+
+    QVERIFY(!link.isConnected());
+    link.disconnect();
 }
 
 UT_REGISTER_TEST(BluetoothWorkerTest, TestLabel::Unit, TestLabel::Comms)
