@@ -28,13 +28,11 @@
 #include "GPSReceiverSystemSerialPorts.h"
 #endif
 #include "GPSReceiverWorker.h"
-#include "GPSRecordingTransport.h"
 #include "GPSSettingsBindings.h"
 #include "GPSTransport.h"
 #include "ManualScheduler.h"
 #include "NMEASentence.h"
 #include "PositionManager.h"
-#include "Protocols/Support/GPSProtocolTestData.h"
 #include "Protocols/Support/ProtocolTestPackets.h"
 #include "Protocols/Support/ScriptedReceiver.h"
 #include "QGCGeoid.h"
@@ -42,6 +40,7 @@
 #include "Receiver/Support/GPSReceiverTestSupport.h"
 #include "Receiver/Support/ScriptedReceiverWorker.h"
 #include "Support/GPSTestHelpers.h"
+#include "Transport/Support/GPSRecordingReader.h"
 #include "Transport/Support/UnusedUdpPort.h"
 
 using namespace std::chrono_literals;
@@ -1021,15 +1020,14 @@ void GPSReceiverTest::_recordsSessionsStartedWhileOn()
     QVERIFY(receiver.recordingFile().isEmpty());
     QCOMPARE(fileChanges.size(), 2);
     QCOMPARE(QDir(directory.path()).entryList(QDir::Files), QStringList{QFileInfo(file).fileName()});
-    QByteArrayList lines = readFile(file).value_or(QByteArray()).split('\n');
-    QCOMPARE(lines.takeFirst(), QByteArray(GPSRecordingTransport::FILE_HEADER));
+    QString damage;
     QByteArray received;
-    for (const QByteArray& line : std::as_const(lines)) {
-        const QByteArrayList fields = line.split(' ');
-        if (fields.size() == 3 && fields[1] == GPSRecordingTransport::RECEIVED) {
-            received += QByteArray::fromHex(fields[2]);
+    for (const GPSTest::GPSRecordingRecord& record : GPSTest::GPSRecordingReader::readFile(file, &damage)) {
+        if (record.kind == GPSTest::GPSRecordingRecord::Kind::Received) {
+            received += record.bytes;
         }
     }
+    QCOMPARE(damage, QString());
     QCOMPARE(received, stream);
 }
 
@@ -1059,6 +1057,35 @@ void GPSReceiverTest::_recordingFileClearsWhenRecordingFails()
     QVERIFY(receiver.recordingFile().isEmpty());
     QCOMPARE(fileChanges.size() % 2, 0);
     receiver.shutdown();
+}
+
+void GPSReceiverTest::_recordingsStartedTogetherGetOwnFiles()
+{
+    TestFixtures::TempDirFixture directory;
+    ManualScheduler scheduler;
+    ScriptedGPSReceiver harness(&scheduler, {.recordingDirectory = [&directory] { return directory.path(); }});
+    GPSReceiver& receiver = harness.receiver;
+    auto configuration = receiverConfiguration(kPassiveManufacturer);
+    useTcp(configuration);
+    configuration.autoConnect = false;
+    receiver.setConfiguration(configuration);
+    receiver.setRecordSessions(true);
+
+    // A recording is named by the millisecond its session starts in. These sessions follow each other far faster than
+    // that, as one that an observer starts from the end of the one before does, and a recording is never made over
+    // an earlier one of its name.
+    QStringList files;
+    for (int session = 0; session < 100; ++session) {
+        QVERIFY(receiver.connectReceiver());
+        files.append(receiver.recordingFile());
+        receiver.disconnectReceiver();
+        harness.workers.finishRetired();
+    }
+    // Each has a name of its own, and the names sort in the order the sessions started.
+    QStringList ordered = files;
+    ordered.removeDuplicates();
+    ordered.sort();
+    QCOMPARE(files, ordered);
 }
 
 void GPSReceiverTest::_withoutSerialLinksSerialSelectionUsesTcp()
@@ -1385,7 +1412,8 @@ void GPSReceiverTest::_serialPortEntries()
          .boardName = QStringLiteral("SiK Radio")},
         serialPort(QStringLiteral("/dev/ttyS0")),
     });
-    ScriptedGPSReceiver harness(nullptr, {.serial = serial.side()});
+    ManualScheduler scheduler;
+    ScriptedGPSReceiver harness(&scheduler, {.serial = serial.side()});
     GPSReceiver& receiver = harness.receiver;
     auto configuration = serialConfiguration(kPassiveManufacturer, QStringLiteral("/dev/ttyACM0"), 115200);
     configuration.autoConnect = false;
@@ -1439,6 +1467,24 @@ void GPSReceiverTest::_serialPortEntries()
     // Polled again, the entries are as they were, so their views are left alone.
     receiver.tick();
     QCOMPARE(changes.size(), 1);
+
+    // Links are connected and disconnected while connection polling is suspended too, as during a flight data
+    // replay. The receiver then connects nothing, not even its saved device that is free, and the marks still follow
+    // the links.
+    configuration.autoConnect = true;
+    receiver.setConfiguration(configuration);
+    receiver.startConnectionPolling([] { return true; });
+    vehicleLink.reset();
+    QVERIFY(scheduler.advanceBy(GPSReceiver::POLL_INTERVAL));
+    QCOMPARE(entries(&GPSSerialPortEntry::label).at(1), QStringLiteral("CubeOrange+ – /dev/ttyACM1"));
+    QCOMPARE(changes.size(), 2);
+    QVERIFY(!receiver.hasReceiver());
+    vehicleLink = serial.manager.reservePort(QStringLiteral("/dev/ttyACM1"));
+    QVERIFY(vehicleLink);
+    QVERIFY(scheduler.advanceBy(GPSReceiver::POLL_INTERVAL));
+    QCOMPARE(entries(&GPSSerialPortEntry::label).at(1), QStringLiteral("CubeOrange+ – /dev/ttyACM1 (in use)"));
+    QCOMPARE(changes.size(), 3);
+    QVERIFY(scans.isEmpty());
 }
 
 void GPSReceiverTest::_serialReservationSurvivesDelayedStop()

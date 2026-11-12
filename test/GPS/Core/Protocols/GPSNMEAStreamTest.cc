@@ -9,6 +9,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include <QtCore/QByteArray>
 #include <QtCore/QDir>
@@ -169,6 +170,25 @@ QByteArray sentenceOf(const QByteArray& type, const QByteArray& utc)
     return type == "GSA" ? GSA : VTG;
 }
 
+/// The sentence of @a type for the epoch @a utc, with @a report as its course, VDOP or accuracy.
+QByteArray sentenceOfReport(const QByteArray& type, const QByteArray& utc, int report)
+{
+    const QByteArray value = QByteArray::number(report) + ".0";
+    if (type == "RMC") {
+        return "GPRMC," + utc + ",A,4807.038,N,01131.000,E,2.0," + value + ",230394,,,A";
+    }
+    if (type == "VTG") {
+        return "GPVTG," + value + ",T,,M,2.0,N,3.7,K";
+    }
+    if (type == "GSA") {
+        return "GPGSA,A,3,01,,,,,,,,,,,,1.0,0.8," + value;
+    }
+    if (type == "GST") {
+        return "GPGST," + utc + ",0,0,0,0," + value + ",0," + value;
+    }
+    return sentenceOf(type, utc);
+}
+
 constexpr uint64_t EPOCH_INTERVAL_US = 1000000;
 constexpr uint64_t SENTENCE_INTERVAL_US = 10000;
 
@@ -284,6 +304,8 @@ void GPSNMEAStreamTest::_sentenceOrder_data()
                                  << true << true << false;
     QTest::newRow("gga-last") << QByteArrayList{"RMC", "VTG", "GSA", "GST", "GGA"} << QByteArray("GGA") << true << true
                               << true;
+    // The GST begins its epoch before the GGA makes it the current one.
+    QTest::newRow("gst-first") << QByteArrayList{"GST", "GGA", "GSA"} << QByteArray("GSA") << false << true << true;
     QTest::newRow("gga-only") << QByteArrayList{"GGA"} << QByteArray("GGA") << false << false << false;
 }
 
@@ -346,6 +368,8 @@ void GPSNMEAStreamTest::_sentenceNotWaitedFor()
         receiver.feed(gga(utc));
         QCOMPARE(receiver.positions, epoch + 1);
         QCOMPARE(receiver.published->navigation.timestampUs, receiver.now);
+        // The RMC that came after the epoch before was published is not published with this one either.
+        QVERIFY(!receiver.published->velocityValid);
         if (epoch % everyEpochs == 0) {
             receiver.now += delayUs;
             receiver.feed(rmc(utc));
@@ -428,17 +452,22 @@ void GPSNMEAStreamTest::_emptyFieldKeepsEpochValue_data()
 {
     QTest::addColumn<QByteArrayList>("sentences");
     const QByteArray utc("123519");
-    // The epoch has its speed, course and VDOP; the last sentence before the GGA leaves those fields empty.
+    // The epoch has its speed, course, VDOP and accuracy; a later sentence before the GGA leaves those fields empty.
     QTest::newRow("vtg-after-rmc") << QByteArrayList{rmc(utc), GSA, "GPVTG,,T,,M,,N,,K"};
     QTest::newRow("rmc-after-vtg") << QByteArrayList{sentenceOf("GLL", utc), VTG, GSA,
                                                      "GPRMC," + utc + ",A,4807.038,N,01131.000,E,,,230394,,,A"};
     QTest::newRow("gsa-after-gsa") << QByteArrayList{rmc(utc), GSA, QByteArray("GPGSA,A,3,02") + QByteArray(14, ',')};
+    // The test's GST precedes the sentence that begins the epoch; the empty one comes before it too, or in the epoch.
+    const QByteArray emptyGst = "GPGST," + utc + QByteArray(7, ',');
+    QTest::newRow("gst-after-gst") << QByteArrayList{emptyGst, rmc(utc), GSA};
+    QTest::newRow("gst-in-epoch-after-gst") << QByteArrayList{rmc(utc), GSA, emptyGst};
 }
 
 void GPSNMEAStreamTest::_emptyFieldKeepsEpochValue()
 {
     QFETCH(QByteArrayList, sentences);
     NMEAReceiver receiver;
+    receiver.feed(gst("123519"));
     for (const auto& sentence : sentences) {
         receiver.feed(sentence);
     }
@@ -451,6 +480,8 @@ void GPSNMEAStreamTest::_emptyFieldKeepsEpochValue()
     QVERIFY(qAbs(navigation.speedMetersPerSecond - 1.03f) < 0.01f);
     QCOMPARE(navigation.courseRadians, qDegreesToRadians(90.0f));
     QCOMPARE(navigation.verticalDop, 0.6f);
+    QCOMPARE(navigation.horizontalAccuracyMeters, 0.5f);
+    QCOMPARE(navigation.verticalAccuracyMeters, 0.6f);
 }
 
 void GPSNMEAStreamTest::_lateSentenceCompletesWaitingEpoch()
@@ -473,21 +504,23 @@ void GPSNMEAStreamTest::_lateSentenceCompletesWaitingEpoch()
     QVERIFY(receiver.published->velocityValid);
 }
 
-void GPSNMEAStreamTest::_awaitedSentenceLaterThanMetadataAge_data()
+void GPSNMEAStreamTest::_awaitedSentenceAfterTwoSeconds_data()
 {
     QTest::addColumn<QByteArray>("type");
     QTest::newRow("rmc") << QByteArray("RMC");
     QTest::newRow("gst") << QByteArray("GST");
+    // Without a time of their own, they join the epoch that waits for them.
+    QTest::newRow("gsa") << QByteArray("GSA");
+    QTest::newRow("vtg") << QByteArray("VTG");
 }
 
-void GPSNMEAStreamTest::_awaitedSentenceLaterThanMetadataAge()
+void GPSNMEAStreamTest::_awaitedSentenceAfterTwoSeconds()
 {
     QFETCH(QByteArray, type);
     // A receiver that reports every five seconds at 4800 baud and sends the GSV sentences of four constellations
     // between its GGA and the sentence that follows: twelve of them put that sentence 1.92 s after the GGA, thirteen
     // put it 2.07 s after.
     constexpr uint64_t INTERVAL_US = 5000000;
-    constexpr uint64_t MAX_AGE_US = NMEA::NavigationEpochAssembler::METADATA_MAX_AGE.count();
     NMEAReceiver receiver;
     const uint64_t start = receiver.now;
     int epoch = 0;
@@ -502,10 +535,51 @@ void GPSNMEAStreamTest::_awaitedSentenceLaterThanMetadataAge()
         QCOMPARE(receiver.positions, epoch);
         const auto& navigation = receiver.published->navigation;
         QCOMPARE(navigation.timestampUs, positionReceipt);
-        if (delayUs > MAX_AGE_US) {
+        if (epoch > 2) {
             // Two epochs have shown the sentence, so this one waited for it and is published with it.
-            QVERIFY(type == "RMC" ? receiver.published->velocityValid
-                                  : std::isfinite(navigation.horizontalAccuracyMeters));
+            QVERIFY(type == "GST"   ? std::isfinite(navigation.horizontalAccuracyMeters)
+                    : type == "GSA" ? std::isfinite(navigation.verticalDop)
+                                    : receiver.published->velocityValid);
+        }
+    }
+}
+
+void GPSNMEAStreamTest::_epochLongerThanTwoSeconds_data()
+{
+    QTest::addColumn<QByteArrayList>("order");
+    QTest::newRow("gga-last") << QByteArrayList{"RMC", "GSA", "GST", "GSV", "GGA"};
+    QTest::newRow("gst-first") << QByteArrayList{"GST", "GSV", "GGA"};
+    QTest::newRow("gga-first") << QByteArrayList{"GGA", "GSV", "GSA", "RMC", "GST"};
+}
+
+void GPSNMEAStreamTest::_epochLongerThanTwoSeconds()
+{
+    QFETCH(QByteArrayList, order);
+    // A receiver that reports every five seconds at 4800 baud, where the GSV sentences of four constellations take
+    // 2.07 s: what precedes them and what follows them belong to one epoch.
+    constexpr uint64_t INTERVAL_US = 5000000;
+    constexpr uint64_t SATELLITES_US = 2070000;
+    NMEAReceiver receiver;
+    const uint64_t start = receiver.now;
+    for (int epoch = 0; epoch < 4; ++epoch) {
+        const QByteArray utc = QByteArray::number(123500 + 5 * epoch);
+        receiver.now = start + epoch * INTERVAL_US;
+        uint64_t positionReceipt = 0;
+        for (const auto& type : order) {
+            receiver.now += type == "GSV" ? SATELLITES_US : SENTENCE_INTERVAL_US;
+            if (type == "GGA") {
+                positionReceipt = receiver.now;
+            }
+            receiver.feed(sentenceOf(type, utc));
+        }
+        QCOMPARE(receiver.positions, epoch + 1);
+        const auto& navigation = receiver.published->navigation;
+        QCOMPARE(navigation.timestampUs, positionReceipt);
+        // What precedes the GGA is published with it; what follows it is waited for once two epochs have shown it.
+        if (order.last() == "GGA" || epoch >= 2) {
+            QCOMPARE(receiver.published->velocityValid, order.contains("RMC"));
+            QCOMPARE(std::isfinite(navigation.verticalDop), order.contains("GSA"));
+            QCOMPARE(std::isfinite(navigation.horizontalAccuracyMeters), order.contains("GST"));
         }
     }
 }
@@ -533,18 +607,89 @@ void GPSNMEAStreamTest::_fixLossWhileWaiting()
     QCOMPARE(receiver.published->navigation.fixType, GPSFixQuality::Fix3D);
 }
 
+void GPSNMEAStreamTest::_timeDoesNotAdvance_data()
+{
+    QTest::addColumn<QByteArrayList>("order");
+    QTest::addColumn<int>("reportsPerTime");
+    const std::array<std::pair<const char*, QByteArrayList>, 5> orders{{
+        {"gga-first", {"GGA", "GSA", "RMC", "VTG"}},
+        {"gga-first-with-gst", {"GGA", "GST", "GSA"}},
+        {"gga-between", {"RMC", "VTG", "GGA", "GSA"}},
+        {"gga-last", {"RMC", "VTG", "GSA", "GST", "GGA"}},
+        {"gst-first", {"GST", "GGA", "GSA"}},
+    }};
+    for (const auto& [name, order] : orders) {
+        // A receiver that prints whole seconds and reports five times a second.
+        QTest::addRow("whole-seconds-%s", name) << order << 5;
+        QTest::addRow("clock-stands-still-%s", name) << order << 1000;
+    }
+}
+
+void GPSNMEAStreamTest::_timeDoesNotAdvance()
+{
+    QFETCH(QByteArrayList, order);
+    QFETCH(int, reportsPerTime);
+    const bool velocity = order.contains("RMC") || order.contains("VTG");
+    NMEAReceiver receiver;
+    for (int report = 1; report <= 16; ++report) {
+        const QByteArray utc = QByteArray::number(123519 + report / reportsPerTime);
+        receiver.now += EPOCH_INTERVAL_US / 5;
+        for (const auto& type : order) {
+            receiver.now += SENTENCE_INTERVAL_US;
+            receiver.feed(sentenceOfReport(type, utc, report));
+        }
+        // Each report is published once, and never with what another report of the same time carried.
+        QCOMPARE(receiver.positions, report);
+        const auto& navigation = receiver.published->navigation;
+        if (receiver.published->velocityValid) {
+            QCOMPARE(qRound(qRadiansToDegrees(navigation.courseRadians)), report);
+        }
+        if (std::isfinite(navigation.verticalDop)) {
+            QCOMPARE(navigation.verticalDop, float(report));
+        }
+        if (std::isfinite(navigation.horizontalAccuracyMeters)) {
+            QCOMPARE(navigation.horizontalAccuracyMeters, float(report));
+        }
+        // Two reports show what the receiver sends after its GGA.
+        if (report > 2) {
+            QCOMPARE(receiver.published->velocityValid, velocity);
+            QCOMPARE(std::isfinite(navigation.verticalDop), order.contains("GSA"));
+            QCOMPARE(std::isfinite(navigation.horizontalAccuracyMeters), order.contains("GST"));
+        }
+    }
+}
+
+void GPSNMEAStreamTest::_timeStepsBack()
+{
+    NMEAReceiver receiver;
+    for (const auto& sentence : {rmc("123519"), QByteArray(GSA), gst("123519"), gga("123519")}) {
+        receiver.feed(sentence);
+    }
+    QVERIFY(receiver.published && receiver.published->velocityValid);
+    receiver.now += EPOCH_INTERVAL_US / 2;
+    receiver.feed(gga("123520"));
+    // The receiver reports a time of day again. What the earlier epoch of that time carried is not this one's.
+    receiver.now += EPOCH_INTERVAL_US / 2;
+    receiver.feed(gga("123519"));
+    QCOMPARE(receiver.positions, 3);
+    const auto& navigation = receiver.published->navigation;
+    QCOMPARE(navigation.timestampUs, receiver.now);
+    QVERIFY(!receiver.published->velocityValid);
+    QVERIFY(std::isnan(navigation.verticalDop));
+    QVERIFY(std::isnan(navigation.horizontalAccuracyMeters));
+}
+
 void GPSNMEAStreamTest::_vdopEpoch_data()
 {
     QTest::addColumn<QByteArray>("firstUtc");
     QTest::addColumn<QByteArray>("nextUtc");
     QTest::addColumn<quint64>("elapsedUs");
-    QTest::addColumn<bool>("retained");
-    QTest::newRow("same-epoch") << QByteArray("123519") << QByteArray("123519") << quint64(1000) << true;
-    QTest::newRow("next-epoch") << QByteArray("123519") << QByteArray("123520") << quint64(1000000) << false;
-    QTest::newRow("midnight") << QByteArray("235959") << QByteArray("000000") << quint64(1000000) << false;
-    QTest::newRow("expired-same-epoch") << QByteArray("123519") << QByteArray("123519") << quint64(7000000) << false;
-    QTest::newRow("expired-next-epoch") << QByteArray("123519") << QByteArray("123526") << quint64(7000000) << false;
-    QTest::newRow("missing-epoch") << QByteArray("123519") << QByteArray() << quint64(1000) << false;
+    QTest::newRow("same-time") << QByteArray("123519") << QByteArray("123519") << quint64(1000);
+    QTest::newRow("next-epoch") << QByteArray("123519") << QByteArray("123520") << quint64(1000000);
+    QTest::newRow("midnight") << QByteArray("235959") << QByteArray("000000") << quint64(1000000);
+    QTest::newRow("same-time-later") << QByteArray("123519") << QByteArray("123519") << quint64(7000000);
+    QTest::newRow("later-epoch") << QByteArray("123519") << QByteArray("123526") << quint64(7000000);
+    QTest::newRow("missing-epoch") << QByteArray("123519") << QByteArray() << quint64(1000);
 }
 
 void GPSNMEAStreamTest::_vdopEpoch()
@@ -552,7 +697,6 @@ void GPSNMEAStreamTest::_vdopEpoch()
     QFETCH(QByteArray, firstUtc);
     QFETCH(QByteArray, nextUtc);
     QFETCH(quint64, elapsedUs);
-    QFETCH(bool, retained);
     NMEAReceiver receiver;
     receiver.feed(rmc(firstUtc));
     receiver.feed(GSA);
@@ -564,39 +708,19 @@ void GPSNMEAStreamTest::_vdopEpoch()
     QCOMPARE(receiver.published->navigation.verticalDop, 0.6f);
     const auto positionReceipt = receiver.published->navigation.timestampUs;
     receiver.now = positionReceipt + elapsedUs;
+    // The next GGA is another epoch, whatever its time, and has only what its own sentences carry.
     receiver.feed(gga(nextUtc));
     QCOMPARE(receiver.published->navigation.timestampUs, receiver.now);
     QCOMPARE(receiver.published->navigation.horizontalDop, 0.9f);
-    if (retained) {
-        QCOMPARE(receiver.published->navigation.verticalDop, 0.6f);
-    } else {
-        QVERIFY(std::isnan(receiver.published->navigation.verticalDop));
-        QVERIFY(std::isnan(receiver.published->navigation.horizontalAccuracyMeters));
-    }
-}
-
-void GPSNMEAStreamTest::_vdopReceiptIsNotRenewed()
-{
-    NMEAReceiver receiver;
-    receiver.feed(gga("123519"));
-    receiver.feed(GSA);
-    for (unsigned second = 1; second <= 7; ++second) {
-        receiver.now += 1000000;
-        receiver.feed(gga("123519"));
-        QCOMPARE(receiver.published->navigation.timestampUs, receiver.now);
-        if (second <= 2) {
-            QCOMPARE(receiver.published->navigation.verticalDop, 0.6f);
-        } else {
-            QVERIFY(std::isnan(receiver.published->navigation.verticalDop));
-        }
-    }
+    QVERIFY(std::isnan(receiver.published->navigation.verticalDop));
+    QVERIFY(std::isnan(receiver.published->navigation.horizontalAccuracyMeters));
 }
 
 void GPSNMEAStreamTest::_unassociatedGsa_data()
 {
     QTest::addColumn<qint64>("ageUs");
     QTest::newRow("before-position") << qint64(0);
-    QTest::newRow("expired-position") << qint64(2000001);
+    QTest::newRow("after-published-position") << qint64(2000001);
     QTest::newRow("clock-regression") << qint64(-1);
 }
 
@@ -608,6 +732,7 @@ void GPSNMEAStreamTest::_unassociatedGsa()
         receiver.feed(gga("123519"));
         receiver.now = static_cast<uint64_t>(static_cast<qint64>(receiver.now) + ageUs);
     }
+    // No epoch has begun, or the current one went out: the GSA is not published, with it or with the next one.
     receiver.feed(GSA);
     QVERIFY(!receiver.published || std::isnan(receiver.published->navigation.verticalDop));
     receiver.now = 4000000;

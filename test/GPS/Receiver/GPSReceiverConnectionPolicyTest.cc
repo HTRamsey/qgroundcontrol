@@ -189,6 +189,11 @@ void GPSReceiverConnectionPolicyTest::_connectConfiguredValidationErrors_data()
     row("serial-bootloader", serialDevice);
     row("invalid-baud", baudRate);
     row("passive-auto-baud", baudRate);
+    // Where only one serial device can be open at a time, as with Android's USB serial driver.
+    row("single-port-in-use", GPSReceiverConnectionPolicy::tr("The selected serial device is already in use."));
+    row("single-port-other-in-use",
+        GPSReceiverConnectionPolicy::tr("Another connection has a serial device open, and only one can be open at a "
+                                        "time. Disconnect it first."));
 #endif
 }
 
@@ -217,7 +222,8 @@ void GPSReceiverConnectionPolicyTest::_connectConfiguredValidationErrors()
     PolicyHarness harness(configuration);
 #else
     QList<SerialPortManager::Port> inventory{rtkPort()};
-    if (reason.startsWith(QStringLiteral("serial-")) || reason == QStringLiteral("invalid-baud")) {
+    if (reason.startsWith(QStringLiteral("serial-")) || reason.startsWith(QStringLiteral("single-port-")) ||
+        reason == QStringLiteral("invalid-baud")) {
         configuration = GPSTest::serialConfiguration(gpsReceiverManufacturerForType(GPSType::UBlox),
                                                      QStringLiteral("/test/rtk"), 115200);
         configuration.autoConnect = false;
@@ -236,6 +242,14 @@ void GPSReceiverConnectionPolicyTest::_connectConfiguredValidationErrors()
         inventory = {serialPort(configuration.serialDevice)};
     }
     PolicyHarness harness(configuration, inventory);
+    // Another connection, such as a vehicle link, holds the selected device or another one.
+    (void) harness.ports.availablePorts();
+    harness.ports.setSinglePortOnly(reason.startsWith(QStringLiteral("single-port-")));
+    const auto vehicleLink = reason == QStringLiteral("single-port-in-use")
+                                 ? harness.ports.reservePort(configuration.serialDevice)
+                             : reason == QStringLiteral("single-port-other-in-use")
+                                 ? harness.ports.reservePort(QStringLiteral("/test/mavlink"))
+                                 : nullptr;
 #endif
     if (reason == QStringLiteral("already-connected")) {
         QVERIFY(harness.receiver.connectReceiver());
@@ -290,17 +304,25 @@ void GPSReceiverConnectionPolicyTest::_configurationChangeCancelsRetry()
 void GPSReceiverConnectionPolicyTest::_unconnectableConfigurationIsNotRetried_data()
 {
     QTest::addColumn<QString>("scenario");
-    QTest::newRow("saved-tcp") << QStringLiteral("saved-tcp");
-    QTest::newRow("saved-base-over-udp") << QStringLiteral("saved-base-over-udp");
+    QTest::addColumn<bool>("connectRefused");
+    for (const bool connectRefused : {false, true}) {
+        const auto row = [connectRefused](const char* scenario) {
+            QTest::addRow("%s%s", scenario, connectRefused ? "-connect-refused" : "")
+                << QString::fromLatin1(scenario) << connectRefused;
+        };
+        row("saved-tcp");
+        row("saved-base-over-udp");
 #ifndef QGC_NO_SERIAL_LINK
-    QTest::newRow("saved-serial-unplugged") << QStringLiteral("saved-serial-unplugged");
-    QTest::newRow("discovered") << QStringLiteral("discovered");
+        row("saved-serial-unplugged");
+        row("discovered");
 #endif
+    }
 }
 
 void GPSReceiverConnectionPolicyTest::_unconnectableConfigurationIsNotRetried()
 {
     QFETCH(QString, scenario);
+    QFETCH(bool, connectRefused);
     // A u-blox base has no receiver-managed averaging.
     auto fixed = receiverConfiguration();
     useTcp(fixed);
@@ -349,6 +371,16 @@ void GPSReceiverConnectionPolicyTest::_unconnectableConfigurationIsNotRetried()
         QVERIFY(harness.scheduler.advanceBy(std::chrono::seconds(60)));
     }
 
+    // The user's Connect is refused for the same reason, and changes nothing of that.
+    if (connectRefused) {
+        QVERIFY(!receiver.connectReceiver());
+        QCOMPARE(receiver.errorMessage(), error);
+        QCOMPARE(errors.size(), 1);
+        QVERIFY(!receiver.reconnecting());
+        harness.update();
+        QCOMPARE(harness.attempts(), 0);
+    }
+
     // A changed configuration is connected as at startup.
 #ifndef QGC_NO_SERIAL_LINK
     if (scenario == QStringLiteral("saved-serial-unplugged")) {
@@ -390,6 +422,9 @@ void GPSReceiverConnectionPolicyTest::_configurationChangeWithdrawsRefusal_data(
     // The host is still missing.
     row("tcp-without-host", "port-changed", false);
     row("tcp-without-host", "forwarding-off", false);
+    // A saved receiver that still cannot connect: its changed configuration is left to automatic connection, and the
+    // message stays all the same.
+    row("base-over-udp", "forwarding-off", false);
     // What ended a session stays, whatever is selected next.
     row("lost-connection", "port-changed", false);
 #ifndef QGC_NO_SERIAL_LINK
@@ -409,6 +444,10 @@ void GPSReceiverConnectionPolicyTest::_configurationChangeWithdrawsRefusal()
     auto configuration = tcpConfiguration(false);
     if (refused == QStringLiteral("tcp-without-host")) {
         configuration.tcpHost.clear();
+    } else if (refused == QStringLiteral("base-over-udp")) {
+        configuration = receiverConfiguration();
+        configuration.connectionType = RTKSettings::Udp;
+        configuration.autoConnect = false;
     }
 #ifdef QGC_NO_SERIAL_LINK
     PolicyHarness harness(configuration);

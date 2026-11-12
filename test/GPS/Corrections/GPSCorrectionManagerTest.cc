@@ -2,13 +2,20 @@
 
 #include <utility>
 
+#include <QtCore/QCoreApplication>
 #include <QtCore/QDir>
+#include <QtCore/QFile>
 #include <QtCore/QFileInfo>
 #include <QtCore/QRegularExpression>
 #include <QtNetwork/QNetworkDatagram>
 #include <QtNetwork/QNetworkInterface>
 #include <QtNetwork/QUdpSocket>
 #include <QtTest/QSignalSpy>
+
+#ifdef Q_OS_LINUX
+#include <fcntl.h>
+#include <unistd.h>
+#endif
 
 #include "Fixtures/RAIIFixtures.h"
 #include "GPSCorrectionManager.h"
@@ -32,6 +39,28 @@
 using namespace GPSTest;
 
 namespace {
+#ifdef Q_OS_LINUX
+/// Points this process's open descriptors of @a file at /dev/full, so that what is written to the open file from now
+/// on fails as on a full disk. Only that file is affected. @return whether a descriptor was found.
+bool failWritesTo(const QString& file)
+{
+    constexpr int DESCRIPTORS = 4096;
+    const QString path = QFileInfo(file).canonicalFilePath();
+    const int full = ::open("/dev/full", O_WRONLY | O_CLOEXEC);
+    if (path.isEmpty() || full < 0) {
+        return false;
+    }
+    bool found = false;
+    for (int descriptor = 0; descriptor < DESCRIPTORS; ++descriptor) {
+        if (descriptor != full && QFile::symLinkTarget(QStringLiteral("/proc/self/fd/%1").arg(descriptor)) == path) {
+            found = ::dup2(full, descriptor) == descriptor || found;
+        }
+    }
+    (void) ::close(full);
+    return found;
+}
+#endif
+
 void configureUdp(TestFixtures::SettingsFixture& saved, GPSCorrectionSettings* settings, quint16 port)
 {
     saved.setFactValue(SettingsManager::instance()->ntripSettings()->ntripServerConnectEnabled(), false);
@@ -600,7 +629,7 @@ void GPSCorrectionManagerTest::_logThatCannotStart()
 
 void GPSCorrectionManagerTest::_logKeepsExistingFile()
 {
-    // Two logs can be named alike: started within one millisecond, or after the clock was set back.
+    // Two logs can be named alike after the clock was set back.
     TestFixtures::TempDirFixture directory;
     const QString earlier = directory.createFile(QStringLiteral("20260102T030405.006Z.rtcm3"), "earlier log");
     RTCMLogFile log;
@@ -614,10 +643,30 @@ void GPSCorrectionManagerTest::_logKeepsExistingFile()
     QCOMPARE(readFile(earlier), QByteArray("earlier log"));
 }
 
+void GPSCorrectionManagerTest::_logsStartedTogetherGetOwnFiles()
+{
+    TestFixtures::TempDirFixture directory;
+    const QString folder = directory.path();
+    ManualScheduler scheduler;
+    GPSCorrectionManager corrections(nullptr, &scheduler, {.logDirectory = [&folder] { return folder; }});
+
+    // A log is named by the millisecond it starts in. These start far more often than that, as a log that is turned
+    // on again from a signal of the one before does, and none is refused as an earlier log of its name.
+    QStringList files;
+    for (int start = 0; start < 100; ++start) {
+        corrections.setLogToFile(true);
+        QVERIFY2(corrections.logToFile(), qPrintable(corrections.logError()));
+        files.append(QFileInfo(corrections.logFile()).fileName());
+        corrections.setLogToFile(false);
+    }
+    // Their names sort in the order they started.
+    QCOMPARE(QDir(folder).entryList(QDir::Files, QDir::Name), files);
+}
+
 void GPSCorrectionManagerTest::_logEndsAtSizeLimit()
 {
     TestFixtures::TempDirFixture directory;
-    QString folder = directory.path();
+    const QString folder = directory.path();
     const QByteArray frame = GPSTest::rtcmMessage(1077, 100);
     ManualScheduler scheduler;
     // Room for two frames and part of a third.
@@ -648,15 +697,71 @@ void GPSCorrectionManagerTest::_logEndsAtSizeLimit()
     QCOMPARE(sent.size(), 4);
     QCOMPARE(readFile(file), frame + frame);
 
-    // The reason stays until the log is turned on again. A log started within the same millisecond would be named
-    // as the one that ended, so this one goes to a folder of its own.
+    // The reason stays until the log is turned on again, which starts a file of its own in the same folder.
     QVERIFY(advanceTick(scheduler));
     QVERIFY(!corrections.logError().isEmpty());
-    folder = QDir(directory.path()).filePath(QStringLiteral("next"));
     corrections.setLogToFile(true);
     QVERIFY(corrections.logToFile());
     QVERIFY(corrections.logError().isEmpty());
     QCOMPARE(changes.size(), 2);
+}
+
+void GPSCorrectionManagerTest::_logStopsAfterWriteError_data()
+{
+    QTest::addColumn<bool>("bufferFills");
+    // The frames are written out every second, and sooner once they fill the file's buffer.
+    QTest::newRow("at-the-tick") << false;
+    QTest::newRow("as-the-buffer-fills") << true;
+}
+
+void GPSCorrectionManagerTest::_logStopsAfterWriteError()
+{
+#ifdef Q_OS_LINUX
+    QFETCH(bool, bufferFills);
+    TestFixtures::TempDirFixture directory;
+    const QString folder = directory.path();
+    ManualScheduler scheduler;
+    GPSCorrectionManager corrections(nullptr, &scheduler, {.logDirectory = [&folder] { return folder; }});
+    QList<QByteArray> sent;
+    captureVehicleFrames(corrections, sent);
+    const auto source = corrections.openSource(GPSCorrectionSettings::Ntrip, {});
+    const QByteArray frame = GPSTest::rtcmMessage(1077, 100);
+    corrections.setLogToFile(true);
+    const QString file = corrections.logFile();
+    source->submit(frame, scheduler.nowMs());
+    QVERIFY(advanceTick(scheduler));
+    QCOMPARE(readFile(file), frame);
+    QSignalSpy changes(&corrections, &GPSCorrectionManager::logChanged);
+
+    // The log is open, and then its disk is full.
+    QVERIFY(failWritesTo(file));
+    expectLogMessage("GPS.Corrections.RTCMLogFile", QtWarningMsg, QRegularExpression(QStringLiteral("file error")));
+    if (bufferFills) {
+        // Several times what QFile buffers before it writes.
+        for (int frames = 0; corrections.logToFile() && frames < 1000; ++frames) {
+            source->submit(frame, scheduler.nowMs());
+        }
+    } else {
+        source->submit(frame, scheduler.nowMs());
+        QVERIFY(corrections.logToFile());
+        QVERIFY(advanceTick(scheduler));
+    }
+    verifyExpectedLogMessage();
+
+    // The log ended, says why with the system's reason and no longer names its file. What it wrote before stays,
+    // and the routing goes on.
+    QVERIFY(!corrections.logToFile());
+    QVERIFY(corrections.logFile().isEmpty());
+    QCOMPARE(corrections.logError(), GPSCorrectionManager::tr("The log stopped after a file error: %1")
+                                         .arg(QCoreApplication::translate("QIODevice", "No space left on device")));
+    QCOMPARE(changes.size(), 1);
+    const qsizetype routed = sent.size();
+    source->submit(frame, scheduler.nowMs());
+    QCOMPARE(sent.size(), routed + 1);
+    QCOMPARE(readFile(file), frame);
+#else
+    QSKIP("Needs /proc/self/fd and /dev/full to fail the writes to an open file");
+#endif
 }
 
 void GPSCorrectionManagerTest::_udpOutputForwardsSelectedStream()

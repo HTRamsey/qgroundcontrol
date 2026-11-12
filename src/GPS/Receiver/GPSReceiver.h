@@ -12,6 +12,7 @@
 #include <QtCore/QString>
 #include <QtQmlIntegration/QtQmlIntegration>
 
+#include "GPSBoundedFile.h"
 #include "GPSObservation.h"
 #include "GPSReceiverConnector.h"
 #include "GPSReceiverDescriptor.h"
@@ -154,7 +155,9 @@ public:
     Q_INVOKABLE bool connectReceiver();
     /// Disconnects and pauses automatic connection until the user connects again.
     Q_INVOKABLE void disconnectReceiver();
-    /// Runs tick() every POLL_INTERVAL until shutdown(), skipping ticks while @a suspended returns true.
+    /// Runs tick() every POLL_INTERVAL until shutdown(). While @a suspended returns true the receiver is not ticked,
+    /// so nothing is scanned or connected, and only the serial port entries are brought up to date with the ports
+    /// other connections hold.
     void startConnectionPolling(std::function<bool()> suspended = {});
     /// One step of automatic connection: connections due, reconnections, and USB discovery. It also brings the serial
     /// port entries up to date with the ports other connections hold.
@@ -357,6 +360,9 @@ private:
     /// shutdown() is running.
     bool _shuttingDown = false;
     const std::function<QString()> _recordingDirectory;
+    /// The start times the recordings are named by, so that sessions which start within one millisecond are recorded
+    /// to files of their own.
+    GPSFileStartTimes _recordingStartTimes;
     /// The recording of the latest session.
     QString _recordingFile;
     /// Set on the worker thread when that recording stopped before its session.

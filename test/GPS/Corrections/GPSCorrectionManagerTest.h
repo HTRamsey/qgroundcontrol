@@ -35,5 +35,8 @@ private slots:
     void _logThatCannotStart_data();
     void _logThatCannotStart();
     void _logKeepsExistingFile();
+    void _logsStartedTogetherGetOwnFiles();
     void _logEndsAtSizeLimit();
+    void _logStopsAfterWriteError_data();
+    void _logStopsAfterWriteError();
 };

@@ -167,8 +167,9 @@ repos:
       # Python type checking
       - id: pyright
         name: pyright
-        # terrain and simulation let pyright resolve numpy/rasterio and pymavlink types.
-        entry: uv run --frozen --project tools --group lint --group terrain --group simulation pyright
+        # test, terrain and simulation let pyright resolve the types of pytest and its plugins, which tools/tests
+        # imports, of numpy/rasterio and of pymavlink.
+        entry: uv run --frozen --project tools --group lint --group test --group terrain --group simulation pyright
         language: system
         require_serial: true
         # Same paths as pyrightconfig.json's include, plus its configuration and the locked Pyright and
