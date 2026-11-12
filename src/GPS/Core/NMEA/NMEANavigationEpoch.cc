@@ -1,11 +1,13 @@
 #include "NMEANavigationEpoch.h"
 
-#include <algorithm>
 #include <utility>
 
 #include "MonotonicClock.h"
 
+namespace NMEA {
+
 namespace {
+
 std::optional<double> finiteValue(double value)
 {
     return std::isfinite(value) ? std::optional<double>(value) : std::nullopt;
@@ -13,7 +15,7 @@ std::optional<double> finiteValue(double value)
 
 std::optional<double> nonnegativeNumber(std::string_view field)
 {
-    const auto value = NMEA::number<double>(field);
+    const auto value = number<double>(field);
     return value && *value >= 0.0 ? value : std::nullopt;
 }
 
@@ -25,13 +27,7 @@ void addReported(std::optional<double>& value, std::optional<double> reported)
     }
 }
 
-void markReceipt(NMEA::NavigationEpoch& epoch, uint64_t receivedAtUs)
-{
-    epoch.receivedAtUs = epoch.receivedAtUs == 0 ? receivedAtUs : (std::min) (epoch.receivedAtUs, receivedAtUs);
-}
 }  // namespace
-
-namespace NMEA {
 
 std::optional<double> NavigationEpoch::altitudeEllipsoidMeters() const
 {
@@ -55,9 +51,7 @@ std::optional<NavigationUpdate> NavigationEpochAssembler::ingest(const Sentence&
             _invalidThroughSequence = sequence;
             NavigationEpoch loss;
             loss.timeMs = navigation->utcMilliseconds;
-            loss.receivedAtUs = receivedAtUs;
             loss.positionReceivedAtUs = receivedAtUs;
-            loss.sequence = sequence;
             loss.fixQuality = GPSFixQuality::NoFix;
             if (sentence.type() == "GGA" && sentence.count > Field::GGA_SATELLITES_USED) {
                 loss.satellitesUsed = ggaSatellitesUsed(sentence.fields[Field::GGA_SATELLITES_USED]);
@@ -121,7 +115,7 @@ NavigationEpochAssembler::StoredEpoch& NavigationEpochAssembler::_positionEpoch(
 std::optional<NavigationEpoch> NavigationEpochAssembler::_end(StoredEpoch& stored)
 {
     std::optional<NavigationEpoch> overdue;
-    if (!stored.published && stored.epoch.ggaQuality && !_hiddenByFixLoss(stored.epoch)) {
+    if (!stored.published && stored.epoch.ggaQuality && !_hiddenByFixLoss(stored)) {
         overdue = stored.epoch;
     }
     stored.published = true;
@@ -129,9 +123,9 @@ std::optional<NavigationEpoch> NavigationEpochAssembler::_end(StoredEpoch& store
     return overdue;
 }
 
-bool NavigationEpochAssembler::_hiddenByFixLoss(const NavigationEpoch& epoch) const
+bool NavigationEpochAssembler::_hiddenByFixLoss(const StoredEpoch& stored) const
 {
-    return !_navigationValid || epoch.sequence <= _invalidThroughSequence;
+    return !_navigationValid || stored.sequence <= _invalidThroughSequence;
 }
 
 void NavigationEpochAssembler::_add(StoredEpoch& stored, Addition addition, uint64_t receivedAtUs) const
@@ -152,7 +146,7 @@ bool NavigationEpochAssembler::_complete(const StoredEpoch& stored) const
 {
     // One epoch with a follower may be a slower sentence's turn; two in a row are the receiver's order.
     const Additions awaited = _previousFollowers & _earlierFollowers;
-    return !stored.published && stored.epoch.ggaQuality && !_hiddenByFixLoss(stored.epoch) &&
+    return !stored.published && stored.epoch.ggaQuality && !_hiddenByFixLoss(stored) &&
            (stored.additions & awaited) == awaited;
 }
 
@@ -173,8 +167,7 @@ NavigationEpochAssembler::StoredEpoch* NavigationEpochAssembler::_joinPosition(c
         epoch.satellitesUsed = ggaFix->satellitesUsed;
         epoch.horizontalDop = finiteValue(ggaFix->hdop);
         epoch.positionReceivedAtUs = receivedAtUs;
-        epoch.sequence = _sequence;
-        markReceipt(epoch, receivedAtUs);
+        stored.sequence = _sequence;
         _ggaInterval = MonotonicClock::age(_ggaReceivedAtUs, receivedAtUs).value_or(std::chrono::microseconds::zero());
         _ggaReceivedAtUs = receivedAtUs;
         return &stored;
@@ -192,11 +185,9 @@ NavigationEpochAssembler::StoredEpoch* NavigationEpochAssembler::_joinPosition(c
     }
     // Only the GGA's position is published.
     auto& stored = _positionEpoch(timeMs, rmcFix ? Position::RMC : Position::GLL, overdue);
-    auto& epoch = stored.epoch;
-    markReceipt(epoch, receivedAtUs);
     if (rmcFix) {
-        addReported(epoch.speedMetersPerSecond, finiteValue(rmcFix->speedMetersPerSecond));
-        addReported(epoch.courseDegrees, finiteValue(rmcFix->courseDegrees));
+        addReported(stored.epoch.speedMetersPerSecond, finiteValue(rmcFix->speedMetersPerSecond));
+        addReported(stored.epoch.courseDegrees, finiteValue(rmcFix->courseDegrees));
         _add(stored, Addition::RMC, receivedAtUs);
     }
     return &stored;
@@ -223,7 +214,6 @@ NavigationEpochAssembler::StoredEpoch* NavigationEpochAssembler::_joinAccuracy(c
     auto& epoch = stored.epoch;
     addReported(epoch.horizontalAccuracyMeters, finiteValue(accuracy->horizontalAccuracy));
     addReported(epoch.verticalAccuracyMeters, finiteValue(accuracy->verticalAccuracy));
-    markReceipt(epoch, receivedAtUs);
     _add(stored, Addition::GST, receivedAtUs);
     return &stored;
 }

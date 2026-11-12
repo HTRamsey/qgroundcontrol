@@ -134,6 +134,7 @@ void NTRIPHttpCodecTest::_buildRequestRejectsInvalidConfig_data()
     QTest::newRow("host-space") << QStringLiteral("caster example") << QStringLiteral("TEST");
     QTest::newRow("host-del") << QStringLiteral("caster\x7f") << QStringLiteral("TEST");
     QTest::newRow("mountpoint-crlf") << QStringLiteral("localhost") << QStringLiteral("TEST\r\nInjected: value");
+    QTest::newRow("mountpoint-cr") << QStringLiteral("localhost") << QStringLiteral("TEST\rOTHER");
     QTest::newRow("mountpoint-space") << QStringLiteral("localhost") << QStringLiteral("TEST OTHER");
     QTest::newRow("mountpoint-del") << QStringLiteral("localhost") << QStringLiteral("TEST\x7f");
     QTest::newRow("mountpoint-empty") << QStringLiteral("localhost") << QString();
@@ -248,6 +249,12 @@ void NTRIPHttpCodecTest::_framing_data()
                                     "HTTP/1.1 2000 OK", "HTTP/1.1\t200 OK"}) {
         QTest::newRow(status.constData()) << status + "\r\n\r\n" << QByteArray() << false << invalid;
     }
+    // Every line the decoder reads ends with CRLF: a bare LF ends neither a status line nor a chunk size, as it ends
+    // no header field ("X: value\nOther: value" above).
+    QTest::newRow("lf-status-line") << QByteArray("HTTP/1.1 200 OK\nContent-Length: 3\n\nabc") << QByteArray() << false
+                                    << invalid;
+    QTest::newRow("icy-lf-status-line") << QByteArray("ICY 200 OK\n") + binary << QByteArray() << false << invalid;
+    QTest::newRow("lf-chunk-size") << chunked + "3\nabc\r\n0\r\n\r\n" << QByteArray() << true << invalid;
     QTest::newRow("switching-protocol") << QByteArray("HTTP/1.1 101 Switching Protocols\r\n\r\n") << QByteArray()
                                         << false << invalid;
     QTest::newRow("too-many-informationals")

@@ -29,18 +29,21 @@ void requireTable(bool condition)
     }
 }
 
-/// The definition of a complete table: a line of @a body is ENDSOURCETABLE, with or without a carriage return after it.
-bool hasEndLine(QByteArrayView body)
+/// The definition of a complete table: a line of @a body is ENDSOURCETABLE and is whole. The carriage return or line
+/// feed after the word shows that it is, and so does the end of a body that has @a ended.
+bool hasEndLine(QByteArrayView body, bool ended)
 {
     static constexpr QByteArrayView END_LINE("ENDSOURCETABLE");
     for (qsizetype start = 0; start <= body.size();) {
-        qsizetype end = body.indexOf('\n', start);
-        if (end < 0) {
-            end = body.size();
-        }
+        const qsizetype lineFeed = body.indexOf('\n', start);
+        const qsizetype end = lineFeed < 0 ? body.size() : lineFeed;
         const QByteArrayView line = body.sliced(start, end - start);
-        if (line.startsWith(END_LINE) && (line.size() == END_LINE.size() || line.at(END_LINE.size()) == '\r')) {
-            return true;
+        if (line.startsWith(END_LINE)) {
+            const bool whole =
+                line.size() == END_LINE.size() ? lineFeed >= 0 || ended : line.at(END_LINE.size()) == '\r';
+            if (whole) {
+                return true;
+            }
         }
         start = end + 1;
     }
@@ -64,7 +67,9 @@ void checkList(const NTRIPSourceTableModel& model, const NTRIPSourceTableSortMod
             requireTable(index.data(role).isValid());
         }
         const QString mountpoint = index.data(NTRIPSourceTableModel::MountpointRole).toString();
-        requireTable(!mountpoint.isEmpty() && !mountpoint.contains(u';') && !mountpoint.contains(u'\n'));
+        requireTable(!mountpoint.isEmpty() && !mountpoint.contains(u';'));
+        requireTable(
+            std::ranges::none_of(mountpoint, [](QChar ch) { return ch.unicode() < 0x20 || ch.unicode() == 0x7f; }));
         const double km = index.data(NTRIPSourceTableModel::DistanceKmRole).toDouble();
         const bool known = km >= 0;
         requireTable(known ? referenceKnown && km <= SOURCE_TABLE_MAX_DISTANCE_KM : km == -1.0);
@@ -93,12 +98,12 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
         received = std::min(received + stride, body.size());
         const QByteArrayView arrived = body.first(received);
         const bool complete = ntripSourceTableComplete(arrived, checked);
-        requireTable(complete == hasEndLine(arrived));
+        requireTable(complete == hasEndLine(arrived, false));
         if (complete) {
             break;
         }
     }
-    requireTable(ntripSourceTableComplete(body) == hasEndLine(body));
+    requireTable(ntripSourceTableComplete(body, 0, true) == hasEndLine(body, true));
 
     const QString table = QString::fromUtf8(body);
     const QGeoCoordinate reference(47.4, 8.5);

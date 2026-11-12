@@ -21,18 +21,26 @@ enum class StrField : qsizetype
     Longitude = 10,
     Bitrate = 17,
 };
+
+/// A control character, such as a bare carriage return left inside a field. NTRIPConnectionConfig refuses a
+/// mountpoint that has one.
+bool hasControlCharacter(const QString& text)
+{
+    return std::ranges::any_of(text, [](QChar ch) { return ch.unicode() < 0x20 || ch.unicode() == 0x7f; });
+}
 }  // namespace
 
-bool ntripSourceTableComplete(QByteArrayView body, qsizetype checkedSize)
+bool ntripSourceTableComplete(QByteArrayView body, qsizetype checkedSize, bool ended)
 {
     static constexpr QByteArrayView terminator("ENDSOURCETABLE");
-    // A terminator the earlier check missed ends past its data, so it starts no earlier than this.
+    // A terminator the earlier check missed has its line ending past that data, so it starts no earlier than this.
     const qsizetype from = (std::max) (qsizetype(0), checkedSize - terminator.size());
     for (qsizetype offset = body.indexOf(terminator, from); offset >= 0;
          offset = body.indexOf(terminator, offset + 1)) {
         const qsizetype end = offset + terminator.size();
-        if ((offset == 0 || body.at(offset - 1) == '\n') &&
-            (end == body.size() || body.at(end) == '\r' || body.at(end) == '\n')) {
+        // At the end of the bytes so far, the line may still go on.
+        const bool lineEnds = end == body.size() ? ended : body.at(end) == '\r' || body.at(end) == '\n';
+        if ((offset == 0 || body.at(offset - 1) == '\n') && lineEnds) {
             return true;
         }
     }
@@ -48,12 +56,15 @@ std::optional<NTRIPMountpoint> NTRIPMountpoint::fromSourceTableLine(const QStrin
     const auto field = [&fields](StrField position) {
         return fields.value(static_cast<qsizetype>(position)).trimmed();
     };
-    if (field(StrField::Type).toUpper() != QStringLiteral("STR") || field(StrField::Mountpoint).isEmpty()) {
+    const QString name = field(StrField::Mountpoint);
+    // A control character does not show in the list: the name would look like one that can be requested, and
+    // selecting it would save a name that every connection is refused for.
+    if (field(StrField::Type).toUpper() != QStringLiteral("STR") || name.isEmpty() || hasControlCharacter(name)) {
         return std::nullopt;
     }
 
     NTRIPMountpoint mp;
-    mp.mountpoint = field(StrField::Mountpoint);
+    mp.mountpoint = name;
     mp.identifier = field(StrField::Identifier);
     mp.format = field(StrField::Format);
     mp.navSystem = field(StrField::NavSystem);
