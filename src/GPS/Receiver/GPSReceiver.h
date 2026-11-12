@@ -142,7 +142,7 @@ public:
     const Configuration& configuration() const { return _configuration; }
 
     /// GPSReceiverSerialPorts::entries(): the serial device picker's entries, of the devices the last scan listed and
-    /// marked as other connections hold them when the receiver was last polled.
+    /// marked as other connections held ports when the receiver was last polled.
     QList<GPSSerialPortEntry> serialPortEntries() const { return _serial->entries(); }
 
     /// The application's serial rates that a receiver accepts as an explicit rate; empty without serial links.
@@ -292,7 +292,7 @@ private:
 
     void endConnection(ShownError error) override;
     bool connectTcp(const QString& host, quint16 port, GPSType type, GPSReceiverConfig request) override;
-    bool connectUdp(quint16 port, GPSType type, GPSReceiverConfig request) override;
+    bool connectUdp(quint16 port, GPSReceiverConfig request) override;
     bool connectSerial(const QString& device, GPSType type, GPSReceiverConfig request, GPSSerialClaim claim) override;
     /// Ends a serial session whose device the scan no longer lists.
     void _onSerialPortsScanned(const QStringList& devices);
