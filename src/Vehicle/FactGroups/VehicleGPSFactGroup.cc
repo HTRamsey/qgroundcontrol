@@ -147,6 +147,11 @@ void VehicleGPSFactGroup::_handleGpsRaw(const mavlink_message_t& message)
         const double yawValue = raw.yaw > 0 && raw.yaw <= 36000 ? (raw.yaw % 36000) / 100.0 : qQNaN();
         _updateFix(raw.fix_type, raw.satellites_visible, hdopValue, vdopValue,
                    position.attribute(QGeoPositionInfo::Direction), yawValue);
+        // Zero is a vehicle that does not report its height above the ellipsoid.
+        if (raw.fix_type >= GPS_FIX_TYPE_3D_FIX && raw.alt_ellipsoid != 0) {
+            _geoidSeparation = GPSGeoidSeparation{.measuredAt = QGeoCoordinate(raw.lat * 1e-7, raw.lon * 1e-7),
+                                                  .meters = raw.alt_ellipsoid / 1000.0 - raw.alt / 1000.0};
+        }
         _reportPosition(position, raw.fix_type);
     };
     if (message.msgid == MAVLINK_MSG_ID_GPS_RAW_INT) {

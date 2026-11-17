@@ -55,12 +55,16 @@ struct GgaHeight
 };
 
 /// The height above mean sea level a GGA reports for @a observation, with the geoid separation that makes it the
-/// height above the ellipsoid. A caster places the rover by its latitude and longitude, so an altitude of unknown
-/// datum is reported as it is, and zero when no height is known, both without a separation.
+/// height above the ellipsoid when its receiver reports both. A caster places the rover by its latitude and
+/// longitude, so a height above the ellipsoid alone or an altitude of unknown datum is reported as it is, and zero
+/// when no height is known, all without a separation.
 GgaHeight reportedHeight(const GPSObservation& observation)
 {
     if (const auto altitude = observation.altitudeMslMeters()) {
         return {.altitude = *altitude, .geoidSeparation = observation.geoidSeparationMeters().value_or(qQNaN())};
+    }
+    if (const auto ellipsoidHeight = observation.ellipsoidHeightMeters()) {
+        return {.altitude = *ellipsoidHeight};
     }
     const double altitude = observation.position.coordinate().altitude();
     return {.altitude = qIsFinite(altitude) ? altitude : 0.0};

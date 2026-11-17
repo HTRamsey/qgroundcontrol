@@ -1,12 +1,14 @@
 #pragma once
 
 #include <chrono>
+#include <optional>
 
 #include <QtCore/QPointer>
 #include <QtPositioning/QGeoPositionInfo>
 #include <QtQmlIntegration/QtQmlIntegration>
 
 #include "FactGroup.h"
+#include "GPSGeoidSeparation.h"
 #include "ScheduledTask.h"
 
 class RuntimeScheduler;
@@ -135,6 +137,11 @@ public:
     /// The receiver's reported system errors, comma separated; empty when there are none.
     QString systemErrorText() const;
 
+    /// What the receiver last had between its altitude and its height above the ellipsoid in a GPS_RAW_INT or
+    /// GPS2_RAW with a 3D fix, and where. It holds for that place, so a later report without the height keeps it.
+    /// Empty for a vehicle that does not report the height above the ellipsoid.
+    std::optional<GPSGeoidSeparation> geoidSeparation() const { return _geoidSeparation; }
+
     bool jammingReported() const;
     bool spoofingReported() const;
     bool authenticationReported() const;
@@ -195,6 +202,7 @@ private:
     Fact _rtkSatellitesFact = Fact(0, QStringLiteral("rtkSatellites"), FactMetaData::valueTypeInt32);
 
     const ReceiverIndex _receiver;
+    std::optional<GPSGeoidSeparation> _geoidSeparation;
     QPointer<RuntimeScheduler> _scheduler;
     ScheduledTask _rtkStatusExpiry;
     ScheduledTask _integrityExpiry;

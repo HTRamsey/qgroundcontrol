@@ -196,7 +196,7 @@ void GPSManagerTest::_vehicleGpsEllipsoidHeight_data()
     QTest::addColumn<QList<int>>("ellipsoidMm");
     // The height above the ellipsoid of the last report's observation, beside 450 m above mean sea level; none is NaN.
     QTest::addColumn<double>("ellipsoid");
-    // The receiver's own geoid separation of 30 m, where the EGM96 model has 48.4 m.
+    // The receiver's own geoid separation of 30 m.
     QTest::newRow("reported") << QList<int>{480000} << 480.0;
     QTest::newRow("not-reported") << QList<int>{0} << qQNaN();
     QTest::newRow("no-longer-reported") << QList<int>{480000, 0} << qQNaN();
@@ -287,10 +287,10 @@ void GPSManagerTest::_groundStationGgaReportsAnyAltitudeDatum_data()
 {
     // The datum of the device position differs by platform; a caster needs its latitude and longitude.
     QTest::addColumn<GPSAltitudeDatum>("datum");
-    // The altitude and geoid separation fields for 450 m at 47N 8E, where the geoid is 48.4 m above the ellipsoid.
+    // The altitude and geoid separation fields for 450 m: a device reports one height, so no separation.
     QTest::addColumn<QByteArray>("heights");
-    QTest::newRow("mean-sea-level") << GPSAltitudeDatum::MeanSeaLevel << QByteArray(",450.0,M,48.4,M,");
-    QTest::newRow("ellipsoid") << GPSAltitudeDatum::Ellipsoid << QByteArray(",401.6,M,48.4,M,");
+    QTest::newRow("mean-sea-level") << GPSAltitudeDatum::MeanSeaLevel << QByteArray(",450.0,M,,M,");
+    QTest::newRow("ellipsoid") << GPSAltitudeDatum::Ellipsoid << QByteArray(",450.0,M,,M,");
     QTest::newRow("unknown") << GPSAltitudeDatum::Unknown << QByteArray(",450.0,M,,M,");
 }
 

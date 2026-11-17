@@ -11,6 +11,7 @@
 #include "QmlObjectListModel.h"
 #include "SettingsManager.h"
 #include "Vehicle.h"
+#include "VehicleGPSFactGroup.h"
 
 QGC_LOGGING_CATEGORY(FollowMeLog, "API.FollowMe")
 
@@ -120,7 +121,6 @@ void FollowMe::_sendGCSMotionReport()
 
     motionReport.lat_int = static_cast<int>(gcsCoordinate.latitude() * 1e7);
     motionReport.lon_int = static_cast<int>(gcsCoordinate.longitude() * 1e7);
-    motionReport.altMetersAMSL = observation->altitudeMslMeters().value_or(qQNaN());
     estimationCapabilities |= (1 << POS);
 
     if (geoPositionInfo.hasAttribute(QGeoPositionInfo::Direction)) {
@@ -158,6 +158,11 @@ void FollowMe::_sendGCSMotionReport()
     for (int i = 0; i < vehicles->count(); i++) {
         Vehicle* const vehicle = vehicles->value<Vehicle*>(i);
         if (vehicle && ((_currentMode == MODE_ALWAYS) || (_isFollowFlightMode(vehicle, vehicle->flightMode())))) {
+            // The vehicle's own GPS converts a height above the ellipsoid, which is all some devices report.
+            VehicleGPSFactGroup* const vehicleGps = vehicle->gpsFactGroup();
+            motionReport.altMetersAMSL =
+                observation->altitudeMslMeters(vehicleGps ? vehicleGps->geoidSeparation() : std::nullopt)
+                    .value_or(qQNaN());
             qCDebug(FollowMeLog) << "sendGCSMotionReport latInt:lonInt:altMetersAMSL" << motionReport.lat_int << motionReport.lon_int << motionReport.altMetersAMSL;
             vehicle->firmwarePlugin()->sendGCSMotionReport(vehicle, motionReport, estimationCapabilities);
         }

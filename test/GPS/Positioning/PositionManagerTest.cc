@@ -10,7 +10,6 @@
 
 #include "ManualScheduler.h"
 #include "PositionManager.h"
-#include "QGCGeoid.h"
 #include "QmlTesting/QmlFixtures.h"
 #include "Support/GPSTestHelpers.h"
 
@@ -214,15 +213,17 @@ void PositionManagerTest::_deviceAltitudeDatum_data()
 {
     QTest::addColumn<GPSAltitudeDatum>("declared");
     QTest::addColumn<bool>("verticalAccuracy");
-    // What Remote ID is given for the altitude of 500 m at 47N 8E, where the geoid is about 48 m above the ellipsoid.
+    // The geoid separation that the reader has from a receiver at the position; NaN when it has none.
+    QTest::addColumn<double>("separation");
+    // What Remote ID is given for the altitude of 500 m at 47N 8E.
     QTest::addColumn<GPSAltitudeDatum>("expected");
     QTest::addColumn<double>("expectedAltitude");
-    QTest::newRow("ellipsoid") << GPSAltitudeDatum::Ellipsoid << true << GPSAltitudeDatum::Ellipsoid << 500.0;
-    QTest::newRow("mean-sea-level") << GPSAltitudeDatum::MeanSeaLevel << true << GPSAltitudeDatum::Ellipsoid
-                                    << 500.0 + QGCGeo::geoidSeparation(47, 8);
-    QTest::newRow("unverified-altitude") << GPSAltitudeDatum::MeanSeaLevel << false << GPSAltitudeDatum::Unknown
-                                         << 500.0;
-    QTest::newRow("undeclared") << GPSAltitudeDatum::Unknown << true << GPSAltitudeDatum::Unknown << 500.0;
+    using Datum = GPSAltitudeDatum;
+    QTest::newRow("ellipsoid") << Datum::Ellipsoid << true << qQNaN() << Datum::Ellipsoid << 500.0;
+    QTest::newRow("mean-sea-level") << Datum::MeanSeaLevel << true << qQNaN() << Datum::MeanSeaLevel << 500.0;
+    QTest::newRow("mean-sea-level-converted") << Datum::MeanSeaLevel << true << 48.0 << Datum::Ellipsoid << 548.0;
+    QTest::newRow("unverified-altitude") << Datum::MeanSeaLevel << false << 48.0 << Datum::Unknown << 500.0;
+    QTest::newRow("undeclared") << Datum::Unknown << true << 48.0 << Datum::Unknown << 500.0;
 }
 
 void PositionManagerTest::_backendAltitudeDatum_data()
@@ -252,6 +253,7 @@ void PositionManagerTest::_deviceAltitudeDatum()
 {
     QFETCH(GPSAltitudeDatum, declared);
     QFETCH(bool, verticalAccuracy);
+    QFETCH(double, separation);
     QFETCH(GPSAltitudeDatum, expected);
     QFETCH(double, expectedAltitude);
     ManualScheduler scheduler;
@@ -264,7 +266,9 @@ void PositionManagerTest::_deviceAltitudeDatum()
     }
     source.publish(position);
 
-    const auto remoteId = service.acceptedObservation(GPSObservation::PositionUse::RemoteID);
+    const auto nearby =
+        qIsFinite(separation) ? std::optional<GPSGeoidSeparation>({position.coordinate(), separation}) : std::nullopt;
+    const auto remoteId = service.acceptedObservation(GPSObservation::PositionUse::RemoteID, std::nullopt, nearby);
     QVERIFY(remoteId);
     QCOMPARE(remoteId->altitudeDatum, expected);
     QCOMPARE(remoteId->position.coordinate().altitude(), expectedAltitude);

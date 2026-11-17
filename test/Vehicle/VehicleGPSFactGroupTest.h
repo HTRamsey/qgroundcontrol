@@ -11,6 +11,8 @@ private slots:
     void _rawNormalization();
     void _positionReported_data();
     void _positionReported();
+    void _geoidSeparation_data();
+    void _geoidSeparation();
     void _highLatency2KeepsReceiverState();
     void _receiverDispatch_data();
     void _receiverDispatch();

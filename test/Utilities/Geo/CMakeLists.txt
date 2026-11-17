@@ -8,8 +8,6 @@ target_sources(
     PRIVATE
         GeoJsonHelperTest.cc
         GeoJsonHelperTest.h
-        GeoidTest.cc
-        GeoidTest.h
         GeoTest.cc
         GeoTest.h
         KMLDomDocumentTest.cc
@@ -43,7 +41,6 @@ qt_add_resources(
 
 add_qgc_test(GeoTest LABELS Unit Utilities)
 add_qgc_test(GeoJsonHelperTest LABELS Unit Utilities)
-add_qgc_test(GeoidTest LABELS Unit Utilities)
 add_qgc_test(KMLDomDocumentTest LABELS Unit Utilities)
 add_qgc_test(PlanarGeometryTest LABELS Unit Utilities)
 add_qgc_test(ShapeTest LABELS Unit Utilities)

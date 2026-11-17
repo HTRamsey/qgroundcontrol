@@ -9,12 +9,12 @@
 #include "ManualScheduler.h"
 #include "MockLink.h"
 #include "PositionManager.h"
-#include "QGCGeoid.h"
 #include "RemoteIDManager.h"
 #include "RemoteIDSettings.h"
 #include "SettingsManager.h"
 #include "Support/GPSTestHelpers.h"
 #include "Vehicle.h"
+#include "VehicleGPSFactGroup.h"
 
 using namespace std::chrono_literals;
 
@@ -252,8 +252,8 @@ void RemoteIDManagerTest::_liveGpsFailureDiagnostics()
     publish(fix);
     QVERIFY(QMetaObject::invokeMethod(manager, "_sendMessages", Qt::DirectConnection));
     QVERIFY(manager->gcsPositionUsable());
-    // The fix has an ellipsoid height, which the ground station publishes as an altitude above mean sea level.
-    QCOMPARE(positioning->gcsPosition(), QGeoCoordinate(47, 8, 500 - QGCGeo::geoidSeparation(47, 8)));
+    // The published position keeps the fix's height above the ellipsoid.
+    QCOMPARE(positioning->gcsPosition(), QGeoCoordinate(47, 8, 500));
 }
 
 void RemoteIDManagerTest::_gpsAltitudePolicy_data()
@@ -265,28 +265,28 @@ void RemoteIDManagerTest::_gpsAltitudePolicy_data()
     QTest::addColumn<double>("ellipsoid");
     QTest::addColumn<bool>("usable");
     QTest::addColumn<GPSAltitudeDatum>("datum");
+    // The geoid separation the vehicle's GPS reports at the operator's place; NaN when it reports no height above
+    // the ellipsoid, as MockLink's does not.
+    QTest::addColumn<double>("vehicleSeparation");
+    using Datum = GPSAltitudeDatum;
+    const double none = qQNaN();
     // How each datum becomes a Remote ID altitude is GPSSourceHealthTest's; these rows cover the region rules.
-    QTest::newRow("fixed") << true << true << 500.0 << qQNaN() << qQNaN() << true << GPSAltitudeDatum::Ellipsoid;
-    // Without an ellipsoid height, the geoid converts an altitude above mean sea level.
-    QTest::newRow("msl-converted") << false << true << 500.0 << 1.0 << qQNaN() << true
-                                   << GPSAltitudeDatum::MeanSeaLevel;
-    // An altitude of unknown datum is sent as it is, with a warning.
-    QTest::newRow("unknown-datum") << false << true << 500.0 << 1.0 << qQNaN() << true << GPSAltitudeDatum::Unknown;
-    QTest::newRow("msl-with-ellipsoid") << false << true << 500.0 << 1.0 << 550.0 << true
-                                        << GPSAltitudeDatum::MeanSeaLevel;
-    QTest::newRow("declared-ellipsoid") << false << true << 500.0 << 1.0 << qQNaN() << true
-                                        << GPSAltitudeDatum::Ellipsoid;
+    QTest::newRow("fixed") << true << true << 500.0 << none << none << true << Datum::Ellipsoid << none;
+    // An altitude that is not known to be above the ellipsoid is sent as it is, with a warning.
+    QTest::newRow("msl") << false << true << 500.0 << 1.0 << none << true << Datum::MeanSeaLevel << none;
+    QTest::newRow("unknown-datum") << false << true << 500.0 << 1.0 << none << true << Datum::Unknown << 48.0;
+    // The vehicle's GPS converts an altitude above mean sea level.
+    QTest::newRow("msl-converted") << false << true << 500.0 << 1.0 << none << true << Datum::MeanSeaLevel << 48.0;
+    QTest::newRow("msl-with-ellipsoid") << false << true << 500.0 << 1.0 << 550.0 << true << Datum::MeanSeaLevel
+                                        << 48.0;
+    QTest::newRow("declared-ellipsoid") << false << true << 500.0 << 1.0 << none << true << Datum::Ellipsoid << none;
     // The ground-station position drops an altitude without a usable vertical accuracy; Remote ID still sends it.
     QTest::newRow("poor-vertical-accuracy")
-        << false << true << 500.0 << 100.0 << qQNaN() << true << GPSAltitudeDatum::Ellipsoid;
-    QTest::newRow("no-vertical-accuracy")
-        << false << true << 500.0 << qQNaN() << qQNaN() << true << GPSAltitudeDatum::Ellipsoid;
-    QTest::newRow("ellipsoid-only") << false << true << qQNaN() << qQNaN() << 550.0 << true
-                                    << GPSAltitudeDatum::Unknown;
-    QTest::newRow("faa-missing-altitude")
-        << false << true << qQNaN() << qQNaN() << qQNaN() << false << GPSAltitudeDatum::Ellipsoid;
-    QTest::newRow("eu-missing-altitude") << false << false << qQNaN() << qQNaN() << qQNaN() << true
-                                         << GPSAltitudeDatum::Unknown;
+        << false << true << 500.0 << 100.0 << none << true << Datum::Ellipsoid << none;
+    QTest::newRow("no-vertical-accuracy") << false << true << 500.0 << none << none << true << Datum::Ellipsoid << none;
+    QTest::newRow("ellipsoid-only") << false << true << none << none << 550.0 << true << Datum::Unknown << none;
+    QTest::newRow("faa-missing-altitude") << false << true << none << none << none << false << Datum::Ellipsoid << none;
+    QTest::newRow("eu-missing-altitude") << false << false << none << none << none << true << Datum::Unknown << none;
 }
 
 void RemoteIDManagerTest::_gpsAltitudePolicy()
@@ -298,8 +298,11 @@ void RemoteIDManagerTest::_gpsAltitudePolicy()
     QFETCH(double, ellipsoid);
     QFETCH(bool, usable);
     QFETCH(GPSAltitudeDatum, datum);
+    QFETCH(double, vehicleSeparation);
+    const bool converted = !fixed && datum == GPSAltitudeDatum::MeanSeaLevel && qIsFinite(altitude) &&
+                           !qIsFinite(ellipsoid) && qIsFinite(vehicleSeparation);
     const bool notGeodetic =
-        !fixed && datum == GPSAltitudeDatum::Unknown && qIsFinite(altitude) && !qIsFinite(ellipsoid);
+        !fixed && datum != GPSAltitudeDatum::Ellipsoid && qIsFinite(altitude) && !qIsFinite(ellipsoid) && !converted;
     auto* settings = SettingsManager::instance()->remoteIDSettings();
     auto* manager = vehicle()->remoteIDManager();
     auto* positioning = GPSManager::instance()->positionManager();
@@ -344,6 +347,14 @@ void RemoteIDManagerTest::_gpsAltitudePolicy()
                              QRegularExpression(QStringLiteral("not a WGS84 ellipsoid height")));
         }
         health.updateObservation(observation);
+        if (qIsFinite(vehicleSeparation)) {
+            vehicle()->gpsFactGroup()->handleMessage(
+                vehicle(), GPSTest::gpsRawMessage({.latitudeE7 = 470000000,
+                                                   .longitudeE7 = 80000000,
+                                                   .altitudeMm = 400000,
+                                                   .altitudeEllipsoidMm = 400000 + qRound(vehicleSeparation * 1000),
+                                                   .fixType = GPS_FIX_TYPE_3D_FIX}));
+        }
         QVERIFY(positioning->acceptedObservation(GPSObservation::PositionUse::RemoteID));
         if (!(verticalAccuracy <= 10)) {
             QVERIFY(qIsNaN(positioning->gcsPosition().altitude()));
@@ -360,9 +371,7 @@ void RemoteIDManagerTest::_gpsAltitudePolicy()
     }
     // The warning is given once, not on every message.
     QVERIFY(QMetaObject::invokeMethod(manager, "_sendMessages", Qt::DirectConnection));
-    const bool converted = !fixed && datum == GPSAltitudeDatum::MeanSeaLevel && !qIsFinite(ellipsoid);
-    const double acceptedAltitude =
-        qIsFinite(ellipsoid) ? ellipsoid : altitude + (converted ? QGCGeo::geoidSeparation(47, 8) : 0.0);
+    const double acceptedAltitude = qIsFinite(ellipsoid) ? ellipsoid : altitude + (converted ? vehicleSeparation : 0.0);
     const float expectedAltitude = usable && qIsFinite(acceptedAltitude) ? float(acceptedAltitude) : -1000.0f;
     QTRY_VERIFY_WITH_TIMEOUT(
         ([&]() {

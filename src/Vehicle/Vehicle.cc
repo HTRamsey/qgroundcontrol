@@ -2776,9 +2776,11 @@ void Vehicle::_updateHomepoint()
         PositionManager* const positionManager = GPSManager::instance()->positionManager();
         QGeoCoordinate gcsPosition = positionManager->gcsPosition();
         // The command takes an altitude above mean sea level and has no value for an unknown one, which ArduPilot
-        // before 4.5 does not reject. The ground station's is sent only when its datum is known. Otherwise home keeps
-        // the altitude the vehicle reports and moves only horizontally.
-        const auto gcsObservation = positionManager->acceptedObservation();
+        // before 4.5 does not reject. The ground station's is sent only when it is one, or a height above the
+        // ellipsoid that this vehicle's GPS converts. Otherwise home keeps the altitude the vehicle reports and moves
+        // only horizontally.
+        const auto gcsObservation = positionManager->acceptedObservation(
+            GPSObservation::PositionUse::GroundStation, std::nullopt, _gpsFactGroup->geoidSeparation());
         const double homeAltitude = homePosition().altitude();
         const double altitude =
             gcsObservation ? gcsObservation->altitudeMslMeters().value_or(homeAltitude) : homeAltitude;

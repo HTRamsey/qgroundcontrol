@@ -10,6 +10,7 @@
 #include "RemoteIDSettings.h"
 #include "SettingsManager.h"
 #include "Vehicle.h"
+#include "VehicleGPSFactGroup.h"
 #include "VehicleLinkManager.h"
 
 QGC_LOGGING_CATEGORY(RemoteIDManagerLog, "Vehicle.RemoteIDManager")
@@ -300,11 +301,14 @@ void RemoteIDManager::_sendSystem()
         }
     } else {
         PositionManager* positionManager = GPSManager::instance()->positionManager();
-        const auto observation = positionManager->acceptedObservation(GPSObservation::PositionUse::RemoteID,
-                                                                      GPSSourceHealth::FRESHNESS_TIMEOUT);
+        // The vehicle's GPS converts an altitude above mean sea level, which is all some devices report.
+        VehicleGPSFactGroup* const vehicleGps = _vehicle->gpsFactGroup();
+        const auto observation = positionManager->acceptedObservation(
+            GPSObservation::PositionUse::RemoteID, GPSSourceHealth::FRESHNESS_TIMEOUT,
+            vehicleGps ? vehicleGps->geoidSeparation() : std::nullopt);
         if (observation) {
             gcsPosition = observation->position.coordinate();
-            // An altitude of unknown datum is still the best available operator altitude.
+            // An altitude that is not known to be geodetic is still the best available operator altitude.
             const bool notGeodetic =
                 observation->altitudeDatum != GPSAltitudeDatum::Ellipsoid && qIsFinite(gcsPosition.altitude());
             if (notGeodetic && !std::exchange(_gcsAltitudeNotGeodeticReported, true)) {
