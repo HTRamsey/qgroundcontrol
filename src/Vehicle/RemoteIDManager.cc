@@ -304,8 +304,7 @@ void RemoteIDManager::_sendSystem()
         // The vehicle's GPS converts an altitude above mean sea level, which is all some devices report.
         VehicleGPSFactGroup* const vehicleGps = _vehicle->gpsFactGroup();
         const auto observation = positionManager->acceptedObservation(
-            GPSObservation::PositionUse::RemoteID, GPSSourceHealth::FRESHNESS_TIMEOUT,
-            vehicleGps ? vehicleGps->geoidSeparation() : std::nullopt);
+            GPSObservation::PositionUse::RemoteID, vehicleGps ? vehicleGps->geoidSeparation() : std::nullopt);
         if (observation) {
             gcsPosition = observation->position.coordinate();
             // An altitude that is not known to be geodetic is still the best available operator altitude.

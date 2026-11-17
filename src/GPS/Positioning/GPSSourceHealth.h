@@ -40,7 +40,6 @@ public:
     /// @a nearby converts the height as GPSObservation::projected() does.
     std::optional<GPSObservation> acceptedObservation(
         GPSObservation::PositionUse use = GPSObservation::PositionUse::GroundStation,
-        std::optional<std::chrono::milliseconds> maximumAge = std::nullopt,
         const std::optional<GPSGeoidSeparation>& nearby = std::nullopt) const;
 
     void updateObservation(const GPSObservation& observation);
@@ -60,8 +59,7 @@ private:
     void _schedulePositionExpiry();
     /// Empty for a missing or future timestamp.
     std::optional<std::chrono::milliseconds> _age(quint64 timestampUs) const;
-    std::chrono::microseconds _remaining(quint64 timestampUs,
-                                         std::optional<std::chrono::milliseconds> maximumAge = std::nullopt) const;
+    std::chrono::microseconds _remaining(quint64 timestampUs) const;
 
     struct PositionState
     {

@@ -2779,8 +2779,8 @@ void Vehicle::_updateHomepoint()
         // before 4.5 does not reject. The ground station's is sent only when it is one, or a height above the
         // ellipsoid that this vehicle's GPS converts. Otherwise home keeps the altitude the vehicle reports and moves
         // only horizontally.
-        const auto gcsObservation = positionManager->acceptedObservation(
-            GPSObservation::PositionUse::GroundStation, std::nullopt, _gpsFactGroup->geoidSeparation());
+        const auto gcsObservation = positionManager->acceptedObservation(GPSObservation::PositionUse::GroundStation,
+                                                                         _gpsFactGroup->geoidSeparation());
         const double homeAltitude = homePosition().altitude();
         const double altitude =
             gcsObservation ? gcsObservation->altitudeMslMeters().value_or(homeAltitude) : homeAltitude;

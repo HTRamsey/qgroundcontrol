@@ -146,7 +146,6 @@ public:
     /// the two heights, as GPSObservation::projected() does. The published position is not converted.
     std::optional<GPSObservation> acceptedObservation(
         GPSObservation::PositionUse use = GPSObservation::PositionUse::GroundStation,
-        std::optional<std::chrono::milliseconds> maximumAge = std::nullopt,
         const std::optional<GPSGeoidSeparation>& nearby = std::nullopt) const;
 
 signals:
@@ -183,7 +182,6 @@ private:
     void _setPositioningError(QGeoPositionInfoSource::Error error);
     std::optional<GPSObservation> _accepted(
         SelectedSource kind, GPSObservation::PositionUse use = GPSObservation::PositionUse::GroundStation,
-        std::optional<std::chrono::milliseconds> maximumAge = std::nullopt,
         const std::optional<GPSGeoidSeparation>& nearby = std::nullopt) const;
     void _setupPositionSources();
     /// The datum of the altitudes that Qt's position backend @a sourceName reports.

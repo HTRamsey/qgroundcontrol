@@ -98,6 +98,8 @@ NTRIPManager::NTRIPManager(QObject* parent, RuntimeScheduler* scheduler, const D
     if (_vehicles) {
         connect(_vehicles, &NTRIPVehiclePresence::presentChanged, this, &NTRIPManager::_onVehiclePresenceChanged);
     }
+    // The message a connection has before it is first started is no change to announce.
+    _notified.message = _stateMessage();
 }
 
 NTRIPManager::~NTRIPManager()
@@ -181,7 +183,7 @@ QString NTRIPManager::_stateMessage() const
                         .arg(_lastFailureDetail);
                 case StopReason::DataLimit:
                     //: %1 is the limit, a number of megabytes
-                    return tr("Stopped at the data limit of %1 MB").arg(_stoppedAtCapMB);
+                    return tr("Stopped at the data limit of %1 MB").arg(_configuration.dataCapMB);
                 case StopReason::Failure:
                     break;
             }
@@ -307,7 +309,6 @@ void NTRIPManager::_start()
     }
     _settingsDebounceTask.cancel();
     _useEnteredCaster();
-    _everStarted = true;
     if (_shouldWaitForVehicle()) {
         _waitForVehicle();
         _stopStreaming();
@@ -340,8 +341,7 @@ void NTRIPManager::_publish()
         emit connectionStatusChanged();
     }
     const QString savedCaster = _savedCaster ? _savedCaster->name : QString();
-    // Until the connection is first started its message was announced by no signal, and is no change to announce.
-    const QString message = _everStarted ? _stateMessage() : QString();
+    const QString message = _stateMessage();
     const bool messageChanged = std::exchange(_notified.message, message) != message;
     if (std::exchange(_notified.savedCaster, savedCaster) != savedCaster || messageChanged) {
         emit statusMessageChanged();
@@ -445,7 +445,6 @@ bool NTRIPManager::_dataCapReached() const
 void NTRIPManager::_stopAtDataCap()
 {
     qCWarning(NTRIPManagerLog) << "NTRIP stopped at the data limit of" << _configuration.dataCapMB << "MB";
-    _stoppedAtCapMB = _configuration.dataCapMB;
     _halt(StopReason::DataLimit);
 }
 

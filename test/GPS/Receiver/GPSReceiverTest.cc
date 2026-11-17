@@ -653,7 +653,7 @@ void GPSReceiverTest::_fixedBasePositionIsGcsPosition()
     QCOMPARE(positions.selectedSource(), PositionManager::SelectedSource::Receiver);
     // The published position keeps the base's height above the ellipsoid; a reader converts it.
     QCOMPARE(positions.gcsPosition(), QGeoCoordinate(47.5, 8.25, 480.0));
-    const auto forVehicle = positions.acceptedObservation(GPSObservation::PositionUse::GroundStation, std::nullopt,
+    const auto forVehicle = positions.acceptedObservation(GPSObservation::PositionUse::GroundStation,
                                                           GPSGeoidSeparation{QGeoCoordinate(47.5, 8.25), 47.5});
     QVERIFY(forVehicle);
     QCOMPARE(forVehicle->altitudeMslMeters(), std::optional<double>(432.5));
