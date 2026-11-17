@@ -108,7 +108,7 @@ How CI runs, retries, and reports the application tests is described in
   still fail the job.
 - Reproduce either Linux lane with `cmake --workflow --preset Linux-sanitizers` or
   `--preset Linux-coverage` (`just coverage` uses `Linux-coverage`).
-- **Portable tests**: Windows x64 and the macOS Release leg build and run eleven standalone portable
+- **Portable tests**: Windows x64 and the macOS Release leg build and run ten standalone portable
   utility executables (`QGC_BUILD_PORTABLE_TESTS=ON`, CTest label `Portable`). They share test
   bodies with the full harness and do not enable test hooks in the packaged application. There is
   no separate Extended Tests workflow.
