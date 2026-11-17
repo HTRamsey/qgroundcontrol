@@ -1,10 +1,7 @@
 qt_add_library(
     QGCGeoMath STATIC
-    EGM96Grid.inc
     QGCGeo.cc
     QGCGeo.h
-    QGCGeoid.cc
-    QGCGeoid.h
     QGCPlanarGeometry.cc
     QGCPlanarGeometry.h
 )
