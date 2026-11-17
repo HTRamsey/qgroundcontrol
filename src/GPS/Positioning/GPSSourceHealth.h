@@ -37,8 +37,10 @@ public:
 
     quint64 observationRevision() const { return _observationRevision; }
 
+    /// @a nearby converts the height as GPSObservation::projected() does.
     std::optional<GPSObservation> acceptedObservation(
-        GPSObservation::PositionUse use = GPSObservation::PositionUse::GroundStation) const;
+        GPSObservation::PositionUse use = GPSObservation::PositionUse::GroundStation,
+        const std::optional<GPSGeoidSeparation>& nearby = std::nullopt) const;
 
     void updateObservation(const GPSObservation& observation);
     void invalidatePosition();

@@ -141,8 +141,12 @@ public:
 
     qreal gcsPositionHorizontalAccuracy() const { return _published.horizontalAccuracy; }
 
+    /// The selected source's position for @a use. @a nearby is the geoid separation of a receiver near the ground
+    /// station, as the GPS of the vehicle the position is sent to has: it converts a position that has only one of
+    /// the two heights, as GPSObservation::projected() does. The published position is not converted.
     std::optional<GPSObservation> acceptedObservation(
-        GPSObservation::PositionUse use = GPSObservation::PositionUse::GroundStation) const;
+        GPSObservation::PositionUse use = GPSObservation::PositionUse::GroundStation,
+        const std::optional<GPSGeoidSeparation>& nearby = std::nullopt) const;
 
 signals:
     void selectionChanged();
@@ -177,7 +181,8 @@ private:
     void _emitChanges();
     void _setPositioningError(QGeoPositionInfoSource::Error error);
     std::optional<GPSObservation> _accepted(
-        SelectedSource kind, GPSObservation::PositionUse use = GPSObservation::PositionUse::GroundStation) const;
+        SelectedSource kind, GPSObservation::PositionUse use = GPSObservation::PositionUse::GroundStation,
+        const std::optional<GPSGeoidSeparation>& nearby = std::nullopt) const;
     void _setupPositionSources();
     /// The datum of the altitudes that Qt's position backend @a sourceName reports.
     static GPSAltitudeDatum _backendAltitudeDatum(const QString& sourceName);

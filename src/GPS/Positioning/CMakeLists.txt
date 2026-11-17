@@ -6,6 +6,7 @@
 target_sources(
     ${CMAKE_PROJECT_NAME}
     PRIVATE
+        GPSGeoidSeparation.h
         GPSObservation.cc
         GPSObservation.h
         GPSSourceHealth.cc

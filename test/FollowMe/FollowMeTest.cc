@@ -13,10 +13,10 @@
 #include "MockLink.h"
 #include "MultiVehicleManager.h"
 #include "PositionManager.h"
-#include "QGCGeoid.h"
 #include "SettingsManager.h"
 #include "Support/GPSTestHelpers.h"
 #include "Vehicle.h"
+#include "VehicleGPSFactGroup.h"
 
 void FollowMeTest::_testFollowMe()
 {
@@ -59,31 +59,43 @@ void FollowMeTest::_motionPolicyReports_data()
     QTest::addColumn<bool>("hasPreviousReport");
     QTest::addColumn<bool>("ardupilot");
     QTest::addColumn<Datum>("datum");
-    QTest::newRow("moving") << 2.0 << true << 1.0 << 500.0 << true << false << false << Datum::Unknown;
+    // The geoid separation the vehicle's GPS reports at the ground station's place; NaN when it reports no height
+    // above the ellipsoid, as MockLink's does not.
+    QTest::addColumn<double>("vehicleSeparation");
+    const double none = qQNaN();
+    QTest::newRow("moving") << 2.0 << true << 1.0 << 500.0 << true << false << false << Datum::Unknown << none;
     QTest::newRow("moving-after-previous-report")
-        << 2.0 << true << 1.0 << 500.0 << true << true << false << Datum::Unknown;
-    QTest::newRow("slow") << 0.1 << true << 1.0 << 500.0 << true << false << false << Datum::Unknown;
-    QTest::newRow("no-course") << 2.0 << false << 1.0 << 500.0 << true << false << false << Datum::Unknown;
+        << 2.0 << true << 1.0 << 500.0 << true << true << false << Datum::Unknown << none;
+    QTest::newRow("slow") << 0.1 << true << 1.0 << 500.0 << true << false << false << Datum::Unknown << none;
+    QTest::newRow("no-course") << 2.0 << false << 1.0 << 500.0 << true << false << false << Datum::Unknown << none;
     QTest::newRow("no-motion-or-vertical-attributes")
-        << qQNaN() << false << qQNaN() << 500.0 << true << false << false << Datum::Unknown;
-    QTest::newRow("uncertain-altitude") << 2.0 << true << 11.0 << 500.0 << true << false << false << Datum::Unknown;
+        << qQNaN() << false << qQNaN() << 500.0 << true << false << false << Datum::Unknown << none;
+    QTest::newRow("uncertain-altitude") << 2.0 << true << 11.0 << 500.0 << true << false << false << Datum::Unknown
+                                        << none;
     QTest::newRow("uncertain-altitude-after-report")
-        << 2.0 << true << 11.0 << 500.0 << true << true << false << Datum::Unknown;
+        << 2.0 << true << 11.0 << 500.0 << true << true << false << Datum::Unknown << none;
     QTest::newRow("missing-vertical-accuracy-after-report")
-        << 2.0 << true << qQNaN() << 500.0 << true << true << false << Datum::Unknown;
-    QTest::newRow("missing-altitude") << 2.0 << true << 1.0 << qQNaN() << true << false << false << Datum::Unknown;
+        << 2.0 << true << qQNaN() << 500.0 << true << true << false << Datum::Unknown << none;
+    QTest::newRow("missing-altitude") << 2.0 << true << 1.0 << qQNaN() << true << false << false << Datum::Unknown
+                                      << none;
     QTest::newRow("missing-altitude-after-report")
-        << 2.0 << true << 1.0 << qQNaN() << true << true << false << Datum::Unknown;
-    QTest::newRow("infinite-altitude") << 2.0 << true << 1.0 << qInf() << true << false << false << Datum::Unknown;
-    QTest::newRow("no-horizontal-accuracy") << 2.0 << true << 1.0 << 500.0 << false << false << false << Datum::Unknown;
-    QTest::newRow("ardupilot-home-altitude") << 2.0 << true << 1.0 << 500.0 << true << false << true << Datum::Unknown;
+        << 2.0 << true << 1.0 << qQNaN() << true << true << false << Datum::Unknown << none;
+    QTest::newRow("infinite-altitude") << 2.0 << true << 1.0 << qInf() << true << false << false << Datum::Unknown
+                                       << none;
+    QTest::newRow("no-horizontal-accuracy")
+        << 2.0 << true << 1.0 << 500.0 << false << false << false << Datum::Unknown << none;
+    QTest::newRow("ardupilot-home-altitude")
+        << 2.0 << true << 1.0 << 500.0 << true << false << true << Datum::Unknown << none;
     QTest::newRow("ardupilot-2d-after-report")
-        << 2.0 << true << qQNaN() << qQNaN() << true << true << true << Datum::Unknown;
-    // FOLLOW_TARGET.alt is defined as MSL. An altitude known to be that is sent, and an ellipsoid height after the
-    // geoid has converted it; an altitude of unknown datum gives way to the vehicle's home altitude.
+        << 2.0 << true << qQNaN() << qQNaN() << true << true << true << Datum::Unknown << none;
+    // FOLLOW_TARGET.alt is defined as MSL. An altitude known to be that is sent, and a height above the ellipsoid
+    // once the vehicle's own GPS has converted it; otherwise the altitude gives way to the vehicle's home altitude.
     QTest::newRow("mean-sea-level-altitude")
-        << 2.0 << true << 1.0 << 500.0 << true << false << false << Datum::MeanSeaLevel;
-    QTest::newRow("ellipsoid-altitude") << 2.0 << true << 1.0 << 500.0 << true << false << false << Datum::Ellipsoid;
+        << 2.0 << true << 1.0 << 500.0 << true << false << false << Datum::MeanSeaLevel << 30.0;
+    QTest::newRow("ellipsoid-altitude") << 2.0 << true << 1.0 << 500.0 << true << false << false << Datum::Ellipsoid
+                                        << none;
+    QTest::newRow("ellipsoid-altitude-converted")
+        << 2.0 << true << 1.0 << 500.0 << true << false << false << Datum::Ellipsoid << 30.0;
 }
 
 void FollowMeTest::_motionPolicyReports()
@@ -96,6 +108,7 @@ void FollowMeTest::_motionPolicyReports()
     QFETCH(bool, hasPreviousReport);
     QFETCH(bool, ardupilot);
     QFETCH(GPSAltitudeDatum, datum);
+    QFETCH(double, vehicleSeparation);
     if (ardupilot && !apmFirmwareSupported()) {
         QSKIP("ArduPilot support not registered in this build");
     }
@@ -146,6 +159,14 @@ void FollowMeTest::_motionPolicyReports()
         observation.monotonicTimestampUs = scheduler.nowUs();
     }
     health.updateObservation(observation);
+    if (qIsFinite(vehicleSeparation)) {
+        vehicle()->gpsFactGroup()->handleMessage(
+            vehicle(), GPSTest::gpsRawMessage({.latitudeE7 = 470000000,
+                                               .longitudeE7 = 80000000,
+                                               .altitudeMm = 400000,
+                                               .altitudeEllipsoidMm = 400000 + qRound(vehicleSeparation * 1000),
+                                               .fixType = GPS_FIX_TYPE_3D_FIX}));
+    }
     const int previousReportCount = mockLink()->receivedMavlinkMessageCount(messageId);
     QSignalSpy sent(vehicle(), &Vehicle::messagesSentChanged);
     QVERIFY(QMetaObject::invokeMethod(&follow, "_sendGCSMotionReport", Qt::DirectConnection));
@@ -179,9 +200,8 @@ void FollowMeTest::_motionPolicyReports()
         double expectedAltitude = vehicle()->homePosition().altitude();
         if (datum == GPSAltitudeDatum::MeanSeaLevel && qIsFinite(altitude)) {
             expectedAltitude = altitude;
-        } else if (datum == GPSAltitudeDatum::Ellipsoid && qIsFinite(altitude)) {
-            // The geoid is about 48 m above the ellipsoid here.
-            expectedAltitude = altitude - QGCGeo::geoidSeparation(47, 8);
+        } else if (datum == GPSAltitudeDatum::Ellipsoid && qIsFinite(altitude) && qIsFinite(vehicleSeparation)) {
+            expectedAltitude = altitude - vehicleSeparation;
         }
         QCOMPARE(report.alt, float(expectedAltitude));
     }

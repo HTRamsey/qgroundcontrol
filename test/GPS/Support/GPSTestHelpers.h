@@ -87,6 +87,7 @@ struct GPSRawFields
     int32_t latitudeE7 = 0;
     int32_t longitudeE7 = 0;
     int32_t altitudeMm = 0;
+    int32_t altitudeEllipsoidMm = 0;
     uint8_t fixType = GPS_FIX_TYPE_NO_FIX;
     uint16_t eph = 0;
     uint16_t epv = 0;
@@ -113,6 +114,7 @@ inline mavlink_message_t gpsRawMessage(const GPSRawFields& fields,
         raw.lat = fields.latitudeE7;
         raw.lon = fields.longitudeE7;
         raw.alt = fields.altitudeMm;
+        raw.alt_ellipsoid = fields.altitudeEllipsoidMm;
         raw.fix_type = fields.fixType;
         raw.eph = fields.eph;
         raw.epv = fields.epv;

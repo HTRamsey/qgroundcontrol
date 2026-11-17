@@ -9,18 +9,27 @@
 
 #include "GPSReceiverConfig.h"
 #include "GPSReceiverReports.h"
-#include "QGCGeoid.h"
 
 namespace {
 
 /// The user-equivalent range error assumed for a receiver that reports only DOP.
 constexpr double DOP_RANGE_ERROR_METERS = 5.1;
 
-/// The height of mean sea level above the ellipsoid at @a coordinate; empty for an invalid coordinate.
-std::optional<double> egm96Separation(const QGeoCoordinate& coordinate)
+/// How far from where it was measured a geoid separation converts a height. The separation changes by 3 cm a
+/// kilometer on average, and by 30 cm where the geoid is steepest.
+constexpr double GEOID_SEPARATION_RANGE_METERS = 50'000.0;
+/// The geoid is between 107 m below and 85 m above the ellipsoid.
+constexpr double MAXIMUM_GEOID_SEPARATION_METERS = 120.0;
+
+/// The separation of @a nearby when it holds at @a coordinate.
+std::optional<double> separationAt(const std::optional<GPSGeoidSeparation>& nearby, const QGeoCoordinate& coordinate)
 {
-    const double separation = QGCGeo::geoidSeparation(coordinate.latitude(), coordinate.longitude());
-    return qIsFinite(separation) ? std::optional<double>(separation) : std::nullopt;
+    if (!nearby || !qIsFinite(nearby->meters) || std::abs(nearby->meters) > MAXIMUM_GEOID_SEPARATION_METERS ||
+        !nearby->measuredAt.isValid() || !coordinate.isValid() ||
+        nearby->measuredAt.distanceTo(coordinate) > GEOID_SEPARATION_RANGE_METERS) {
+        return std::nullopt;
+    }
+    return nearby->meters;
 }
 
 /// The altitude of @a observation when its datum is @a datum.
@@ -125,7 +134,8 @@ double GPSObservation::accuracyFromDop(double dop)
     return dop * DOP_RANGE_ERROR_METERS;
 }
 
-std::optional<GPSObservation> GPSObservation::projected(PositionUse use) const
+std::optional<GPSObservation> GPSObservation::projected(PositionUse use,
+                                                        const std::optional<GPSGeoidSeparation>& nearby) const
 {
     if (!hasNavigationSolution() || (use != PositionUse::Gga && !usable())) {
         return std::nullopt;
@@ -141,7 +151,7 @@ std::optional<GPSObservation> GPSObservation::projected(PositionUse use) const
                 // An altitude that is not accurate enough is withheld in either datum.
                 accepted.position.removeAttribute(QGeoPositionInfo::VerticalAccuracy);
                 accepted.altitudeEllipsoidMeters.reset();
-            } else if (const auto altitudeMsl = altitudeMslMeters()) {
+            } else if (const auto altitudeMsl = altitudeMslMeters(nearby)) {
                 groundStation.setAltitude(*altitudeMsl);
                 accepted.altitudeDatum = GPSAltitudeDatum::MeanSeaLevel;
             }
@@ -149,7 +159,7 @@ std::optional<GPSObservation> GPSObservation::projected(PositionUse use) const
             break;
         }
         case PositionUse::RemoteID:
-            if (const auto ellipsoidHeight = ellipsoidHeightMeters()) {
+            if (const auto ellipsoidHeight = ellipsoidHeightMeters(nearby)) {
                 auto ellipsoidCoordinate = accepted.position.coordinate();
                 ellipsoidCoordinate.setAltitude(*ellipsoidHeight);
                 accepted.position.setCoordinate(ellipsoidCoordinate);
@@ -204,23 +214,23 @@ QGeoCoordinate GPSObservation::coordinate() const
     return coordinate;
 }
 
-std::optional<double> GPSObservation::altitudeMslMeters() const
+std::optional<double> GPSObservation::altitudeMslMeters(const std::optional<GPSGeoidSeparation>& nearby) const
 {
     if (const auto altitude = altitudeIn(*this, GPSAltitudeDatum::MeanSeaLevel)) {
         return altitude;
     }
     const std::optional<double> ellipsoidHeight = reportedEllipsoidHeight(*this);
-    const std::optional<double> separation = egm96Separation(position.coordinate());
+    const std::optional<double> separation = separationAt(nearby, position.coordinate());
     return ellipsoidHeight && separation ? std::optional<double>(*ellipsoidHeight - *separation) : std::nullopt;
 }
 
-std::optional<double> GPSObservation::ellipsoidHeightMeters() const
+std::optional<double> GPSObservation::ellipsoidHeightMeters(const std::optional<GPSGeoidSeparation>& nearby) const
 {
     if (const auto ellipsoidHeight = reportedEllipsoidHeight(*this)) {
         return ellipsoidHeight;
     }
     const std::optional<double> altitude = altitudeIn(*this, GPSAltitudeDatum::MeanSeaLevel);
-    const std::optional<double> separation = egm96Separation(position.coordinate());
+    const std::optional<double> separation = separationAt(nearby, position.coordinate());
     return altitude && separation ? std::optional<double>(*altitude + *separation) : std::nullopt;
 }
 
@@ -228,10 +238,7 @@ std::optional<double> GPSObservation::geoidSeparationMeters() const
 {
     const std::optional<double> altitude = altitudeIn(*this, GPSAltitudeDatum::MeanSeaLevel);
     const std::optional<double> ellipsoidHeight = reportedEllipsoidHeight(*this);
-    if (altitude && ellipsoidHeight) {
-        return *ellipsoidHeight - *altitude;
-    }
-    return egm96Separation(position.coordinate());
+    return altitude && ellipsoidHeight ? std::optional<double>(*ellipsoidHeight - *altitude) : std::nullopt;
 }
 
 double GPSObservation::heading() const

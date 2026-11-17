@@ -11,10 +11,10 @@
 #include "MockLink.h"
 #include "MultiVehicleManager.h"
 #include "PositionManager.h"
-#include "QGCGeoid.h"
 #include "SettingsManager.h"
 #include "Support/GPSTestHelpers.h"
 #include "Vehicle.h"
+#include "VehicleGPSFactGroup.h"
 
 namespace {
 
@@ -164,21 +164,28 @@ void SetHomeTest::_gcsPositionUpdateSendsCommandInt_data()
     QTest::addColumn<GPSAltitudeDatum>("datum");
     // NaN for a position without an altitude.
     QTest::addColumn<double>("verticalAccuracy");
+    // The geoid separation the vehicle's GPS reports at the ground station's place; NaN when it reports no height
+    // above the ellipsoid, as MockLink's does not.
+    QTest::addColumn<double>("vehicleSeparation");
     // MAV_FRAME_GLOBAL altitudes are MSL, so only an altitude known in that datum becomes the home altitude.
     QTest::addColumn<bool>("movesHomeVertically");
-    QTest::newRow("mean-sea-level") << GPSAltitudeDatum::MeanSeaLevel << 1.0 << true;
-    // An ellipsoid height, as Android reports, is converted with the geoid.
-    QTest::newRow("ellipsoid") << GPSAltitudeDatum::Ellipsoid << 1.0 << true;
-    QTest::newRow("inaccurate-ellipsoid") << GPSAltitudeDatum::Ellipsoid << 11.0 << false;
-    QTest::newRow("unknown-datum") << GPSAltitudeDatum::Unknown << 1.0 << false;
+    using Datum = GPSAltitudeDatum;
+    const double none = qQNaN();
+    QTest::newRow("mean-sea-level") << Datum::MeanSeaLevel << 1.0 << none << true;
+    // An ellipsoid height, as Android reports, becomes one once the vehicle's own GPS converts it.
+    QTest::newRow("ellipsoid") << Datum::Ellipsoid << 1.0 << none << false;
+    QTest::newRow("ellipsoid-converted") << Datum::Ellipsoid << 1.0 << 47.5 << true;
+    QTest::newRow("inaccurate-ellipsoid") << Datum::Ellipsoid << 11.0 << 47.5 << false;
+    QTest::newRow("unknown-datum") << Datum::Unknown << 1.0 << 47.5 << false;
     // The command has no value for an unknown altitude.
-    QTest::newRow("no-altitude") << GPSAltitudeDatum::MeanSeaLevel << qQNaN() << false;
+    QTest::newRow("no-altitude") << Datum::MeanSeaLevel << none << none << false;
 }
 
 void SetHomeTest::_gcsPositionUpdateSendsCommandInt()
 {
     QFETCH(GPSAltitudeDatum, datum);
     QFETCH(double, verticalAccuracy);
+    QFETCH(double, vehicleSeparation);
     QFETCH(bool, movesHomeVertically);
     QVERIFY(vehicle());
     QVERIFY_TRUE_WAIT(vehicle()->coordinate().isValid(), TestTimeout::shortMs());
@@ -193,13 +200,19 @@ void SetHomeTest::_gcsPositionUpdateSendsCommandInt()
         gcsCoord.setAltitude(homeAltitude + 25);
         gcs.verticalAccuracy = verticalAccuracy;
     }
+    if (qIsFinite(vehicleSeparation)) {
+        vehicle()->gpsFactGroup()->handleMessage(
+            vehicle(), GPSTest::gpsRawMessage({.latitudeE7 = qRound(gcsCoord.latitude() * 1e7),
+                                               .longitudeE7 = qRound(gcsCoord.longitude() * 1e7),
+                                               .altitudeMm = 400000,
+                                               .altitudeEllipsoidMm = 400000 + qRound(vehicleSeparation * 1000),
+                                               .fixType = GPS_FIX_TYPE_3D_FIX}));
+    }
     gcs.publish(gcsCoord);
     // Otherwise home moves horizontally and keeps the altitude the vehicle reports.
     double expectedAltitude = homeAltitude;
     if (movesHomeVertically) {
-        // The geoid is about 47.5 m above the ellipsoid here.
-        const double separation = QGCGeo::geoidSeparation(gcsCoord.latitude(), gcsCoord.longitude());
-        expectedAltitude = gcsCoord.altitude() - (datum == GPSAltitudeDatum::Ellipsoid ? separation : 0.0);
+        expectedAltitude = gcsCoord.altitude() - (datum == GPSAltitudeDatum::Ellipsoid ? vehicleSeparation : 0.0);
     }
     verifyOneCommandInt(sent, gcsCoord, expectedAltitude);
     QVERIFY_TRUE_WAIT(mockLink()->receivedMavCommandCount(MAV_CMD_DO_SET_HOME) >= 1, TestTimeout::longMs());

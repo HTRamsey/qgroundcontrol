@@ -301,15 +301,16 @@ It may also use the GPS as a location source for _Follow Me Mode_ - currently su
 
 Vehicles take the altitudes they are sent as above mean sea level, so that is how _Follow Me_ and [Update return to home position based on device location](fly_view.md) send the ground station's altitude.
 A GNSS receiver and macOS, iOS and Windows devices report it that way.
-A height above the WGS84 ellipsoid, which is what Android devices report and what the fixed or surveyed position of a base station has, is converted with the EGM96 geoid model built into QGroundControl.
-The converted altitude is within 1 m of the model almost everywhere, and up to 4 m off where the geoid changes over a short distance, as in northern Colombia, on the Canary Islands and on Hawaii.
+A height above the WGS84 ellipsoid, which is what Android devices report and what the fixed or surveyed position of a base station has, is converted with the difference between the two heights that the vehicle's own GPS reports (`alt` and `alt_ellipsoid` in `GPS_RAW_INT`), as PX4 and ArduPilot do for most receivers.
+That difference changes by about 3 cm per kilometer, and by 30 cm where it changes fastest, so the vehicle's is used for a ground station within 50 km of where the vehicle measured it.
 
-An altitude of unknown reference, as the location service of a Linux device reports, or a position without an altitude is not sent. The vehicle's own home altitude is sent instead: home moves only horizontally, and a followed target is taken to be at home altitude.
+A height above the ellipsoid that the vehicle cannot convert, an altitude of unknown reference, as the location service of a Linux device reports, or a position without an altitude is not sent. The vehicle's own home altitude is sent instead: home moves only horizontally, and a followed target is taken to be at home altitude.
 The home position also keeps the vehicle's altitude when the ground station's is not accurate to 10 m.
 A receiver that states no vertical accuracy, as an NMEA receiver without GST sentences, counts as that accurate while its VDOP is below 2.
 
 [Remote ID](remote_id.md) reports the operator's height above the WGS84 ellipsoid instead.
-It sends the ellipsoid height of a GNSS receiver or an Android device as it is, and converts an altitude above mean sea level, which is all macOS, iOS and Windows devices report, with the same geoid model.
+It sends the ellipsoid height of a GNSS receiver or an Android device as it is, and converts an altitude above mean sea level, which is all macOS, iOS and Windows devices report, with the same difference from the vehicle's GPS.
+While the vehicle's GPS reports no height above the ellipsoid, that altitude is sent as it is.
 
 A connected GNSS receiver can provide the ground station position instead; set [Use receiver as](#receiver) to _Position only_ for a receiver that only does that, or a [position receiver](#position_receiver) beside a receiver that is an RTK base station.
 The settings are:

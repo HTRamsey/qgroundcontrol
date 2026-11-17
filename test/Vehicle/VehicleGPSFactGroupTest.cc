@@ -120,6 +120,51 @@ void VehicleGPSFactGroupTest::_positionReported()
     QCOMPARE(reports.count(), 2);
 }
 
+void VehicleGPSFactGroupTest::_geoidSeparation_data()
+{
+    QTest::addColumn<bool>("secondary");
+    QTest::addColumn<int>("fixType");
+    // The height above the ellipsoid of each report in millimeters, beside 450 m above mean sea level; zero when
+    // the vehicle does not report it.
+    QTest::addColumn<QList<int>>("ellipsoidMm");
+    // NaN when the receiver has none.
+    QTest::addColumn<double>("separation");
+    QTest::newRow("gps1") << false << int(GPS_FIX_TYPE_3D_FIX) << QList<int>{480000} << 30.0;
+    QTest::newRow("gps2") << true << int(GPS_FIX_TYPE_RTK_FIXED) << QList<int>{480000} << 30.0;
+    QTest::newRow("geoid-below-ellipsoid") << false << int(GPS_FIX_TYPE_3D_FIX) << QList<int>{415500} << -34.5;
+    QTest::newRow("not-reported") << false << int(GPS_FIX_TYPE_3D_FIX) << QList<int>{0} << qQNaN();
+    QTest::newRow("without-3d-fix") << false << int(GPS_FIX_TYPE_2D_FIX) << QList<int>{480000} << qQNaN();
+    // The separation is that of the place, which a report without the height does not change.
+    QTest::newRow("kept-when-no-longer-reported") << false << int(GPS_FIX_TYPE_3D_FIX) << QList<int>{480000, 0} << 30.0;
+}
+
+void VehicleGPSFactGroupTest::_geoidSeparation()
+{
+    QFETCH(bool, secondary);
+    QFETCH(int, fixType);
+    QFETCH(QList<int>, ellipsoidMm);
+    QFETCH(double, separation);
+    using GPSTest::GPSReceiverIndex;
+    ManualScheduler scheduler;
+    auto gps = receiver(secondary, &scheduler);
+    QVERIFY(!gps->geoidSeparation());
+    for (const int reported : ellipsoidMm) {
+        gps->handleMessage(nullptr,
+                           GPSTest::gpsRawMessage({.latitudeE7 = 470000000,
+                                                   .longitudeE7 = 80000000,
+                                                   .altitudeMm = 450000,
+                                                   .altitudeEllipsoidMm = reported,
+                                                   .fixType = static_cast<uint8_t>(fixType)},
+                                                  secondary ? GPSReceiverIndex::Secondary : GPSReceiverIndex::Primary));
+    }
+    const auto measured = gps->geoidSeparation();
+    QCOMPARE(measured.has_value(), qIsFinite(separation));
+    if (measured) {
+        QCOMPARE(measured->meters, separation);
+        QCOMPARE(measured->measuredAt, QGeoCoordinate(47, 8));
+    }
+}
+
 void VehicleGPSFactGroupTest::_highLatency2KeepsReceiverState()
 {
     ManualScheduler scheduler;

@@ -4,6 +4,7 @@
 
 #include <QtPositioning/QGeoPositionInfo>
 
+#include "GPSGeoidSeparation.h"
 #include "GPSReceiverReports.h"
 
 struct GPSEllipsoidPosition;
@@ -53,20 +54,25 @@ struct GPSObservation
     /// estimates twice as much.
     [[nodiscard]] static double accuracyFromDop(double dop);
 
-    /// The owner separately enforces freshness and session authorization.
-    [[nodiscard]] std::optional<GPSObservation> projected(PositionUse use) const;
+    /// The owner separately enforces freshness and session authorization. @a nearby converts the height as in
+    /// altitudeMslMeters() and ellipsoidHeightMeters().
+    [[nodiscard]] std::optional<GPSObservation> projected(
+        PositionUse use, const std::optional<GPSGeoidSeparation>& nearby = std::nullopt) const;
     [[nodiscard]] bool hasNavigationSolution() const;
     [[nodiscard]] bool usable() const;
     [[nodiscard]] QGeoCoordinate coordinate() const;
     [[nodiscard]] double heading() const;
-    /// The position's altitude above mean sea level. A height above the WGS84 ellipsoid, which the altitude or
-    /// altitudeEllipsoidMeters may be, is converted with the EGM96 geoid. Empty when the position has no height or
-    /// only an altitude of unknown datum.
-    [[nodiscard]] std::optional<double> altitudeMslMeters() const;
+    /// The position's altitude above mean sea level. A height above the WGS84 ellipsoid alone, which the altitude or
+    /// altitudeEllipsoidMeters may be, is converted with @a nearby: the geoid separation that a receiver measured
+    /// within 50 km of the position, over which it changes by 1.5 m on average. Empty when the position has no
+    /// height, only an altitude of unknown datum, or an ellipsoid height and no such separation.
+    [[nodiscard]] std::optional<double> altitudeMslMeters(
+        const std::optional<GPSGeoidSeparation>& nearby = std::nullopt) const;
     /// The position's height above the WGS84 ellipsoid: altitudeEllipsoidMeters or an altitude in that datum, else
-    /// an altitude above mean sea level converted with the EGM96 geoid. Empty as for altitudeMslMeters().
-    [[nodiscard]] std::optional<double> ellipsoidHeightMeters() const;
-    /// How far ellipsoidHeightMeters() is above altitudeMslMeters(): what a receiver that reports both heights has
-    /// between them, else the EGM96 geoid at the position. Empty for invalid coordinates.
+    /// an altitude above mean sea level converted with @a nearby. Empty as for altitudeMslMeters().
+    [[nodiscard]] std::optional<double> ellipsoidHeightMeters(
+        const std::optional<GPSGeoidSeparation>& nearby = std::nullopt) const;
+    /// How far the position's height above the ellipsoid is above its altitude above mean sea level. Empty unless
+    /// its receiver reports both.
     [[nodiscard]] std::optional<double> geoidSeparationMeters() const;
 };

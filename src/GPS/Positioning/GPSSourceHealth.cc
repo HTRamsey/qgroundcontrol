@@ -32,13 +32,14 @@ std::optional<std::chrono::milliseconds> GPSSourceHealth::_age(quint64 timestamp
     return std::chrono::duration_cast<std::chrono::milliseconds>(*age);
 }
 
-std::optional<GPSObservation> GPSSourceHealth::acceptedObservation(GPSObservation::PositionUse use) const
+std::optional<GPSObservation> GPSSourceHealth::acceptedObservation(
+    GPSObservation::PositionUse use, const std::optional<GPSGeoidSeparation>& nearby) const
 {
     if (_position.invalidated ||
         _remaining(_position.observation.monotonicTimestampUs) == std::chrono::microseconds::zero()) {
         return std::nullopt;
     }
-    return _position.observation.projected(use);
+    return _position.observation.projected(use, nearby);
 }
 
 std::chrono::microseconds GPSSourceHealth::_remaining(quint64 timestampUs) const

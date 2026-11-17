@@ -129,9 +129,8 @@ Once it has a position, the caster works out corrections for it before it sends 
 
 The report carries the selected position's height above mean sea level and the geoid separation that goes with it.
 When the position comes with its height above the WGS84 ellipsoid as well, the separation is the receiver's own, the difference between the two heights. The GNSS receiver's position usually has both, and so has the vehicle GPS position when the vehicle reports the ellipsoid height (`alt_ellipsoid` in `GPS_RAW_INT`), as PX4 and ArduPilot do for most receivers.
-Otherwise the separation comes from the EGM96 geoid model built into QGroundControl.
-A height above the WGS84 ellipsoid alone, as the position of an Android device or of a base station has, is converted with that model.
-A height of unknown reference, as the position of a Linux device has, is reported as it is, and a position without a height is reported with height 0, both without a geoid separation. A caster places the rover by its latitude and longitude.
+A position with one height only is reported with that height and without a geoid separation: the altitude of a macOS, iOS or Windows device, the height above the WGS84 ellipsoid of an Android device or of a base station, or a height of unknown reference, as the position of a Linux device has.
+A position without a height is reported with height 0. A caster places the rover by its latitude and longitude.
 
 ## UDP RTCM Input
 
