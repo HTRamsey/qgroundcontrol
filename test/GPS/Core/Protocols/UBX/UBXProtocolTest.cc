@@ -1921,9 +1921,8 @@ void ubloxCorrectionConstellations(GPSTestClock& clock)
                 QVERIFY2(rate(output.msm7Key, output.msm7) == (scenario.compact ? 0 : sent), what.constData());
                 QVERIFY2(rate(output.msm4Key, output.msm4) == (scenario.compact ? sent : 0), what.constData());
             }
-            QVERIFY2(
-                rate(Cfg::MSGOUT_RTCM_3X_TYPE1230, Msg::RTCM3_1230) == scenario.sent.testFlag(Constellation::GLONASS),
-                scenario.name);
+            const unsigned glonassSent = scenario.sent.testFlag(Constellation::GLONASS);
+            QVERIFY2(rate(Cfg::MSGOUT_RTCM_3X_TYPE1230, Msg::RTCM3_1230) == glonassSent, scenario.name);
             QVERIFY2(rate(Cfg::MSGOUT_RTCM_3X_TYPE1005, Msg::RTCM3_1005) > 0, scenario.name);
             QVERIFY2(f.log.warnings().isEmpty(), scenario.name);
         }
