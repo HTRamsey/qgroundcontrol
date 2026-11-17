@@ -218,19 +218,20 @@ dialogue fixture fails:
 
 ## Hardware qualification
 
-Which receivers the runner has configured and observed. **No run is recorded for any family.**
+Which receivers the runner has configured and observed. **A run is recorded for `ublox` and
+`passive` alone.**
 
 | Family (`--family`) | Receiver and firmware | Connection | Action, base mode | Date, QGC commit | Outcome | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| `ublox` | No run recorded | | | | | |
+| `ublox` | ZED-F9P, HPG 1.13 (protocol 27.12) | USB | `suite` and `configure`, also with `--family automatic`: survey-in with MSM7 and with `--compact-rtcm`, fixed; `cancel` | 2026-11-17, a94d8af6f2 | `inconclusive`, no failed check. The antenna had a poor view of the sky: only a survey of 10 s within 100 m completed, and a fixed position 300 m off failed `fixed_base_position`, as it should | Kept by @HTRamsey with the recordings, unpublished: they hold the base position |
 | `trimble` | No run recorded | | | | | |
 | `septentrio` | No run recorded | | | | | |
 | `femto` | No run recorded | | | | | |
 | `unicore` | No run recorded | | | | | |
 | `quectel` | No run recorded | | | | | |
-| `passive` | No run recorded | | | | | |
+| `passive` | The output of the same ZED-F9P: NMEA and UBX | USB | `configure`, passive | 2026-11-17, a94d8af6f2 | `inconclusive`, no failed check; nothing written | As above |
 
-What the tests use instead is not a run against a receiver:
+What the tests use for the other families, and beside those runs, is not a run against a receiver:
 
 - The drivers configure receiver models (`../Support`). The runner's own test and the simulator's
   suite use the u-blox model with the identities of a ZED-F9P (HPG 1.32) and a NEO-M8P-2
@@ -256,6 +257,12 @@ evidence file, the outcome from `outcome` and the failed checks, and says where 
 and the recordings are kept. The runner reports `inconclusive` rather than `passed` for what it
 cannot prove, such as a fresh survey; copy that. A run against a receiver model, the simulator or
 a replay is not a row.
+
+A fixed base (`--base-mode fixed`) has the check `fixed_base_position`: how far the position it
+was given lies from the one the receiver found itself, for the families that compare the two. More
+than 50 m apart fails the stage, and a receiver without a position of its own leaves the check
+`inconclusive`. The deadline of such a stage is 30 seconds longer, the time a u-blox receiver is
+waited for.
 
 `--family automatic` runs the session QGroundControl runs with **Detect automatically**: the
 driver finds the receiver family and then configures it. Each stage reports what it found as
