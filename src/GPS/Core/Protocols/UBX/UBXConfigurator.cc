@@ -318,7 +318,11 @@ bool Protocol::_disableTimeMode(GPSCommandChannel& channel)
 
 bool Protocol::_restartNavigation(GPSCommandChannel& channel)
 {
-    return _send(channel, Msg::CFG_RST, Plan::GNSS_HOT_START, {"UBX-CFG-RST GNSS hot start", Plan::CONFIG_TIMEOUT});
+    if (!_send(channel, Msg::CFG_RST, Plan::GNSS_HOT_START, {"UBX-CFG-RST GNSS hot start", Plan::CONFIG_TIMEOUT})) {
+        return false;
+    }
+    (void) channel.receiveUntil([] { return false; }, Plan::GNSS_RESTART_SETTLE);
+    return !channel.failed();
 }
 
 bool Protocol::_waitForSurveyStop(GPSCommandChannel& channel)
@@ -359,11 +363,7 @@ GPSFixedBaseCheck Protocol::_checkFixedBase(GPSCommandChannel& channel, const GP
             return UNCHECKED;
         }
     }
-    // _ownPositionWanted is still unset: what the receiver sent before the restart took effect is not kept.
-    (void) channel.receiveUntil([] { return false; }, Plan::GNSS_RESTART_SETTLE);
-    if (channel.failed()) {
-        return UNCHECKED;
-    }
+    // _ownPositionWanted was unset until here: what the receiver sent before the restart took effect is not kept.
     channel.beginCommand(
         {.command = "UBX-NAV-PVT own position", .timeout = GPSFixedBaseCheck::WAIT, .required = false});
     _ownPosition.reset();

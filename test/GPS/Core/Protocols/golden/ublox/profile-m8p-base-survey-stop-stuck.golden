@@ -1,6 +1,6 @@
 about M8P whose earlier survey never stops
 request type=ublox role=rtk-base mode=survey-in accuracy=2.0000m duration=180s compact=0 persistent=0 baud=0
-configure configured=0 baud=115200->115200 failure=protocol ready=0 elapsed=3020ms
+configure configured=0 baud=115200->115200 failure=protocol ready=0 elapsed=3520ms
   identity "NEO-M8P-2 HPG 1.40"
   error "u-blox receiver did not acknowledge 'UBX-NAV-SVIN stopped'"
   baud 115200 configured

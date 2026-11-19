@@ -1,6 +1,6 @@
 about u-blox sending UBX at 19200, which u-blox configuration does not probe, is configured from that rate
 request type=automatic role=rtk-base mode=survey-in accuracy=1.2500m duration=60s compact=0 persistent=0 baud=0
-configure configured=1 baud=0->115200 failure=none ready=1 elapsed=40620ms
+configure configured=1 baud=0->115200 failure=none ready=1 elapsed=41120ms
   identity "ZED-F9P HPG 1.32"
   detected type=ublox baud=19200 evidence="UBX frames"
   baud 115200 configured

@@ -1,6 +1,6 @@
 about M8P left surveying by an earlier session
 request type=ublox role=rtk-base mode=survey-in accuracy=2.0000m duration=180s compact=0 persistent=0 baud=0
-configure configured=1 baud=115200->115200 failure=none ready=1 elapsed=20ms
+configure configured=1 baud=115200->115200 failure=none ready=1 elapsed=520ms
   identity "NEO-M8P-2 HPG 1.40"
   baud 115200 configured
   write "UBX-MON-VER" 8 acknowledged required

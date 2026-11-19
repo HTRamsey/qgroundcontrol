@@ -446,6 +446,7 @@ bool UBXReceiverModel::_handleFrame(ScriptedReceiver& receiver, const QByteArray
     if (gnssHotStart) {
         // Not acknowledged. The receiver finds itself anew, as after it left time mode.
         gnssRestarts.push_back(timeMode);
+        _gnssRestartedAtUs = _clock->nowUs();
         heldPosition.reset();
         if (ownPosition && timeMode == 0) {
             _ownPositionDueUs =
@@ -632,6 +633,7 @@ bool UBXReceiverModel::_handleValset(ScriptedReceiver& receiver, uint16_t messag
         if (mode->second == 1) {
             ++starts;
             startedAt = _clock->nowUs();
+            _surveyEnabled();
             startSettings = settings;
             reject = reject || rejectStart;
         }
@@ -723,11 +725,22 @@ bool UBXReceiverModel::_handleLegacyFrame(ScriptedReceiver& receiver, uint16_t m
             if (!reject) {
                 timeMode = mode;
             }
+            if (mode == 1) {
+                _surveyEnabled();
+            }
             _queueAck(receiver, id, !reject);
             return true;
         }
         default:
             return _refuse(receiver, message);
+    }
+}
+
+void UBXReceiverModel::_surveyEnabled()
+{
+    const auto delay = static_cast<uint64_t>(std::chrono::microseconds(GNSS_RESTART_DELAY).count());
+    if (_gnssRestartedAtUs && _clock->nowUs() - *_gnssRestartedAtUs < delay) {
+        ++carriedOverSurveys;
     }
 }
 

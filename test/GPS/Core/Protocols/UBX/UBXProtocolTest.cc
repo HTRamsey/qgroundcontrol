@@ -173,6 +173,8 @@ struct Fixture
         // The navigation is restarted once, outside time mode: a survey would otherwise average the position an
         // earlier time mode held.
         QCOMPARE(receiver.model.gnssRestarts, std::vector<unsigned>({0}));
+        // The survey is enabled once that restart has taken effect: sooner, the receiver goes on with the old one.
+        QCOMPARE(receiver.model.carriedOverSurveys, 0u);
         QCOMPARE(receiver.model.surveyPolls, expectedSurveyPolls);
         QCOMPARE(receiver.model.starts, 1);
         QCOMPARE(receiver.model.startSettings.at(Cfg::TMODE_SVIN_MIN_DUR.id), 60);
@@ -190,8 +192,10 @@ struct Fixture
         QCOMPARE(receiver.model.modes, std::vector<uint32_t>({0}));
         QCOMPARE(receiver.model.starts, 0);
         QVERIFY(receiver.model.surveyPolls > 1 && receiver.model.surveyPolls <= 31);
-        QCOMPARE_GE(receiver.clock.nowUs() - receiver.model.disabledAt, 3000000);
-        QVERIFY(receiver.clock.nowUs() - receiver.model.disabledAt < 3300000);
+        // The three seconds the survey has to stop in follow the restart that settles after time mode is left.
+        const auto waited = std::chrono::microseconds(receiver.clock.nowUs() - receiver.model.disabledAt);
+        QCOMPARE_GE(waited, UBX::Plan::GNSS_RESTART_SETTLE + UBX::Plan::SURVEY_STOP_TIMEOUT);
+        QCOMPARE_LT(waited, UBX::Plan::GNSS_RESTART_SETTLE + UBX::Plan::SURVEY_STOP_TIMEOUT + 300ms);
         QCOMPARE(receiver.log.count<GPSBaseStatus>(), 0);
         QCOMPARE(receiver.model.rtcmEnables, 0);
     }

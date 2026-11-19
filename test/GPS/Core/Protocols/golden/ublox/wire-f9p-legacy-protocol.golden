@@ -1,6 +1,6 @@
 about ZED-F9P hardware reporting PROTVER 20.30
 request type=ublox role=rtk-base mode=survey-in accuracy=1.2500m duration=60s compact=0 persistent=0 baud=115200
-configure configured=1 baud=115200->115200 failure=none ready=1 elapsed=20ms
+configure configured=1 baud=115200->115200 failure=none ready=1 elapsed=520ms
   identity "ZED-F9P HPG 1.32"
   baud 115200 configured
   write "UBX-MON-VER" 8 acknowledged required

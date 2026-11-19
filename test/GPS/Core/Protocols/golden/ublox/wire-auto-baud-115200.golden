@@ -1,6 +1,6 @@
 about Detects a receiver already at 115200
 request type=ublox role=rtk-base mode=survey-in accuracy=1.0000m duration=60s compact=0 persistent=0 baud=0
-configure configured=1 baud=0->115200 failure=none ready=1 elapsed=6080ms
+configure configured=1 baud=0->115200 failure=none ready=1 elapsed=6580ms
   identity "ZED-F9P HPG 1.32"
   baud 38400 configured
   write "UBX-MON-VER" 8 timed-out required

@@ -217,6 +217,11 @@ public:
     int resetCommands = 0;
     /// The time mode in effect at each hot start of the GNSS alone.
     std::vector<unsigned> gnssRestarts;
+    /// How long a hot start of the GNSS takes to take effect. A survey enabled sooner is the earlier one carried on,
+    /// with its observations (a NEO-F9P, HPGL1L5 1.40: within 50 ms of the command, not from 60 ms).
+    static constexpr std::chrono::milliseconds GNSS_RESTART_DELAY{60};
+    /// The surveys enabled before a hot start had taken effect.
+    unsigned carriedOverSurveys = 0;
 
 private:
     struct Response
@@ -266,6 +271,8 @@ private:
     QByteArray _identityPayload();
     /// A NAV-PVT of ownPositionFix at ownPosition.
     QByteArray _ownPositionFrame() const;
+    /// Counts a survey that is enabled now as carried over when the last hot start has not taken effect yet.
+    void _surveyEnabled();
 
     GPSTestClock* _clock;
     ScriptedReceiver* _receiver = nullptr;
@@ -278,6 +285,7 @@ private:
     std::deque<DelayedResponse> _delayed;
     QByteArray _heldBaudAck;
     std::optional<uint64_t> _ownPositionDueUs;
+    std::optional<uint64_t> _gnssRestartedAtUs;
     /// The I/O ports a CFG-MSG holds a rate for.
     static constexpr qsizetype PORTS = 6;
     /// What a legacy receiver was last set to: each port of CFG-PRT, CFG-RATE, and the CFG-MSG rates on every port.
