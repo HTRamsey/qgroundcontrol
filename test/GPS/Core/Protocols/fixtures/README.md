@@ -224,6 +224,7 @@ Which receivers the runner has configured and observed. **A run is recorded for 
 | Family (`--family`) | Receiver and firmware | Connection | Action, base mode | Date, QGC commit | Outcome | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
 | `ublox` | ZED-F9P, HPG 1.13 (protocol 27.12) | USB | `suite` and `configure`, also with `--family automatic`: survey-in with MSM7 and with `--compact-rtcm`, fixed; `cancel` | 2026-11-17, a94d8af6f2 | `inconclusive`, no failed check. The antenna had a poor view of the sky: only a survey of 10 s within 100 m completed, and a fixed position 300 m off failed `fixed_base_position`, as it should | Kept by @HTRamsey with the recordings, unpublished: they hold the base position |
+| `ublox` | NEO-F9P, HPGL1L5 1.40 (protocol 27.40), in a Here 4 Base | USB | `suite`, `cancel` and `configure`, with `--family automatic`: survey-in, fixed with MSM7 and with `--compact-rtcm` | 2026-11-19, b5576ce94f | `inconclusive`, no failed check. The signals were weak (28 dB-Hz at the median), so no survey completed: one stood at 20 m after 330 s, against a limit of 2 m. The fixed position passed `fixed_base_position`, and the GPS corrections carried L1 and L5 | As above |
 | `trimble` | No run recorded | | | | | |
 | `septentrio` | No run recorded | | | | | |
 | `femto` | No run recorded | | | | | |
