@@ -242,6 +242,8 @@ The status is shown while a connection is open or being opened, below the settin
 It shows the receiver's fix and satellites, and any jamming or spoofing it reports.
 The status line of a base station, beside [Connect](#connect), says when the base sends no corrections.
 While a survey or the receiver's own averaging runs, it sends none until that completes.
+A u-blox survey that is still short of its **Survey-In accuracy** three minutes after its **Min observation time** says so, with what helps: a clearer view of the sky for the antenna, a higher limit, or a [fixed position](#base_station).
+With weak signals a survey can stay above its limit for hours.
 Otherwise the status reads _Waiting for a valid base position; the base sends no corrections until then_, as before the receiver confirms a fixed position or after it loses its position.
 [Corrections are sent](#base_station) once the base position is valid.
 A Septentrio base is the exception: its corrections do not wait for the base position, so its status does not say this.

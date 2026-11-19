@@ -38,6 +38,8 @@ private slots:
     void _statusTextFollowsState();
     void _statusTextSaysWhenNoCorrectionsAreSent_data();
     void _statusTextSaysWhenNoCorrectionsAreSent();
+    void _statusTextSaysWhenASurveyIsOverdue_data();
+    void _statusTextSaysWhenASurveyIsOverdue();
     void _udpPositionOnlyReceiver();
     void _passiveForwardingRegistersCorrections_data();
     void _passiveForwardingRegistersCorrections();

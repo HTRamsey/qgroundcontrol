@@ -339,6 +339,8 @@ private:
     std::optional<BaseModeDefinition::Mode> _activeBaseMode() const;
     /// What the connected configured base reports of its base position; Inactive for a passive receiver or without one.
     GPSBaseState _activeBaseState() const;
+    /// The survey of the connected base is well past its minimum time and has not reached the accuracy it ends on.
+    bool _surveyOverdue() const;
 
     void setConnectionError(const QString& message) override { _setError(message); }
 

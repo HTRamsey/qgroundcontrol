@@ -295,6 +295,11 @@ QString receiverStatus(const ReceiverStatus& status)
     }
     if (status.correctionsWithheld) {
         if (determining && status.baseMode == Mode::BaseSurveyIn) {
+            if (status.surveyOverdue) {
+                return GPSReceiver::tr(
+                    "Survey-In is still short of its accuracy limit; the base sends no corrections until it completes. "
+                    "Improve the antenna's view of the sky, raise the limit or use a fixed position.");
+            }
             return GPSReceiver::tr("Survey-In active; the base sends no corrections until it completes");
         }
         if (determining && status.baseMode == Mode::BaseReceiverAveraging) {

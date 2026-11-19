@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <optional>
 
 #include <QtCore/QString>
@@ -42,6 +43,10 @@ namespace GPSReceiverMessages {
 /// The name of a satellite constellation; "Other" for one the receiver does not identify.
 [[nodiscard]] QString constellationName(GPSConstellation constellation);
 
+/// How long past its minimum time a survey runs before its status says that it is still short of its accuracy limit,
+/// so that a survey about to complete does not say it.
+inline constexpr std::chrono::seconds SURVEY_OVERDUE_AFTER{180};
+
 /// What the receiver status sentence describes.
 struct ReceiverStatus
 {
@@ -61,6 +66,8 @@ struct ReceiverStatus
     bool correctionsWithheld = false;
     /// A fixed base waits for its receiver's own position, which the fixed one is checked against.
     bool awaitingOwnPosition = false;
+    /// A survey that ends on an accuracy limit is SURVEY_OVERDUE_AFTER past its minimum time and has not reached it.
+    bool surveyOverdue = false;
 };
 
 /// The receiver status sentence; empty when no receiver is connected or being connected.

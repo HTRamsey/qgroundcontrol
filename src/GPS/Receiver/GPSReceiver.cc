@@ -496,6 +496,20 @@ GPSBaseState GPSReceiver::_activeBaseState() const
     return _session ? _session->baseState() : GPSBaseState::Inactive;
 }
 
+bool GPSReceiver::_surveyOverdue() const
+{
+    const GPSReceiverPresentation presentation = activePresentation();
+    // A receiver that averages has no accuracy to reach, and one that filters its observations ends on their time.
+    if (!presentation.surveyAccuracy || presentation.observationAccuracyFilter) {
+        return false;
+    }
+    const double limit = _facts->targetAccuracy()->rawValue().toDouble();
+    const double minimum = _facts->targetDuration()->rawValue().toDouble();
+    const double overdue = minimum + static_cast<double>(GPSReceiverMessages::SURVEY_OVERDUE_AFTER.count());
+    return limit > 0 && minimum > 0 && _facts->currentAccuracy()->rawValue().toDouble() > limit &&
+           _facts->currentDuration()->rawValue().toDouble() >= overdue;
+}
+
 int GPSReceiver::activeBaseMode() const
 {
     const std::optional<BaseModeDefinition::Mode> mode = _activeBaseMode();
@@ -757,7 +771,8 @@ QString GPSReceiver::statusText() const
                                                 .baseMode = _activeBaseMode(),
                                                 .baseState = _activeBaseState(),
                                                 .correctionsWithheld = _session && _session->correctionsWithheld(),
-                                                .awaitingOwnPosition = fixedBaseCheck() == FixedBaseCheck::Waiting});
+                                                .awaitingOwnPosition = fixedBaseCheck() == FixedBaseCheck::Waiting,
+                                                .surveyOverdue = _surveyOverdue()});
 }
 
 QString GPSReceiver::summaryLabel() const

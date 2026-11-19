@@ -26,6 +26,7 @@
 #include "GPSReceiver.h"
 #include "GPSReceiverConnectionPolicy.h"
 #include "GPSReceiverFactGroup.h"
+#include "GPSReceiverMessages.h"
 #ifndef QGC_NO_SERIAL_LINK
 #include "GPSReceiverSystemSerialPorts.h"
 #endif
@@ -556,6 +557,55 @@ void GPSReceiverTest::_statusTextSaysWhenNoCorrectionsAreSent()
     for (const GPSBaseState state : states) {
         worker->baseStatus({.state = state});
     }
+    QCOMPARE(receiver.statusText(), text);
+    QCOMPARE(notified, text);
+}
+
+void GPSReceiverTest::_statusTextSaysWhenASurveyIsOverdue_data()
+{
+    QTest::addColumn<GPSType>("family");
+    // What the survey reports last, of the 180 s and 2 m that receiverConfiguration() asks for.
+    QTest::addColumn<int>("seconds");
+    QTest::addColumn<double>("accuracyMeters");
+    QTest::addColumn<bool>("overdue");
+    const int overdue = 180 + static_cast<int>(GPSReceiverMessages::SURVEY_OVERDUE_AFTER.count());
+    QTest::newRow("before-the-wait-ends") << GPSType::UBlox << overdue - 1 << 17. << false;
+    QTest::newRow("overdue") << GPSType::UBlox << overdue << 17. << true;
+    QTest::newRow("within-the-limit") << GPSType::UBlox << overdue << 2. << false;
+    // A Quectel survey ends on the time of the observations its limit accepts, not on an accuracy.
+    QTest::newRow("filters-its-observations") << GPSType::Quectel << overdue << 17. << false;
+}
+
+void GPSReceiverTest::_statusTextSaysWhenASurveyIsOverdue()
+{
+    QFETCH(GPSType, family);
+    QFETCH(int, seconds);
+    QFETCH(double, accuracyMeters);
+    QFETCH(bool, overdue);
+    ScriptedGPSReceiver harness;
+    GPSReceiver& receiver = harness.receiver;
+    auto configuration = receiverConfiguration(gpsReceiverManufacturerForType(family));
+    useTcp(configuration);
+    configuration.autoConnect = false;
+    receiver.setConfiguration(configuration);
+    // A Quectel base is not configured without it.
+    receiver.setPersistentChangesAllowed(true);
+    QVERIFY(receiver.connectReceiver());
+    ScriptedReceiverWorker* const worker = harness.workers.current();
+    QString notified;
+    QObject observer;
+    connect(&receiver, &GPSReceiver::statusTextChanged, &observer, [&] { notified = receiver.statusText(); });
+    worker->ready();
+    const QString surveying = GPSReceiver::tr("Survey-In active; the base sends no corrections until it completes");
+    worker->baseStatus({.state = GPSBaseState::Active, .meanAccuracyMeters = 17., .duration = 180s});
+    QCOMPARE(receiver.statusText(), surveying);
+    worker->baseStatus({.state = GPSBaseState::Active,
+                        .meanAccuracyMeters = accuracyMeters,
+                        .duration = std::chrono::seconds{seconds}});
+    const QString stillShort = GPSReceiver::tr(
+        "Survey-In is still short of its accuracy limit; the base sends no corrections until it completes. "
+        "Improve the antenna's view of the sky, raise the limit or use a fixed position.");
+    const QString text = overdue ? stillShort : surveying;
     QCOMPARE(receiver.statusText(), text);
     QCOMPARE(notified, text);
 }
